@@ -34,9 +34,20 @@ export const MONEY_ROLES = ['flow', 'total', 'balance', 'plain'];
 /**
  * Reiner Betrag ohne Rollenlogik. Nur benutzen, wenn wirklich kein Vorzeichen
  * und keine Farbe im Spiel sind (Achsenbeschriftung, Tooltip, CSV).
+ *
+ * `digits` wie bei amountPlaceholder: die Stellen, die der Server fuer diesen
+ * Betrag fuehrt, wenn sie nicht die des CLDR sind (#2810) - eine Umrechnung
+ * nach HUF traegt "3581.47", der CLDR zeigt HUF ohne Nachkommastellen. Ohne
+ * `digits` gelten die Stellen der Waehrung.
+ * @param {any} amount
+ * @param {any} currency  unbrauchbar oder leer: die Haushaltswaehrung (usableCurrency)
+ * @param {{ digits?: number | null }} [options]
  */
-export function formatMoney(amount, currency) {
-  return getNumberFormat({ style: 'currency', currency: usableCurrency(currency) }).format(Number(amount) || 0);
+export function formatMoney(amount, currency, { digits = null } = {}) {
+  const fixed = typeof digits === 'number' && Number.isInteger(digits) && digits >= 0
+    ? { minimumFractionDigits: digits, maximumFractionDigits: digits }
+    : {};
+  return getNumberFormat({ style: 'currency', currency: usableCurrency(currency), ...fixed }).format(Number(amount) || 0);
 }
 
 /*
@@ -155,9 +166,13 @@ export function roundToCurrency(amount, currency) {
  * kann das auch gar nicht leisten: das Dezimaltrennzeichen hängt an der Region
  * (getFormatLocale), nicht an der UI-Sprache, und die Nachkommastellen hängen an
  * der Währung - beides weiß eine Übersetzungsdatei nicht.
+ *
+ * @param {any} currency  unbrauchbar oder leer: die Haushaltswaehrung (usableCurrency)
+ * @param {{ digits?: number | null }} [options]  `digits` wie bei
+ *   amountInputProblem: die Stellen des Servers, wenn bekannt.
  */
-export function amountPlaceholder(currency) {
-  const digits = currencyFractionDigits(currency);
+export function amountPlaceholder(currency, { digits: fixed = null } = {}) {
+  const digits = typeof fixed === 'number' && Number.isInteger(fixed) && fixed >= 0 ? fixed : currencyFractionDigits(currency);
   return getNumberFormat({ minimumFractionDigits: digits, maximumFractionDigits: digits }).format(0);
 }
 
@@ -500,8 +515,16 @@ export function amountInputToCents(text, currency) {
  * unangetasteter Betrag neben dem Raster bleibt speicherbar, solange er nicht
  * MEHR Stellen trägt als vorher. Ein Währungswechsel hebt den Schutz auf
  * (`originalCurrency`): 12.50 EUR, auf JPY umgestellt, ist ein neuer Betrag.
+ *
+ * `digits` ersetzt die Stellen der Währung, wenn gesetzt: die Stellen, die der
+ * SERVER für diesen Betrag führt (exakte Anteile einer Umrechnung nach COP,
+ * HUF, IDR oder IRR, utils/split-conversion.js).
+ *
+ * @param {any} text
+ * @param {any} currency  unbrauchbar oder leer: die Haushaltswaehrung (usableCurrency)
+ * @param {{ original?: any, originalCurrency?: string | null, required?: boolean, sign?: string, decimalComma?: boolean, digits?: number | null }} [options]
  */
-export function amountInputProblem(text, currency, { original = null, originalCurrency = null, required = false, sign = 'positive', decimalComma = false } = {}) {
+export function amountInputProblem(text, currency, { original = null, originalCurrency = null, required = false, sign = 'positive', decimalComma = false, digits = null } = {}) {
   const raw = withAsciiMinus(text);
   // Leer ist Sache des Pflichtfelds - ausser der Aufrufer sagt, dass ein Betrag
   // da sein muss: `required` des Browsers nimmt ein Feld aus Leerzeichen an,
@@ -521,7 +544,8 @@ export function amountInputProblem(text, currency, { original = null, originalCu
     if (value < 0 || decimal.startsWith('-')) return 'invalid';
   } else if (!(value > 0)) return 'notPositive';
   const places = fractionLength(decimal);
-  if (places <= currencyFractionDigits(currency)) return null;
+  const allowed = typeof digits === 'number' && Number.isInteger(digits) && digits >= 0 ? digits : currencyFractionDigits(currency);
+  if (places <= allowed) return null;
   const untouched = original != null && Number(original) === value
     && (originalCurrency == null || originalCurrency === currency)
     && places <= fractionLength(String(original));

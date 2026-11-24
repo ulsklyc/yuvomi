@@ -1,4 +1,23 @@
-import { op, jsonBody } from '../helpers.js';
+import { op, withValidationRefusal } from '../helpers.js';
+
+// Typ und Form der WebDAV-Felder (#2810). Was die Seite als `errorCode`
+// uebersetzt - `password_required`, `url_invalid` (das Muster
+// `^https?://`) und `config_incomplete` -, prueft weiter die Route: die
+// Absage des Schemas traegt keinen `errorCode`.
+/** @param {string} description */
+const optionalText = (description) => ({ type: ['string', 'null'], description });
+const WEBDAV_URL = { type: ['string', 'null'], description: 'The server address, starting with `http://` or `https://` (checked by the route, `errorCode: url_invalid`); `null` or `""` removes it.' };
+const WEBDAV_ORDER_NOTE = 'A body outside the schema (a value that is not of its type) answers 400 with `reason: "validation"` and `fields`, without `errorCode`.';
+
+/**
+ * A JSON body that must be sent (`{}` sent on purpose counts as sent).
+ * @param {Record<string, unknown>} properties
+ */
+const body = (properties) => ({
+  required: true,
+  description: 'JSON request body. Fields the schema does not name are ignored.',
+  content: { 'application/json': { schema: { type: 'object', properties } } },
+});
 
 export function backupPaths() {
   return {
@@ -7,7 +26,10 @@ export function backupPaths() {
         summary: 'Get backup status',
         tag: 'Backup',
         admin: true,
-        description: '`database_key` (see DatabaseKeyStatus) says where the database key comes from, never its value; `GET /api/v1/backup/database-key` returns a generated one.',
+        description: '`database_key` (see DatabaseKeyStatus) says where the database key comes from, never its value; `GET /api/v1/backup/database-key` returns a generated one. '
+          + '`scheduler.lastBackup` is the last local run (`timestamp`, `success`, and on a failure `reason` and `error`), `scheduler.lastSuccess` the time of the last run that wrote a verified backup, `scheduler.nextRun` when the schedule fires next (`null` without a running schedule), `scheduler.timezone` the IANA zone the schedule runs in (`TZ`, otherwise `UTC`; `schedule` is wall-clock time there), and `scheduler.lastError` is `null` after a successful run and `{ timestamp, reason, message }` after a failed one. '
+          + '`reason` is always one of `backup_dir_not_writable`, `disk_full`, `backup_verify_failed`, `unknown`, and `message` (like `lastBackup.error`) is the fixed English sentence of that reason, never the text of the error - that is in the server log. A client shows its own sentence per `reason`. '
+          + 'The three values are stored in the database: they survive a restart, and a restore keeps the ones of this installation.',
       }),
     },
     '/api/v1/backup/database': {
@@ -87,9 +109,11 @@ export function backupPaths() {
     '/api/v1/backup/trigger': {
       post: op({
         summary: 'Run a manual local backup',
+        operationId: 'triggerLocalBackup',
         tag: 'Backup',
         admin: true,
         stateChanging: true,
+        description: 'Answers 200 also when the backup failed: `data.success` is `false` then, `data.reason` one of `backup_dir_not_writable`, `disk_full`, `backup_verify_failed`, `unknown` and `data.error` the fixed English sentence of that reason. The outcome is what `GET /api/v1/backup/status` shows as `scheduler.lastBackup` afterwards.',
       }),
     },
     '/api/v1/backup/webdav/config': {
@@ -99,24 +123,36 @@ export function backupPaths() {
         admin: true,
         description: 'Returns the scheduler WebDAV backup target status with the password masked/omitted.',
       }),
-      put: op({
+      put: withValidationRefusal(op({
         summary: 'Update WebDAV backup configuration',
         tag: 'Backup',
         admin: true,
-        description: 'An omitted or empty `password` (or the mask `****`) keeps the stored one, but only while the server (scheme, host and port) and the `username` stay the same. A different server or username without a new password is refused with 400 and `errorCode: password_required`, and nothing is saved. A different path on the same server needs no password.',
+        description: `An omitted or empty \`password\` (or the mask \`****\`) keeps the stored one, but only while the server (scheme, host and port) and the \`username\` stay the same. A different server or username without a new password is refused with 400 and \`errorCode: password_required\`, and nothing is saved. A different path on the same server needs no password. Every field left out stays as it is. ${WEBDAV_ORDER_NOTE}`,
         stateChanging: true,
-        requestBody: jsonBody(null),
-      }),
+        requestBody: body({
+          enabled: { type: 'boolean', description: 'Whether the scheduled backup also uploads to this server.' },
+          url: WEBDAV_URL,
+          username: optionalText('`null` or `""` removes it.'),
+          password: optionalText('A new password; left out, `null`, `""` or the mask `****` keeps the stored one.'),
+          remotePath: optionalText('The folder on the server; `null` or `""` means `/yuvomi/backups/`.'),
+          keep: { type: 'integer', minimum: 1, description: 'How many backups stay on the server, a whole number from 1.' },
+        }),
+      })),
     },
     '/api/v1/backup/webdav/test': {
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Test WebDAV backup connection',
         tag: 'Backup',
         admin: true,
-        description: 'Optional overrides `url`, `username`, `password`, `remotePath`; missing fields fall back to the stored configuration. An override with a different server (scheme, host and port) or username but no new password is refused with 400 and `errorCode: password_required` before any request is made, so the stored password never reaches a server it was not entered for. Missing `url`, `username` or `password` answers 400 with `errorCode: config_incomplete`. A refusal of the server answers 502 with `remote_auth_failed`, `remote_http_status`, `remote_unreachable` or `remote_failed` and the class in `detail` (`HTTP 401`, `ECONNREFUSED`), never the server\'s text. A failure on this server (the database, the local file, a filesystem error) answers 500 with `backup_local_failed`.',
+        description: 'Optional overrides `url`, `username`, `password`, `remotePath`; missing fields fall back to the stored configuration. An override with a different server (scheme, host and port) or username but no new password is refused with 400 and `errorCode: password_required` before any request is made, so the stored password never reaches a server it was not entered for. Missing `url`, `username` or `password` answers 400 with `errorCode: config_incomplete`. A refusal of the server answers 502 with `remote_auth_failed`, `remote_http_status`, `remote_unreachable` or `remote_failed` and the class in `detail` (`HTTP 401`, `ECONNREFUSED`), never the server\'s text. A failure on this server (the database, the local file, a filesystem error) answers 500 with `backup_local_failed`. ' + WEBDAV_ORDER_NOTE,
         stateChanging: true,
-        requestBody: jsonBody(null),
-      }),
+        requestBody: body({
+          url: WEBDAV_URL,
+          username: optionalText('Override of the stored username.'),
+          password: optionalText('Override of the stored password; the mask `****` counts as none.'),
+          remotePath: optionalText('Override of the stored folder.'),
+        }),
+      })),
     },
     '/api/v1/backup/webdav/files': {
       get: op({

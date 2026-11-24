@@ -1,4 +1,4 @@
-import { jsonBody, op } from '../helpers.js';
+import { idParam, jsonBody, op } from '../helpers.js';
 
 const apiError = (description) => ({
   description,
@@ -12,13 +12,14 @@ export function familyPaths() {
         summary: "Fetch a person's profile picture",
         tag: 'Family',
         params: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer', minimum: 1 }, description: 'User ID' },
+          // Bounded above only (#2810): `0` and a negative id stay the route's own answer.
+          idParam('id', 'User ID, plain decimal digits.'),
           {
             name: 'v',
             in: 'query',
             required: true,
             schema: { type: 'string', pattern: '^[0-9a-f]{32}$' },
-            description: 'The picture key, taken from the address in a list row. Without the matching key the answer is `404`.',
+            description: 'The picture key, taken from the address in a list row: 32 lowercase hex characters, given once. Missing or of another shape it answers `400`; a well-formed key that does not match answers `404`.',
           },
         ],
         description: 'The image bytes of a profile picture (PNG, JPEG or WebP). List rows that show a person - '
@@ -32,7 +33,8 @@ export function familyPaths() {
           + 'carries `Cache-Control: private, no-cache` and an `ETag` derived from the picture key, so a client revalidates on every use '
           + '(through authentication and the access checks, also after a sign-out in the same browser) and `If-None-Match` answers `304`. '
           + 'Errors stay `no-store`. '
-          + 'Without the matching key the answer is `404`, the same as for a person without a picture.',
+          + 'A missing or malformed key (`v` not 32 lowercase hex characters, or given twice) answers `400` with `fields`, before any row is read, so it tells nothing about the person. '
+          + 'A well-formed key that does not match answers `404`, the same as for a person without a picture.',
         responses: {
           200: {
             description: 'The picture',
@@ -43,7 +45,7 @@ export function familyPaths() {
             },
           },
           304: { description: 'Unchanged since the given ETag; no image bytes' },
-          400: apiError('Invalid person ID'),
+          400: apiError('The person ID is not plain decimal digits, or `v` is missing or not 32 lowercase hex characters (`fields` names it, `reason: \'validation\'`)'),
           401: { $ref: '#/components/responses/Unauthorized' },
           403: apiError('Split-expense guest'),
           404: apiError('No picture for this person, or the key in `v` does not match'),
@@ -79,13 +81,14 @@ export function familyPaths() {
           + 'An account that is not a household member (housekeeping staff, a split-expense guest, a wall display, a deactivated account) has no position and is refused. '
           + 'A member created later has no position and sorts after the placed ones by display name until the order is set again. '
           + 'Refusals carry a stable `reason`: 403 `admin_required`; 400 `invalid_order` (not a non-empty array of positive integers), `duplicate_member`, `not_a_household_member`, `incomplete_order` (a household member is missing). Nothing is written on a refusal. '
+          + 'The admin check comes first: a member gets the 403 for any body. `invalid_order` and `duplicate_member` come from the request schema and carry `fields` naming the place (`body/order/1`); `not_a_household_member` and `incomplete_order` read the database and carry none. '
           + 'Returns the member list in the new order, in the shape of `GET /api/v1/family/members`.',
         responses: {
           200: {
             description: 'Members in the new order',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/FamilyMembersResponse' } } },
           },
-          400: apiError('The order is not a complete list of the household members'),
+          400: apiError('The order is not a complete list of the household members. A refusal of the request schema (`invalid_order`, `duplicate_member`) carries `fields`.'),
           401: { $ref: '#/components/responses/Unauthorized' },
           403: apiError('Only administrators can change the member order'),
           500: { $ref: '#/components/responses/InternalServerError' },

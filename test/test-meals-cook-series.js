@@ -27,7 +27,7 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 globalThis.HTMLElement = globalThis.HTMLElement ?? class {};
 globalThis.customElements = globalThis.customElements ?? { define() {}, get() {} };
@@ -43,7 +43,6 @@ globalThis.document.documentElement.classList = globalThis.document.documentElem
   ?? { add() {}, remove() {}, toggle() {}, contains: () => false };
 
 const dbmod = await import('../server/db.js');
-const { default: mealsRouter } = await import('../server/routes/meals.js');
 const { default: familyRouter } = await import('../server/routes/family.js');
 const { addDays } = await import('../server/services/meal-recurrence.js');
 const { removeUser } = await import('../server/services/user-removal.js');
@@ -74,22 +73,25 @@ const ANNA = addUser('Anna');
 const BEN = addUser('Ben');
 const CARLA = addUser('Carla');
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = ADMIN;
-  req.authRole = 'admin';
-  req.session = { userId: ADMIN, role: 'admin' };
-  next();
+// Both routers at their real prefix: validateRequest() reads the operation
+// from the mount (#2810). The cases speak the paths of public/api.js
+// (`/meals/...`); `call()` puts `/api/v1` in front.
+const app = await createContactsMealsApp({
+  mount: ['meals'],
+  auth: (req, _res, next) => {
+    req.authUserId = ADMIN;
+    req.authRole = 'admin';
+    req.session = { userId: ADMIN, role: 'admin' };
+    next();
+  },
+  after: [['/api/v1/family', familyRouter]],
 });
-app.use('/family', familyRouter);
-app.use('/meals', mealsRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}${path.startsWith('/api/') ? '' : '/api/v1'}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -145,7 +147,7 @@ async function dialog(s, index) {
   const week = await weekOf(s, index);
   const meal = week.find((m) => m.id === s.ids[index]);
   Object.assign(meals.state, {
-    members: (await call('GET', '/family/members')).body.data,
+    members: (await call('GET', '/api/v1/family/members')).body.data,
     meals: week, currentWeek: s.start, recipes: [], lists: [], categories: [], loadError: null, modal: null,
   });
   meals.setContainerForTest({ querySelector: () => null, querySelectorAll: () => [] });
@@ -224,6 +226,8 @@ async function dialog(s, index) {
       for (const fn of handler.umfang) fn({ target: felder['#modal-edit-scope'] });
     },
     titel: (wert) => { felder['#modal-title'].value = wert; },
+    /** Ein Rezept im <select> waehlen: sein Wert ist Text, wie im Browser. */
+    rezept: (/** @type {string} */ wert) => { felder['#modal-recipe-id'].value = wert; },
     /** Speichern-Knopf: der Body geht an den ECHTEN Router; zurueck kommt, was gesendet wurde. */
     speichern: async () => {
       const gesendet = [];
@@ -432,7 +436,7 @@ test('Koch der Vorlage nicht waehlbar: der Wechsel auf "ganze Serie" laesst die 
 test('leere Mitgliederliste: der Dialog laedt sie beim Oeffnen nach und reicht die Auswahl nach', async () => {
   const s = await serie(ANNA);
   const meal = (await weekOf(s, 0)).find((m) => m.id === s.ids[0]);
-  const mitglieder = (await call('GET', '/family/members')).body.data;
+  const mitglieder = (await call('GET', '/api/v1/family/members')).body.data;
   const abrufe = [];
   globalThis.__apiStub = { get: async (path) => { abrufe.push(path); return { data: mitglieder }; } };
 
@@ -474,4 +478,31 @@ test('leere Mitgliederliste: der Dialog laedt sie beim Oeffnen nach und reicht d
   } finally {
     globalThis.__apiStub = undefined;
   }
+});
+
+// #2810: das <select> des Rezepts liefert Text. Der Dialog schickt die ID als
+// Zahl - Ziffern-Text nimmt der Server nur noch als Altform an - und der
+// ECHTE Router nimmt den Rumpf, im Einzel- wie im Serien-Umfang.
+test('der Dialog schickt die Rezept-ID als Zahl, und der Router nimmt sie', async () => {
+  const rezept = Number(db.prepare("INSERT INTO recipes (title, created_by) VALUES ('Suppe', ?)").run(ADMIN).lastInsertRowid);
+  const s = await serie(ANNA);
+
+  const d = await dialog(s, 1);
+  d.rezept(String(rezept));
+  const einzeln = await d.speichern();
+  assert.equal(einzeln.path, `/meals/${s.ids[1]}`);
+  assert.equal(einzeln.body.recipe_id, rezept, 'als Zahl, nicht als Text');
+  assert.equal(einzeln.status, 200);
+
+  const e = await dialog(s, 2);
+  e.umfang('series');
+  e.rezept(String(rezept));
+  const serienweit = await e.speichern();
+  assert.equal(serienweit.path, `/meals/${s.ids[2]}?scope=series`);
+  assert.equal(serienweit.body.recipe_id, rezept);
+  assert.equal(serienweit.status, 200);
+
+  // Ohne Wahl bleibt es null.
+  const f = await dialog(s, 0);
+  assert.equal((await f.speichern()).body.recipe_id, null);
 });

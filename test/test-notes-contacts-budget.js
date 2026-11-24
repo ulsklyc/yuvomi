@@ -1,7 +1,7 @@
 /**
  * Modul: Notes / Contacts / Budget - Tests
  * Zweck: Validiert CRUD, Constraints, Filterabfragen, Aggregation für alle drei Module
- * Ausführen: node --experimental-sqlite test-notes-contacts-budget.js
+ * Ausführen: node test-notes-contacts-budget.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

@@ -321,7 +321,8 @@ function openIcsEditModal(container, sub, subs, user) {
         const errEl = panel.querySelector('#ics-edit-error');
         const name = panel.querySelector('#ics-edit-name').value.trim();
         const color = panel.querySelector('#ics-edit-color').value;
-        const shared = panel.querySelector('#ics-edit-shared').checked ? 1 : 0;
+        // A boolean, as the document types it (#2810): 0/1 is a 400 since then.
+        const shared = panel.querySelector('#ics-edit-shared').checked;
         const assignee = assigneePatch(panel.querySelector('#ics-edit-assignee'), storedAssignees);
         errEl.hidden = true;
         // Geschlossen wird nur dieser Dialog, nicht einer, der waehrend der
@@ -379,7 +380,7 @@ function bindIcsEvents(container, subs, user) {
     const url = container.querySelector('#ics-url').value.trim();
     const name = container.querySelector('#ics-name').value.trim();
     const color = container.querySelector('#ics-color').value;
-    const shared = container.querySelector('#ics-shared').checked ? 1 : 0;
+    const shared = container.querySelector('#ics-shared').checked;
     const default_assignee_user_ids = assigneeIdsOf(container.querySelector('#ics-assignee'));
 
     submitBtn.disabled = true;

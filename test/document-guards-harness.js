@@ -46,6 +46,7 @@ import puppeteer from 'puppeteer';
 import { launchBrowser } from '../scripts/lib/chrome-executable.js';
 import { SETTINGS_LEAVES } from '../public/settings/registry.js';
 import { tempDir } from './tmp-dir.js';
+import { layoutOf } from '../server/utils/frontend-dir.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -222,6 +223,11 @@ function startServer(dbPath, port) {
       RATE_LIMIT_MAX_ATTEMPTS: '1000',
       // Hintergrundarbeit aus dem Messfenster halten.
       DISABLE_BACKUP_SCHEDULER: '1',
+      // Die Browser-Suiten laufen gegen die Testanordnung (npm run
+      // build:browser-tests); der Server liefert sie nur auf ausdruecklichen
+      // Wunsch (server/utils/frontend-dir.js). Die Smoke-Suite des
+      // ausgelieferten Builds (test:built-app-browser) laeuft gegen das Buendel.
+      YUVOMI_BUILD_LAYOUT: layoutOf(join(REPO, 'dist')) === 'modules' ? 'modules' : '',
     },
     stdio: 'ignore',
   });
@@ -618,63 +624,9 @@ export async function gotoAnonRoute(page, path) {
   await wait(400);
 }
 
-/**
- * Farb-Parser fuer BEIDE Notationen, die Chromium liefert.
- *
- * FALLE, die das Architektur-Audit selbst getroffen hat: `color-mix()` rendert
- * als `color(srgb 0.4 0.2 0.8 / 0.16)`, nicht als `rgba()`. Ein naiver
- * rgba-Parser meldet daraufhin Fehltreffer - im ersten Auditlauf zwei falsche
- * AA-Befunde. Wer hier etwas ergaenzt, ergaenzt beide Notationen.
- *
- * @returns {[number, number, number, number]} r,g,b in 0..255, alpha 0..1
- */
-export function parseColor(value) {
-  if (!value) return [0, 0, 0, 0];
-  const srgbMatch = value.match(/^color\(srgb\s+([^)]+)\)$/i);
-  if (srgbMatch) {
-    const parts = srgbMatch[1].split('/');
-    const rgb = parts[0].trim().split(/\s+/).map(Number);
-    const alpha = parts[1] === undefined ? 1 : parseFloat(parts[1]);
-    return [rgb[0] * 255, rgb[1] * 255, rgb[2] * 255, Number.isFinite(alpha) ? alpha : 1];
-  }
-  const rgbMatch = value.match(/^rgba?\(([^)]+)\)$/i);
-  if (rgbMatch) {
-    const parts = rgbMatch[1].split(/[,\s/]+/).filter(Boolean).map(Number);
-    return [parts[0], parts[1], parts[2], parts[3] === undefined ? 1 : parts[3]];
-  }
-  if (value === 'transparent') return [0, 0, 0, 0];
-  return [0, 0, 0, 1];
-}
-
-const channel = (c) => {
-  const v = c / 255;
-  return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-};
-
-export function luminance([r, g, b]) {
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-}
-
-export function contrastRatio(fg, bg) {
-  const l1 = luminance(fg);
-  const l2 = luminance(bg);
-  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-}
-
-/** Alpha-Komposition eines Vordergrunds auf einen deckenden Untergrund. */
-export function composite([r, g, b, a], base) {
-  if (a >= 1) return [r, g, b];
-  return [
-    r * a + base[0] * (1 - a),
-    g * a + base[1] * (1 - a),
-    b * a + base[2] * (1 - a),
-  ];
-}
-
-export function toHex([r, g, b]) {
-  const h = (v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0');
-  return `#${h(r)}${h(g)}${h(b)}`.toUpperCase();
-}
+// Die Farbrechnung (Parser, Komposition, Kontrast) wohnt browserfrei in
+// text-contrast.js, damit `npm test` sie pruefen kann; hier nur weitergereicht.
+export { parseColor, luminance, contrastRatio, composite, toHex } from './text-contrast.js';
 
 // --------------------------------------------------------
 // Totzeit frisch geoeffneter Dialoge (#1284)

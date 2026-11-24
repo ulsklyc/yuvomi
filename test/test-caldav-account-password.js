@@ -12,7 +12,7 @@
  *        ein lokaler HTTP-Server spielt den fremden Host und schneidet jeden
  *        Authorization-Header mit: gemessen wird, was dort ankam und was in
  *        der Tabelle steht, nicht nur der Statuscode.
- * Ausfuehren: node --experimental-sqlite --test test/test-caldav-account-password.js
+ * Ausfuehren: node --test test/test-caldav-account-password.js
  */
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';

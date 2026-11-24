@@ -31,10 +31,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: mealsRouter } = await import('../server/routes/meals.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { addDays } = await import('../server/services/meal-recurrence.js');
 const { todayKey } = await import('../server/utils/timezone.js');
@@ -74,22 +73,26 @@ db.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').r
 const NON_MEMBERS = { Hauspersonal: CLARA, 'Geteilte-Ausgaben-Gast': DORA, Wandtablett: WAND };
 
 let actor = ANNA;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor;
-  req.authRole = actor === ANNA ? 'admin' : 'member';
-  req.session = { userId: actor, role: req.authRole };
-  next();
+// Am echten Praefix samt Fehlerhandler (#2810): validateRequest() findet die
+// Operation ueber `req.baseUrl`. Die Pfade der Faelle bleiben relativ zum
+// Essensplan, `call()` setzt das Praefix davor.
+const app = await createContactsMealsApp({
+  mount: ['meals'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor;
+    req.authRole = actor === ANNA ? 'admin' : 'member';
+    req.session = { userId: actor, role: req.authRole };
+    next();
+  },
+  after: [['/api/v1/dashboard', dashboardRouter]],
 });
-app.use('/dashboard', dashboardRouter);
-app.use('/', mealsRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const prefix = path.startsWith('/dashboard') ? '/api/v1' : '/api/v1/meals';
+  const res = await fetch(`${baseUrl}${prefix}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -412,6 +415,17 @@ test('gespeicherter Koch einer Serie: scope=series nimmt den Koch der VORLAGE we
   assert.equal(fremd.status, 400, 'wer nirgends steht, ist erst recht eine neue Wahl');
 });
 
+/**
+ * Eine Absage an der Form des Kochs: seit #2810 die Pruefung gegen das Schema
+ * vor der Route (fester Satz, Feld `body/cook_user_id`); was das Schema als
+ * Ziffernfolge durchlaesst, aber keine sichere ganze Zahl ist
+ * (`"9007199254740993"`), weist `cookField()` mit seinem Satz ab.
+ * @param {any} body
+ */
+const cookFormRefused = (body) => (body?.reason === 'validation' && body.fields?.some((/** @type {any} */ f) => f.path.startsWith('body/cook_user_id')
+  || f.path.startsWith('body/assignments/0/cook_user_id')))
+  || /Koch muss die ID eines Haushaltsmitglieds sein/.test(body?.error ?? '');
+
 test('ungueltige und unbekannte Angaben: 400 statt Fremdschluessel-Fehler, nichts geschrieben', async () => {
   const meal = (await createMeal({ date: '2035-02-05', cook_user_id: BEN })).body.data;
   const before = db.prepare('SELECT COUNT(*) AS c FROM meals').get().c;
@@ -420,11 +434,12 @@ test('ungueltige und unbekannte Angaben: 400 statt Fremdschluessel-Fehler, nicht
     const angelegt = await createMeal({ date: '2035-02-06', cook_user_id: wert });
     assert.equal(angelegt.status, 400, `POST mit ${JSON.stringify(wert)}`);
     // Die Meldung nennt die FORM, nicht "nicht gefunden": eine Liste oder ein
-    // Bruch ist keine unbekannte Person, sondern keine id.
-    assert.match(angelegt.body.error, /Koch muss die ID eines Haushaltsmitglieds sein/, `POST mit ${JSON.stringify(wert)}`);
+    // Bruch ist keine unbekannte Person, sondern keine id. Seit #2810 sagt es
+    // das Schema vor der Route, mit dem Feld.
+    assert.ok(cookFormRefused(angelegt.body), `POST mit ${JSON.stringify(wert)}: ${JSON.stringify(angelegt.body)}`);
     const geaendert = await call('PUT', `/${meal.id}`, { cook_user_id: wert });
     assert.equal(geaendert.status, 400, `PUT mit ${JSON.stringify(wert)}`);
-    assert.match(geaendert.body.error, /Koch muss die ID eines Haushaltsmitglieds sein/, `PUT mit ${JSON.stringify(wert)}`);
+    assert.ok(cookFormRefused(geaendert.body), `PUT mit ${JSON.stringify(wert)}: ${JSON.stringify(geaendert.body)}`);
   }
   const unbekannt = await createMeal({ date: '2035-02-06', cook_user_id: 999999 });
   assert.equal(unbekannt.status, 400);
@@ -479,7 +494,7 @@ test('cookField: nur eine positive ganze Zahl oder null - nichts, was erst `Numb
     assert.deepEqual(feld(wert), { given: true, value: null, error: 'Koch muss die ID eines Haushaltsmitglieds sein.' }, `cookField(${name})`);
     const angelegt = await createMeal({ date: '2035-04-03', cook_user_id: wert });
     assert.equal(angelegt.status, 400, `POST mit ${name}`);
-    assert.match(angelegt.body.error, /Koch muss die ID eines Haushaltsmitglieds sein/, `POST mit ${name}`);
+    assert.ok(cookFormRefused(angelegt.body), `POST mit ${name}: ${JSON.stringify(angelegt.body)}`);
     assert.equal((await call('PUT', `/${meal.id}`, { cook_user_id: wert })).status, 400, `PUT mit ${name}`);
     assert.equal((await call('POST', '/apply-plan', { assignments: [{ date: '2035-04-03', meal_type: 'lunch', title: 'X', cook_user_id: wert }] })).status,
       400, `apply-plan mit ${name}`);
@@ -657,7 +672,7 @@ test('das Bild des Kochs haengt an keiner Mahlzeit: eine volle Woche wiegt nicht
   assert.equal(angelegt.status, 201);
   assert.equal(angelegt.body.data.length, 21);
 
-  const res = await fetch(`${baseUrl}/?week=${montag}`);
+  const res = await fetch(`${baseUrl}/api/v1/meals/?week=${montag}`);
   const text = await res.text();
   // Die Serien der Tests darueber laufen ohne Ende und stehen auch in dieser
   // Woche; gemessen werden die 21 Mahlzeiten dieses Kochs, gewogen wird alles.

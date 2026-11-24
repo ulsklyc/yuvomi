@@ -14,7 +14,7 @@
  *          - WebDAV-Ziele sind ein IN-PROCESS Loopback-Stub (kein externes Netz),
  *            der PROPFIND->207 / PUT->201 beantwortet; die Fehlerpfade (unkonfiguriert)
  *            decken die catch-Zweige ohne Netz ab.
- * Ausführen: node --experimental-sqlite --test test/test-backup-routes.js
+ * Ausführen: node --test test/test-backup-routes.js
  */
 
 import os from 'node:os';
@@ -47,6 +47,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: backupRouter } = await import('../server/routes/backup.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const database = () => dbmod.get(); // frisch lesen: restore re-initialisiert das Singleton
 
 // ── Loopback-WebDAV-Stub (in-process, kein externes Netz) ───────────────────────
@@ -89,9 +91,12 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', backupRouter);
+app.use(defaultEmptyBody);
+// Der echte Praefix: validateRequest() liest die Operation aus `req.baseUrl` (#2810).
+app.use('/api/v1/backup', backupRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/backup`)));
 
 const ADM = { id: 1, role: 'admin' };
 const MEM = { id: 2, role: 'member' };
@@ -154,6 +159,7 @@ test('GET /status: liefert Schema-Version, Upload-Limit und Scheduler-Status', a
   assert.ok(d.scheduler, 'scheduler-Objekt vorhanden');
   assert.equal(d.scheduler.backupDir, BACKUP_DIR);
   assert.ok(d.scheduler.webdav, 'scheduler.webdav-Status eingebettet');
+  assert.equal(d.scheduler.timezone, process.env.TZ || 'UTC', 'scheduler.timezone nennt die Zone des Crons');
 });
 
 // ── POST /trigger: echter lokaler Backup (WebDAV noch aus) ──────────────────────
@@ -229,17 +235,20 @@ test('GET /webdav/config: unkonfiguriert → Passwort null, nicht configured', a
 });
 
 test('PUT /webdav/config: Validierungsfehler → 400', async () => {
+  // Typ und Grenzen prueft seit #2810 das Schema (`fields` statt Satz), das
+  // Muster der Adresse weiter die Route (`errorCode: url_invalid`).
   const cases = [
-    { body: { enabled: 'yes' }, rx: /enabled/ },
-    { body: { url: 123 }, rx: /url/ },
+    { body: { enabled: 'yes' }, field: 'body/enabled' },
+    { body: { url: 123 }, field: 'body/url' },
     { body: { url: 'ftp://example.com/dav' }, rx: /http/ },
-    { body: { keep: 0 }, rx: /keep/ },
-    { body: { keep: 'many' }, rx: /keep/ },
+    { body: { keep: 0 }, field: 'body/keep' },
+    { body: { keep: 'many' }, field: 'body/keep' },
   ];
   for (const c of cases) {
     const r = await call('PUT', '/webdav/config', { actor: ADM, body: c.body });
     assert.equal(r.status, 400, `Body ${JSON.stringify(c.body)} muss 400 liefern`);
-    assert.match(r.body.error, c.rx);
+    if (c.rx) assert.match(r.body.error, c.rx);
+    else assert.equal(r.body.fields?.[0]?.path, c.field, JSON.stringify(r.body));
   }
   const badUrl = await call('PUT', '/webdav/config', { actor: ADM, body: { url: 'ftp://x' } });
   assert.equal(badUrl.body.errorCode, 'url_invalid', 'die App sagt den Satz, nicht der Server (#1909)');
@@ -474,6 +483,38 @@ test('POST /restore: valides Backup wird wiederhergestellt (Roundtrip)', async (
   assert.doesNotThrow(() => database().prepare('SELECT MAX(version) FROM schema_migrations').get());
 });
 
+// Phase 1b section F (E12): the three status keys in `sync_config` describe the
+// backups of THIS installation. The restored file carries the status of the
+// moment it was written; the restore puts this installation's values back.
+test('POST /restore: the status of the last backup survives the restore, the status inside the file does not', async () => {
+  const stored = () => Object.fromEntries(database()
+    .prepare("SELECT key, value FROM sync_config WHERE key IN ('backup_last_attempt', 'backup_last_success', 'backup_last_reason')")
+    .all().map((/** @type {any} */ row) => [row.key, row.value]));
+
+  // The file to restore is written while the last run counts as failed ...
+  assert.equal((await call('POST', '/trigger', { actor: ADM })).body.data.success, true);
+  database().prepare("INSERT INTO sync_config (key, value) VALUES ('backup_last_reason', 'disk_full')").run();
+  const inFile = stored();
+  assert.equal(inFile.backup_last_reason, 'disk_full', 'precondition: the file carries a failed status');
+  const dl = await call('GET', '/database', { actor: ADM });
+  assert.equal(dl.status, 200);
+
+  // ... and after it this installation runs a backup that succeeds.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal((await call('POST', '/trigger', { actor: ADM })).body.data.success, true);
+  const before = stored();
+  assert.notEqual(before.backup_last_success, inFile.backup_last_success, 'precondition: the installation is ahead of the file');
+  assert.equal(before.backup_last_reason, undefined, 'precondition: the success cleared the reason');
+
+  const r = await call('POST', '/restore', { actor: ADM, raw: dl.buf });
+  assert.equal(r.status, 200);
+  assert.deepEqual(stored(), before, 'the restored database holds this installation\'s status, not the file\'s');
+
+  const status = (await call('GET', '/status', { actor: ADM })).body.data.scheduler;
+  assert.equal(status.lastSuccess, before.backup_last_success);
+  assert.equal(status.lastError, null);
+});
+
 test('POST /restore: ein zweiter Restore, waehrend der erste laeuft → 409 restore_in_progress (#1431)', async () => {
   const dl = await call('GET', '/database', { actor: ADM });
   assert.equal(dl.status, 200);
@@ -627,7 +668,7 @@ test('GET /database und POST /webdav/trigger: ein Backup ohne bestandene Integri
 });
 
 // ── Phase 0 section H: a foreign server's text stays out of the answer ────────
-// test:client-error-text-guard reads the routes; this runs one as a program. A
+// The lint rule ERROR-TEXT reads the routes; this runs one as a program. A
 // WebDAV server answers the connection test with a status line that names its
 // internal host and path - exactly what a misconfigured reverse proxy sends.
 // Decision E4 (08.11.2026): the admin gets a fixed sentence, a `reason` and the

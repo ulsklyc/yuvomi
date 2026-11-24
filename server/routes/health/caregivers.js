@@ -11,9 +11,11 @@
 import express from 'express';
 import * as db from '../../db.js';
 import { requireAdmin } from '../../middleware/require-admin.js';
-import { log, viewerId, caredForIds } from './helpers.js';
+import { log, viewerId, pathId } from './helpers.js';
+import { allCareGrants, caredForIds, caregiversOf, replaceCaregivers } from '../../authorize/index.ts';
 import { syncPreventionRemindersForSubject } from '../../services/prevention-reminders.js';
 import { isActiveAccount } from '../../services/household-members.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
@@ -22,33 +24,21 @@ const router = express.Router();
  * IDs der Personen, für die der eingeloggte Nutzer eintragen darf.
  * Für jedes Mitglied zugänglich - es ist die Auskunft über die eigenen Rechte.
  */
-router.get('/caregivers/me', (req, res) => {
-  try {
-    res.json({ data: caredForIds(viewerId(req)) });
-  } catch (err) {
-    log.error('Error listing own care grants:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+router.get('/caregivers/me', validateRequest(), (req, res) => {
+  res.json({ data: caredForIds(db.get(), viewerId(req)) });
 });
 
 /**
  * GET /caregivers
  * Alle Beziehungen als { subject_id: [caregiver_id, ...] } für die Admin-UI.
  */
-router.get('/caregivers', requireAdmin, (req, res) => {
-  try {
-    const rows = db.get().prepare(
-      'SELECT subject_id, caregiver_id FROM health_care_grants ORDER BY subject_id, caregiver_id'
-    ).all();
-    const bySubject = {};
-    for (const row of rows) {
-      (bySubject[row.subject_id] ||= []).push(row.caregiver_id);
-    }
-    res.json({ data: bySubject });
-  } catch (err) {
-    log.error('Error listing care grants:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+router.get('/caregivers', requireAdmin, validateRequest(), (req, res) => {
+  /** @type {Record<number, number[]>} */
+  const bySubject = {};
+  for (const row of allCareGrants(db.get())) {
+    (bySubject[row.subject_id] ||= []).push(row.caregiver_id);
   }
+  res.json({ data: bySubject });
 });
 
 /**
@@ -57,85 +47,73 @@ router.get('/caregivers', requireAdmin, (req, res) => {
  * Array entzieht die Betreuung - Löschen ist damit derselbe Weg wie Ändern und
  * braucht keine eigene Route.
  */
-router.put('/caregivers/:subjectId', requireAdmin, (req, res) => {
-  try {
-    const subjectId = parseInt(req.params.subjectId, 10);
-    if (!subjectId) return res.status(400).json({ error: 'Invalid user_id.', code: 400 });
+router.put('/caregivers/:subjectId', requireAdmin, validateRequest(), (req, res) => {
+  const subjectId = pathId(req, 'subjectId');
+  if (!subjectId) return res.status(400).json({ error: 'Invalid user_id.', code: 400 });
 
-    const subject = db.get().prepare('SELECT id FROM users WHERE id = ?').get(subjectId);
-    if (!subject) return res.status(404).json({ error: 'User not found.', code: 404 });
+  const subject = db.get().prepare('SELECT id FROM users WHERE id = ?').get(subjectId);
+  if (!subject) return res.status(404).json({ error: 'User not found.', code: 404 });
 
-    const raw = req.body?.caregiver_ids;
-    if (!Array.isArray(raw)) {
-      return res.status(400).json({ error: 'caregiver_ids must be an array.', code: 400 });
-    }
-
-    // Doppelte Einträge und die Person selbst fallen still heraus: beides wäre
-    // kein Fehler des Aufrufers, sondern eine Liste, die dasselbe zweimal oder
-    // etwas Wirkungsloses sagt.
-    const ids = [...new Set(raw.map((x) => parseInt(x, 10)).filter(Boolean))]
-      .filter((id) => id !== subjectId);
-
-    if (ids.length) {
-      const placeholders = ids.map(() => '?').join(', ');
-      const found = db.get().prepare(
-        `SELECT id FROM users WHERE id IN (${placeholders})`
-      ).all(...ids);
-      if (found.length !== ids.length) {
-        return res.status(400).json({ error: 'caregiver_ids contains an unknown user.', code: 400 });
-      }
-      // Ein ehemaliges Konto betreut niemanden NEU (#1381). Das Deaktivieren
-      // nimmt ihm seine Betreuungen; ohne diese Zeile liesse sich die naechste
-      // gleich wieder eintragen, fuer ein Konto, das nie mehr hereinkommt.
-      const stored = new Set(db.get()
-        .prepare('SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?').all(subjectId)
-        .map((row) => row.caregiver_id));
-      const former = ids.filter((id) => !stored.has(id) && !isActiveAccount(id, { db: db.get() }));
-      if (former.length) {
-        return res.status(400).json({
-          error: `A deactivated account cannot be a caregiver - user ${former.join(', ')}.`,
-          code: 400,
-          reason: 'account_deactivated',
-        });
-      }
-      // UND NIEMAND BEKOMMT NEU ZUGRIFF AUF DIE DATEN EINES EHEMALIGEN. Dessen
-      // Gesundheitsdaten bleiben beim Deaktivieren stehen, und eine Betreuung
-      // macht sie lesbar und schreibbar. Wer schon betreut, behaelt das (die
-      // Liste laesst sich auch kuerzen und leeren); eine NEUE Betreuung waere
-      // ein neuer Leser fuer Daten, deren Eigentuemer nicht mehr widersprechen
-      // kann. Was mit diesen Daten geschieht, ist offen (#1381).
-      const added = ids.filter((id) => !stored.has(id));
-      if (added.length && !isActiveAccount(subjectId, { db: db.get() })) {
-        return res.status(400).json({
-          error: 'A deactivated account cannot get new caregivers.',
-          code: 400,
-          reason: 'account_deactivated',
-        });
-      }
-    }
-
-    const insert = db.get().prepare(
-      'INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)'
-    );
-    const tx = db.get().transaction(() => {
-      db.get().prepare('DELETE FROM health_care_grants WHERE subject_id = ?').run(subjectId);
-      for (const id of ids) insert.run(subjectId, id);
-    });
-    tx();
-
-    // Wirkt sofort: eine entzogene Betreuung darf nicht bis zum naechsten
-    // periodischen Lauf weiter eine Vorsorge-Erinnerung an die betroffene
-    // Person schicken (D6) - dieselbe Erwartung wie beim Zyklus-
-    // Einstellungs-Schreiben.
-    try { syncPreventionRemindersForSubject(db.get(), subjectId); } catch (err) {
-      log.error('Error re-syncing prevention reminders after care grant change:', err.message);
-    }
-
-    res.json({ data: { subject_id: subjectId, caregiver_ids: ids } });
-  } catch (err) {
-    log.error('Error saving care grants:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  // Pflicht, eine Liste von Ids ab 1 (Zahl oder Ziffern-Text): das Schema
+  // (#2810). Die Senke (`map` ueber die Liste) prueft trotzdem selbst.
+  const raw = req.body?.caregiver_ids;
+  if (!Array.isArray(raw)) {
+    return res.status(400).json({ error: 'caregiver_ids must be an array.', code: 400 });
   }
+
+  // Doppelte Einträge und die Person selbst fallen still heraus: beides wäre
+  // kein Fehler des Aufrufers, sondern eine Liste, die dasselbe zweimal oder
+  // etwas Wirkungsloses sagt.
+  const ids = [...new Set(raw.map((x) => Number(x)).filter(Boolean))]
+    .filter((id) => id !== subjectId);
+
+  if (ids.length) {
+    const placeholders = ids.map(() => '?').join(', ');
+    const found = db.get().prepare(
+      `SELECT id FROM users WHERE id IN (${placeholders})`
+    ).all(...ids);
+    if (found.length !== ids.length) {
+      return res.status(400).json({ error: 'caregiver_ids contains an unknown user.', code: 400 });
+    }
+    // Ein ehemaliges Konto betreut niemanden NEU (#1381). Das Deaktivieren
+    // nimmt ihm seine Betreuungen; ohne diese Zeile liesse sich die naechste
+    // gleich wieder eintragen, fuer ein Konto, das nie mehr hereinkommt.
+    const stored = new Set(caregiversOf(db.get(), subjectId));
+    const former = ids.filter((id) => !stored.has(id) && !isActiveAccount(id, { db: db.get() }));
+    if (former.length) {
+      return res.status(400).json({
+        error: `A deactivated account cannot be a caregiver - user ${former.join(', ')}.`,
+        code: 400,
+        reason: 'account_deactivated',
+      });
+    }
+    // UND NIEMAND BEKOMMT NEU ZUGRIFF AUF DIE DATEN EINES EHEMALIGEN. Dessen
+    // Gesundheitsdaten bleiben beim Deaktivieren stehen, und eine Betreuung
+    // macht sie lesbar und schreibbar. Wer schon betreut, behaelt das (die
+    // Liste laesst sich auch kuerzen und leeren); eine NEUE Betreuung waere
+    // ein neuer Leser fuer Daten, deren Eigentuemer nicht mehr widersprechen
+    // kann. Was mit diesen Daten geschieht, ist offen (#1381).
+    const added = ids.filter((id) => !stored.has(id));
+    if (added.length && !isActiveAccount(subjectId, { db: db.get() })) {
+      return res.status(400).json({
+        error: 'A deactivated account cannot get new caregivers.',
+        code: 400,
+        reason: 'account_deactivated',
+      });
+    }
+  }
+
+  replaceCaregivers(db.get(), subjectId, ids);
+
+  // Wirkt sofort: eine entzogene Betreuung darf nicht bis zum naechsten
+  // periodischen Lauf weiter eine Vorsorge-Erinnerung an die betroffene
+  // Person schicken (D6) - dieselbe Erwartung wie beim Zyklus-
+  // Einstellungs-Schreiben.
+  try { syncPreventionRemindersForSubject(db.get(), subjectId); } catch (err) {
+    log.error('Error re-syncing prevention reminders after care grant change:', err.message);
+  }
+
+  res.json({ data: { subject_id: subjectId, caregiver_ids: ids } });
 });
 
 export default router;

@@ -18,7 +18,7 @@
  *            der Haushalt ihn verlangt
  *          - neue Wiederherstellungscodes entwerten die alten
  *          - das Loeschen eines Nutzers raeumt Geheimnis und Codes mit weg
- * Ausfuehren: node --experimental-sqlite --test test/test-two-factor.js
+ * Ausfuehren: node --test test/test-two-factor.js
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';

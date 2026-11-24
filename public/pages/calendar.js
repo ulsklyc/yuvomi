@@ -164,7 +164,7 @@ const sameColor = (a, b) =>
  * Farbe wechselte also genau beim Bearbeiten, ohne dass jemand sie angefasst
  * hatte (#856).
  */
-// Spiegelt COLOR_RE aus server/middleware/validate.js. Die Route prueft das
+// Spiegelt COLOR_RE aus server/api/formats.ts. Die Route prueft das
 // bereits, aber die Sync-Dienste schreiben ihre Farben direkt in die Tabelle -
 // was von dort kommt, hat diese Pruefung nie gesehen. Und der Wert landet gleich
 // in einem style-Attribut, wo esc() zwar das Ausbrechen verhindert, nicht aber
@@ -4367,8 +4367,8 @@ function renderMonthDay(date, inMonth, { selected = false, selWeek = false, spli
   const dayWaste = wasteOccurrencesOnDay(date);
   const isToday  = date === state.today;
   // `month-day--shifts` gibt den Strichen am Kopf ihren Bezugsrahmen. Eine
-  // Klasse aus dem Renderer statt `:has()`: ohne `:has()` (Chrome < 105, die
-  // Mindestversion ist 87) fiele die Regel weg, und die Striche jeder Zelle
+  // Klasse aus dem Renderer statt `:has()`: ohne `:has()` (Firefox 115 an der
+  // Untergrenze, erst ab 121) fiele die Regel weg, und die Striche jeder Zelle
   // stuenden an derselben Ecke des Rasters (R22, S10).
   const classes  = monthDayClasses(date, inMonth, state.today, { selected, selWeek })
     + (daySchedule.length ? ' month-day--shifts' : '');

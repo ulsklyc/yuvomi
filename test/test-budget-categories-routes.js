@@ -7,7 +7,7 @@
  *        budget_entries, 409 letzte Kategorie/Subkategorie), Reihenfolge, sowie die
  *        Lese-Endpunkte (meta, lokalisierte Liste mit genesteten Subkategorien).
  *        Migration 88 legte KEINE visibility auf Kategorien → kein Auth-Gate-Teil.
- * Ausführen: node --experimental-sqlite --test test/test-budget-categories-routes.js
+ * Ausführen: node --test test/test-budget-categories-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -15,30 +15,31 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 import { readFileSync } from 'node:fs';
 
 const dbmod = await import('../server/db.js');
-const { default: catRouter } = await import('../server/routes/budget/categories.js');
 const db = dbmod.get();
 
 const U = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('u','U','x','member')`).run().lastInsertRowid;
 
 let actor = { id: U, role: 'member' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['budget'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use('/', catRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}/api/v1/budget${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,

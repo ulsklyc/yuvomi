@@ -6,13 +6,14 @@
 
 import express from 'express';
 import crypto from 'node:crypto';
-import { createLogger } from '../logger.js';
 import { hashPassword } from '../utils/password.js';
 import * as db from '../db.js';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
-import { collectErrors, color, date, datetime, month, num, oneOf, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { collectErrors, color, date, datetime, num, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
+import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
+import { MAX_WORKER_NAME, MAX_WORKER_USERNAME } from '../services/housekeeping-fields.js';
 import { minutesBetween, computeHourlyAmount } from '../services/housekeeping-billing.js';
 import { assertDocumentsNotDeleting, sendDocumentDeletionConflict } from '../services/document-deletion-lock.js';
 import {
@@ -31,8 +32,13 @@ import {
   queueEventDeletion,
   markInlineOutbound,
 } from '../services/calendar-outbound.js';
-import { mayWriteModule, moduleAccessVerdict, MODULE_ACCESS_ALLOW, requestHasCapability } from '../permissions.js';
-import { documentVisibleSql } from '../services/document-access.js';
+import {
+  mayWriteModule,
+  moduleAccessVerdict,
+  MODULE_ACCESS_ALLOW,
+  requestHasCapability,
+  visibleWhere,
+} from '../authorize/index.ts';
 import { tokenAllows } from '../scopes.js';
 import {
   configuredHouseholdTimeZone,
@@ -61,12 +67,10 @@ import {
 } from '../services/housekeeping-month.js';
 import { personAvatarUrlSql } from '../services/person-avatar.js';
 
-const log = createLogger('Housekeeping');
 const router = express.Router();
 
 const MAX_PHOTO_DATA_LENGTH = 6 * 1024 * 1024;
 const IMAGE_DATA_RE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
-const PAYMENT_SCHEDULES = ['daily', 'twice_monthly', 'monthly'];
 // Lese-Rueckfall fuer eine Zeile ohne Farbe - Bestand, deshalb unveraendert.
 const DEFAULT_CALENDAR_COLOR = '#7C3AED';
 // Startfarbe eines NEUEN Profils ohne eigene Wahl: die Vorgabe der geteilten
@@ -316,7 +320,7 @@ function publicDecayTask(row, tz) {
 
 function validatePhotoUrl(value) {
   if (value === undefined || value === null || value === '') return { value: null, error: null };
-  if (typeof value !== 'string') return { value: null, error: 'Photo must be a data URL string.' };
+  // Text or null: the schema refuses anything else before the handler (#2810).
   const trimmed = value.trim();
   if (trimmed.length > MAX_PHOTO_DATA_LENGTH) return { value: null, error: 'Photo is too large.' };
   if (!IMAGE_DATA_RE.test(trimmed)) return { value: null, error: 'Photo must be PNG, JPEG, or WebP.' };
@@ -703,9 +707,11 @@ function housekeepingDashboard(receipts = MASKED_RECEIPTS, daySource = {}) {
   };
 }
 
+// The callers need a yes/no to stop; the refusal itself is the one of every
+// admin gate (refuseAdmin, phase 2 C2).
 function assertAdmin(req, res) {
   if (isAdminRequest(req)) return true;
-  res.status(403).json({ error: 'Permission denied.', code: 403 });
+  refuseAdmin(req, res);
   return false;
 }
 
@@ -762,7 +768,7 @@ function visitCapabilities(row, req, viewer = MASKED_RECEIPTS) {
 // LOEHNE, ZAHLUNGEN UND BETRAEGE SIND EINE EIGENE FRAGE (R20). Das Modulrecht
 // sagt, ob jemand die Haushaltshilfe sieht und bedient; die Capability
 // `housekeeping_view_amounts` sagt, ob er dabei Geld sieht. Neue Kinderkonten
-// starten ohne sie (CHILD_START_PERMISSIONS in server/permissions.js).
+// starten ohne sie (CHILD_START_PERMISSIONS in server/authorize/catalog.ts).
 // Das Urteil reist im selben Objekt wie das zum Beleg (`receiptAccess`), weil
 // es an genau denselben Serialisierern haengt - und ein Serialisierer, der es
 // nicht bekommt, gibt wie beim Beleg nichts heraus (MASKED_RECEIPTS).
@@ -794,7 +800,7 @@ function payment403(res) {
 // UND Token-Scope, dieselbe Frage wie bei Budget, Ausgaben und Inventar) und die
 // Sichtbarkeit des einzelnen Dokuments (`documentVisibleSql`, dieselbe Regel
 // wie im Dokumente-Modul). Wer durchfaellt, bekommt `null` fuer beide - auch die
-// ID verraet sonst, dass es ein Dokument dieser Nummer gibt (document-access.js).
+// ID verraet sonst, dass es ein Dokument dieser Nummer gibt (authorize/rows/documents.ts).
 // Uebrig bleibt `has_receipt`, eine Aussage ueber den Besuch - aber nur fuer
 // wer Dokumente lesen darf. Ohne dieses Recht ist es `null` wie `attachments`
 // bei Budget, Ausgaben und Inventar und `document_count` bei Aufgaben: kein
@@ -815,7 +821,7 @@ function receiptAccess(req) {
     for (const id of wanted) names.set(id, undefined);
     const rows = db.get().prepare(`
       SELECT d.id, d.name FROM family_documents d
-      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${documentVisibleSql('d')}
+      WHERE d.id IN (${wanted.map(() => '?').join(', ')}) AND ${visibleWhere('documents', 'd', '@userId')}
     `).all(...wanted, { userId: viewer });
     for (const row of rows) names.set(row.id, row.name);
   };
@@ -897,54 +903,36 @@ function defaultShoppingList(actorId) {
   return result.lastInsertRowid;
 }
 
-router.get('/dashboard', (req, res) => {
-  try {
-    res.json({ data: housekeepingDashboard(receiptAccess(req), req.query) });
-  } catch (err) {
-    log.error('GET /dashboard error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/dashboard', validateRequest(), (req, res) => {
+  res.json({ data: housekeepingDashboard(receiptAccess(req), req.query) });
 });
 
-router.get('/task-templates', (_req, res) => {
-  try {
-    res.json({ data: TASK_TEMPLATES });
-  } catch (err) {
-    log.error('GET /task-templates error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/task-templates', validateRequest(), (_req, res) => {
+  res.json({ data: TASK_TEMPLATES });
 });
 
-router.get('/worker', (req, res) => {
-  try {
-    res.json({ data: publicWorker(loadWorker(), localDayContext(req.query), receiptAccess(req)) });
-  } catch (err) {
-    log.error('GET /worker error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/worker', validateRequest(), (req, res) => {
+  res.json({ data: publicWorker(loadWorker(), localDayContext(req.query), receiptAccess(req)) });
 });
 
-router.get('/workers', (req, res) => {
-  try {
-    const context = localDayContext(req.query);
-    const receipts = receiptAccess(req);
-    // `can_manage`: darf der Aufrufer Profile anlegen und bearbeiten
-    // (POST /worker)? Dieselben zwei Pruefungen wie dort - Schreibrecht am
-    // Modul samt Token-Scope und die Admin-Rolle -, damit die Seite die
-    // Admin-Regel nicht nachbaut (wie `can_mark_unpaid`, #1136). Ohne das Feld
-    // bot sie einem Mitglied "Profil anlegen" an, das am 403 endete.
-    res.json({
-      data: loadWorkers().map((worker) => publicWorker(worker, context, receipts)),
-      can_manage: mayWriteHousekeeping(req) && isAdminRequest(req),
-    });
-  } catch (err) {
-    log.error('GET /workers error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/workers', validateRequest(), (req, res) => {
+  const context = localDayContext(req.query);
+  const receipts = receiptAccess(req);
+  // `can_manage`: darf der Aufrufer Profile anlegen und bearbeiten
+  // (POST /worker)? Dieselben zwei Pruefungen wie dort - Schreibrecht am
+  // Modul samt Token-Scope und die Admin-Rolle -, damit die Seite die
+  // Admin-Regel nicht nachbaut (wie `can_mark_unpaid`, #1136). Ohne das Feld
+  // bot sie einem Mitglied "Profil anlegen" an, das am 403 endete.
+  res.json({
+    data: loadWorkers().map((worker) => publicWorker(worker, context, receipts)),
+    can_manage: mayWriteHousekeeping(req) && isAdminRequest(req),
+  });
 });
 
-router.post('/worker', async (req, res) => {
-  if (!assertAdmin(req, res)) return;
+// Das Admin-Recht haengt an keiner Zeile: es steht als Middleware VOR
+// validateRequest() (#2810), ein Mitglied bekommt 403 wie bisher, nie ein 400,
+// das Felder nennt. Dieselbe Absage (refuseAdmin) wie vorher im Handler.
+router.post('/worker', requireAdmin, validateRequest(), async (req, res) => {
   try {
     const vWorkerId = req.body.id !== undefined && req.body.id !== null && req.body.id !== ''
       ? validateId(req.body.id, 'id')
@@ -953,28 +941,31 @@ router.post('/worker', async (req, res) => {
     const existing = vWorkerId.value ? loadWorkerById(vWorkerId.value) : null;
     if (vWorkerId.value && !existing) return res.status(404).json({ error: 'Housekeeper not found.', code: 404, reason: 'housekeeping_worker_not_found' });
 
-    const vDisplayName = str(req.body.display_name, 'display_name', { max: 128 });
-    const vUsername = str(req.body.username, 'username', { max: 64, required: false });
+    const vDisplayName = str(req.body.display_name, 'display_name', { max: MAX_WORKER_NAME });
+    const vUsername = str(req.body.username, 'username', { max: MAX_WORKER_USERNAME, required: false });
     const vPhone = str(req.body.phone, 'phone', { max: MAX_SHORT, required: false });
     const vEmail = str(req.body.email, 'email', { max: MAX_TITLE, required: false });
     // Ohne Jahr (#2095) weicht das Jahr dem Platzhalter, bevor geprueft wird.
     const vYearUnknown = validateYearUnknown(req.body.birth_year_unknown, 'birth_year_unknown');
     const vBirthDate = date(birthDateInput(req.body.birth_date, vYearUnknown.value === true), 'birth_date');
-    const vDailyRate = num(req.body.daily_rate, 'daily_rate', { required: true });
-    const vSchedule = oneOf(req.body.payment_schedule || 'monthly', PAYMENT_SCHEDULES, 'payment_schedule');
+    // Type, presence and list of `daily_rate`, `hourly_rate`, `payment_schedule`
+    // and `rate_type` hold the schema (#2810): a number resp. a value of
+    // PAYMENT_SCHEDULES / RATE_TYPES, `null` or `""` for the default.
+    const dailyRate = req.body.daily_rate;
+    const hourlyRate = req.body.hourly_rate ?? null;
+    const schedule = req.body.payment_schedule || 'monthly';
+    const rateType = req.body.rate_type || 'daily';
     const vCalendarColor = color(req.body.calendar_color || existing?.calendar_color || NEW_WORKER_COLOR, 'calendar_color');
     const vNotes = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
-    const vRateType = oneOf(req.body.rate_type || 'daily', ['daily', 'hourly'], 'rate_type');
-    const vHourlyRate = num(req.body.hourly_rate, 'hourly_rate');
-    const errors = collectErrors([vDisplayName, vUsername, vPhone, vEmail, vYearUnknown, vBirthDate, vDailyRate, vSchedule, vCalendarColor, vNotes, vRateType, vHourlyRate]);
+    const errors = collectErrors([vDisplayName, vUsername, vPhone, vEmail, vYearUnknown, vBirthDate, vCalendarColor, vNotes]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     if (vUsername.value && !/^[a-zA-Z0-9._-]{3,64}$/.test(vUsername.value)) {
       return res.status(400).json({ error: 'Username must be 3-64 characters long and may only contain letters, numbers, dots, hyphens, and underscores.', code: 400, reason: 'housekeeping_username_invalid' });
     }
-    if (vDailyRate.value < 0) {
+    if (dailyRate < 0) {
       return res.status(400).json({ error: 'daily_rate must be greater than or equal to zero.', code: 400 });
     }
-    if ((vHourlyRate.value ?? 0) < 0) {
+    if ((hourlyRate ?? 0) < 0) {
       return res.status(400).json({ error: 'hourly_rate must be greater than or equal to zero.', code: 400 });
     }
     const avatarColor = String(req.body.avatar_color || existing?.avatar_color || NEW_WORKER_COLOR).trim();
@@ -1018,7 +1009,7 @@ router.post('/worker', async (req, res) => {
           notes = excluded.notes,
           rate_type = excluded.rate_type,
           hourly_rate = excluded.hourly_rate
-      `).run(targetUserId, vDailyRate.value, vSchedule.value, vCalendarColor.value, vNotes.value, vRateType.value, vHourlyRate.value ?? 0);
+      `).run(targetUserId, dailyRate, schedule, vCalendarColor.value, vNotes.value, rateType, hourlyRate ?? 0);
       syncFamilyMemberArtifacts(db.get(), targetUserId, {
         displayName: vDisplayName.value,
         phone: vPhone.value,
@@ -1036,202 +1027,175 @@ router.post('/worker', async (req, res) => {
     if (err.message?.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'housekeeping_username_taken' });
     }
-    log.error('POST /worker error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
-router.get('/summary', (req, res) => {
-  try {
-    const vMonth = month(req.query.month, 'month');
-    if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
-    const viewer = receiptAccess(req);
-    res.json({
-      data: {
-        current_session: publicSession(loadOpenSession(), viewer),
-        default_daily_rate: viewer.amounts ? defaultDailyRate() : null,
-        summary: monthlySummary(vMonth.value || currentMonth(), viewer),
-      },
-    });
-  } catch (err) {
-    log.error('GET /summary error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/summary', validateRequest(), (req, res) => {
+  // `?month=` is YYYY-MM (years 1001 to 9999) or empty: HOUSEKEEPING_MONTH_PATTERN in the schema (#2810).
+  const monthValue = req.query.month || currentMonth();
+  const viewer = receiptAccess(req);
+  res.json({
+    data: {
+      current_session: publicSession(loadOpenSession(), viewer),
+      default_daily_rate: viewer.amounts ? defaultDailyRate() : null,
+      summary: monthlySummary(monthValue, viewer),
+    },
+  });
 });
 
-router.get('/work-sessions', (req, res) => {
-  try {
-    reconcilePaymentTasks();
-    const vMonth = month(req.query.month, 'month');
-    if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
-    const { start, end, keep, order } = monthVisits(vMonth.value || currentMonth());
-    const rows = db.get().prepare(`
-      SELECT * FROM housekeeping_work_sessions
-      WHERE check_in >= ? AND check_in < ?
-    `).all(start, end).filter(keep).sort(order);
-    const receipts = receiptAccess(req).preload(rows);
-    res.json({ data: rows.map((row) => publicSession(row, receipts)) });
-  } catch (err) {
-    log.error('GET /work-sessions error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/work-sessions', validateRequest(), (req, res) => {
+  reconcilePaymentTasks();
+  // `?month=` is YYYY-MM (years 1001 to 9999) or empty: HOUSEKEEPING_MONTH_PATTERN in the schema (#2810).
+  const monthValue = req.query.month || currentMonth();
+  const { start, end, keep, order } = monthVisits(monthValue);
+  const rows = db.get().prepare(`
+    SELECT * FROM housekeeping_work_sessions
+    WHERE check_in >= ? AND check_in < ?
+  `).all(start, end).filter(keep).sort(order);
+  const receipts = receiptAccess(req).preload(rows);
+  res.json({ data: rows.map((row) => publicSession(row, receipts)) });
 });
 
-router.get('/visits', (req, res) => {
-  try {
-    reconcilePaymentTasks();
-    const vMonth = month(req.query.month, 'month');
-    if (vMonth.error) return res.status(400).json({ error: vMonth.error, code: 400 });
-    const vWorkerId = req.query.worker_id !== undefined && req.query.worker_id !== ''
-      ? validateId(req.query.worker_id, 'worker_id')
-      : { value: null, error: null };
-    if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
-    const selectedMonth = vMonth.value || currentMonth();
-    const { start, end, keep, order } = monthVisits(selectedMonth);
-    const rows = db.get().prepare(`
-      SELECT hws.*,
-             hw.payment_schedule,
-             u.display_name AS worker_name,
-             u.avatar_color AS worker_avatar_color,
-             ${personAvatarUrlSql('u')} AS worker_avatar_data,
-             t.status AS payment_task_status,
-             t.title AS payment_task_title
-      FROM housekeeping_work_sessions hws
-      LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
-      LEFT JOIN users u ON u.id = hw.user_id
-      LEFT JOIN tasks t ON t.id = hws.payment_task_id
-      WHERE hws.check_in >= ? AND hws.check_in < ?
-        AND (? IS NULL OR hws.worker_id = ?)
-    `).all(start, end, vWorkerId.value, vWorkerId.value).filter(keep).sort(order);
-    const receipts = receiptAccess(req).preload(rows);
-    const visits = rows.map((row) => ({
-      ...publicSession(row, receipts),
-      worker_name: row.worker_name ?? null,
-      worker_avatar_color: row.worker_avatar_color ?? DEFAULT_CALENDAR_COLOR,
-      worker_avatar_data: row.worker_avatar_data ?? null,
-      payment_schedule: row.payment_schedule ?? 'monthly',
-      payment_task_status: row.payment_task_status ?? null,
-      payment_task_title: row.payment_task_title ?? null,
-      receipt_document_name: receipts.view(row).receipt_document_name,
-      total_amount: receipts.amounts ? Number(row.daily_rate || 0) + Number(row.extras || 0) : null,
-      ...(receipts.amounts ? {} : { payment_task_status: null, payment_task_title: null }),
-      ...visitCapabilities(row, req, receipts),
-    }));
-    const totals = receipts.amounts ? visits.reduce((acc, visit) => {
-      acc.total += visit.total_amount;
-      if (visit.paid_at) acc.paid += visit.total_amount;
-      else acc.pending += visit.total_amount;
-      return acc;
-    }, { total: 0, paid: 0, pending: 0 }) : null;
-    res.json({ data: { month: selectedMonth, visits, totals } });
-  } catch (err) {
-    log.error('GET /visits error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/visits', validateRequest(), (req, res) => {
+  reconcilePaymentTasks();
+  // `?month=` is YYYY-MM (years 1001 to 9999) or empty: HOUSEKEEPING_MONTH_PATTERN in the schema (#2810).
+  const monthValue = req.query.month || currentMonth();
+  const vWorkerId = req.query.worker_id !== undefined && req.query.worker_id !== ''
+    ? validateId(req.query.worker_id, 'worker_id')
+    : { value: null, error: null };
+  if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
+  const { start, end, keep, order } = monthVisits(monthValue);
+  const rows = db.get().prepare(`
+    SELECT hws.*,
+           hw.payment_schedule,
+           u.display_name AS worker_name,
+           u.avatar_color AS worker_avatar_color,
+           ${personAvatarUrlSql('u')} AS worker_avatar_data,
+           t.status AS payment_task_status,
+           t.title AS payment_task_title
+    FROM housekeeping_work_sessions hws
+    LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
+    LEFT JOIN users u ON u.id = hw.user_id
+    LEFT JOIN tasks t ON t.id = hws.payment_task_id
+    WHERE hws.check_in >= ? AND hws.check_in < ?
+      AND (? IS NULL OR hws.worker_id = ?)
+  `).all(start, end, vWorkerId.value, vWorkerId.value).filter(keep).sort(order);
+  const receipts = receiptAccess(req).preload(rows);
+  const visits = rows.map((row) => ({
+    ...publicSession(row, receipts),
+    worker_name: row.worker_name ?? null,
+    worker_avatar_color: row.worker_avatar_color ?? DEFAULT_CALENDAR_COLOR,
+    worker_avatar_data: row.worker_avatar_data ?? null,
+    payment_schedule: row.payment_schedule ?? 'monthly',
+    payment_task_status: row.payment_task_status ?? null,
+    payment_task_title: row.payment_task_title ?? null,
+    receipt_document_name: receipts.view(row).receipt_document_name,
+    total_amount: receipts.amounts ? Number(row.daily_rate || 0) + Number(row.extras || 0) : null,
+    ...(receipts.amounts ? {} : { payment_task_status: null, payment_task_title: null }),
+    ...visitCapabilities(row, req, receipts),
+  }));
+  const totals = receipts.amounts ? visits.reduce((acc, visit) => {
+    acc.total += visit.total_amount;
+    if (visit.paid_at) acc.paid += visit.total_amount;
+    else acc.pending += visit.total_amount;
+    return acc;
+  }, { total: 0, paid: 0, pending: 0 }) : null;
+  res.json({ data: { month: monthValue, visits, totals } });
 });
 
-router.post('/work-sessions/check-in', (req, res) => {
-  try {
-    if (loadWorkers().length === 0) {
-      return res.status(400).json({ error: 'Add a housekeeper before checking in.', code: 400 });
-    }
-    const vWorkerId = validateId(req.body.worker_id, 'worker_id');
-    if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
-    const worker = loadWorkerById(vWorkerId.value);
-    if (!worker) return res.status(404).json({ error: 'Housekeeper not found.', code: 404, reason: 'housekeeping_worker_not_found' });
-    const workerRateType = worker.rate_type || 'daily';
-    const workerHourlyRate = worker.hourly_rate ?? 0;
-    // Nur eine OFFENE Sitzung sperrt. Vorher sperrte jede Sitzung des Tages,
-    // auch eine laengst abgeschlossene - geteilte Schichten, eine Pause mit
-    // Wiederaufnahme und zwei getrennte Besuche am selben Tag waren damit
-    // unmoeglich (#1138).
-    if (loadOpenSession(worker.id)) return res.status(409).json({ error: 'This housekeeper is already checked in.', code: 409, reason: 'housekeeping_already_checked_in' });
-
-    // Ohne Betragsrecht (R20) kommt der Satz aus dem Profil und nicht aus dem
-    // Body - der Knopf, der ihn schickte, kannte ihn nicht.
-    const viewer = receiptAccess(req);
-    const body = viewer.amounts ? req.body : {
-      ...req.body,
-      daily_rate: workerRateType === 'hourly' ? 0 : Number(worker.daily_rate || 0),
-      extras: 0,
-      payment_title: undefined,
-      payment_description: undefined,
-    };
-    const vDailyRate = num(body.daily_rate, 'daily_rate', { required: true });
-    const vExtras = num(body.extras, 'extras');
-    const vEventTitle = str(body.event_title, 'event_title', { max: MAX_TITLE, required: false });
-    const vPaymentTitle = str(body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
-    const vPaymentDescription = str(body.payment_description, 'payment_description', { max: MAX_TEXT, required: false });
-    const errors = collectErrors([vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
-      return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
-    }
-
-    const actorId = userId(req);
-    const checkIn = nowIso();
-    // Termin und Zahlungsaufgabe liegen am Tag des Check-ins - gelesen an
-    // derselben Uhr wie "heute" auf der Seite (#1556).
-    const context = localDayContext(req.body, new Date(checkIn));
-    const result = db.get().transaction(() => {
-      const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId, vEventTitle.value, context.localDate);
-      const totalAmount = Number(vDailyRate.value || 0) + Number(vExtras.value || 0);
-      const taskId = housekeepingPaymentTasksEnabled(db.get())
-        ? createPaymentTask(db.get(), worker, checkIn, totalAmount, { id: actorId, amounts: viewer.amounts }, vPaymentTitle.value, vPaymentDescription.value, context.localDate)
-        : null;
-      return db.get().prepare(`
-        INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, calendar_event_id, payment_task_id, created_by, rate_type, hourly_rate)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(worker.id, checkIn, null, vDailyRate.value, vExtras.value ?? 0, eventId, taskId, actorId, workerRateType, workerHourlyRate);
-    })();
-    const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: publicSession(row, viewer), summary: monthlySummary(currentMonth(), viewer) });
-  } catch (err) {
-    log.error('POST /work-sessions/check-in error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+router.post('/work-sessions/check-in', validateRequest(), (req, res) => {
+  if (loadWorkers().length === 0) {
+    return res.status(400).json({ error: 'Add a housekeeper before checking in.', code: 400 });
   }
+  const vWorkerId = validateId(req.body.worker_id, 'worker_id');
+  if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
+  const worker = loadWorkerById(vWorkerId.value);
+  if (!worker) return res.status(404).json({ error: 'Housekeeper not found.', code: 404, reason: 'housekeeping_worker_not_found' });
+  const workerRateType = worker.rate_type || 'daily';
+  const workerHourlyRate = worker.hourly_rate ?? 0;
+  // Nur eine OFFENE Sitzung sperrt. Vorher sperrte jede Sitzung des Tages,
+  // auch eine laengst abgeschlossene - geteilte Schichten, eine Pause mit
+  // Wiederaufnahme und zwei getrennte Besuche am selben Tag waren damit
+  // unmoeglich (#1138).
+  if (loadOpenSession(worker.id)) return res.status(409).json({ error: 'This housekeeper is already checked in.', code: 409, reason: 'housekeeping_already_checked_in' });
+
+  // Ohne Betragsrecht (R20) kommt der Satz aus dem Profil und nicht aus dem
+  // Body - der Knopf, der ihn schickte, kannte ihn nicht.
+  const viewer = receiptAccess(req);
+  const body = viewer.amounts ? req.body : {
+    ...req.body,
+    daily_rate: workerRateType === 'hourly' ? 0 : Number(worker.daily_rate || 0),
+    extras: 0,
+    payment_title: undefined,
+    payment_description: undefined,
+  };
+  const vDailyRate = num(body.daily_rate, 'daily_rate', { required: true });
+  const vExtras = num(body.extras, 'extras');
+  const vEventTitle = str(body.event_title, 'event_title', { max: MAX_TITLE, required: false });
+  const vPaymentTitle = str(body.payment_title, 'payment_title', { max: MAX_TITLE, required: false });
+  const vPaymentDescription = str(body.payment_description, 'payment_description', { max: MAX_TEXT, required: false });
+  const errors = collectErrors([vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  if (vDailyRate.value < 0 || (vExtras.value ?? 0) < 0) {
+    return res.status(400).json({ error: 'Amounts must be greater than or equal to zero.', code: 400 });
+  }
+
+  const actorId = userId(req);
+  const checkIn = nowIso();
+  // Termin und Zahlungsaufgabe liegen am Tag des Check-ins - gelesen an
+  // derselben Uhr wie "heute" auf der Seite (#1556).
+  const context = localDayContext(req.body, new Date(checkIn));
+  const result = db.get().transaction(() => {
+    const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId, vEventTitle.value, context.localDate);
+    const totalAmount = Number(vDailyRate.value || 0) + Number(vExtras.value || 0);
+    const taskId = housekeepingPaymentTasksEnabled(db.get())
+      ? createPaymentTask(db.get(), worker, checkIn, totalAmount, { id: actorId, amounts: viewer.amounts }, vPaymentTitle.value, vPaymentDescription.value, context.localDate)
+      : null;
+    return db.get().prepare(`
+      INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, calendar_event_id, payment_task_id, created_by, rate_type, hourly_rate)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(worker.id, checkIn, null, vDailyRate.value, vExtras.value ?? 0, eventId, taskId, actorId, workerRateType, workerHourlyRate);
+  })();
+  const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ data: publicSession(row, viewer), summary: monthlySummary(currentMonth(), viewer) });
 });
 
-router.get('/visits/:id', (req, res) => {
-  try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const row = db.get().prepare(`
-      SELECT hws.*,
-             hw.payment_schedule,
-             u.display_name AS worker_name,
-             u.avatar_color AS worker_avatar_color,
-             ${personAvatarUrlSql('u')} AS worker_avatar_data,
-             t.status  AS payment_task_status,
-             t.title   AS payment_task_title
-      FROM housekeeping_work_sessions hws
-      LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
-      LEFT JOIN users u ON u.id = hw.user_id
-      LEFT JOIN tasks t ON t.id = hws.payment_task_id
-      WHERE hws.id = ?
-    `).get(vId.value);
-    if (!row) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
-    const receipts = receiptAccess(req);
-    const visit = {
-      ...publicSession(row, receipts),
-      worker_name: row.worker_name ?? null,
-      worker_avatar_color: row.worker_avatar_color ?? null,
-      worker_avatar_data: row.worker_avatar_data ?? null,
-      payment_schedule: row.payment_schedule ?? 'monthly',
-      payment_task_status: receipts.amounts ? (row.payment_task_status ?? null) : null,
-      payment_task_title: receipts.amounts ? (row.payment_task_title ?? null) : null,
-      receipt_document_name: receipts.view(row).receipt_document_name,
-      total_amount: receipts.amounts ? Number(row.daily_rate || 0) + Number(row.extras || 0) : null,
-      ...visitCapabilities(row, req, receipts),
-    };
-    res.json({ data: visit });
-  } catch (err) {
-    log.error('GET /visits/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/visits/:id', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const row = db.get().prepare(`
+    SELECT hws.*,
+           hw.payment_schedule,
+           u.display_name AS worker_name,
+           u.avatar_color AS worker_avatar_color,
+           ${personAvatarUrlSql('u')} AS worker_avatar_data,
+           t.status  AS payment_task_status,
+           t.title   AS payment_task_title
+    FROM housekeeping_work_sessions hws
+    LEFT JOIN housekeeping_workers hw ON hw.id = hws.worker_id
+    LEFT JOIN users u ON u.id = hw.user_id
+    LEFT JOIN tasks t ON t.id = hws.payment_task_id
+    WHERE hws.id = ?
+  `).get(vId.value);
+  if (!row) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
+  const receipts = receiptAccess(req);
+  const visit = {
+    ...publicSession(row, receipts),
+    worker_name: row.worker_name ?? null,
+    worker_avatar_color: row.worker_avatar_color ?? null,
+    worker_avatar_data: row.worker_avatar_data ?? null,
+    payment_schedule: row.payment_schedule ?? 'monthly',
+    payment_task_status: receipts.amounts ? (row.payment_task_status ?? null) : null,
+    payment_task_title: receipts.amounts ? (row.payment_task_title ?? null) : null,
+    receipt_document_name: receipts.view(row).receipt_document_name,
+    total_amount: receipts.amounts ? Number(row.daily_rate || 0) + Number(row.extras || 0) : null,
+    ...visitCapabilities(row, req, receipts),
+  };
+  res.json({ data: visit });
 });
 
-router.put('/visits/:id', (req, res) => {
+router.put('/visits/:id', validateRequest(), (req, res) => {
   try {
     const vId = validateId(req.params.id, 'id');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
@@ -1262,10 +1226,8 @@ router.put('/visits/:id', (req, res) => {
     const vReceiptId = body.receipt_document_id !== undefined && body.receipt_document_id !== null && body.receipt_document_id !== ''
       ? validateId(body.receipt_document_id, 'receipt_document_id')
       : { value: null, error: null };
-    const vMinutesWorked = isHourly && body.minutes_worked !== undefined
-      ? num(body.minutes_worked, 'minutes_worked')
-      : { value: null, error: null };
-    if (vMinutesWorked.error) return res.status(400).json({ error: vMinutesWorked.error, code: 400 });
+    // A whole number or null (schema); without the amounts right the body has none.
+    const minutesWorked = isHourly ? (body.minutes_worked ?? null) : null;
     const errors = collectErrors([vDate, vOriginalDate, vDailyRate, vExtras, vEventTitle, vPaymentTitle, vPaymentDescription, vReceiptId]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     // Der Beleg folgt Regel 2 aus services/document-links.js: entfernen oder
@@ -1304,8 +1266,8 @@ router.put('/visits/:id', (req, res) => {
     }
 
     let effectiveDailyRate = vDailyRate.value ?? existing.daily_rate;
-    if (isHourly && vMinutesWorked.value !== null) {
-      effectiveDailyRate = computeHourlyAmount(vMinutesWorked.value, existing.hourly_rate || 0);
+    if (isHourly && minutesWorked !== null) {
+      effectiveDailyRate = computeHourlyAmount(minutesWorked, existing.hourly_rate || 0);
     }
 
     // Ein neuer Tag verschiebt den Besuch um die Tage zwischen altem und neuem
@@ -1342,7 +1304,7 @@ router.put('/visits/:id', (req, res) => {
         effectiveDailyRate,
         vExtras.value ?? 0,
         receiptDocumentId,
-        vMinutesWorked.value !== null ? vMinutesWorked.value : existing.minutes_worked,
+        minutesWorked !== null ? minutesWorked : existing.minutes_worked,
         existing.id,
       );
       updateVisitLinks(
@@ -1362,38 +1324,32 @@ router.put('/visits/:id', (req, res) => {
   } catch (err) {
     if (sendDocumentDeletionConflict(res, err)) return;
     if (sendDocumentLinkRefusal(res, err)) return;
-    log.error('PUT /visits/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
-router.post('/visits/:id/pay', (req, res) => {
-  try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
-    if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
-    if (!assertMayTouchSettled(existing, req, res)) return;
-    const viewer = receiptAccess(req);
-    if (!viewer.amounts) return payment403(res);
-    const paidAt = nowIso();
-    db.get().transaction(() => {
-      db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = ? WHERE id = ?').run(paidAt, existing.id);
-      if (existing.payment_task_id) {
-        const prev = db.get().prepare('SELECT status FROM tasks WHERE id = ?').get(existing.payment_task_id);
-        db.get().prepare('UPDATE tasks SET status = ? WHERE id = ?').run('done', existing.payment_task_id);
-        // Derselbe Erledigungseintrag wie beim Abhaken (#1836); abgehakt hat,
-        // wer die Zahlung vermerkt.
-        if (prev) syncTaskCompletion(db.get(), existing.payment_task_id, prev.status, 'done', userId(req));
-        normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
-      }
-    })();
-    const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
-  } catch (err) {
-    log.error('POST /visits/:id/pay error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.post('/visits/:id/pay', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
+  if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
+  if (!assertMayTouchSettled(existing, req, res)) return;
+  const viewer = receiptAccess(req);
+  if (!viewer.amounts) return payment403(res);
+  const paidAt = nowIso();
+  db.get().transaction(() => {
+    db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = ? WHERE id = ?').run(paidAt, existing.id);
+    if (existing.payment_task_id) {
+      const prev = db.get().prepare('SELECT status FROM tasks WHERE id = ?').get(existing.payment_task_id);
+      db.get().prepare('UPDATE tasks SET status = ? WHERE id = ?').run('done', existing.payment_task_id);
+      // Derselbe Erledigungseintrag wie beim Abhaken (#1836); abgehakt hat,
+      // wer die Zahlung vermerkt.
+      if (prev) syncTaskCompletion(db.get(), existing.payment_task_id, prev.status, 'done', userId(req));
+      normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
+    }
+  })();
+  const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
+  res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
 });
 
 // Der Rueckweg zu /pay (#1136), nur fuer Admins: ein bezahlter Besuch ist
@@ -1402,92 +1358,77 @@ router.post('/visits/:id/pay', (req, res) => {
 // verknuepfte Zahlungsaufgabe direkt wieder geoeffnet, ohne Punktebuchung, und
 // ihr Erledigungseintrag geht mit (#1836, services/task-completions.js). Bliebe sie 'done', setzte
 // reconcilePaymentTasks() beim naechsten GET /visits paid_at sofort wieder.
-router.post('/visits/:id/unpay', (req, res) => {
-  try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
-    if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
-    if (!assertAdmin(req, res)) return;
-    const viewer = receiptAccess(req);
-    if (!viewer.amounts) return payment403(res);
-    if (existing.paid_at) {
-      db.get().transaction(() => {
-        db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = NULL WHERE id = ?').run(existing.id);
-        if (existing.payment_task_id) {
-          const reopened = db.get().prepare('UPDATE tasks SET status = ? WHERE id = ? AND status = ?').run('open', existing.payment_task_id, 'done');
-          if (reopened.changes > 0) syncTaskCompletion(db.get(), existing.payment_task_id, 'done', 'open', userId(req));
-          normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
-        }
-      })();
-    }
-    const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
-    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
-  } catch (err) {
-    log.error('POST /visits/:id/unpay error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+router.post('/visits/:id/unpay', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
+  if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
+  if (!assertAdmin(req, res)) return;
+  const viewer = receiptAccess(req);
+  if (!viewer.amounts) return payment403(res);
+  if (existing.paid_at) {
+    db.get().transaction(() => {
+      db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = NULL WHERE id = ?').run(existing.id);
+      if (existing.payment_task_id) {
+        const reopened = db.get().prepare('UPDATE tasks SET status = ? WHERE id = ? AND status = ?').run('open', existing.payment_task_id, 'done');
+        if (reopened.changes > 0) syncTaskCompletion(db.get(), existing.payment_task_id, 'done', 'open', userId(req));
+        normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
+      }
+    })();
   }
+  const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
+  res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
 });
 
-router.delete('/visits/:id', (req, res) => {
-  try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
-    if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
-    if (!assertMayTouchSettled(existing, req, res)) return;
-    db.get().transaction(() => {
-      deleteVisitLinks(db.get(), existing);
-      db.get().prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(existing.id);
-    })();
-    res.json({ data: { summary: monthlySummary(currentMonth(), receiptAccess(req)) } });
-  } catch (err) {
-    log.error('DELETE /visits/:id error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.delete('/visits/:id', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
+  if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
+  if (!assertMayTouchSettled(existing, req, res)) return;
+  db.get().transaction(() => {
+    deleteVisitLinks(db.get(), existing);
+    db.get().prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(existing.id);
+  })();
+  res.json({ data: { summary: monthlySummary(currentMonth(), receiptAccess(req)) } });
 });
 
-router.post('/work-sessions/check-out', (req, res) => {
-  try {
-    const vWorkerId = validateId(req.body.worker_id, 'worker_id');
-    if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
-    const session = loadOpenSession(vWorkerId.value);
-    if (!session) return res.status(404).json({ error: 'No open work session found.', code: 404, reason: 'housekeeping_open_session_not_found' });
+router.post('/work-sessions/check-out', validateRequest(), (req, res) => {
+  const vWorkerId = validateId(req.body.worker_id, 'worker_id');
+  if (vWorkerId.error) return res.status(400).json({ error: vWorkerId.error, code: 400 });
+  const session = loadOpenSession(vWorkerId.value);
+  if (!session) return res.status(404).json({ error: 'No open work session found.', code: 404, reason: 'housekeeping_open_session_not_found' });
 
-    // Ohne Betragsrecht (R20) bleiben die Extras der Sitzung stehen.
-    const viewer = receiptAccess(req);
-    const vExtras = viewer.amounts ? num(req.body.extras, 'extras') : { value: null, error: null };
-    if (vExtras.error) return res.status(400).json({ error: vExtras.error, code: 400 });
-    if ((vExtras.value ?? session.extras) < 0) {
-      return res.status(400).json({ error: 'Extras must be greater than or equal to zero.', code: 400 });
-    }
-
-    const checkOut = nowIso();
-    const worker = session.worker_id ? loadWorkerById(session.worker_id) : null;
-    let updateRate = session.daily_rate;
-    let minutesWorked = session.minutes_worked ?? null;
-    let sessionRateType = session.rate_type || 'daily';
-    let sessionHourlyRate = session.hourly_rate ?? 0;
-    if (worker?.rate_type === 'hourly') {
-      sessionRateType = 'hourly';
-      sessionHourlyRate = worker.hourly_rate;
-      minutesWorked = minutesBetween(session.check_in, checkOut);
-      updateRate = computeHourlyAmount(minutesWorked ?? 0, worker.hourly_rate);
-    }
-    db.get().transaction(() => {
-      db.get().prepare(`
-        UPDATE housekeeping_work_sessions
-        SET check_out = ?, extras = ?, daily_rate = ?, minutes_worked = ?, rate_type = ?, hourly_rate = ?
-        WHERE id = ?
-      `).run(checkOut, vExtras.value ?? session.extras, updateRate, minutesWorked, sessionRateType, sessionHourlyRate, session.id);
-      normalizePaymentTaskAudience(db.get(), session.payment_task_id);
-    })();
-    const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
-    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
-  } catch (err) {
-    log.error('POST /work-sessions/check-out error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // Ohne Betragsrecht (R20) bleiben die Extras der Sitzung stehen.
+  const viewer = receiptAccess(req);
+  // A number or null (schema).
+  const extras = viewer.amounts ? (req.body.extras ?? null) : null;
+  if ((extras ?? session.extras) < 0) {
+    return res.status(400).json({ error: 'Extras must be greater than or equal to zero.', code: 400 });
   }
+
+  const checkOut = nowIso();
+  const worker = session.worker_id ? loadWorkerById(session.worker_id) : null;
+  let updateRate = session.daily_rate;
+  let minutesWorked = session.minutes_worked ?? null;
+  let sessionRateType = session.rate_type || 'daily';
+  let sessionHourlyRate = session.hourly_rate ?? 0;
+  if (worker?.rate_type === 'hourly') {
+    sessionRateType = 'hourly';
+    sessionHourlyRate = worker.hourly_rate;
+    minutesWorked = minutesBetween(session.check_in, checkOut);
+    updateRate = computeHourlyAmount(minutesWorked ?? 0, worker.hourly_rate);
+  }
+  db.get().transaction(() => {
+    db.get().prepare(`
+      UPDATE housekeeping_work_sessions
+      SET check_out = ?, extras = ?, daily_rate = ?, minutes_worked = ?, rate_type = ?, hourly_rate = ?
+      WHERE id = ?
+    `).run(checkOut, extras ?? session.extras, updateRate, minutesWorked, sessionRateType, sessionHourlyRate, session.id);
+    normalizePaymentTaskAudience(db.get(), session.payment_task_id);
+  })();
+  const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
+  res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
 });
 
 /** So lange nach dem Auschecken nimmt "Rueckgaengig" es zurueck (Minuten). */
@@ -1506,213 +1447,176 @@ const REOPEN_WINDOW_MINUTES = 10;
  * wieder eingecheckt ist: sonst stuenden zwei offene Sitzungen da, und die
  * Seite kennt nur eine.
  */
-router.post('/work-sessions/:id/reopen', (req, res) => {
-  try {
-    const vId = validateId(req.params.id, 'id');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const session = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
-    if (!session) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
-    if (!session.check_out) return res.status(409).json({ error: 'This visit is still open.', code: 409, reason: 'housekeeping_visit_open' });
-    const outMs = Date.parse(session.check_out);
-    if (session.paid_at || !Number.isFinite(outMs) || Date.now() - outMs > REOPEN_WINDOW_MINUTES * 60_000) {
-      return res.status(409).json({ error: 'This check-out can no longer be taken back.', code: 409, reason: 'housekeeping_reopen_expired' });
-    }
-    if (session.worker_id && loadOpenSession(session.worker_id)) {
-      return res.status(409).json({ error: 'This housekeeper is already checked in.', code: 409, reason: 'housekeeping_already_checked_in' });
-    }
-    const hourly = session.rate_type === 'hourly';
-    db.get().prepare(`
-      UPDATE housekeeping_work_sessions
-      SET check_out = NULL,
-          minutes_worked = CASE WHEN ? THEN NULL ELSE minutes_worked END,
-          daily_rate = CASE WHEN ? THEN 0 ELSE daily_rate END
-      WHERE id = ?
-    `).run(hourly ? 1 : 0, hourly ? 1 : 0, session.id);
-    const viewer = receiptAccess(req);
-    const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
-    res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
-  } catch (err) {
-    log.error('POST /work-sessions/:id/reopen error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+router.post('/work-sessions/:id/reopen', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.id, 'id');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const session = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
+  if (!session) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
+  if (!session.check_out) return res.status(409).json({ error: 'This visit is still open.', code: 409, reason: 'housekeeping_visit_open' });
+  const outMs = Date.parse(session.check_out);
+  if (session.paid_at || !Number.isFinite(outMs) || Date.now() - outMs > REOPEN_WINDOW_MINUTES * 60_000) {
+    return res.status(409).json({ error: 'This check-out can no longer be taken back.', code: 409, reason: 'housekeeping_reopen_expired' });
   }
+  if (session.worker_id && loadOpenSession(session.worker_id)) {
+    return res.status(409).json({ error: 'This housekeeper is already checked in.', code: 409, reason: 'housekeeping_already_checked_in' });
+  }
+  const hourly = session.rate_type === 'hourly';
+  db.get().prepare(`
+    UPDATE housekeeping_work_sessions
+    SET check_out = NULL,
+        minutes_worked = CASE WHEN ? THEN NULL ELSE minutes_worked END,
+        daily_rate = CASE WHEN ? THEN 0 ELSE daily_rate END
+    WHERE id = ?
+  `).run(hourly ? 1 : 0, hourly ? 1 : 0, session.id);
+  const viewer = receiptAccess(req);
+  const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
+  res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
 });
 
-router.get('/decay-tasks', (_req, res) => {
-  try {
-    const rows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks ORDER BY area COLLATE NOCASE, name COLLATE NOCASE').all();
-    const tz = householdTimeZone(db.get());
-    const tasks = rows
-      .map((row) => publicDecayTask(row, tz))
-      .sort((a, b) => {
-        const rank = { overdue: 0, today: 1, ok: 2 };
-        const rankDiff = rank[a.urgency_status] - rank[b.urgency_status];
-        if (rankDiff !== 0) return rankDiff;
-        return (b.urgency ?? 9999) - (a.urgency ?? 9999);
-      });
-    res.json({ data: tasks });
-  } catch (err) {
-    log.error('GET /decay-tasks error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/decay-tasks', validateRequest(), (_req, res) => {
+  const rows = db.get().prepare('SELECT * FROM housekeeping_decay_tasks ORDER BY area COLLATE NOCASE, name COLLATE NOCASE').all();
+  const tz = householdTimeZone(db.get());
+  const tasks = rows
+    .map((row) => publicDecayTask(row, tz))
+    .sort((a, b) => {
+      const rank = { overdue: 0, today: 1, ok: 2 };
+      const rankDiff = rank[a.urgency_status] - rank[b.urgency_status];
+      if (rankDiff !== 0) return rankDiff;
+      return (b.urgency ?? 9999) - (a.urgency ?? 9999);
+    });
+  res.json({ data: tasks });
 });
 
-router.post('/decay-tasks', (req, res) => {
-  try {
-    const vName = str(req.body.name, 'name', { max: MAX_TITLE });
-    const vArea = str(req.body.area, 'area', { max: MAX_SHORT });
-    const vFrequency = num(req.body.frequency_days, 'frequency_days', { required: true });
-    // Ein `Z` oder Offset wird der UTC-Instant, den auch `/complete` schreibt
-    // (#1364), statt seine Ziffern als Wanduhrzeit zu behalten.
-    const vCompleted = datetime(req.body.last_completed, 'last_completed', false, { to: 'instant' });
-    const errors = collectErrors([vName, vArea, vFrequency, vCompleted]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    if (!Number.isInteger(vFrequency.value) || vFrequency.value < 1) {
-      return res.status(400).json({ error: 'frequency_days must be a positive integer.', code: 400 });
-    }
+router.post('/decay-tasks', validateRequest(), (req, res) => {
+  const vName = str(req.body.name, 'name', { max: MAX_TITLE });
+  const vArea = str(req.body.area, 'area', { max: MAX_SHORT });
+  // `frequency_days`: a required whole number of at least 1 (schema, #2810).
+  const frequencyDays = req.body.frequency_days;
+  // Ein `Z` oder Offset wird der UTC-Instant, den auch `/complete` schreibt
+  // (#1364), statt seine Ziffern als Wanduhrzeit zu behalten.
+  const vCompleted = datetime(req.body.last_completed, 'last_completed', false, { to: 'instant' });
+  const errors = collectErrors([vName, vArea, vCompleted]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const result = db.get().prepare(`
-      INSERT INTO housekeeping_decay_tasks (name, area, frequency_days, last_completed, created_by)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(vName.value, vArea.value, vFrequency.value, vCompleted.value, userId(req));
-    const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
-  } catch (err) {
-    log.error('POST /decay-tasks error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const result = db.get().prepare(`
+    INSERT INTO housekeeping_decay_tasks (name, area, frequency_days, last_completed, created_by)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(vName.value, vArea.value, frequencyDays, vCompleted.value, userId(req));
+  const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
 });
 
-router.patch('/decay-tasks/:taskId', (req, res) => {
-  try {
-    const vId = validateId(req.params.taskId, 'taskId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const existing = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
-    if (!existing) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'housekeeping_task_not_found' });
+router.patch('/decay-tasks/:taskId', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.taskId, 'taskId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const existing = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
+  if (!existing) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'housekeeping_task_not_found' });
 
-    const vName = req.body.name !== undefined ? str(req.body.name, 'name', { max: MAX_TITLE }) : { value: existing.name, error: null };
-    const vArea = req.body.area !== undefined ? str(req.body.area, 'area', { max: MAX_SHORT }) : { value: existing.area, error: null };
-    const vFrequency = req.body.frequency_days !== undefined ? num(req.body.frequency_days, 'frequency_days', { required: true }) : { value: existing.frequency_days, error: null };
-    const vCompleted = req.body.last_completed !== undefined ? datetime(req.body.last_completed, 'last_completed', false, { to: 'instant' }) : { value: existing.last_completed, error: null };
-    const errors = collectErrors([vName, vArea, vFrequency, vCompleted]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-    if (!Number.isInteger(Number(vFrequency.value)) || Number(vFrequency.value) < 1) {
-      return res.status(400).json({ error: 'frequency_days must be a positive integer.', code: 400 });
-    }
-
-    db.get().prepare(`
-      UPDATE housekeeping_decay_tasks
-      SET name = ?, area = ?, frequency_days = ?, last_completed = ?
-      WHERE id = ?
-    `).run(vName.value, vArea.value, Number(vFrequency.value), vCompleted.value, vId.value);
-    const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
-    res.json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
-  } catch (err) {
-    log.error('PATCH /decay-tasks/:taskId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const vName = req.body.name !== undefined ? str(req.body.name, 'name', { max: MAX_TITLE }) : { value: existing.name, error: null };
+  const vArea = req.body.area !== undefined ? str(req.body.area, 'area', { max: MAX_SHORT }) : { value: existing.area, error: null };
+  const vFrequency = req.body.frequency_days !== undefined ? num(req.body.frequency_days, 'frequency_days', { required: true }) : { value: existing.frequency_days, error: null };
+  const vCompleted = req.body.last_completed !== undefined ? datetime(req.body.last_completed, 'last_completed', false, { to: 'instant' }) : { value: existing.last_completed, error: null };
+  const errors = collectErrors([vName, vArea, vFrequency, vCompleted]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  if (!Number.isInteger(Number(vFrequency.value)) || Number(vFrequency.value) < 1) {
+    return res.status(400).json({ error: 'frequency_days must be a positive integer.', code: 400 });
   }
+
+  db.get().prepare(`
+    UPDATE housekeeping_decay_tasks
+    SET name = ?, area = ?, frequency_days = ?, last_completed = ?
+    WHERE id = ?
+  `).run(vName.value, vArea.value, Number(vFrequency.value), vCompleted.value, vId.value);
+  const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
+  res.json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
 });
 
-router.post('/decay-tasks/:taskId/complete', (req, res) => {
-  try {
-    const vId = validateId(req.params.taskId, 'taskId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const existing = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
-    if (!existing) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'housekeeping_task_not_found' });
+router.post('/decay-tasks/:taskId/complete', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.taskId, 'taskId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const existing = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
+  if (!existing) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'housekeeping_task_not_found' });
 
-    db.get().prepare('UPDATE housekeeping_decay_tasks SET last_completed = ? WHERE id = ?').run(nowIso(), vId.value);
-    const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
-    res.json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
-  } catch (err) {
-    log.error('POST /decay-tasks/:taskId/complete error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  db.get().prepare('UPDATE housekeeping_decay_tasks SET last_completed = ? WHERE id = ?').run(nowIso(), vId.value);
+  const row = db.get().prepare('SELECT * FROM housekeeping_decay_tasks WHERE id = ?').get(vId.value);
+  res.json({ data: publicDecayTask(row, householdTimeZone(db.get())) });
 });
 
-router.delete('/decay-tasks/:taskId', (req, res) => {
-  try {
-    const vId = validateId(req.params.taskId, 'taskId');
-    if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const result = db.get().prepare('DELETE FROM housekeeping_decay_tasks WHERE id = ?').run(vId.value);
-    if (result.changes === 0) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'housekeeping_task_not_found' });
-    res.json({ data: null });
-  } catch (err) {
-    log.error('DELETE /decay-tasks/:taskId error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.delete('/decay-tasks/:taskId', validateRequest(), (req, res) => {
+  const vId = validateId(req.params.taskId, 'taskId');
+  if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
+  const result = db.get().prepare('DELETE FROM housekeeping_decay_tasks WHERE id = ?').run(vId.value);
+  if (result.changes === 0) return res.status(404).json({ error: 'Task not found.', code: 404, reason: 'housekeeping_task_not_found' });
+  res.json({ data: null });
 });
 
-router.post('/supply-requests', (req, res) => {
-  try {
-    // WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1351, Regel aus
-    // #1290, ausfuehrlich in routes/meals.js). Der Pfad sagt `housekeeping`,
-    // angelegt wird ein `shopping_items`-Eintrag und ueber
-    // `defaultShoppingList()` notfalls eine ganze Einkaufsliste. Die Riegel in
-    // server/index.js urteilen am ersten Pfadsegment und sehen davon nichts;
-    // `mayWriteModule()` prueft Mitgliedsrecht und Token-Scope in einem Aufruf.
-    //
-    // Als Erstes, vor Validierung und Transaktion: eine Antwort darf einem
-    // Gesperrten nichts ueber den Einkauf verraten, und angelegt wird nichts.
-    if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
-    }
-
-    const vName = str(req.body.name, 'name', { max: MAX_TITLE });
-    const vQuantity = str(req.body.quantity, 'quantity', { max: MAX_SHORT, required: false });
-    const errors = collectErrors([vName, vQuantity]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-
-    const actorId = userId(req);
-    const result = db.get().transaction(() => {
-      const listId = defaultShoppingList(actorId);
-      const item = db.get().prepare(`
-        INSERT INTO shopping_items (list_id, name, quantity, category)
-        VALUES (?, ?, ?, ?)
-      `).run(listId, vName.value, vQuantity.value, defaultShoppingCategory());
-      const request = db.get().prepare(`
-        INSERT INTO housekeeping_supply_requests (name, quantity, shopping_item_id, created_by)
-        VALUES (?, ?, ?, ?)
-      `).run(vName.value, vQuantity.value, item.lastInsertRowid, actorId);
-      return {
-        requestId: request.lastInsertRowid,
-        shoppingItemId: item.lastInsertRowid,
-      };
-    })();
-
-    const row = db.get().prepare('SELECT * FROM housekeeping_supply_requests WHERE id = ?').get(result.requestId);
-    res.status(201).json({ data: row, shopping_item_id: result.shoppingItemId });
-  } catch (err) {
-    log.error('POST /supply-requests error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+// WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1351, Regel aus
+// #1290, ausfuehrlich in routes/meals.js). Der Pfad sagt `housekeeping`,
+// angelegt wird ein `shopping_items`-Eintrag und ueber
+// `defaultShoppingList()` notfalls eine ganze Einkaufsliste. Die Riegel in
+// server/index.js urteilen am ersten Pfadsegment und sehen davon nichts;
+// `mayWriteModule()` prueft Mitgliedsrecht und Token-Scope in einem Aufruf.
+//
+// Als Erstes, vor Validierung und Transaktion: eine Antwort darf einem
+// Gesperrten nichts ueber den Einkauf verraten, und angelegt wird nichts. Das
+// Recht haengt an keiner Zeile und steht deshalb als Middleware VOR
+// validateRequest() (#2810): 403 bleibt 403, auch bei kaputtem Koerper.
+/**
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireShoppingWrite(req, res, next) {
+  if (!mayWriteModule(req, 'shopping')) {
+    return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
   }
+  return next();
+}
+
+router.post('/supply-requests', requireShoppingWrite, validateRequest(), (req, res) => {
+  const vName = str(req.body.name, 'name', { max: MAX_TITLE });
+  const vQuantity = str(req.body.quantity, 'quantity', { max: MAX_SHORT, required: false });
+  const errors = collectErrors([vName, vQuantity]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+
+  const actorId = userId(req);
+  const result = db.get().transaction(() => {
+    const listId = defaultShoppingList(actorId);
+    const item = db.get().prepare(`
+      INSERT INTO shopping_items (list_id, name, quantity, category)
+      VALUES (?, ?, ?, ?)
+    `).run(listId, vName.value, vQuantity.value, defaultShoppingCategory());
+    const request = db.get().prepare(`
+      INSERT INTO housekeeping_supply_requests (name, quantity, shopping_item_id, created_by)
+      VALUES (?, ?, ?, ?)
+    `).run(vName.value, vQuantity.value, item.lastInsertRowid, actorId);
+    return {
+      requestId: request.lastInsertRowid,
+      shoppingItemId: item.lastInsertRowid,
+    };
+  })();
+
+  const row = db.get().prepare('SELECT * FROM housekeeping_supply_requests WHERE id = ?').get(result.requestId);
+  res.status(201).json({ data: row, shopping_item_id: result.shoppingItemId });
 });
 
-router.get('/maintenance-log', (_req, res) => {
-  try {
-    const rows = db.get().prepare('SELECT * FROM housekeeping_maintenance_log ORDER BY created_at DESC, id DESC').all();
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('GET /maintenance-log error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/maintenance-log', validateRequest(), (_req, res) => {
+  const rows = db.get().prepare('SELECT * FROM housekeeping_maintenance_log ORDER BY created_at DESC, id DESC').all();
+  res.json({ data: rows });
 });
 
-router.post('/maintenance-log', (req, res) => {
-  try {
-    const vDescription = str(req.body.description, 'description', { max: MAX_TEXT });
-    const vPhoto = validatePhotoUrl(req.body.photo_url);
-    const errors = collectErrors([vDescription, vPhoto]);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+router.post('/maintenance-log', validateRequest(), (req, res) => {
+  const vDescription = str(req.body.description, 'description', { max: MAX_TEXT });
+  const vPhoto = validatePhotoUrl(req.body.photo_url);
+  const errors = collectErrors([vDescription, vPhoto]);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const result = db.get().prepare(`
-      INSERT INTO housekeeping_maintenance_log (description, photo_url, created_by)
-      VALUES (?, ?, ?)
-    `).run(vDescription.value, vPhoto.value, userId(req));
-    const row = db.get().prepare('SELECT * FROM housekeeping_maintenance_log WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: row });
-  } catch (err) {
-    log.error('POST /maintenance-log error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const result = db.get().prepare(`
+    INSERT INTO housekeeping_maintenance_log (description, photo_url, created_by)
+    VALUES (?, ?, ?)
+  `).run(vDescription.value, vPhoto.value, userId(req));
+  const row = db.get().prepare('SELECT * FROM housekeeping_maintenance_log WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ data: row });
 });
 
 export default router;

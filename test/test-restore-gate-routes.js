@@ -46,6 +46,16 @@ const ROUTE_ALLOWLIST = new Map([
 ]);
 
 /**
+ * Routen, die waehrend eines Restores selbst mit 503 antworten, ohne die
+ * Datenbank zu brauchen und ohne das Gate: ihr 503 IST die Auskunft. Gemessen
+ * wird unten der eigene Rumpf, damit hier keine Route landet, die nur zufaellig
+ * mit 503 scheitert.
+ */
+const SELF_REFUSING = new Map([
+  ['/readyz', { reason: 'Readiness (Phase 1b, E11): meldet den laufenden Restore selbst', body: { status: 'not_ready', reason: 'restore_in_progress' } }],
+]);
+
+/**
  * Globale Middleware (Mount-Pfad `/`), nach Funktionsname. Sie laeuft fuer
  * JEDE Anfrage, also auch vor dem Gate oder an ihm vorbei.
  */
@@ -86,6 +96,12 @@ const dbmod = await import('../server/db.js');
 /**
  * Jeder Layer der App als `{ kind, paths, name }`. Ein Layer ohne
  * mitgeschriebenen Pfad ist selbst ein Befund: dann kam er an `app.use` vorbei.
+ *
+ * Ein Router-Mount, den `needsDatabase()` nicht als Ganzes deckt, zaehlt mit
+ * den Routen seines Routers (Mount plus Routenpfad, `kind: 'mounted'`): die
+ * sechs ICS-Feeds stehen seit #2810 (Gruppe 13) in server/routes/ics-feeds.js
+ * unter `app.use('/feed', ...)`, und `/feed` selbst liefert nichts - gedeckt
+ * sein muss jede Feed-Adresse darunter.
  */
 function topLevelLayers() {
   return app.router.stack.map((layer) => {
@@ -94,6 +110,12 @@ function topLevelLayers() {
       return { kind: 'route', paths, name: layer.name };
     }
     const mountPath = mountPaths.get(layer);
+    /** @type {any[]} */
+    const routes = Array.isArray(layer.handle?.stack) ? layer.handle.stack.filter((/** @type {any} */ l) => l.route) : [];
+    if (typeof mountPath === 'string' && mountPath !== '/' && !needsDatabase(mountPath) && routes.length > 0) {
+      const paths = routes.flatMap((l) => [l.route.path].flat().map((/** @type {string} */ p) => `${mountPath}${p}`));
+      return { kind: 'mounted', paths, name: layer.name };
+    }
     return { kind: 'use', paths: mountPath === undefined ? [] : [mountPath].flat(), name: layer.name };
   });
 }
@@ -120,7 +142,7 @@ test('#1531 jede Top-Level-Route ist von needsDatabase() gedeckt oder begruendet
         uncovered.push(`${entry.kind} ${String(path)} (kein String-Pfad, nicht pruefbar)`);
         continue;
       }
-      if (needsDatabase(path) || ROUTE_ALLOWLIST.has(path)) continue;
+      if (needsDatabase(path) || ROUTE_ALLOWLIST.has(path) || SELF_REFUSING.has(path)) continue;
       uncovered.push(`${entry.kind} ${path}`);
     }
   }
@@ -137,12 +159,21 @@ test('#1531 jede globale Middleware steht mit Begruendung in der Allowlist', () 
   assert.deepEqual(unknown, [], 'globale Middleware ohne Eintrag (anonyme Funktionen einen Namen geben)');
 });
 
+test('#2810 die ICS-Feeds unter dem Mount /feed werden einzeln gelesen und sind gedeckt', () => {
+  const feeds = topLevelLayers().filter((/** @type {any} */ l) => l.kind === 'mounted').flatMap((/** @type {any} */ l) => l.paths).sort();
+  assert.deepEqual(feeds, [
+    '/feed/birthdays/:token.ics', '/feed/calendar/:token.ics', '/feed/cycle/:token.ics',
+    '/feed/inventory-deadlines/:token.ics', '/feed/schedule/:token.ics', '/feed/waste/:token.ics',
+  ]);
+  assert.ok(feeds.every((/** @type {string} */ path) => needsDatabase(path)), 'jede Feed-Adresse bekommt waehrend eines Restores 503');
+});
+
 test('#1531 jeder Allowlist-Eintrag gibt es in der App noch', () => {
   const layers = topLevelLayers();
   const routePaths = new Set(layers.filter((l) => !isGlobal(l)).flatMap((l) => l.paths));
   const globalNames = new Set(layers.filter(isGlobal).map((l) => l.name));
   const stale = [
-    ...[...ROUTE_ALLOWLIST.keys()].filter((p) => !routePaths.has(p)),
+    ...[...ROUTE_ALLOWLIST.keys(), ...SELF_REFUSING.keys()].filter((p) => !routePaths.has(p)),
     ...[...GLOBAL_MIDDLEWARE_ALLOWLIST.keys()].filter((n) => !globalNames.has(n)),
   ];
   assert.deepEqual(stale, [], 'veraltete Allowlist-Eintraege');
@@ -206,7 +237,16 @@ test('#1531 bei geschlossener Verbindung: gedeckte Routen 503, freigestellte ohn
         headers: { Authorization: 'Bearer restore-gate-probe', Accept: 'application/json' },
         redirect: 'manual',
       });
-      await res.arrayBuffer();
+      const text = await res.text();
+      const own = SELF_REFUSING.get(probe.path);
+      if (own) {
+        let body = null;
+        try { body = JSON.parse(text); } catch { /* kein JSON: unten ein Befund */ }
+        if (res.status !== 503 || JSON.stringify(body) !== JSON.stringify(own.body)) {
+          wrong.push(`GET ${probe.url} (${probe.path}): ${res.status} ${text.slice(0, 120)}`);
+        }
+        continue;
+      }
       if (probe.covered ? res.status !== 503 : res.status >= 500) {
         wrong.push(`GET ${probe.url} (${probe.path}): ${res.status}`);
       }
@@ -215,6 +255,6 @@ test('#1531 bei geschlossener Verbindung: gedeckte Routen 503, freigestellte ohn
     restore.release();
     await restore.done;
   }
-  assert.deepEqual(wrong, [], 'gedeckt heisst 503, freigestellt heisst ohne 5xx');
+  assert.deepEqual(wrong, [], 'gedeckt heisst 503, freigestellt heisst ohne 5xx, selbst meldend heisst 503 mit eigenem Rumpf');
 });
 

@@ -1,7 +1,7 @@
 /**
  * Modul: Housekeeping-Test
  * Zweck: Validiert Housekeeping-Schema, API-Abfragen und Constraints
- * Ausführen: node --experimental-sqlite test/test-housekeeping.js
+ * Ausführen: node test/test-housekeeping.js
  */
 
 import assert from 'node:assert/strict';

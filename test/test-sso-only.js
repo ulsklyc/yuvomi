@@ -2,7 +2,7 @@
  * Modul: SSO als einziger Weg hinein (#847)
  * Zweck: Der Schalter `AUTH_ALLOW_PASSWORD_LOGIN`, Konten ohne Passwort und die
  *        Loecher, die beide im Passwort-Reset aufreissen wuerden.
- * Ausfuehren: node --experimental-sqlite test/test-sso-only.js
+ * Ausfuehren: node test/test-sso-only.js
  *
  * Warum eine eigene Suite und nicht ein Kapitel in test-oidc.js: die Regeln
  * hier gelten fuer die EINGEBAUTE Anmeldung. Dass OIDC ueber ihr Wirksamwerden
@@ -12,6 +12,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import { DatabaseSync } from 'node:sqlite';
 import { createPasswordResetService } from '../server/services/password-reset.js';
 import {
@@ -211,8 +212,6 @@ function makeDb() {
 async function makeAuthApp(db) {
   const { buildResetRoutes } = await import('../server/auth.js');
   const sent = [];
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   const pending = [];
   buildResetRoutes(router, {
@@ -224,7 +223,7 @@ async function makeAuthApp(db) {
     // Der Versand laeuft nach der Antwort; `drain` wartet auf ihn.
     defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   app.locals.drain = () => Promise.all(pending.splice(0));
   return { app, sent };
 }
@@ -234,7 +233,7 @@ async function callJson(app, method, path, body) {
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const { port } = server.address();
-  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/v1${path}`, {
     method, headers: { 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -509,7 +508,7 @@ test('die Sichtbarkeit von sso_only haengt am geltenden Zugang, nicht an der Ses
   // Feld; ein Mitglieds-Token neben einem Admin-Cookie bekaeme es zu Unrecht.
   const users = authSrc.slice(authSrc.indexOf("router.get('/users'"));
   const body = users.slice(0, users.indexOf("router.get('/api-tokens'"));
-  assert.match(body, /const isAdmin = req\.authRole === 'admin'/);
+  assert.match(body, /const isAdmin = isAdminRequest\(req\)/);
   assert.doesNotMatch(body, /req\.session\?\.role/,
     'die Session ist hier die falsche Quelle');
 });
@@ -651,8 +650,7 @@ async function configFor(db) {
   ]);
   _setTestDatabase(db);
   try {
-    const app = express();
-    app.use('/auth', router);
+    const app = await createAuthApp({ routers: [router] });
     const { json } = await callJson(app, 'GET', '/auth/oidc/config');
     return json;
   } finally {

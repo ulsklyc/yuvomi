@@ -92,6 +92,20 @@ test('ein "nichts Neues" muss nennen, WOMIT verglichen wurde', () => {
     'ein "nichts Neues" ohne Bezugspunkt laesst sich nicht nachpruefen (#1266)');
 });
 
+test('haelt die Review einen Stand fuer trivial, sagt sie das als Kommentar', () => {
+  // #2765, 15.11.2026: nur `tsc-baseline.json`. Der Prompt zaehlte "trivial"
+  // zu den Bedingungen aus Schritt 1, die "unveraendert" gelten, und das
+  // Plugin brach still ab - Lauf 43758461498, 2 Turns, kein Kommentar, rot.
+  // Entwurf und Bot-PR nimmt der Nachweis-Schritt aus, weil der Workflow sie
+  // sicher weiss; "trivial" entscheidet erst das Plugin. Statt einer Ausnahme
+  // fuer ein Schweigen, das sich selbst entschuldigt, gilt hier dasselbe wie
+  // fuer "nichts Neues": ein Satz als Kommentar, mit Bezugspunkt.
+  assert.doesNotMatch(prompt, /\([^)]*\btrivial\b[^)]*\)\s*gelten unveraendert/,
+    '"trivial" darf nicht zu den Bedingungen gehoeren, bei denen die Review still aufhoert');
+  assert.match(prompt, /\btrivial\b[^.]*Kommentar/,
+    'der Trivial-Fall muss zu einem Kommentar fuehren');
+});
+
 test('der Prompt bleibt kurz, und die Laenge ist die Regel', () => {
   // DIE LAENGE IST DAS MESSBARE AN "NICHT ARGUMENTATIV" (#1259, 18.09.2026).
   // Der alte Prompt war auf 1783 Zeichen und 26 Zeilen gewachsen, und die

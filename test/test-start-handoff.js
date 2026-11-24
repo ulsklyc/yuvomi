@@ -16,6 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createStartHandoff } from '../public/utils/start-handoff.js';
+import { isPrecachedSource } from './dist-build.js';
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -197,5 +198,6 @@ test('health takes the preferences of the start instead of asking again', () => 
 });
 
 test('the handoff module ships with the shell', () => {
-  assert.match(read('../public/sw.js'), /'\/utils\/start-handoff\.js',/);
+  // Seit dem Build: die Liste schreibt Vite (dist/sw.js), das Modul liegt in einem precachten Chunk.
+  assert.ok(isPrecachedSource('/utils/start-handoff.js'), '/utils/start-handoff.js liegt in keinem precachten Chunk');
 });

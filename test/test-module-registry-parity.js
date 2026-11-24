@@ -16,12 +16,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { isPrecachedSource } from './dist-build.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 const { MODULE_KEYS } = await import('../server/scopes.js');
-const { PERMISSION_MODULES } = await import('../server/permissions.js');
+const { PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 const { KITCHEN_CHILD_IDS } = await import('../public/settings/module-order.js');
+const { TOGGLEABLE_MODULES, normalizeMobileNavOrder } = await import('../server/settings/values.ts');
 
 /**
  * Liest ein Array-Literal aus einer Frontend-Quelldatei.
@@ -98,12 +100,11 @@ test('die drei Kitchen-Child-Listen tragen dieselben IDs', () => {
 });
 
 test('server KITCHEN_NAV_IDS enthält jedes Kitchen-Kind des Clients', () => {
-  const source = read('../server/routes/preferences.js');
-  const match = source.match(/KITCHEN_NAV_IDS\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
-  assert.ok(match, 'KITCHEN_NAV_IDS nicht gefunden');
-  const serverIds = [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
-
-  const missing = KITCHEN_CHILD_IDS.filter((id) => !serverIds.includes(id));
+  // KITCHEN_NAV_IDS (server/settings/values.ts, seit Phase 2, C3) ist nicht
+  // exportiert: gefragt wird die Funktion, die es anwendet. Ein Kitchen-Kind
+  // in der mobilen Leiste wird zu 'kitchen' - fehlt es in der Menge (oder im
+  // Muster davor), kommt etwas anderes heraus.
+  const missing = KITCHEN_CHILD_IDS.filter((id) => normalizeMobileNavOrder([id]).join() !== 'kitchen');
   assert.deepEqual(missing, [], 'Kitchen-Kind fehlt in der serverseitigen Nav-Validierung');
 });
 
@@ -111,35 +112,21 @@ test('server KITCHEN_NAV_IDS enthält jedes Kitchen-Kind des Clients', () => {
 // Service Worker: jedes Modul mit eigenem Stylesheet gehört in die App-Shell,
 // sonst rendert die Seite offline unformatiert
 // --------------------------------------------------------------------------
-// Auf die Deklarationen ankern, nicht auf den ersten Namenstreffer: beide
-// Konstanten werden im Kopfkommentar der Datei erwähnt.
-function swArray(sw, name) {
-  const start = sw.indexOf(`const ${name} = [`);
-  assert.notEqual(start, -1, `const ${name} = [ nicht gefunden`);
-  const end = sw.indexOf('];', start);
-  assert.notEqual(end, -1, `Ende von ${name} nicht gefunden`);
-  return sw.slice(start, end);
-}
+// Seit dem Build (Phase 1a, Abschnitt D) schreibt Vite die Precache-Liste in
+// dist/sw.js; gefragt wird das Artefakt, nicht mehr eine Hand-Liste.
 
-test('sw.js APP_SHELL cacht das Stylesheet jedes Kitchen-Moduls', () => {
-  const shell = swArray(read('../public/sw.js'), 'APP_SHELL');
-
+test('der gebaute Worker cacht das Stylesheet jedes Kitchen-Moduls', () => {
   for (const id of KITCHEN_CHILD_IDS) {
     assert.ok(
-      shell.includes(`'/styles/${id}.css'`),
-      `/styles/${id}.css fehlt in APP_SHELL - die Seite rendert offline ungestylt`
+      isPrecachedSource(`/styles/${id}.css`),
+      `/styles/${id}.css fehlt im Precache - die Seite rendert offline ungestylt`
     );
   }
 });
 
-test('sw.js PAGE_MODULES cacht die Seite jedes Kitchen-Moduls', () => {
-  const modules = swArray(read('../public/sw.js'), 'PAGE_MODULES');
-
+test('der gebaute Worker cacht die Seite jedes Kitchen-Moduls', () => {
   for (const id of KITCHEN_CHILD_IDS) {
-    assert.ok(
-      modules.includes(`'/pages/${id}.js'`),
-      `/pages/${id}.js fehlt in PAGE_MODULES`
-    );
+    assert.ok(isPrecachedSource(`/pages/${id}.js`), `/pages/${id}.js liegt in keinem precachten Chunk`);
   }
 });
 
@@ -148,12 +135,7 @@ test('sw.js PAGE_MODULES cacht die Seite jedes Kitchen-Moduls', () => {
 // abschaltbar sein - sonst hat die Gruppe ein Kind ohne Schalter
 // --------------------------------------------------------------------------
 test('TOGGLEABLE_MODULES enthält jedes Kitchen-Kind', () => {
-  const source = read('../server/routes/preferences.js');
-  const match = source.match(/TOGGLEABLE_MODULES\s*=\s*\[([\s\S]*?)\]/);
-  assert.ok(match, 'TOGGLEABLE_MODULES nicht gefunden');
-  const toggleable = [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
-
-  const missing = KITCHEN_CHILD_IDS.filter((id) => !toggleable.includes(id));
+  const missing = KITCHEN_CHILD_IDS.filter((id) => !TOGGLEABLE_MODULES.includes(id));
   assert.deepEqual(missing, [], 'Kitchen-Kind ohne Abschalt-Möglichkeit');
 });
 

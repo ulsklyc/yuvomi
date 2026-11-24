@@ -27,11 +27,14 @@
  *
  *   node scripts/build-screenshot-crops.mjs [name ...]
  *
+ * Playwright ist keine Abhaengigkeit: YUVOMI_PLAYWRIGHT_PATH zeigt auf ein global
+ * installiertes playwright/index.mjs (Default: Homebrew), scripts/lib/playwright-module.js.
+ *
  * test:docs-landing prueft, dass jeder Ausschnitt, den die Seite nennt, hier
  * steht und in jedem Sprachordner in beiden Themes und Breiten existiert.
  */
 
-import { chromium } from '/opt/homebrew/lib/node_modules/playwright/index.mjs';
+import { loadChromium } from './lib/playwright-module.js';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,7 +98,7 @@ async function main() {
   const only = new Set(process.argv.slice(2));
   const unknown = [...only].filter((n) => !CROPS.some((c) => c.name === n));
   if (unknown.length) { console.error(`Unknown crop: ${unknown.join(', ')}`); process.exit(1); }
-  const browser = await chromium.launch({ headless: true });
+  const browser = await (await loadChromium()).launch({ headless: true });
   const page = await browser.newPage();
   await page.setContent('<!doctype html><meta charset="utf-8"><title>crops</title>');
   let written = 0;

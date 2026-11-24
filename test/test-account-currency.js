@@ -19,7 +19,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'account-currency-test-secret';
@@ -27,7 +27,6 @@ delete process.env.FIXER_API_KEY;
 
 const dbmod = await import('../server/db.js');
 const subscriptions = await import('../server/routes/subscriptions.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { expectedSubscriptionEntries } = await import('../server/services/subscription-budget-projection.js');
 
 const db = dbmod.get();
@@ -46,16 +45,17 @@ subscriptions._setRatesForTest(async (base, currencies) => {
 });
 test.after(() => subscriptions._setRatesForTest(null));
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = ADA;
-  req.authRole = 'admin';
-  req.session = { userId: ADA, role: 'admin' };
-  next();
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['subscriptions', 'budget'],
+  auth: (req, _res, next) => {
+    req.authUserId = ADA;
+    req.authRole = 'admin';
+    req.session = { userId: ADA, role: 'admin' };
+    next();
+  },
 });
-app.use('/api/v1/budget/subscriptions', subscriptions.default);
-app.use('/api/v1/budget', budgetRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));

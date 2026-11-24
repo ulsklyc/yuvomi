@@ -22,7 +22,7 @@
  * test-calendar-timezone-window.js). Tokio liegt sieben Stunden oestlich von
  * Berlin: ein Termin um 23:30 Berliner Zeit ist dort schon der Folgetag.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-dashboard-week.js
+ * Ausfuehren: node --test test/test-dashboard-week.js
  */
 process.env.TZ = 'Asia/Tokyo';
 process.env.DB_PATH = ':memory:';
@@ -34,7 +34,6 @@ import { randomUUID } from 'node:crypto';
 import { register } from 'node:module';
 import http from 'node:http';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 register('./test-browser-loader.mjs', import.meta.url);
 
@@ -284,8 +283,8 @@ test('der Kalender kennt den Tag-Link: /calendar?date= ohne Termin oeffnet diese
 // --------------------------------------------------------------------------
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { todayKey: serverTodayKey, shiftDateKey, localToUTC } = await import('../server/utils/timezone.js');
 
 function buildMigratedDatabase(migrations) {
@@ -356,20 +355,23 @@ database.prepare(`
 
 let actor = ADMIN;
 let tokenScopes = null;
-const app = express();
-app.use((req, _res, next) => {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(database, user));
-  req.authScopes = tokenScopes;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(database, user));
+    req.authScopes = tokenScopes;
+    next();
+  },
 });
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-const endpoint = `http://127.0.0.1:${server.address().port}/`;
+const endpoint = `http://127.0.0.1:${server.address().port}/api/v1/dashboard/`;
 
 test.after(async () => {
   await new Promise((resolve) => server.close(resolve));

@@ -17,9 +17,10 @@ import { createLogger } from '../logger.js';
 import { readPrivateNetworkOptIn, createGuardedLookup, BlockedAddressError } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
 import { checkSSRF as checkSSRFWithOptIn } from './ics-subscription.js';
-import { url as validateUrl, num } from '../middleware/validate.js';
+import { url as validateUrl, num } from '../api/formats.ts';
 import { MAX_ICS_BYTES, MAX_ICS_MB } from './waste-import.js';
 import * as store from './waste-store.js';
+import { MIN_REFRESH_INTERVAL_MINUTES, MAX_REFRESH_INTERVAL_MINUTES } from './waste-fields.js';
 import { WasteValidationError, WasteNotFoundError, WasteConflictError } from './waste-store.js';
 
 const log = createLogger('Waste');
@@ -32,8 +33,8 @@ const ENV_ALLOW_PRIVATE_NETWORK = 'WASTE_SOURCE_ALLOW_PRIVATE_NETWORK';
 // month" so a mistyped value can't hammer a remote server nor go silently
 // stale for a year (invariant #6, "needs refresh" still watches for a future
 // pickup independent of this).
-export const MIN_REFRESH_INTERVAL_MINUTES = 60;
-export const MAX_REFRESH_INTERVAL_MINUTES = 43_200;
+// The bounds live in waste-fields.js (#2810), read by the OpenAPI document too.
+export { MIN_REFRESH_INTERVAL_MINUTES, MAX_REFRESH_INTERVAL_MINUTES };
 export const DEFAULT_REFRESH_INTERVAL_MINUTES = 1440;
 
 const MAX_BACKOFF_MINUTES = 24 * 60;

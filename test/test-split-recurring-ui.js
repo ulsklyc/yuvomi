@@ -673,7 +673,7 @@ test('Bearbeiten: je Feld nur dieses Feld - und was zusammen gilt, reist zusamme
   const faelle = [
     ['Termin', (f) => f.setze('next_run_date', '2026-12-15'), { next_run_date: '2026-12-15' }],
     ['Rhythmus', (f) => f.setze('frequency', 'yearly'), { frequency: 'yearly' }],
-    ['Zahler', (f) => f.setze('payer_id', '3'), { payer_id: '3' }],
+    ['Zahler', (f) => f.setze('payer_id', '3'), { payer_id: 3 }],
     ['Notiz', (f) => f.setze('description', 'neu'), { description: 'neu' }],
     ['Betrag reist mit Waehrung', (f) => f.setze('amount', '950,00'), { amount: '950.00', currency: 'EUR' }],
     ['Waehrung reist mit Betrag', (f) => f.setze('currency', 'JPY'), { amount: '900.00', currency: 'JPY' }],
@@ -729,7 +729,7 @@ test('Ein ausgetretener Zahler bleibt vorbelegt und gekennzeichnet; gespeichert 
 
     setze('payer_id', '3');
     await panel.feuere('submit');
-    assert.deepEqual(spur.gesendet, [['PUT', '/split-expenses/recurring/52', { title: 'Nur der Titel', payer_id: '3' }]]);
+    assert.deepEqual(spur.gesendet, [['PUT', '/split-expenses/recurring/52', { title: 'Nur der Titel', payer_id: 3 }]]);
   });
   // Ein Zahler, der Mitglied ist, bekommt keine zweite Option.
   await buehne({}, (spur) => {
@@ -772,7 +772,7 @@ test('Speichern einer neuen Serie sendet POST mit allen Feldern der Route; ein u
     setze('title', 'Strom'); setze('amount', '30'); setze('frequency', 'weekly'); setze('next_run_date', '2026-11-05'); setze('budget_category', 'housing');
     await panel.feuere('submit');
     assert.deepEqual(spur.gesendet, [['POST', '/split-expenses/groups/2/recurring', {
-      title: 'Strom', amount: '30', currency: 'EUR', payer_id: '1', frequency: 'weekly', next_run_date: '2026-11-05',
+      title: 'Strom', amount: '30', currency: 'EUR', payer_id: 1, frequency: 'weekly', next_run_date: '2026-11-05',
       split_method: 'equal', budget_category: 'housing', description: '', participants: [1, 3], splits: [],
     }]]);
   });

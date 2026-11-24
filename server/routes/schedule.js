@@ -1,7 +1,8 @@
 /** Schedule API: patterns are computed into entries, never calendar events. */
 import express from 'express';
+import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
-import { bool, color, collectErrors, date, id, num, str, time } from '../middleware/validate.js';
+import { collectErrors, date, id, str } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { createLogger } from '../logger.js';
 import { dateKeysInRange, scheduleData, fieldsForShiftTypes, fieldValuesFor, typeColumns } from '../services/schedule.js';
@@ -14,6 +15,16 @@ export { scheduleData, fieldValuesFor } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { householdMemberSql, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
+import {
+  MAX_CUSTOM_FIELD_NAME, MAX_CYCLE_LENGTH, MAX_FIELD_VALUE_LENGTH, MAX_SCHEDULE_NOTE, MAX_SHORT_CODE, MIN_CYCLE_LENGTH,
+} from '../services/schedule-fields.js';
+
+// Seit #2810 prueft validateRequest() jede Anfrage gegen das Schema ihrer
+// Operation (server/openapi/paths/schedule.js), bevor ein Handler laeuft. Was
+// das Schema auf JEDER Eingabe abweist - Typen, Zeit- und Farbmuster, die
+// Grenzen aus services/schedule-fields.js -, prueft der Handler nicht noch
+// einmal. Er behaelt, was das Schema nicht sieht: leer nach trim, den
+// Kalendertag, Ids von 0 und darunter, den Besitz und die Datenbank.
 
 const router = express.Router();
 const log = createLogger('Schedule');
@@ -73,32 +84,65 @@ const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_t
 const customFieldExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_custom_fields WHERE id = ?').get(value);
 const mineOrAdmin = (req, userId) => isAdminRequest(req) || actorId(req) === userId;
 
+/**
+ * Das Recht an einem Sammel-Schreibweg haengt am mitgeschickten `user_id`
+ * (fehlt er, gilt der Akteur), nicht an einer geladenen Zeile: es steht
+ * deshalb als Middleware VOR validateRequest() (#2810). Ein Mitglied, das
+ * fuer jemand anderen schreibt, bekommt 403 wie bisher - auch mit einem sonst
+ * kaputten Rumpf -, nie ein 400, das Felder nennt. Gleich ist nur die eigene
+ * Id als Zahl oder als Ziffern-Text (die Altform, die der Handler per
+ * parseInt liest); alles andere (`1.5`, `"7abc"`, ein Array) ist fuer ein
+ * Mitglied fremd. Die Pruefung im Handler (mineOrAdmin) bleibt dahinter.
+ * `place` ist `body` oder `query`.
+ * @param {'body' | 'query'} place
+ */
+export function refuseForeignOwner(place) {
+  /** @param {any} req @param {any} res @param {() => void} next */
+  return function refuseForeignOwnerMiddleware(req, res, next) {
+    if (isAdminRequest(req)) return next();
+    const raw = req[place]?.user_id;
+    if (raw === undefined || raw === null) return next();
+    const own = actorId(req);
+    const same = (typeof raw === 'number' && raw === own)
+      || (typeof raw === 'string' && /^[0-9]+$/.test(raw) && Number(raw) === own);
+    if (same) return next();
+    return res.status(403).json({ error: 'Forbidden.', code: 403 });
+  };
+}
+
 // Wer darf als eigene Spalte in der Uebersicht (Overview-Tab) auftauchen? Nur
 // echte Haushaltsmitglieder - Haushaltshilfen (housekeeping_workers) und
 // Split-Expense-Gaeste (split_expense_guest_users) sollen nie eine leere Spur
 // bekommen. Das strenge Praedikat aus server/services/household-members.js,
 // dieselbe Regel wie isHouseholdMember() - als Bedingung in der Abfrage statt
 // als Einzelpruefung je Zeile, nicht neu geschrieben.
-router.get('/household-members', (_req, res) => {
+router.get('/household-members', validateRequest(), (_req, res) => {
   const rows = db.get()
     .prepare(`SELECT u.id, u.display_name, u.avatar_color, u.avatar_data, ${memberPositionSql('u')} AS sort_order FROM users u WHERE ${householdMemberSql('u')} ORDER BY ${memberOrderSql('u')}`)
     .all();
   res.json({ data: rows });
 });
 
-/** Lucides laengster Name liegt bei 34 Zeichen; 48 laesst Luft nach oben - dieselbe Grenze wie bei den Schnellzugriffen (quick-links.js). */
-const MAX_ICON_NAME_LENGTH = 48;
+// MAX_ICON_NAME_LENGTH (services/schedule-fields.js): Lucides laengster Name liegt bei 34 Zeichen; 48 laesst Luft nach oben - dieselbe Grenze wie bei den Schnellzugriffen (quick-links.js).
 const ICON_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-/** Wie iconName() in quick-links.js: der Name ist zur Laufzeit gewaehlt, geprueft wird nur die Form, nicht gegen Lucides Vorrat - das Vorrat-Modul (utils/lucide-icons.js) liegt auf `window.lucide` und ist serverseitig nicht erreichbar. */
+/**
+ * Wie iconName() in quick-links.js: der Name ist zur Laufzeit gewaehlt, geprueft wird nur die Form, nicht gegen Lucides Vorrat - das Vorrat-Modul (utils/lucide-icons.js) liegt auf `window.lucide` und ist serverseitig nicht erreichbar.
+ * Text oder `null` und hoechstens MAX_ICON_NAME_LENGTH Zeichen wie gesendet haelt das Schema (#2810); nach trim ist der Name nie laenger.
+ * @param {string | null | undefined} value
+ */
 function shiftIcon(value) {
-  if (value === undefined || value === null || value === '') return { value: null, error: null };
-  if (typeof value !== 'string') return { value: null, error: 'icon must be a string.' };
-  const trimmed = value.trim();
+  const trimmed = (value ?? '').trim();
   if (!trimmed) return { value: null, error: null };
-  if (trimmed.length > MAX_ICON_NAME_LENGTH) return { value: null, error: 'icon is too long.' };
   if (!ICON_NAME_RE.test(trimmed)) return { value: null, error: 'icon must contain only lowercase letters, digits, and hyphens.' };
   return { value: trimmed, error: null };
 }
+
+/**
+ * Eine Uhrzeit oder Farbe, deren Form das Schema schon geprueft hat (TIME_PATTERN,
+ * COLOR_PATTERN, jeweils auch leer, #2810): leer oder `null` heisst keine.
+ * @param {string | null | undefined} value
+ */
+const shapeChecked = (value) => ({ value: value || null, error: null });
 
 /**
  * Ein Schichttyp gehoert dem Haushalt, nicht einer Person: er taucht in den
@@ -160,10 +204,10 @@ const MAX_FILL_DAYS = 100;
 // A/B) - einige hundert Zeilen decken das grosszuegig, ohne eine Zeile je
 // Position ueber den vollen 366-Tage-Zyklus zuzulassen, was keine echte
 // Zeitplanung mehr waere, sondern gespeicherte Lese-Verstaerkung.
-const MAX_PATTERN_DAY_ROWS = 500;
+// MAX_PATTERN_DAY_ROWS steht in services/schedule-fields.js (#2810), das Dokument liest sie mit.
 
 
-router.get('/entries', (req, res) => {
+router.get('/entries', validateRequest(), (req, res) => {
   const from = date(req.query.from, 'from', true); const to = date(req.query.to, 'to', true);
   const requested = req.query.user_id == null ? null : id(req.query.user_id, 'user_id');
   const errors = collectErrors([from, to, requested].filter(Boolean));
@@ -173,11 +217,7 @@ router.get('/entries', (req, res) => {
     return fail(res, 400, `The range must not exceed ${MAX_RANGE_DAYS} days.`);
   }
   if (requested && !userExists(requested.value)) return fail(res, 404, 'User not found.');
-  try { res.json({ data: scheduleData(from.value, to.value, requested?.value ?? null) }); }
-  catch (err) {
-    log.error('Error resolving schedule entries:', err.message);
-    return fail(res, 500, 'Schedule entries could not be resolved.');
-  }
+  res.json({ data: scheduleData(from.value, to.value, requested?.value ?? null) });
 });
 
 // Bettet die eigenen Felder in EINE Schichttyp-Zeile ein - dasselbe fieldsForShiftTypes(), nur fuer
@@ -187,7 +227,6 @@ function withFields(type) {
   return { ...type, fields: fieldsForShiftTypes([type.id]).get(type.id) ?? [] };
 }
 
-const MAX_FIELD_VALUE_LENGTH = 500;
 function fieldValue(v) {
   if (v === undefined || v === null || v === '') return { value: null, error: null };
   const s = String(v).trim();
@@ -239,14 +278,14 @@ export function replaceFieldValues(entryType, entryId, values) {
   const insert = db.get().prepare('INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES (?, ?, ?, ?)');
   for (const [fieldId, value] of values) insert.run(entryType, entryId, fieldId, value);
 }
-router.get('/shift-types', (_req, res) => {
+router.get('/shift-types', validateRequest(), (_req, res) => {
   const types = db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types ORDER BY name COLLATE NOCASE`).all();
   const fields = fieldsForShiftTypes(types.map((type) => type.id));
   res.json({ data: types.map((type) => ({ ...type, fields: fields.get(type.id) ?? [] })) });
 });
-router.post('/shift-types', (req, res) => {
-  const name = str(req.body?.name, 'name'); const shortCode = str(req.body?.short_code, 'short_code', { required: false, max: 12 });
-  const start = time(req.body?.start_time, 'start_time'); const end = time(req.body?.end_time, 'end_time'); const shade = color(req.body?.color || SHIFT_COLOR_DEFAULT, 'color');
+router.post('/shift-types', validateRequest(), (req, res) => {
+  const name = str(req.body?.name, 'name'); const shortCode = str(req.body?.short_code, 'short_code', { required: false, max: MAX_SHORT_CODE });
+  const start = shapeChecked(req.body?.start_time); const end = shapeChecked(req.body?.end_time); const shade = shapeChecked(req.body?.color || SHIFT_COLOR_DEFAULT);
   const icon = shiftIcon(req.body?.icon);
   const errors = collectErrors([name, shortCode, start, end, shade, icon]);
   if ((start.value == null) !== (end.value == null)) errors.push('start_time and end_time must be provided together.');
@@ -254,7 +293,7 @@ router.post('/shift-types', (req, res) => {
   const result = db.get().prepare('INSERT INTO schedule_shift_types (name, short_code, start_time, end_time, color, icon, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name.value, shortCode.value, start.value, end.value, shade.value, icon.value, actorId(req));
   res.status(201).json({ data: withFields(db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(result.lastInsertRowid)) });
 });
-router.delete('/shift-types/:id', (req, res) => {
+router.delete('/shift-types/:id', validateRequest(), (req, res) => {
   const shiftType = id(req.params.id, 'id');
   if (shiftType.error) return fail(res, 400, shiftType.error);
   const existing = db.get().prepare('SELECT id, created_by FROM schedule_shift_types WHERE id = ?').get(shiftType.value);
@@ -262,15 +301,15 @@ router.delete('/shift-types/:id', (req, res) => {
   if (!ownTypeOrAdmin(req, existing)) return fail(res, 403, 'Forbidden.');
   try {
     db.get().prepare('DELETE FROM schedule_shift_types WHERE id = ?').run(existing.id);
-    return res.status(204).end();
   } catch (err) {
     // Nur der Fremdschluessel wird als "in Benutzung" gedeutet. Vorher fing der
     // Zweig JEDEN Fehler und nannte denselben Grund - ein Schreibfehler im SQL
-    // haette dem Aufrufer erzaehlt, der Typ sei noch im Einsatz.
+    // haette dem Aufrufer erzaehlt, der Typ sei noch im Einsatz. Alles andere
+    // geht an den zentralen Fehlerhandler (#2810).
     if (isStillReferenced(err)) return fail(res, 409, 'Shift type is in use.', { reason: 'schedule_shift_type_in_use' });
-    log.error('Error deleting shift type:', err.message);
-    return fail(res, 500, 'Internal error.');
+    throw err;
   }
+  return res.status(204).end();
 });
 
 const customFieldColumns = 'id, name, created_by, created_at, updated_at';
@@ -278,24 +317,24 @@ const customFieldColumns = 'id, name, created_by, created_at, updated_at';
 // Definiert einmal, angeheftet an beliebig viele Schichttypen (schedule_shift_type_fields,
 // siehe Migration 189) - derselbe "gehoert dem Haushalt, nicht einer Person"-Gedanke wie bei
 // Schichttypen: anlegen darf jeder, aendern/loeschen nur wer ihn angelegt hat oder ein Admin.
-router.get('/custom-fields', (_req, res) => res.json({ data: db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields ORDER BY name COLLATE NOCASE`).all() }));
-router.post('/custom-fields', (req, res) => {
-  const name = str(req.body?.name, 'name', { max: 100 });
+router.get('/custom-fields', validateRequest(), (_req, res) => res.json({ data: db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields ORDER BY name COLLATE NOCASE`).all() }));
+router.post('/custom-fields', validateRequest(), (req, res) => {
+  const name = str(req.body?.name, 'name', { max: MAX_CUSTOM_FIELD_NAME });
   if (name.error) return fail(res, 400, name.error);
   const result = db.get().prepare('INSERT INTO schedule_custom_fields (name, created_by) VALUES (?, ?)').run(name.value, actorId(req));
   res.status(201).json({ data: db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields WHERE id = ?`).get(result.lastInsertRowid) });
 });
-router.put('/custom-fields/:id', (req, res) => {
+router.put('/custom-fields/:id', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields WHERE id = ?`).get(key.value);
   if (!old) return fail(res, 404, 'Custom field not found.', { reason: 'schedule_custom_field_not_found' });
   if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
-  const name = req.body?.name === undefined ? { value: old.name, error: null } : str(req.body.name, 'name', { max: 100 });
+  const name = req.body?.name === undefined ? { value: old.name, error: null } : str(req.body.name, 'name', { max: MAX_CUSTOM_FIELD_NAME });
   if (name.error) return fail(res, 400, name.error);
   db.get().prepare('UPDATE schedule_custom_fields SET name=? WHERE id=?').run(name.value, key.value);
   res.json({ data: db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields WHERE id = ?`).get(key.value) });
 });
-router.delete('/custom-fields/:id', (req, res) => {
+router.delete('/custom-fields/:id', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT id, created_by FROM schedule_custom_fields WHERE id = ?').get(key.value);
   if (!old) return fail(res, 404, 'Custom field not found.', { reason: 'schedule_custom_field_not_found' });
@@ -307,38 +346,43 @@ router.delete('/custom-fields/:id', (req, res) => {
   return res.status(204).end();
 });
 
-router.get('/patterns', (req, res) => {
+router.get('/patterns', validateRequest(), (req, res) => {
   const requested = req.query.user_id == null ? null : id(req.query.user_id, 'user_id');
   if (requested?.error) return fail(res, 400, requested.error);
   if (requested && !userExists(requested.value)) return fail(res, 404, 'User not found.');
   const rows = requested ? db.get().prepare('SELECT * FROM schedule_patterns WHERE user_id = ? ORDER BY valid_from DESC, id DESC').all(requested.value) : db.get().prepare('SELECT * FROM schedule_patterns ORDER BY user_id, valid_from DESC, id DESC').all();
   res.json({ data: rows });
 });
-router.post('/patterns', (req, res) => {
+router.post('/patterns', refuseForeignOwner('body'), validateRequest(), (req, res) => {
   const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const name = str(req.body?.name, 'name'); const anchor = date(req.body?.anchor_date, 'anchor_date', true);
-  const length = num(req.body?.cycle_length, 'cycle_length', { required: true }); const from = date(req.body?.valid_from, 'valid_from'); const until = date(req.body?.valid_until, 'valid_until');
-  const active = req.body?.is_active === undefined ? { value: true, error: null } : bool(req.body.is_active, 'is_active');
-  const errors = collectErrors([user, name, anchor, length, from, until, active]); if (!Number.isInteger(length.value) || length.value < 1 || length.value > 366) errors.push('cycle_length must be between 1 and 366.'); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
-  if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (from.value && until.value && from.value > until.value) errors.push('valid_from must be before valid_until.');
-  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
-  const result = db.get().prepare('INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from, valid_until, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)').run(user.value, name.value, anchor.value, length.value, from.value, until.value, Number(active.value));
+  // cycle_length (Pflicht, ganze Zahl MIN_CYCLE_LENGTH..MAX_CYCLE_LENGTH) und
+  // is_active (Boolean) haelt das Schema. Das Recht haelt refuseForeignOwner()
+  // davor: ein Mitglied kommt hier nur mit der eigenen Id oder ohne an.
+  const length = req.body.cycle_length; const from = date(req.body?.valid_from, 'valid_from'); const until = date(req.body?.valid_until, 'valid_until');
+  const active = req.body.is_active ?? true;
+  const errors = collectErrors([user, name, anchor, from, until]); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
+  if (from.value && until.value && from.value > until.value) errors.push('valid_from must be before valid_until.');
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...rangeReason(errors) });
+  const result = db.get().prepare('INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from, valid_until, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)').run(user.value, name.value, anchor.value, length, from.value, until.value, Number(active));
   res.status(201).json({ data: db.get().prepare('SELECT * FROM schedule_patterns WHERE id = ?').get(result.lastInsertRowid) });
 });
-router.put('/overrides/:dateKey', (req, res) => {
-  const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 });
-  const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
-  const fields = validateFieldValues(req.body?.field_values, typeId?.value ?? null); if (fields.error) errors.push(fields.error);
-  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
+router.put('/overrides/:dateKey', refuseForeignOwner('body'), validateRequest(), (req, res) => {
+  const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body.note, 'note', { required: false, max: MAX_SCHEDULE_NOTE });
+  // Das Recht haelt refuseForeignOwner() davor (#2810). Das Schema verlangt
+  // shift_type_id, note und field_values (volle Darstellung, #2810): null ist
+  // der ausdrueckliche freie Tag bzw. keine Notiz; user_id adressiert nur die Zeile.
+  const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value])); if (typeId && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE);
+  const fields = validateFieldValues(req.body.field_values, typeId?.value ?? null); if (fields.error) errors.push(fields.error);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...rangeReason(errors) });
   // Upsert und replaceFieldValues() in EINER Transaktion: ohne sie stand der
   // Override schon geschrieben, bevor replaceFieldValues() ueberhaupt lief -
   // ein Wurf dazwischen (z.B. eine spaeter doch noch durchrutschende doppelte
   // Feld-Id) liess die erste Zeile committed und den Aufruf trotzdem mit einem
-  // 500er scheitern. `field_values` fehlt im Body ganz = gespeicherte Werte
-  // bleiben unangetastet (wie PUT /extras/:id); nur ein ausdruecklich
-  // mitgeschicktes Objekt, auch `{}`, ersetzt sie.
+  // 500er scheitern. `field_values` ersetzt die gespeicherten Werte immer,
+  // `{}` und `null` leeren sie (das Schema verlangt das Feld, #2810).
   const row = db.get().transaction(() => {
     const upserted = db.get().prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note RETURNING *').get(user.value, key.value, typeId?.value ?? null, note.value);
-    if (req.body?.field_values !== undefined) replaceFieldValues('override', upserted.id, fields.values);
+    replaceFieldValues('override', upserted.id, fields.values);
     return upserted;
   })();
   try { syncScheduleRemindersForUser(db.get(), user.value); }
@@ -346,22 +390,19 @@ router.put('/overrides/:dateKey', (req, res) => {
   res.json({ data: { ...row, field_values: fieldValuesFor('override', [row.id]).get(row.id) ?? {} } });
 });
 
-router.put('/shift-types/:id', (req, res) => {
+router.put('/shift-types/:id', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(key.value);
   if (!old) return fail(res, 404, 'Shift type not found.', { reason: 'schedule_shift_type_not_found' });
   if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
   const name = req.body?.name === undefined ? { value: old.name } : str(req.body.name, 'name');
-  const shortCode = req.body?.short_code === undefined ? { value: old.short_code } : str(req.body.short_code, 'short_code', { required: false, max: 12 });
-  const start = req.body?.start_time === undefined ? { value: old.start_time } : time(req.body.start_time, 'start_time');
-  const end = req.body?.end_time === undefined ? { value: old.end_time } : time(req.body.end_time, 'end_time');
-  // `color()` antwortet auf jeden falsy Wert mit {value: null, error: null}, und
-  // die Spalte ist NOT NULL - ein `{"color": ""}` schriebe also NULL und flöge als
-  // roher 500er zurueck. Der Ruecksetzer ist die bestehende Farbe und nicht der
+  const shortCode = req.body?.short_code === undefined ? { value: old.short_code } : str(req.body.short_code, 'short_code', { required: false, max: MAX_SHORT_CODE });
+  const start = req.body?.start_time === undefined ? { value: old.start_time } : shapeChecked(req.body.start_time);
+  const end = req.body?.end_time === undefined ? { value: old.end_time } : shapeChecked(req.body.end_time);
+  // Eine leere oder `null`-Farbe schriebe NULL in die NOT-NULL-Spalte und floege
+  // als roher 500er zurueck. Der Ruecksetzer ist die bestehende Farbe und nicht der
   // Palettenerste: die Anfrage sagt "nicht anfassen", nicht "auf Anfang".
-  const shade = req.body?.color === undefined || !req.body.color
-    ? { value: old.color, error: null }
-    : color(req.body.color, 'color');
+  const shade = { value: req.body?.color || old.color, error: null };
   const icon = req.body?.icon === undefined ? { value: old.icon, error: null } : shiftIcon(req.body.icon);
   const errors = collectErrors([name, shortCode, start, end, shade, icon]);
   if ((start.value == null) !== (end.value == null)) errors.push('start_time and end_time must be provided together.');
@@ -372,23 +413,23 @@ router.put('/shift-types/:id', (req, res) => {
 // Ersetzt IMMER die gesamte Feldzuordnung eines Schichttyps in einem Rutsch (loeschen, neu
 // anlegen) - derselbe Grund wie PUT /patterns/:id/days: kein natuerliches Merkmal, an dem sich
 // "unveraendert" von "entfernt" unterscheiden liesse.
-router.put('/shift-types/:id/fields', (req, res) => {
+router.put('/shift-types/:id/fields', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT id, created_by FROM schedule_shift_types WHERE id = ?').get(key.value);
   if (!old) return fail(res, 404, 'Shift type not found.', { reason: 'schedule_shift_type_not_found' });
   if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
-  if (!Array.isArray(req.body?.fields)) return fail(res, 400, 'fields must be an array.');
+  // `fields` als Liste von Objekten, `position` als ganze Zahl ab 0 und
+  // `show_in_overlay` als Boolean haelt das Schema (#2810); eine Feld-Id von 0
+  // laesst es durch.
   const seen = new Set();
   const rows = [];
   for (const row of req.body.fields) {
-    const fieldId = id(row?.custom_field_id, 'custom_field_id');
-    const position = num(row?.position, 'position', { required: true });
-    const showInOverlay = row?.show_in_overlay === undefined ? { value: false, error: null } : bool(row.show_in_overlay, 'show_in_overlay');
-    if (fieldId.error || position.error || !Number.isInteger(position.value) || position.value < 0 || showInOverlay.error) return fail(res, 400, 'Invalid field entry.');
+    const fieldId = id(row.custom_field_id, 'custom_field_id');
+    if (fieldId.error) return fail(res, 400, 'Invalid field entry.');
     if (!customFieldExists(fieldId.value)) return fail(res, 400, CUSTOM_FIELD_GONE_MESSAGE);
     if (seen.has(fieldId.value)) return fail(res, 400, 'custom_field_id must not repeat.');
     seen.add(fieldId.value);
-    rows.push([fieldId.value, position.value, Number(showInOverlay.value)]);
+    rows.push([fieldId.value, row.position, Number(row.show_in_overlay ?? false)]);
   }
   db.get().transaction(() => {
     db.get().prepare('DELETE FROM schedule_shift_type_fields WHERE shift_type_id=?').run(old.id);
@@ -397,25 +438,29 @@ router.put('/shift-types/:id/fields', (req, res) => {
   })();
   return res.json({ data: withFields(db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(old.id)) });
 });
-router.put('/patterns/:id', (req, res) => {
+router.put('/patterns/:id', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
   if (!old) return fail(res, 404, 'Pattern not found.', { reason: 'schedule_pattern_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   const name = req.body?.name === undefined ? { value: old.name } : str(req.body.name, 'name');
   const anchor = req.body?.anchor_date === undefined ? { value: old.anchor_date } : date(req.body.anchor_date, 'anchor_date', true);
-  const length = req.body?.cycle_length === undefined ? { value: old.cycle_length } : num(req.body.cycle_length, 'cycle_length', { required: true });
+  // Ein gesendetes cycle_length (ganze Zahl MIN_CYCLE_LENGTH..MAX_CYCLE_LENGTH)
+  // und is_active (Boolean) haelt das Schema (#2810). Die Grenzpruefung bleibt
+  // fuer den GESPEICHERTEN Wert: ohne das Feld liest sie die Zeile, und der
+  // CHECK der Spalte laesst 7.5 durch.
+  const length = req.body?.cycle_length === undefined ? old.cycle_length : req.body.cycle_length;
   const from = req.body?.valid_from === undefined ? { value: old.valid_from } : date(req.body.valid_from, 'valid_from');
   const until = req.body?.valid_until === undefined ? { value: old.valid_until } : date(req.body.valid_until, 'valid_until');
-  const active = req.body?.is_active === undefined ? { value: Boolean(old.is_active) } : bool(req.body.is_active, 'is_active');
-  const errors = collectErrors([name, anchor, length, from, until, active]);
-  if (!Number.isInteger(length.value) || length.value < 1 || length.value > 366) errors.push('cycle_length must be between 1 and 366.');
+  const active = req.body?.is_active === undefined ? Boolean(old.is_active) : req.body.is_active;
+  const errors = collectErrors([name, anchor, from, until]);
+  if (!Number.isInteger(length) || length < MIN_CYCLE_LENGTH || length > MAX_CYCLE_LENGTH) errors.push(`cycle_length must be between ${MIN_CYCLE_LENGTH} and ${MAX_CYCLE_LENGTH}.`);
   if (from.value && until.value && from.value > until.value) errors.push('valid_from must be before valid_until.');
-  if (db.get().prepare('SELECT 1 FROM schedule_pattern_days WHERE pattern_id=? AND position>=?').get(old.id, length.value)) errors.push(CYCLE_LENGTH_CONFLICT_MESSAGE);
+  if (db.get().prepare('SELECT 1 FROM schedule_pattern_days WHERE pattern_id=? AND position>=?').get(old.id, length)) errors.push(CYCLE_LENGTH_CONFLICT_MESSAGE);
   if (errors.length) return fail(res, 400, errors.join(' '));
-  db.get().prepare('UPDATE schedule_patterns SET name=?,anchor_date=?,cycle_length=?,valid_from=?,valid_until=?,is_active=? WHERE id=?').run(name.value, anchor.value, length.value, from.value, until.value, Number(active.value), old.id);
+  db.get().prepare('UPDATE schedule_patterns SET name=?,anchor_date=?,cycle_length=?,valid_from=?,valid_until=?,is_active=? WHERE id=?').run(name.value, anchor.value, length, from.value, until.value, Number(active), old.id);
   return res.json({ data: db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(old.id) });
 });
-router.delete('/patterns/:id', (req, res) => {
+router.delete('/patterns/:id', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
   if (!old) return fail(res, 404, 'Pattern not found.', { reason: 'schedule_pattern_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
@@ -431,7 +476,7 @@ router.delete('/patterns/:id', (req, res) => {
   })();
   return res.status(204).end();
 });
-router.get('/patterns/:id/days', (req, res) => {
+router.get('/patterns/:id/days', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   if (!db.get().prepare('SELECT 1 FROM schedule_patterns WHERE id=?').get(key.value)) return fail(res, 404, 'Pattern not found.', { reason: 'schedule_pattern_not_found' });
   const rows = db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position, id').all(key.value);
@@ -448,20 +493,22 @@ router.get('/patterns/:id/days', (req, res) => {
 // server/services/schedule-reminders.js's Anker-Sync und die ICS-UIDs
 // (server/services/schedule-ics.js) sind bewusst so gebaut, dass sie das
 // verkraften (Selbstheilung beim naechsten Sync-Lauf statt einer Kaskade).
-router.put('/patterns/:id/days', (req, res) => {
+router.put('/patterns/:id/days', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
   if (!old) return fail(res, 404, 'Pattern not found.', { reason: 'schedule_pattern_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
-  if (!Array.isArray(req.body?.days)) return fail(res, 400, 'days must be an array.');
-  if (req.body.days.length > MAX_PATTERN_DAY_ROWS) return fail(res, 400, `days must not exceed ${MAX_PATTERN_DAY_ROWS} rows.`);
+  // `days` als Liste von hoechstens MAX_PATTERN_DAY_ROWS Objekten und
+  // `position` als ganze Zahl ab 0 haelt das Schema (#2810). Die Obergrenze
+  // haengt an der Zykluslaenge der Zeile, eine Schichtart-Id von 0 laesst das
+  // Schema durch: beides bleibt hier.
   const days = [];
   for (const row of req.body.days) {
-    const position = num(row?.position, 'position', { required: true }); const shiftType = row?.shift_type_id == null ? null : id(row.shift_type_id, 'shift_type_id');
-    if (position.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= old.cycle_length || shiftType?.error) return fail(res, 400, 'Invalid pattern day.');
+    const shiftType = row.shift_type_id == null ? null : id(row.shift_type_id, 'shift_type_id');
+    if (row.position >= old.cycle_length || shiftType?.error) return fail(res, 400, 'Invalid pattern day.');
     if (shiftType && !typeExists(shiftType.value)) return fail(res, 400, SHIFT_TYPE_GONE_MESSAGE);
-    const fields = validateFieldValues(row?.field_values, shiftType?.value ?? null);
+    const fields = validateFieldValues(row.field_values, shiftType?.value ?? null);
     if (fields.error) return fail(res, 400, fields.error);
-    days.push({ position: position.value, shiftTypeId: shiftType?.value ?? null, fieldValues: fields.values });
+    days.push({ position: row.position, shiftTypeId: shiftType?.value ?? null, fieldValues: fields.values });
   }
   // entry_id-Werte fuer schedule_custom_field_values haengen an KEINEM echten
   // Fremdschluessel (polymorph, siehe Migration 189) - das Loeschen der alten
@@ -483,7 +530,7 @@ router.put('/patterns/:id/days', (req, res) => {
   const values = fieldValuesFor('pattern_day', rows.map((row) => row.id));
   return res.json({ data: rows.map((row) => ({ ...row, field_values: values.get(row.id) ?? {} })) });
 });
-router.get('/overrides', (req, res) => {
+router.get('/overrides', validateRequest(), (req, res) => {
   const user = req.query.user_id == null ? null : id(req.query.user_id, 'user_id'); const from = date(req.query.from, 'from'); const to = date(req.query.to, 'to');
   const errors = collectErrors([user, from, to].filter(Boolean)); if (from.value && to.value && from.value > to.value) errors.push(RANGE_REVERSED_MESSAGE);
   if (errors.length) return fail(res, 400, errors.join(' ')); if (user && !userExists(user.value)) return fail(res, 404, 'User not found.');
@@ -499,12 +546,12 @@ router.get('/overrides', (req, res) => {
  * Bereich soll mit 400 scheitern, nicht mit `dateKeysInRange()`s stillem
  * leeren Array bei einem invertierten Bereich durchrutschen.
  */
-router.post('/overrides/fill', (req, res) => {
+router.post('/overrides/fill', refuseForeignOwner('body'), validateRequest(), (req, res) => {
   const user = id(req.body?.user_id ?? actorId(req), 'user_id');
   const from = date(req.body?.from, 'from', true);
   const to = date(req.body?.to, 'to', true);
   const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id');
-  const note = str(req.body?.note, 'note', { required: false, max: 5000 });
+  const note = str(req.body?.note, 'note', { required: false, max: MAX_SCHEDULE_NOTE });
   const fields = validateFieldValues(req.body?.field_values, typeId?.value ?? null);
   const errors = collectErrors([user, from, to, typeId, note].filter(Boolean));
   if (fields.error) errors.push(fields.error);
@@ -512,8 +559,8 @@ router.post('/overrides/fill', (req, res) => {
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
   else if (user.value && rejectedScheduleOwner(user.value)) errors.push(nonMemberMessage([user.value]));
   if (typeId && !typeExists(typeId.value)) errors.push(SHIFT_TYPE_GONE_MESSAGE);
-  if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
-  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
+  // Das Recht haelt refuseForeignOwner() davor (#2810).
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...rangeReason(errors) });
   const span = daysBetweenDateKeys(from.value, to.value);
   if (span === null || span + 1 > MAX_FILL_DAYS) {
     return fail(res, 400, `The range must not exceed ${MAX_FILL_DAYS} days.`);
@@ -549,15 +596,15 @@ router.post('/overrides/fill', (req, res) => {
  * ist eine einzelne indizierte Anweisung, keine Schleife ueber N Zeilen - die
  * Kosten skalieren nicht mit der Spanne, deshalb der groessere Lese-Deckel.
  */
-router.delete('/overrides', (req, res) => {
+router.delete('/overrides', refuseForeignOwner('query'), validateRequest(), (req, res) => {
   const user = id(req.query.user_id ?? actorId(req), 'user_id');
   const from = date(req.query.from, 'from', true);
   const to = date(req.query.to, 'to', true);
   const errors = collectErrors([user, from, to]);
   if (from.value && to.value && from.value > to.value) errors.push(RANGE_REVERSED_MESSAGE);
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
-  if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
-  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400, ...rangeReason(errors) });
+  // Das Recht haelt refuseForeignOwner() davor (#2810).
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400, ...rangeReason(errors) });
   const span = daysBetweenDateKeys(from.value, to.value);
   if (span === null || span + 1 > MAX_RANGE_DAYS) {
     return fail(res, 400, `The range must not exceed ${MAX_RANGE_DAYS} days.`);
@@ -576,9 +623,10 @@ router.delete('/overrides', (req, res) => {
   res.json({ data: { deleted: result.changes } });
 });
 
-router.delete('/overrides/:dateKey', (req, res) => {
+router.delete('/overrides/:dateKey', refuseForeignOwner('query'), validateRequest(), (req, res) => {
+  // Das Recht haelt refuseForeignOwner() davor (#2810).
   const key = date(req.params.dateKey, 'date_key', true); const user = id(req.query.user_id ?? actorId(req), 'user_id'); const errors = collectErrors([key, user]);
-  if (!mineOrAdmin(req, user.value)) return fail(res, 403, 'Forbidden.'); if (errors.length) return fail(res, 400, errors.join(' '));
+  if (errors.length) return fail(res, 400, errors.join(' '));
   const result = db.get().transaction(() => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=? AND date_key=?)`).run(user.value, key.value);
     return db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key=?').run(user.value, key.value);

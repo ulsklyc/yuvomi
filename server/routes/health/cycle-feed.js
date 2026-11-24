@@ -13,8 +13,9 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import { viewerId, log } from './helpers.js';
+import { viewerId } from './helpers.js';
 import * as cycleIcs from '../../services/cycle-ics.js';
+import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
 
@@ -25,37 +26,22 @@ function feedUrl(req, token) {
 }
 
 // GET /api/v1/health/cycle/feed → eigener Feed-Status
-router.get('/cycle/feed', (req, res) => {
-  try {
-    const token = cycleIcs.getFeedToken(db.get(), viewerId(req));
-    if (!token) return res.json({ data: null });
-    res.json({ data: { token, url: feedUrl(req, token) } });
-  } catch (err) {
-    log.error('GET /cycle/feed error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/cycle/feed', validateRequest(), (req, res) => {
+  const token = cycleIcs.getFeedToken(db.get(), viewerId(req));
+  if (!token) return res.json({ data: null });
+  res.json({ data: { token, url: feedUrl(req, token) } });
 });
 
 // POST /api/v1/health/cycle/feed/regenerate → eigenen Token neu erzeugen
-router.post('/cycle/feed/regenerate', (req, res) => {
-  try {
-    const token = cycleIcs.regenerateFeedToken(db.get(), viewerId(req));
-    res.json({ data: { token, url: feedUrl(req, token) } });
-  } catch (err) {
-    log.error('POST /cycle/feed/regenerate error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.post('/cycle/feed/regenerate', validateRequest(), (req, res) => {
+  const token = cycleIcs.regenerateFeedToken(db.get(), viewerId(req));
+  res.json({ data: { token, url: feedUrl(req, token) } });
 });
 
 // DELETE /api/v1/health/cycle/feed → eigenen Feed deaktivieren
-router.delete('/cycle/feed', (req, res) => {
-  try {
-    cycleIcs.clearFeedToken(db.get(), viewerId(req));
-    res.json({ data: { token: null } });
-  } catch (err) {
-    log.error('DELETE /cycle/feed error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.delete('/cycle/feed', validateRequest(), (req, res) => {
+  cycleIcs.clearFeedToken(db.get(), viewerId(req));
+  res.json({ data: { token: null } });
 });
 
 export default router;

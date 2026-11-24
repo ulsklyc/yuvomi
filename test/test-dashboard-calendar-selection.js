@@ -27,18 +27,16 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { register } from 'node:module';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 register('./test-browser-loader.mjs', import.meta.url);
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'dashboard-calendar-selection-test-secret';
 
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
-const { default: localCalendarsRouter } = await import('../server/routes/calendar/local-calendars.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { normalizeCalendarSelection } = await import('../server/services/calendar-selection.js');
 const widgets = await import('../public/utils/dashboard-widgets.js');
 
@@ -75,19 +73,20 @@ const ADMIN = Number(addUser.run(`cal-admin-${randomUUID()}`, 'Anna', 'admin', '
 const LEO = Number(addUser.run(`cal-leo-${randomUUID()}`, 'Leo', 'member', 'child').lastInsertRowid);
 
 let currentUser = ADMIN;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(currentUser);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810). Der
+// Katalog `GET /calendar/calendars` kommt aus dem ganzen Kalender-Router.
+const app = await createCalendarApp({
+  auth: (req, _res, next) => {
+    const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(currentUser);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
+    next();
+  },
+  before: [['/api/v1/preferences', preferencesRouter]],
 });
-app.use('/preferences', preferencesRouter);
-app.use('/calendar', localCalendarsRouter);
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -101,10 +100,18 @@ test.after(async () => {
 const NOW = '2026-10-28T08:00:00Z';
 db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('household_timezone', 'Europe/Berlin')").run();
 
+// `path` ist der Teil hinter dem Praefix (#2810): `/calendar/...` liegt unter
+// /api/v1, `/preferences` ebenso, alles andere fragt die Uebersicht.
+function urlOf(path) {
+  if (path.startsWith('/preferences')) return `${base}/api/v1${path}`;
+  if (path.startsWith('/calendar/')) return `${base}/api/v1${path}`;
+  return `${base}/api/v1/dashboard${path}`;
+}
+
 async function getJson(path) {
   mock.timers.enable({ apis: ['Date'], now: new Date(NOW) });
   try {
-    const res = await fetch(`${base}${path}`);
+    const res = await fetch(urlOf(path));
     assert.equal(res.status, 200, `${path}: ${res.status}`);
     return await res.json();
   } finally {
@@ -257,7 +264,7 @@ const calendarTile = (options) => [{ id: 'calendar', visible: true, order: 0, si
 test('die Auswahl ueberlebt das Speichern und fuehrt zur gefilterten Antwort', async () => {
   const keys = [`local:${ARBEIT}`, `cal:${SCHULE}`];
   try {
-    const res = await fetch(`${base}/preferences`, {
+    const res = await fetch(`${base}/api/v1/preferences`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dashboard_widgets: calendarTile({ calendars: keys }) }),
     });

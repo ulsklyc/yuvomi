@@ -10,7 +10,7 @@
  *    einer den anderen ueberschreibt (der Grund, warum die Route existiert)
  *  - das Dashboard bekommt die interaktive Fassung ausdruecklich NICHT
  *  - i18n: die neuen Keys in allen Locales
- * Ausfuehren: node --experimental-sqlite --test test/test-notes-checklist.js
+ * Ausfuehren: node --test test/test-notes-checklist.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -263,9 +263,9 @@ app.use((req, _res, next) => {
   req.session = { userId: U, role: 'member' };
   next();
 });
-app.use('/', notesRouter);
+app.use('/api/v1/notes', notesRouter);
 const server  = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/notes`)));
 
 async function call(method, path, body) {
   const res = await fetch(`${baseUrl}${path}`, {

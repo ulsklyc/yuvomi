@@ -1,4 +1,5 @@
-import { op, jsonBody, idParam } from '../helpers.js';
+import { op, jsonBody, withValidationRefusal } from '../helpers.js';
+import { SCREENSAVER_PHOTO_ID_PATTERN } from '../../display-scopes.js';
 
 export function screensaverPaths() {
   return {
@@ -10,16 +11,18 @@ export function screensaverPaths() {
         description: 'Immich connection settings for the wall-display screensaver. Admin only, '
           + 'because it carries the connection details of an external server.',
       }),
-      put: op({
+      put: withValidationRefusal(op({
         summary: 'Update screensaver configuration',
         tag: 'Screensaver',
         admin: true,
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: jsonBody('#/components/schemas/ScreensaverConfigInput'),
         description: 'A rejected field answers 400 with a `reason` next to the `error` (#1909): '
-          + '`immich_url_invalid` (the URL does not start with http:// or https://, or is longer than 2048 characters), '
-          + '`immich_album_id_invalid` (the album ID is not a UUID), `immich_api_key_invalid` (the API key is longer than 1000 characters).',
-      }),
+          + '`immich_url_invalid` (the URL is not text, does not start with http:// or https://, or is longer than 2048 characters), '
+          + '`immich_album_id_invalid` (the album ID is not text or not a UUID), `immich_api_key_invalid` (the API key is longer than 1000 characters). '
+          + 'A missing body, a body that is no object, an API key that is not text and a `clearApiKey` that is not a boolean answer 400 with `reason: \'validation\'`. '
+          + 'A refusal of the request schema carries `fields` and is answered before anything is stored.',
+      })),
     },
     '/api/v1/screensaver/test': {
       post: op({
@@ -43,13 +46,19 @@ export function screensaverPaths() {
       }),
     },
     '/api/v1/screensaver/photos/{id}': {
-      get: op({
+      get: withValidationRefusal(op({
         summary: 'Fetch one screensaver photo',
         tag: 'Screensaver',
-        params: [idParam('id', 'Immich asset ID')],
+        params: [{
+          name: 'id',
+          in: 'path',
+          required: true,
+          description: 'Immich asset ID, a UUID (either letter case). Any other shape answers 400, also when Immich is not configured.',
+          schema: { type: 'string', pattern: SCREENSAVER_PHOTO_ID_PATTERN },
+        }],
         description: 'Proxies the image bytes from Immich. It is fetched through Yuvomi rather than '
           + 'linked directly so the browser never needs the Immich token.',
-      }),
+      })),
     },
   };
 }

@@ -18,7 +18,7 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
+import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
 import { DatabaseSync } from 'node:sqlite';
 
 const dbmod = await import('../server/db.js');
@@ -69,17 +69,17 @@ test('die Spalten-DEFAULT bleibt 0, ein kuenftiges Konto startet ungesehen', () 
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
 
 const actor = { userId: 0 };
-const app = express();
-app.use(express.json());
-app.use(sessionMiddleware);
-app.use((req, _res, next) => {
-  if (actor.userId) { req.session.userId = actor.userId; req.session.role = 'member'; }
-  next();
+const app = await createAuthApp({
+  session: sessionMiddleware,
+  auth: (req, _res, next) => {
+    if (actor.userId) { req.session.userId = actor.userId; req.session.role = 'member'; }
+    next();
+  },
+  routers: [authRouter],
 });
-app.use('/', authRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
+const base = `http://127.0.0.1:${server.address().port}${AUTH_PREFIX}`;
 
 test.after(() => server.close());
 

@@ -21,7 +21,7 @@
  */
 
 import { localToUTC, householdTimeZone, todayKey, shiftDateKey } from '../utils/timezone.js';
-import { resolvePermissions } from '../permissions.js';
+import { actorForUser, authorize } from '../authorize/index.ts';
 import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { listTypes, getOccurrences } from './waste-store.js';
@@ -30,12 +30,10 @@ const log = createLogger('Waste');
 
 // A pickup rhythm is weekly/monthly, not daily like a shift - long enough to
 // comfortably cover a monthly rhythm plus the widest allowed lead time
-// (MAX_OFFSET_DAYS below), short enough that this stays "a few dozen rows,"
+// (MAX_OFFSET_DAYS in waste-fields.js, the bound the schema of the reminder
+// setting holds since #2810), short enough that this stays "a few dozen rows,"
 // not real storage (invariant #8 - every list has a measured work limit).
 const REMINDER_WINDOW_DAYS = 45;
-
-export const MIN_OFFSET_DAYS = 0;
-export const MAX_OFFSET_DAYS = 14;
 
 function toNaiveUTC(isoWithZ) {
   // reminders.remind_at is naive-UTC, HH:MM (no seconds) throughout this app
@@ -65,9 +63,7 @@ export function wasteDisabled(database) {
 }
 
 function lacksWaste(database, userId) {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(userId);
-  if (!user) return true;
-  return resolvePermissions(database, user).modules.waste === 'none';
+  return !authorize(actorForUser(database, userId), 'receive', { module: 'waste' }).allowed;
 }
 
 function dropAllForUser(database, userId) {

@@ -13,14 +13,16 @@ import express from 'express';
 import * as db from '../db.js';
 import { searchEverything, emptySearchResults, SEARCH_MODULES } from '../services/search.js';
 import { householdDisabledModules } from '../services/household-modules.js';
-import { hiddenModulesFor } from '../permissions.js';
+import { hiddenModulesFor } from '../authorize/index.ts';
+import { validateRequest } from '../api/validate-request.ts';
 
 const router = express.Router();
 
 /**
  * GET /api/v1/search?q=<query>
  * Durchsucht Aufgaben, Kalender-Events, Notizen, Kontakte, Einkaufsartikel,
- * Gesundheits-Medikamente und -Aktivitäten (Health: nur eigene oder family-sichtbare Zeilen).
+ * Gesundheits-Medikamente und -Aktivitäten. Je Trefferart gilt die Zeilenregel der
+ * Liste desselben Typs (Health: eigene, family-sichtbare und die betreuter Personen).
  * Response: { tasks, events, notes, contacts, items, meds, activities, waste,
  *            recipes, pantry, inventory, documents, birthdays, budget }
  *
@@ -38,19 +40,17 @@ const router = express.Router();
  * Modul lesen darf - sonst las ein Token mit `search:read` Notizen, Kontakte und
  * Medikamente, die seine Scopes gar nicht nennen.
  */
-router.get('/', (req, res) => {
-  try {
-    const q = String(req.query.q ?? '').trim();
-    if (q.length < 2) return res.json(emptySearchResults());
+// An unexpected error goes to the central error handler (#2810), which logs
+// it - the catch here answered without a log line.
+router.get('/', validateRequest(), (req, res) => {
+  const q = String(req.query.q ?? '').trim();
+  if (q.length < 2) return res.json(emptySearchResults());
 
-    const userId = req.authUserId || req.session.userId;
-    res.json(searchEverything(db.get(), q, userId, {
-      hiddenModules: hiddenModulesFor(req, SEARCH_MODULES),
-      disabledNav: householdDisabledModules(db.get()),
-    }));
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const userId = req.authUserId || req.session.userId;
+  res.json(searchEverything(db.get(), q, userId, {
+    hiddenModules: hiddenModulesFor(req, SEARCH_MODULES),
+    disabledNav: householdDisabledModules(db.get()),
+  }));
 });
 
 export default router;

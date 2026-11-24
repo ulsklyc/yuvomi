@@ -19,7 +19,7 @@ import crypto from 'node:crypto';
 import * as db from '../db.js';
 import { parseRRule } from './recurrence.js';
 import { outboundEvent } from './outbound-dtstart.js';
-import { visibilityWhere } from './visibility.js';
+import { visibleWhere } from '../authorize/index.ts';
 import { householdTimeZone } from '../utils/timezone.js';
 import { newNonMembers, nonMemberMessage } from './household-members.js';
 
@@ -99,6 +99,18 @@ function getAccountById(accountId) {
 
 function getAllAccounts() {
   return db.get().prepare('SELECT * FROM outlook_accounts').all();
+}
+
+/**
+ * Whether the account exists (#2810, group 10b): the routes with an account in
+ * the path ask this before the service, so an unknown account is a 404 of its
+ * own instead of the plain Error the service throws for it (500, or 502
+ * `remote_failed` as if the server had refused).
+ * @param {number} accountId
+ * @returns {boolean}
+ */
+function accountExists(accountId) {
+  return db.get().prepare('SELECT 1 FROM outlook_accounts WHERE id = ?').get(accountId) !== undefined;
 }
 
 function listAccounts() {
@@ -582,7 +594,7 @@ function allDayEndToExclusive(dateStr) {
 
 /**
  * DB-Datetime → Graph {dateTime, timeZone}. Lokal angelegte Events sind naive
- * "YYYY-MM-DDTHH:MM" (validate.js) → Sekunden ergänzen, TZ Europe/Berlin.
+ * "YYYY-MM-DDTHH:MM" (api/formats.ts) → Sekunden ergänzen, TZ Europe/Berlin.
  * Importierte Events können Z/Offset tragen → nach UTC normalisieren.
  */
 function toGraphDateTime(dt, tz = outlookTimeZone()) {
@@ -686,7 +698,7 @@ function collectCandidates(conn, account) {
       FROM calendar_events e
       WHERE e.external_source = 'local'
         AND e.recurrence_parent_id IS NULL
-        AND ${visibilityWhere('e', 'event_assignments', 'event_id')}
+        AND ${visibleWhere('events', 'e', '?')}
     `).all(account.owner_user_id, account.owner_user_id);
     for (const event of rows) {
       candidates.set(event.id, { event, calendarId: account.auto_sync_calendar_id });
@@ -958,6 +970,7 @@ function getStatus() {
 }
 
 export {
+  accountExists,
   getAuthUrl,
   handleCallback,
   sync,
@@ -969,6 +982,7 @@ export {
   listCalendarSelection,
   setCalendarEnabled,
   assertConfigured,
+  ReauthRequiredError,
 };
 
 export const __test = {

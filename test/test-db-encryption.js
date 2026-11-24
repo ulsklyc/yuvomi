@@ -15,7 +15,7 @@
  * Cache-Busting-Query), da DB_PATH und DB_ENCRYPTION_KEY beim Modul-Load aus
  * der Env gelesen werden.
  *
- * Lauf: node --experimental-sqlite test/test-db-encryption.js
+ * Lauf: node test/test-db-encryption.js
  *   (bzw. npm run test:db-encryption)
  */
 
@@ -1094,10 +1094,11 @@ async function restoreRoute() {
     req.session = { userId: 1, role: 'admin' };
     next();
   });
-  app.use('/', router);
+  // Der echte Praefix: validateRequest() liest die Operation aus `req.baseUrl` (#2810).
+  app.use('/api/v1/backup', router);
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.on('listening', resolve));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const base = `http://127.0.0.1:${server.address().port}/api/v1/backup`;
   routeInstance = {
     db,
     server,

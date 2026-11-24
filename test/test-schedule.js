@@ -104,6 +104,8 @@ test('calendar day arithmetic remains stable across DST', () => {
   assert.equal(cyclePosition('2026-03-27', 8, '2026-03-30'), 3);
 });
 
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 let actor = ALICE;
 const app = express();
 app.use((req, _res, next) => {
@@ -115,9 +117,13 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', scheduleRouter);
+app.use(defaultEmptyBody);
+// The real prefixes, in the mount order of server/index.js: validateRequest()
+// finds its operation by `req.baseUrl` (#2810).
+app.use('/api/v1/schedule', scheduleRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}/api/v1/schedule`)));
 test.after(() => server.close());
 
 async function call(method, path, { as = ALICE, body } = {}) {
@@ -239,14 +245,14 @@ test('members may write only themselves while admins may write any household sch
   const allowed = await call('POST', '/patterns', { as: ADMIN, body: { ...body, name: 'Admin pattern', is_active: false } });
   assert.equal(allowed.status, 201);
   assert.equal(allowed.body.data.is_active, 0);
-  const self = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: null, note: 'Vacation' } });
+  const self = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: null, note: 'Vacation', field_values: {} } });
   assert.equal(self.status, 200);
-  const foreign = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: BOB.id, shift_type_id: null } });
+  const foreign = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: BOB.id, shift_type_id: null, note: null, field_values: {} } });
   assert.equal(foreign.status, 403);
 });
 
 test('a member API token sent next to an admin session may not write someone else\'s schedule; the admin session alone may', async () => {
-  const body = { user_id: BOB.id, shift_type_id: null, note: 'Token probe' };
+  const body = { user_id: BOB.id, shift_type_id: null, note: 'Token probe', field_values: {} };
   try {
     const withToken = await call('PUT', '/overrides/2031-02-03', { as: { ...ALICE, cookieSession: { userId: ADMIN.id, role: 'admin' } }, body });
     assert.equal(withToken.status, 403, 'the gate judges by the token subject\'s role');
@@ -301,7 +307,7 @@ test('overrides can be filled across a date range, self or admin-on-behalf, capp
 
   // A pre-existing override in-range must be overwritten, not duplicated -
   // fill uses the same ON CONFLICT upsert as the single-date PUT.
-  await call('PUT', '/overrides/2027-03-02', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'stale' } });
+  await call('PUT', '/overrides/2027-03-02', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'stale', field_values: {} } });
 
   const filled = await call('POST', '/overrides/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2027-03-01', to: '2027-03-05', shift_type_id: null, note: 'Vacation' } });
   assert.equal(filled.status, 200);
@@ -355,7 +361,7 @@ test('an override\'s field_values round-trip, fill shares one set across the ran
   const client = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Client' } })).body.data.id;
   await call('PUT', `/shift-types/${type}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: client, position: 0 }] } });
 
-  const set = await call('PUT', '/overrides/2027-05-01', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: { [client]: 'Acme Corp' } } });
+  const set = await call('PUT', '/overrides/2027-05-01', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: null, field_values: { [client]: 'Acme Corp' } } });
   assert.equal(set.status, 200);
   assert.deepEqual(set.body.data.field_values, { [client]: 'Acme Corp' });
   const overrideId = set.body.data.id;
@@ -435,28 +441,27 @@ test('validateFieldValues() rejects normalized-duplicate keys directly', () => {
   assert.match(result.error, /must not repeat/);
 });
 
-// PUT /overrides/:dateKey's field_values contract (Migration 189, matching
-// what /extras already does): OMITTING field_values from the body means
-// "leave whatever is stored alone", but an EXPLICIT {} means "clear it" -
-// these must not collapse into the same behaviour, or a caller that only
-// meant to touch `note` would silently wipe out field values it never
-// mentioned.
-test('PUT /overrides/:dateKey: omitting field_values preserves stored values, an explicit {} clears them', async () => {
+// PUT /overrides/:dateKey's field_values contract: up to v2.93 OMITTING
+// field_values kept the stored values while a missing note wiped the stored
+// note. Since #2810 the body is the whole override - omitting field_values is
+// a 400 that leaves the stored values alone, an EXPLICIT {} clears them.
+test('PUT /overrides/:dateKey: omitting field_values is a 400 that keeps stored values, an explicit {} clears them', async () => {
   const type = (await call('POST', '/shift-types', { as: ALICE, body: { name: 'Omit-vs-clear type' } })).body.data.id;
   const field = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Omit-vs-clear field' } })).body.data.id;
   await call('PUT', `/shift-types/${type}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: field, position: 0 }] } });
 
-  const set = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: { [field]: 'Kept' } } });
+  const set = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: null, field_values: { [field]: 'Kept' } } });
   assert.equal(set.status, 200);
   assert.deepEqual(set.body.data.field_values, { [field]: 'Kept' });
   const overrideId = set.body.data.id;
 
   const omitted = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: 'Just a note change' } });
-  assert.equal(omitted.status, 200);
-  assert.deepEqual(omitted.body.data.field_values, { [field]: 'Kept' }, 'field_values omitted from the body must leave the stored values alone');
+  assert.equal(omitted.status, 400, 'field_values omitted from the body is refused (full representation, #2810)');
+  assert.equal(omitted.body.reason, 'validation');
+  assert.equal(database.prepare('SELECT note FROM schedule_overrides WHERE id = ?').get(overrideId).note, null, 'the refused body changed nothing');
   assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 1);
 
-  const cleared = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: {} } });
+  const cleared = await call('PUT', '/overrides/2027-06-21', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, note: null, field_values: {} } });
   assert.equal(cleared.status, 200);
   assert.deepEqual(cleared.body.data.field_values, {}, 'an explicit empty object must clear the stored values');
   assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 0);
@@ -487,7 +492,7 @@ test('PUT /overrides/:dateKey resyncs reminders immediately, and a throwing resy
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const dateKey = tomorrow.toISOString().slice(0, 10);
 
-  const put = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType } });
+  const put = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType, note: null, field_values: {} } });
   assert.equal(put.status, 200);
 
   const anchor = database.prepare('SELECT * FROM schedule_reminder_entries WHERE user_id = ? AND date_key = ?').get(ALICE.id, dateKey);
@@ -504,7 +509,7 @@ test('PUT /overrides/:dateKey resyncs reminders immediately, and a throwing resy
   };
   let throwing;
   try {
-    throwing = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType, note: 'still saved' } });
+    throwing = await call('PUT', `/overrides/${dateKey}`, { as: ALICE, body: { user_id: ALICE.id, shift_type_id: timedType, note: 'still saved', field_values: {} } });
   } finally {
     database.prepare = originalPrepare;
   }
@@ -540,7 +545,7 @@ test('a shift type may be added by anyone but only changed by its creator or an 
 // has to come from THAT and not from any error at all - the branch used to
 // catch everything and blame the same cause, so a broken statement would have
 // told the caller the type was still in use.
-// `color()` in validate.js answers a falsy input with {value: null, error: null},
+// `color()` in api/formats.ts answers a falsy input with {value: null, error: null},
 // so an empty string passes validation and reaches the UPDATE - where the column
 // is NOT NULL. The default does not apply to an explicitly bound NULL, so this
 // used to surface as an unhandled constraint error and a bare 500. The POST
@@ -760,13 +765,14 @@ test('PUT /patterns/:id validates cycle_length bounds, valid_from/until ordering
   const patchPatternId = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Patchable', '2027-10-01', 10)").run().lastInsertRowid;
   database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 7, ?)').run(patchPatternId, typeId);
 
+  // The bounds 1-366 stand in the schema since #2810: the 400 of the check names the field.
   const tooShort = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { cycle_length: 0 } });
   assert.equal(tooShort.status, 400);
-  assert.match(tooShort.body.error, /between 1 and 366/);
+  assert.deepEqual(tooShort.body.fields, [{ path: 'body/cycle_length', rule: 'minimum' }]);
 
   const tooLong = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { cycle_length: 367 } });
   assert.equal(tooLong.status, 400);
-  assert.match(tooLong.body.error, /between 1 and 366/);
+  assert.deepEqual(tooLong.body.fields, [{ path: 'body/cycle_length', rule: 'maximum' }]);
 
   const invertedDates = await call('PUT', `/patterns/${patchPatternId}`, { as: ALICE, body: { valid_from: '2027-12-01', valid_until: '2027-01-01' } });
   assert.equal(invertedDates.status, 400);
@@ -839,7 +845,7 @@ test('PUT /patterns/:id/days: a foreign user is refused with 403 and writes noth
 });
 
 test('DELETE /overrides/:dateKey: a foreign user is refused with 403 and the override survives', async () => {
-  await call('PUT', '/overrides/2027-10-25', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'Must survive' } });
+  await call('PUT', '/overrides/2027-10-25', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: typeId, note: 'Must survive', field_values: {} } });
 
   const foreign = await call('DELETE', '/overrides/2027-10-25?user_id=' + ALICE.id, { as: BOB });
   assert.equal(foreign.status, 403);
@@ -900,7 +906,8 @@ test('PUT /patterns/:id/days rejects more than MAX_PATTERN_DAY_ROWS (500) rows, 
   const overLimit = { days: Array.from({ length: 501 }, () => ({ position: 0, shift_type_id: typeId })) };
   const rejected = await call('PUT', `/patterns/${bulkPatternId}/days`, { as: ALICE, body: overLimit });
   assert.equal(rejected.status, 400);
-  assert.match(rejected.body.error, /500 rows/);
+  // The cap stands in the schema since #2810 (`maxItems`).
+  assert.deepEqual(rejected.body.fields, [{ path: 'body/days', rule: 'maxItems' }]);
   assert.equal(database.prepare('SELECT COUNT(*) AS c FROM schedule_pattern_days WHERE pattern_id = ?').get(bulkPatternId).c, 0,
     'a rejected over-limit save must not partially apply');
 
@@ -966,14 +973,14 @@ test('a pattern day carries field_values, validated against its shift type\'s at
 // its own small self-contained app for server/routes/preferences.js (this
 // file's own scheduleRouter app is unrelated).
 test('PUT /api/v1/preferences: a non-admin payload mixing schedule_hidden_templates with another valid field is rejected 403 with no partial application', async () => {
-  const prefsApp = express();
-  prefsApp.use(express.json());
   let prefsRole = 'admin';
-  prefsApp.use((req, _res, next) => { req.authUserId = ALICE.id; req.authRole = prefsRole; next(); });
-  const { default: preferencesRouter } = await import('../server/routes/preferences.js');
-  prefsApp.use('/', preferencesRouter);
+  const { createPreferencesApp, PREFERENCES_PREFIX } = await import('./preferences-app.js');
+  const prefsApp = await createPreferencesApp({
+    mount: ['preferences'],
+    auth: (req, _res, next) => { req.authUserId = ALICE.id; req.authRole = prefsRole; next(); },
+  });
   const prefsServer = prefsApp.listen(0, '127.0.0.1');
-  const prefsBaseUrl = await new Promise((r) => prefsServer.on('listening', () => r(`http://127.0.0.1:${prefsServer.address().port}`)));
+  const prefsBaseUrl = await new Promise((r) => prefsServer.on('listening', () => r(`http://127.0.0.1:${prefsServer.address().port}${PREFERENCES_PREFIX}`)));
   try {
     // Baseline, set as admin, so the "must not have changed" assertion below
     // has a known-different value to check against.
@@ -2598,10 +2605,16 @@ test('an "overtime tracking" toggle exists separate from the weekly-hours number
   assert.match(settingsFn, /save\(\{ overtimeEnabled: overtimeToggle\.checked \}\)/);
 });
 
-test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separate toggle, not a repurposed sentinel (D-C)', () => {
-  const prefsRoute = readFileSync(new URL('../server/routes/schedule-preferences.js', import.meta.url), 'utf8');
-  assert.match(prefsRoute, /n < 1 \|\| n > MAX_WEEKLY_HOURS/, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
-  assert.match(prefsRoute, /typeof raw !== 'boolean'/, 'overtimeEnabled must be validated as a real boolean, not loosely coerced');
+test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separate toggle, not a repurposed sentinel (D-C)', async () => {
+  // Since #2810 the schema of PUT /schedule/preferences is the only check
+  // (validateRequest() refuses before the handler runs); the bounds come from
+  // services/schedule-fields.js. test-waste-schedule-answers.js sends 0 and
+  // 'false' and pins the 400.
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const props = buildOpenApiSpec(null, '0.0.0-test').paths['/api/v1/schedule/preferences'].put.requestBody.content['application/json'].schema.properties;
+  assert.equal(props.weeklyHours.minimum, 1, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
+  assert.deepEqual(props.weeklyHours.type, ['integer', 'null']);
+  assert.equal(props.overtimeEnabled.type, 'boolean', 'overtimeEnabled must be validated as a real boolean, not loosely coerced');
 });
 
 // App-weite UX-Durchsicht 2026-09-12 (Batch 4): "Schedule: hierarchy + actions".
@@ -3196,7 +3209,8 @@ test('#1777: a reversed range is refused with reason range_reversed, the sentenc
   assert.equal('reason' in foreign.body, false);
   const other = await call('GET', '/entries?from=not-a-date&to=2027-04-01', { as: ALICE });
   assert.equal(other.status, 400);
-  assert.equal('reason' in other.body, false);
+  // Outside the schema since #2810: the reason of the check, never range_reversed.
+  assert.equal(other.body.reason, 'validation');
 
   // Die Oberflaeche liest den reason der ECHTEN Antwort, nicht den Satz.
   const { __test } = await import('../public/pages/schedule.js');

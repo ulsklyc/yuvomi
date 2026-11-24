@@ -33,7 +33,7 @@ delete process.env.FIXER_API_KEY;
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 const dbmod = await import('../server/db.js');
 const routes = await import('../server/routes/subscriptions.js');
@@ -50,14 +50,16 @@ db.prepare(`INSERT INTO sync_config (key, value) VALUES ('budget_mode', 'shared'
 
 // Der Nutzer kommt aus dem Header, nicht aus einer Variablen: zwei Requests
 // sind hier gleichzeitig unterwegs.
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  const id = Number(req.get('x-test-user')) || ADA;
-  req.authUserId = id; req.authRole = 'member'; req.session = { userId: id, role: 'member' };
-  next();
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['subscriptions'],
+  auth: (req, _res, next) => {
+    const id = Number(req.get('x-test-user')) || ADA;
+    req.authUserId = id; req.authRole = 'member'; req.session = { userId: id, role: 'member' };
+    next();
+  },
 });
-app.use('/', routes.default);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => { routes._setRatesForTest(null); server.close(); });
@@ -65,7 +67,7 @@ test.after(() => { routes._setRatesForTest(null); server.close(); });
 async function call(method, route, body) {
   const headers = { 'x-test-user': String(ADA) };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  const res = await fetch(`${baseUrl}${route}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const res = await fetch(`${baseUrl}/api/v1/budget/subscriptions${route}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text();
   return { status: res.status, body: text ? JSON.parse(text) : null };
 }

@@ -2,40 +2,41 @@
  * Module: Waste collection routes - fresh ICS import
  * Purpose: the two endpoints that create a brand-new source. Re-import of an
  *          existing source lives in ./sources.js, sharing the same
- *          previewImport/commitImport service calls.
+ *          previewImport/commitImport service calls. A catch answers only the
+ *          typed waste errors; anything else reaches the central error
+ *          handler (#2810).
  */
 
 import express from 'express';
-import { createLogger } from '../../logger.js';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import * as store from '../../services/waste-store.js';
 import { wasteErrorResponse, currentUserId } from './helpers.js';
 import { icsFromBody } from './sources.js';
 
-const log = createLogger('Waste');
 const router = express.Router();
 
-router.post('/preview', (req, res) => {
+router.post('/preview', validateRequest(), (req, res) => {
+  const ics = icsFromBody(req, res);
+  if (ics === null) return;
   try {
-    const ics = icsFromBody(req, res);
-    if (ics === null) return;
     const preview = store.previewImport(db.get(), { sourceId: null, icsText: ics });
     res.json({ data: preview });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('POST /waste/import/preview error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 
-router.post('/commit', (req, res) => {
+router.post('/commit', validateRequest(), (req, res) => {
+  const ics = icsFromBody(req, res);
+  if (ics === null) return;
+  const body = req.body ?? {};
+  // The schema requires `name` as text; empty after trimming is the route's.
+  if (typeof body.name !== 'string' || !body.name.trim()) {
+    return res.status(400).json({ error: 'name is required.', code: 400 });
+  }
   try {
-    const ics = icsFromBody(req, res);
-    if (ics === null) return;
-    const body = req.body ?? {};
-    if (typeof body.name !== 'string' || !body.name.trim()) {
-      return res.status(400).json({ error: 'name is required.', code: 400 });
-    }
     const result = store.commitImport(db.get(), {
       sourceId: null,
       name: body.name,
@@ -49,8 +50,7 @@ router.post('/commit', (req, res) => {
     res.status(201).json({ data: result });
   } catch (err) {
     if (wasteErrorResponse(res, err)) return;
-    log.error('POST /waste/import/commit error:', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
+    throw err;
   }
 });
 

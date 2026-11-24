@@ -7,7 +7,7 @@
  *          - Ausschluss von Housekeeping-Workern (NOT EXISTS)
  *          - Sortierung display_name COLLATE NOCASE ASC
  *          - Response-Shape { data: Member[] } inkl. family_role/avatar_color
- * Ausführen: node --experimental-sqlite --test test/test-family-routes.js
+ * Ausführen: node --test test/test-family-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -16,19 +16,26 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
 
 const dbmod = await import('../server/db.js');
 const { default: familyRouter } = await import('../server/routes/family.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
+// Am Pfad der App (#2810): validateRequest() liest die Operation aus Mount und Route.
 const app = express();
-app.use('/', familyRouter);
+app.use(express.json());
+app.use(defaultEmptyBody);
+app.use('/api/v1/family', familyRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
 async function get(route) {
-  const res = await fetch(`${baseUrl}${route}`);
+  const res = await fetch(`${baseUrl}/api/v1/family${route}`);
   const body = await res.json();
   return { status: res.status, body };
 }
@@ -100,16 +107,16 @@ test('GET /members — Shape enthält family_role, avatar_color, id', async () =
 // --------------------------------------------------------------------------
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
 const authActor = { userId: 0 };
-const authApp = express();
-authApp.use(express.json());
-authApp.use(sessionMiddleware);
-authApp.use((req, _res, next) => {
-  if (authActor.userId) { req.session.userId = authActor.userId; req.session.role = 'member'; }
-  next();
+const authApp = await createAuthApp({
+  session: sessionMiddleware,
+  auth: (req, _res, next) => {
+    if (authActor.userId) { req.session.userId = authActor.userId; req.session.role = 'member'; }
+    next();
+  },
+  routers: [authRouter],
 });
-authApp.use('/', authRouter);
 const authServer = authApp.listen(0, '127.0.0.1');
-const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}`)));
+const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}${AUTH_PREFIX}`)));
 test.after(() => authServer.close());
 
 async function signIn(userId) {

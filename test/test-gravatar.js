@@ -45,6 +45,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import express from 'express';
+import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
@@ -326,8 +327,8 @@ test('Fehlermeldungen tragen weder Hash noch Basis-URL', async () => {
 // --------------------------------------------------------------------------
 // Die Route, gegen den echten Handler. Aufbau wie test-changelog-seen.js:
 // requireAuth loest seine Session selbst auf. Der Handler kommt aus dem
-// Builder mit injiziertem Abruf und haengt unter /t; /me, /me/profile und der
-// Riegel fuer Wandtabletts kommen vom unveraenderten Auth-Router darunter.
+// Builder mit injiziertem Abruf und haengt vor dem unveraenderten Auth-Router,
+// der /me, /me/profile und den Riegel fuer Wandtabletts beitraegt.
 // --------------------------------------------------------------------------
 
 const transport = { reply: null };
@@ -337,19 +338,29 @@ buildGravatarRoute(testRouter, {
 });
 
 const actor = { userId: 0 };
-const app = express();
-app.use(express.json({ limit: '2mb' }));
-app.use(sessionMiddleware);
-app.use((req, _res, next) => {
+/** @param {any} req @param {unknown} _res @param {() => void} next */
+const signInStandIn = (req, _res, next) => {
   if (actor.userId) { req.session.userId = actor.userId; req.session.role = 'member'; }
   next();
+};
+// Both at the real prefix (test/auth-app.js): the built route in front, so it
+// answers `/me/avatar/gravatar`, the real router behind it for the rest.
+const app = await createAuthApp({
+  session: sessionMiddleware, auth: signInStandIn, routers: [testRouter, authRouter], jsonLimit: '2mb',
 });
-app.use('/t', testRouter);
-app.use('/', authRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
+const base = `http://127.0.0.1:${server.address().port}${AUTH_PREFIX}`;
 test.after(() => server.close());
+// The real router alone, for the one case that must reach its own gravatar
+// route (the gate for wall displays).
+const realApp = await createAuthApp({
+  session: sessionMiddleware, auth: signInStandIn, routers: [authRouter], jsonLimit: '2mb',
+});
+const realServer = /** @type {any} */ (http.createServer(realApp));
+await new Promise((r) => realServer.listen(0, '127.0.0.1', r));
+const realBase = `http://127.0.0.1:${realServer.address().port}${AUTH_PREFIX}`;
+test.after(() => realServer.close());
 
 function cookieHeader(res) {
   return res.headers.getSetCookie().map((raw) => raw.split(';')[0]).join('; ');
@@ -373,7 +384,7 @@ async function call(method, path, session, payload) {
   return { status: res.status, body: await res.json() };
 }
 
-const importGravatar = (session, payload = {}) => call('POST', '/t/me/avatar/gravatar', session, payload);
+const importGravatar = (session, payload = {}) => call('POST', '/me/avatar/gravatar', session, payload);
 const gravatarFlag = async (session) => (await call('GET', '/me', session)).body.gravatarAvailable;
 
 /** Fuehrt fn mit GRAVATAR_BASE_URL = value aus (undefined = Variable entfernt). */
@@ -558,7 +569,7 @@ test('zehn Aufrufe in zehn Minuten je Mitglied; der elfte -> 429 gravatar_rate_l
 });
 
 test('ohne Sitzung -> 401; ein Wandtablett -> 403 display_account am echten Router', async () => {
-  const anonymous = await fetch(`${base}/t/me/avatar/gravatar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  const anonymous = await fetch(`${base}/me/avatar/gravatar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   assert.equal(anonymous.status, 401);
 
   addUser(306, 'kueche', { email: 'kueche@example.com' });
@@ -575,7 +586,7 @@ test('ohne Sitzung -> 401; ein Wandtablett -> 403 display_account am echten Rout
   process.env.GRAVATAR_BASE_URL = '';
   let res;
   try {
-    res = await fetch(`${base}/me/avatar/gravatar`, {
+    res = await fetch(`${realBase}/me/avatar/gravatar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: `${DISPLAY_COOKIE}=${encodeURIComponent(paired.token)}` },
       body: '{}',

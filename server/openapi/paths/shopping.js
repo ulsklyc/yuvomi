@@ -1,10 +1,55 @@
 import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { DATE_PATTERN } from '../../utils/datetime-pattern.js';
 
 const schema = (name) => ({ 'application/json': { schema: { $ref: `#/components/schemas/${name}` } } });
 const apiError = (description) => ({ description, content: schema('ApiError') });
 const BAD_REQUEST = { $ref: '#/components/responses/BadRequest' };
 const LIST_NOT_FOUND = apiError('The list does not exist.');
 const ITEM_NOT_FOUND = apiError('The item does not exist.');
+const CATEGORY_NOT_FOUND = apiError('The category does not exist.');
+const STORE_NOT_FOUND = apiError('The shop does not exist.');
+
+// ---------------------------------------------------------------------------
+// Bausteine der Anfrage-Schemata (#2810, Gruppe 8). Das Schema traegt Typ und
+// Gestalt; Laengen und Leere bleiben im Handler, weil er nach dem Trimmen
+// zaehlt. Unbekannte Felder bleiben ignoriert (kein `additionalProperties:
+// false`).
+// ---------------------------------------------------------------------------
+
+/**
+ * A JSON body. `{}` sent on purpose counts as sent; a call without a body is 400.
+ * @param {Record<string, unknown>} properties
+ * @param {string[]} [required]
+ */
+const body = (properties, required = []) => ({
+  required: true,
+  description: 'JSON request body. Fields the schema does not name are ignored.',
+  content: { 'application/json': { schema: { type: 'object', properties, ...(required.length ? { required } : {}) } } },
+});
+
+const NAME = { type: 'string', description: 'Trimmed before it is stored; empty after trimming or too long is the route\'s 400.' };
+const NAME_BODY = body({ name: NAME }, ['name']);
+/** A row id in a request body: a positive integer. */
+const ROW_ID = { type: 'integer', minimum: 1 };
+/** A day key `YYYY-MM-DD`; whether the day exists is the route's check. */
+const DAY = { type: 'string', pattern: DATE_PATTERN };
+
+/**
+ * The answers of an operation outside the client contract, with the 400 of
+ * validateRequest() (#2810).
+ * @param {Record<string, unknown>} own
+ */
+const answers = (own) => ({
+  ...own,
+  400: BAD_REQUEST,
+  401: { $ref: '#/components/responses/Unauthorized' },
+  500: { $ref: '#/components/responses/InternalServerError' },
+});
+
+const listId = () => idParam('listId', 'List ID, plain decimal digits.');
+const itemId = () => idParam('itemId', 'Item ID, plain decimal digits.');
+const catId = () => idParam('catId', 'Category ID, plain decimal digits.');
+const storeId = () => idParam('id', 'Shop ID, plain decimal digits; `0` is the route\'s 400 `Invalid store ID.`.');
 
 /** Die Antworten einer Operation des Client-Vertrags: Erfolg mit Schema, dazu die Absagen. */
 function typed(status, name, refusals = {}) {
@@ -25,22 +70,58 @@ export function shoppingPaths() {
     },
     '/api/v1/shopping/categories': {
       get: op({ summary: 'List shopping categories', operationId: 'listShoppingCategories', tag: 'Shopping', description: 'In shop order, the order of `sort_order`.', responses: typed(200, 'ShoppingCategoriesResponse') }),
-      post: op({ summary: 'Create shopping category', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. A name that is already taken is refused with 409 and `reason: "category_exists"`.' }),
+      post: op({
+        summary: 'Create shopping category', tag: 'Shopping', stateChanging: true, requestBody: NAME_BODY,
+        description: 'Body: { name }. A name that is already taken is refused with 409 and `reason: "category_exists"`.',
+        responses: answers({ 201: { description: 'Created' }, 409: apiError('A category with this name exists.') }),
+      }),
     },
     '/api/v1/shopping/stores': {
       get: op({ summary: 'List the shops a price can be recorded against', tag: 'Shopping', description: 'A managed list rather than free text on the item: a household visits few enough shops that maintaining them is cheap, and free text is messy from the first week ("REWE", "Rewe", "rewe City" would be three).' }),
-      post: op({ summary: 'Add a shop', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. Adding a shop that already exists returns the existing row with 200 rather than a conflict - that is not a mistake, it is already there.' }),
+      post: op({
+        summary: 'Add a shop', tag: 'Shopping', stateChanging: true, requestBody: NAME_BODY,
+        description: 'Body: { name }. Adding a shop that already exists returns the existing row with 200 rather than a conflict - that is not a mistake, it is already there.',
+        responses: answers({ 200: { description: 'The shop already existed' }, 201: { description: 'Created' } }),
+      }),
     },
     '/api/v1/shopping/stores/{id}': {
-      put: op({ summary: 'Rename a shop', tag: 'Shopping', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. Renaming rather than re-creating, so a typo does not split the purchase history away from the shop it belongs to. 409 with `reason: "shopping_store_exists"` when another shop already carries that name, 404 with `reason: "shopping_store_not_found"` when the shop is gone.' }),
-      delete: op({ summary: 'Remove a shop', tag: 'Shopping', params: [idParam()], stateChanging: true, description: 'Prices recorded against it keep their value and lose only the shop reference: what was once paid stays true even when the shop leaves the list. 404 with `reason: "shopping_store_not_found"` when the shop is already gone.' }),
+      put: op({
+        summary: 'Rename a shop', tag: 'Shopping', params: [storeId()], stateChanging: true, requestBody: NAME_BODY,
+        description: 'Body: { name }. Renaming rather than re-creating, so a typo does not split the purchase history away from the shop it belongs to. 409 with `reason: "shopping_store_exists"` when another shop already carries that name, 404 with `reason: "shopping_store_not_found"` when the shop is gone.',
+        responses: answers({ 200: { description: 'Successful response' }, 404: STORE_NOT_FOUND, 409: apiError('Another shop carries this name.') }),
+      }),
+      delete: op({
+        summary: 'Remove a shop', tag: 'Shopping', params: [storeId()], stateChanging: true,
+        description: 'Prices recorded against it keep their value and lose only the shop reference: what was once paid stays true even when the shop leaves the list. 404 with `reason: "shopping_store_not_found"` when the shop is already gone.',
+        responses: answers({ 204: { description: 'Removed' }, 404: STORE_NOT_FOUND }),
+      }),
     },
     '/api/v1/shopping/categories/{catId}': {
-      put: op({ summary: 'Update shopping category', tag: 'Shopping', params: [idParam('catId', 'Category ID')], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. 409 with `reason: "category_exists"` when another category carries that name, 404 with `reason: "shopping_category_not_found"` when the category is gone.' }),
-      delete: op({ summary: 'Delete shopping category', tag: 'Shopping', params: [idParam('catId', 'Category ID')], stateChanging: true, description: 'Items of the category move to the next one. The last category is kept: 400 with `reason: "category_last"`. 404 with `reason: "shopping_category_not_found"` when the category is already gone.' }),
+      put: op({
+        summary: 'Update shopping category', tag: 'Shopping', params: [catId()], stateChanging: true, requestBody: NAME_BODY,
+        description: 'Body: { name }. 409 with `reason: "category_exists"` when another category carries that name, 404 with `reason: "shopping_category_not_found"` when the category is gone.',
+        responses: answers({ 200: { description: 'Successful response' }, 404: CATEGORY_NOT_FOUND, 409: apiError('Another category carries this name.') }),
+      }),
+      delete: op({
+        summary: 'Delete shopping category', tag: 'Shopping', params: [catId()], stateChanging: true,
+        description: 'Items of the category move to the next one. The last category is kept: 400 with `reason: "category_last"`. 404 with `reason: "shopping_category_not_found"` when the category is already gone.',
+        responses: answers({ 200: { description: 'Successful response' }, 404: CATEGORY_NOT_FOUND }),
+      }),
     },
     '/api/v1/shopping/categories/reorder': {
-      patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({
+        summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true,
+        description: 'Body: { order } - the category ids in their new shop order. An id that does not exist changes nothing.',
+        requestBody: body({
+          order: {
+            type: 'array',
+            minItems: 1,
+            items: { anyOf: [ROW_ID, { type: 'string', pattern: '^0*[1-9][0-9]*$' }] },
+            description: 'Category ids: positive integers. A string of decimal digits is read as the same id (the older form the app sent until v2.93).',
+          },
+        }, ['order']),
+        responses: answers({ 200: { description: 'All categories in their new order' } }),
+      }),
     },
     '/api/v1/shopping/price-history': {
       get: op({
@@ -52,24 +133,25 @@ export function shoppingPaths() {
             name: 'name',
             in: 'query',
             required: true,
-            description: 'Item name to look up purchases for (matched case-insensitively).',
+            description: 'Item name to look up purchases for (matched case-insensitively). Empty or only spaces: an empty list.',
             schema: { type: 'string' },
           },
           {
             name: 'limit',
             in: 'query',
             required: false,
-            description: 'Maximum number of recorded purchases to return (1-50, defaults to 10).',
+            description: 'Maximum number of recorded purchases to return (1-50, defaults to 10). Outside that range, or not a whole number, is a 400.',
             schema: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
           },
           {
             name: 'exclude_item_id',
             in: 'query',
             required: false,
-            description: 'Optional shopping item ID to exclude its current purchase from results. A value that is not a positive integer is a 400.',
+            description: 'Optional shopping item ID to exclude its current purchase from results. A value that is not a positive integer (plain decimal digits without a leading zero) is a 400.',
             schema: { type: 'integer', minimum: 1 },
           },
         ],
+        responses: answers({ 200: { description: 'Successful response' } }),
       }),
     },
     '/api/v1/shopping/suggestions': {
@@ -88,7 +170,7 @@ export function shoppingPaths() {
           description: 'The start of the name, without regard to case for ASCII letters. At most 8 names come back. Without it, or with nothing but spaces, the list is empty.',
           schema: { type: 'string' },
         }],
-        responses: typed(200, 'ShoppingSuggestionsResponse'),
+        responses: typed(200, 'ShoppingSuggestionsResponse', { 400: BAD_REQUEST }),
       }),
     },
     '/api/v1/shopping/versions': {
@@ -111,13 +193,11 @@ export function shoppingPaths() {
         description: 'Removes the items created by one transfer (the `added_ids` of the response) and clears the `on_shopping_list` flag on the meal ingredients they came from - exactly the `ingredient_ids` of the response when they are sent, including ingredients the transfer skipped because an open item of the same name was already on the list. Unknown ids are skipped; `removed` reports what actually went back. Clearing that flag writes meal-plan data, so as soon as one of the named items came from a meal, write access to the `meals` module is required as well and a credential without it is refused with 403. A transfer from the pantry or from a recipe carries no meal, and taking it back needs `shopping` alone.',
         tag: 'Shopping',
         stateChanging: true,
-        requestBody: jsonBody(null),
-        responses: {
-          200: { description: 'Successful response' },
-          401: { $ref: '#/components/responses/Unauthorized' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
+        requestBody: body({
+          ids: { type: 'array', items: ROW_ID, description: 'The `added_ids` of the transfer. Without it, or empty, nothing is removed.' },
+          ingredient_ids: { type: 'array', items: ROW_ID, description: 'The `ingredient_ids` of the transfer.' },
+        }),
+        responses: answers({ 200: { description: 'Successful response' }, 403: { $ref: '#/components/responses/Forbidden' } }),
       }),
     },
     '/api/v1/shopping/items/{itemId}': {
@@ -137,16 +217,16 @@ export function shoppingPaths() {
           + '`shopping_category_not_found` (400, unknown `category`). Every shopping route that works on a list answers a '
           + 'missing list with 404 and `reason: "shopping_list_not_found"`. Validation errors carry no `reason`.',
         tag: 'Shopping',
-        params: [idParam('itemId', 'Item ID')],
+        params: [itemId()],
         stateChanging: true,
         requestBody: jsonBody('#/components/schemas/ShoppingItemUpdateInput'),
         responses: typed(200, 'ShoppingItemResponse', { 400: BAD_REQUEST, 404: ITEM_NOT_FOUND }),
       }),
-      delete: op({ summary: 'Delete shopping item', operationId: 'deleteShoppingItem', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true, responses: typed(200, 'ShoppingItemDeleteResponse', { 404: ITEM_NOT_FOUND }) }),
+      delete: op({ summary: 'Delete shopping item', operationId: 'deleteShoppingItem', tag: 'Shopping', params: [itemId()], stateChanging: true, responses: typed(200, 'ShoppingItemDeleteResponse', { 400: BAD_REQUEST, 404: ITEM_NOT_FOUND }) }),
     },
     '/api/v1/shopping/{listId}': {
-      put: op({ summary: 'Rename shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
-      delete: op({ summary: 'Delete shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
+      put: op({ summary: 'Rename shopping list', tag: 'Shopping', params: [listId()], stateChanging: true, requestBody: NAME_BODY, responses: answers({ 200: { description: 'Successful response' }, 404: LIST_NOT_FOUND }) }),
+      delete: op({ summary: 'Delete shopping list', tag: 'Shopping', params: [listId()], stateChanging: true, responses: answers({ 200: { description: 'Successful response' }, 404: LIST_NOT_FOUND }) }),
     },
     '/api/v1/shopping/{listId}/duplicate': {
       post: op({
@@ -157,9 +237,15 @@ export function shoppingPaths() {
           + 'are never copied: each is a fact about the ORIGINAL item (a synced remote object, a specific meal, a '
           + 'price actually paid in a specific shop) that is not true of a fresh copy.',
         tag: 'Shopping',
-        params: [idParam('listId', 'List ID')],
+        params: [listId()],
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: body({
+          name: NAME,
+          resetChecked: { type: 'boolean' },
+          keepQuantities: { type: 'boolean' },
+          keepNotes: { type: 'boolean' },
+        }, ['name']),
+        responses: answers({ 201: { description: 'Created' }, 404: LIST_NOT_FOUND }),
       }),
     },
     '/api/v1/shopping/{listId}/items': {
@@ -169,10 +255,10 @@ export function shoppingPaths() {
         description: 'Returns the items with the list, the categories and `version`, the list\'s change counter read in the same '
           + 'synchronous step as the items, so a client that polls `/shopping/versions` knows exactly which state it holds.',
         tag: 'Shopping',
-        params: [idParam('listId', 'List ID')],
-        responses: typed(200, 'ShoppingItemsResponse', { 404: LIST_NOT_FOUND }),
+        params: [listId()],
+        responses: typed(200, 'ShoppingItemsResponse', { 400: BAD_REQUEST, 404: LIST_NOT_FOUND }),
       }),
-      post: op({ summary: 'Add item to shopping list', operationId: 'createShoppingItem', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody('#/components/schemas/ShoppingItemCreateInput'), responses: typed(201, 'ShoppingItemResponse', { 400: BAD_REQUEST, 404: LIST_NOT_FOUND }) }),
+      post: op({ summary: 'Add item to shopping list', operationId: 'createShoppingItem', tag: 'Shopping', params: [listId()], stateChanging: true, requestBody: jsonBody('#/components/schemas/ShoppingItemCreateInput'), responses: typed(201, 'ShoppingItemResponse', { 400: BAD_REQUEST, 404: LIST_NOT_FOUND }) }),
     },
     '/api/v1/shopping/{listId}/import-pantry': {
       post: op({
@@ -181,9 +267,27 @@ export function shoppingPaths() {
           + 'An entry is `{ pantry_item_id, quantity? }` for a batch, or `{ pantry_product_id, quantity? }` for a household product, which goes over with its name and category; `quantity` is display text, such as the shortfall to the minimum of the product. '
           + 'Reads the pantry, so it requires read access to the `pantry` module in addition to `shopping` - a credential without it is refused with 403.',
         tag: 'Shopping',
-        params: [idParam('listId', 'List ID')],
+        params: [listId()],
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: body({
+          items: {
+            type: 'array',
+            description: 'The entries to add; an empty list adds nothing. An entry whose batch or product does not exist counts in `skipped`.',
+            items: {
+              type: 'object',
+              properties: {
+                pantry_item_id: ROW_ID,
+                pantry_product_id: ROW_ID,
+                quantity: { type: ['string', 'null'], description: 'Display text, such as the shortfall to the minimum of the product.' },
+              },
+              anyOf: [
+                { properties: { pantry_item_id: ROW_ID }, required: ['pantry_item_id'] },
+                { properties: { pantry_product_id: ROW_ID }, required: ['pantry_product_id'] },
+              ],
+            },
+          },
+        }, ['items']),
+        responses: answers({ 200: { description: 'Successful response' }, 403: { $ref: '#/components/responses/Forbidden' }, 404: LIST_NOT_FOUND }),
       }),
     },
     '/api/v1/shopping/send-recipients': {
@@ -206,9 +310,18 @@ export function shoppingPaths() {
           + 'Requires SMTP to be configured. Rate limited to 10 requests per minute per IP, separately from the '
           + 'general API limit. Fails with 422 when the member has no address, SMTP is unset, or nothing is open.',
         tag: 'Shopping',
-        params: [idParam('listId', 'List ID')],
+        params: [listId()],
         stateChanging: true,
-        requestBody: jsonBody(null),
+        requestBody: body({
+          userId: { type: 'integer', minimum: 1, description: 'The household member to send the list to.' },
+        }, ['userId']),
+        responses: answers({
+          200: { description: 'Successful response' },
+          404: apiError('The list or the recipient does not exist.'),
+          422: apiError('The member has no address, SMTP is unset, or nothing is open.'),
+          429: { description: 'More than 10 requests per minute from this IP.' },
+          502: apiError('The email could not be sent.'),
+        }),
       }),
     },
     '/api/v1/shopping/{listId}/items/checked': {
@@ -220,29 +333,35 @@ export function shoppingPaths() {
           + 'optimistically names exactly what it removed, so a row someone else ticked in the meantime stays. '
           + '`deleted` reports what actually went.',
         tag: 'Shopping',
-        params: [idParam('listId', 'List ID')],
+        params: [listId()],
         stateChanging: true,
         requestBody: { ...jsonBody('#/components/schemas/ShoppingCheckedDeleteInput', 'Optional: `{ ids: number[] }`'), required: false },
         responses: typed(200, 'ShoppingCheckedDeleteResponse', { 400: BAD_REQUEST, 404: LIST_NOT_FOUND }),
       }),
     },
     '/api/v1/shopping/{listId}/items/reorder': {
-      patch: op({ summary: 'Reorder the items of one category', tag: 'Shopping', stateChanging: true, params: [idParam('listId', 'Shopping list ID')], requestBody: jsonBody(null), description: 'Per category rather than across the whole list: the category order is already its own handle and models the route through the shop; a second, list-wide rank beside it would make two statements about the same order. The request must name EVERY item of the category - a subset would let the ranks of the omitted ones collide with the newly assigned ones, and creation time would decide again.' }),
+      patch: op({
+        summary: 'Reorder the items of one category', tag: 'Shopping', stateChanging: true, params: [listId()],
+        requestBody: body({
+          category: { type: 'string', description: 'The name of an existing category.' },
+          order: { type: 'array', minItems: 1, items: ROW_ID, description: 'Every item id of the category, in the new order.' },
+        }, ['order']),
+        responses: answers({ 200: { description: 'Successful response' }, 404: LIST_NOT_FOUND }),
+        description: 'Per category rather than across the whole list: the category order is already its own handle and models the route through the shop; a second, list-wide rank beside it would make two statements about the same order. The request must name EVERY item of the category - a subset would let the ranks of the omitted ones collide with the newly assigned ones, and creation time would decide again.' }),
     },
     '/api/v1/shopping/{listId}/import-meal-plan': {
       post: op({
         summary: 'Import ingredients from the meal plan into a list',
         tag: 'Shopping',
         stateChanging: true,
-        params: [idParam('listId', 'Shopping list ID')],
-        requestBody: jsonBody(null),
+        params: [listId()],
+        requestBody: body({
+          from: DAY,
+          to: DAY,
+          preview: { type: 'boolean', description: 'With `true` nothing is written. Up to v2.93 the text `"true"` ran the real import; it is a 400 now.' },
+        }, ['from', 'to']),
         description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). Meals planned from a recipe are included. ' + 'Body: { from, to, preview? }. With `preview: true` nothing is written - it only counts (`added` new items, `skipped` already on the list), for the "X ingredients from Y meals" line in the import dialog; meals planned from a recipe are read from it there instead of being copied. The import answers `added_ids` and `ingredient_ids` for POST /api/v1/shopping/items/undo-transfer. Marks the imported ingredients as transferred, which is meal-plan data, so it requires write access to the `meals` module in addition to `shopping` - a credential scoped to the shopping list alone is refused with 403, for the preview as well.',
-        responses: {
-          200: { description: 'Successful response' },
-          401: { $ref: '#/components/responses/Unauthorized' },
-          403: { $ref: '#/components/responses/Forbidden' },
-          500: { $ref: '#/components/responses/InternalServerError' },
-        },
+        responses: answers({ 200: { description: 'Successful response' }, 403: { $ref: '#/components/responses/Forbidden' }, 404: LIST_NOT_FOUND }),
       }),
     },
   });

@@ -30,6 +30,11 @@ colors:
   border-subtle: "#EDEAE3"
   border-strong: "#CFC9BC"
   ink-on-vivid: "#FFFFFF"
+  # Dark-Tinte auf den vividen Fuellungen und das dunkle Inset-Well (tokens.css
+  # --_color-ink-on-vivid, --_color-surface-3, Dark-Block): stehen hier, weil
+  # offline.html und browser-too-old.html sie als Literal spiegeln (Phase 1a E).
+  ink-on-vivid-dark: "#0A0A0C"
+  fill-well-dark: "#37332E"
   success: "#1E7B35"
   warning: "#A85D00"
   danger: "#D70015"
@@ -2780,7 +2785,10 @@ Zielgroessen-Regel halten (**Ebene 3**, `die Groesse des Icon-Knopfs gehoert der
 - **Saeulendiagramm mit einer Reihe (R20, Haushaltshilfe):** Saeulen auf einer Haarlinie,
   keine volle Bahn (die las sich als Fortschritt); bezahlt im Vollton der Serie, offen als
   `--tint-hint`-Tint derselben Serie, Legende darunter; ein leerer Monat traegt nur die
-  Grundlinie und keinen "0,00 €"-Wert, ganze Betraege ohne Nachkommastellen.
+  Grundlinie und keinen "0,00 €"-Wert. Die Zahl ueber der Saeule ist immer ganz, auch ein
+  krummer Betrag wird kaufmaennisch gerundet (Folge zu #2772: "1.234,50 €" stiess bei 320-390px
+  an die Nachbarspalte); der genaue Betrag steht im Namen der Spalte, im Titel der Spur, in
+  den Besuchen und im Bericht.
 - **Zahlen-Stepper (R20, "Alle N Wochen"):** das native `<input type="number">` bleibt das
   Feld (Label, Tastatur), links und rechts `btn--secondary btn--icon` mit Minus/Plus; an der
   Grenze `disabled`, der Fokus geht dann ins Feld.
@@ -2845,7 +2853,7 @@ Bremse, Serverfehler, offline, keine Verbindung) - die Beschreibung des Aufrufer
 Rueckfall. Der Statuscode steht zugeklappt unter "Technische Details", nie als sichtbarer Chip.
 Zeigt die Flaeche den Fehler, gibt es keinen Toast daneben. Die Sitzungspruefung beim Start
 hat denselben Zustand als Shell-Fassung (`utils/session-unreachable.js`, im Lichtfeld des
-Ladebilds): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
+Ladebilds auf der Glastafel der Zugangsseiten - kein Text direkt auf dem Feld): nur ein 401 fuehrt zur Anmeldung, alles andere versucht mit wachsendem Abstand
 und nach `Retry-After` selbst erneut. Ihr Titel folgt der Ursache wie der Satz darunter
 (`unreachableTitleKey`: Verbindung, Server nicht bereit, zu viele Anfragen; R20). Scheitert ein
 SEITENWECHSEL am Netz, zeichnet `showPageUnreachable()` denselben Ton in den Inhaltsbereich
@@ -3262,7 +3270,7 @@ Gemessen am echten Markup: `test:module-readonly-ui`, `test:budget-readonly-ui`,
 
 ### Kinderkonten: Startrechte und eigene Sicht (R20, entschieden 2026-10-17)
 Ein NEUES Konto mit Familienrolle Kind startet mit Mitglied-Zeilen
-(`CHILD_START_PERMISSIONS`, server/permissions.js): Budget `none`, Haushaltshilfe `read`,
+(`CHILD_START_PERMISSIONS`, server/authorize/catalog.ts): Budget `none`, Haushaltshilfe `read`,
 Fasten aus, `housekeeping_view_amounts` aus. Nur verschaerfend, nur beim Anlegen (Admin,
 Einladung); bestehende Konten und ein spaeterer Rollenwechsel bleiben unberuehrt.
 Seit R21 (D6) startet es ausserdem ohne Zyklus-Tab (`CHILD_START_PREFERENCES`): keine Rechte-Zeile,

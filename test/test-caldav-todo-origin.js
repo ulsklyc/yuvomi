@@ -16,7 +16,7 @@
  * Originals keine ausgewählte Liste ist (`listIsSelected`). Der Fall steht
  * hier, damit das so bleibt.
  *
- * Ausführen: node --experimental-sqlite --test test/test-caldav-todo-origin.js
+ * Ausführen: node --test test/test-caldav-todo-origin.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

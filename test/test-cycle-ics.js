@@ -7,7 +7,7 @@
  *        des FEED-INHALTS (nicht nur des Tokens, anders als der Inventar-Feed).
  *        (2) Token-Lebenszyklus gegen users.cycle_feed_token (Migration 180).
  *        (3) Der Verwaltungs-Router (/health/cycle/feed) end-to-end.
- * Ausführen: node --experimental-sqlite --test test/test-cycle-ics.js
+ * Ausführen: node --test test/test-cycle-ics.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -20,6 +20,8 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const cycleIcs = await import('../server/services/cycle-ics.js');
 const { default: cycleFeedRouter } = await import('../server/routes/health/cycle-feed.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 function setHouseholdLanguage(language) {
@@ -233,15 +235,19 @@ test('Token-Lebenszyklus: null ohne Token, regenerate erzeugt, clear entfernt, e
 let actorId = alice;
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => { req.authUserId = actorId; next(); });
-app.use('/health', cycleFeedRouter);
+// At its real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and refuses through next(err).
+app.use('/api/v1/health', cycleFeedRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
 async function call(method, path, { as = alice } = {}) {
   actorId = as;
-  const res = await fetch(`${baseUrl}${path}`, { method });
+  const res = await fetch(`${baseUrl}/api/v1${path}`, { method });
   let json = null;
   try { json = await res.json(); } catch { /* leer */ }
   return { status: res.status, body: json };

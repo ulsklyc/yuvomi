@@ -303,9 +303,10 @@ async function call(method, template, { params = {}, query = '', body, headers =
       await seed('POST', '/tasks', { title: 'Schon fertig', due_date: today, assigned_to: [adminId], status: 'done' });
       await seed('POST', '/calendar', {
         title: 'Elternabend', start_datetime: `${await householdDay(1)}T17:00:00Z`, end_datetime: `${await householdDay(1)}T18:00:00Z`,
-        assigned_to: [adminId], countdown: 1,
+        assigned_to: [adminId], countdown: true,
       });
-      await seed('POST', '/calendar', { title: 'Klassenfahrt', start_datetime: today, all_day: 1, assigned_to: [child.id] });
+      // The switches of an event are booleans (#2810): 1 is a 400 since then.
+      await seed('POST', '/calendar', { title: 'Klassenfahrt', start_datetime: today, all_day: true, assigned_to: [child.id] });
 
       const { data: list } = await seed('POST', '/shopping', { name: 'Wocheneinkauf' });
       const { data: emptyList } = await seed('POST', '/shopping', { name: 'Noch leer' });
@@ -347,7 +348,7 @@ async function call(method, template, { params = {}, query = '', body, headers =
       await seed('POST', '/rewards/bonus', { user_id: child.id, delta: 20, reason: 'Geholfen' });
 
       const { data: shift } = await seed('POST', '/schedule/shift-types', { name: 'Frueh', short_code: 'F', start_time: '06:00', end_time: '14:00', icon: 'sun' });
-      await seed('PUT', `/schedule/overrides/${today}`, { shift_type_id: shift.id });
+      await seed('PUT', `/schedule/overrides/${today}`, { shift_type_id: shift.id, note: null, field_values: {} });
       const { data: wasteType } = await seed('POST', '/waste/types', { name: 'Papier', color: '#3366CC', icon: 'recycle' });
       await seed('POST', '/waste/pickups', { type_id: wasteType.id, date: today });
 
@@ -358,7 +359,10 @@ async function call(method, template, { params = {}, query = '', body, headers =
         split_method: 'equal', expense_date: today,
       });
 
-      await seed('PUT', '/health/nutrition/targets', { energy_kcal: 2000 });
+      // The whole target (#2810): all eight nutrients, the rest `null`.
+      await seed('PUT', '/health/nutrition/targets', {
+        energy_kcal: 2000, fat_g: null, saturated_fat_g: null, carbs_g: null, sugar_g: null, protein_g: null, salt_g: null, fiber_g: null,
+      });
       await seed('POST', '/health/nutrition/entries', {
         title: 'Fruehstueck', consumed_at: `${today}T08:00`, meal_type: 'breakfast', energy_kcal: 400, visibility: 'private',
       });

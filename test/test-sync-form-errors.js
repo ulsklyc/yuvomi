@@ -13,7 +13,7 @@
  *        CalDAV und Apple, das echte tsdav gegen test/caldav-fake-server.js:
  *        ob "keine Kalender" ein eigener Fall ist, entscheidet die Antwort des
  *        Servers auf PROPFIND, keine Attrappe am Client.
- * Ausfuehren: node --experimental-sqlite --test test/test-sync-form-errors.js
+ * Ausfuehren: node --test test/test-sync-form-errors.js
  */
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';

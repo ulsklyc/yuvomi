@@ -346,8 +346,8 @@
  * positionierter Nachfahre, dessen Bezugsrahmen (die Zeile) ausserhalb liegt,
  * wird nicht beschnitten.
  *
- * Ohne `:is()`/`:where()` (Chrome 87) fallen beide Regeln zusammen weg: dann
- * oeffnet der Knopf allein, wie vorher - nie eine Strecke ueber Knoepfen, die
+ * `:is()`/`:where()` kennt jeder Browser ab der Untergrenze; beide Regeln
+ * stehen und fallen trotzdem zusammen - nie eine Strecke ueber Knoepfen, die
  * nicht gehoben sind. Guard: test:control-dialect "D10".
  * -------------------------------------------------------- */
 .list-row {

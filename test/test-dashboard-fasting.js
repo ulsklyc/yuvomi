@@ -4,9 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 import { WIDGET_IDS, DEFAULT_HIDDEN_WIDGETS, defaultWidgetSize } from '../public/utils/dashboard-widgets.js';
-import { PERMISSION_WIDGETS } from '../server/permissions.js';
+import { PERMISSION_WIDGETS } from '../server/authorize/index.ts';
 
 test('fasting dashboard widget is registered and sized as a compact timer', () => {
   assert.ok(WIDGET_IDS.includes('fasting'));
@@ -25,8 +24,8 @@ process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'dashboard-fasting-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 function buildMigratedDatabase(migrations) {
   const database = new Database(':memory:');
@@ -97,20 +96,23 @@ database.prepare(`
 
 let actor = OWNER;
 let tokenScopes = null;
-const app = express();
-app.use((req, _res, next) => {
-  const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(database, user));
-  req.authScopes = tokenScopes;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    const user = database.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(database, user));
+    req.authScopes = tokenScopes;
+    next();
+  },
 });
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-const endpoint = `http://127.0.0.1:${server.address().port}/`;
+const endpoint = `http://127.0.0.1:${server.address().port}/api/v1/dashboard/`;
 
 test.after(async () => {
   await new Promise((resolve) => server.close(resolve));

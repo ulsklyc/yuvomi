@@ -6,7 +6,7 @@
  * Query), nachdem process.env.DB_PATH gesetzt wurde — denn der effektive Pfad
  * wird beim Modul-Load aus der Env abgeleitet.
  *
- * Lauf: node --experimental-sqlite --test test/test-rename-migration.js
+ * Lauf: node --test test/test-rename-migration.js
  *   (bzw. npm run test:rename-migration)
  */
 

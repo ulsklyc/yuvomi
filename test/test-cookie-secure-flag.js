@@ -34,7 +34,7 @@
  * `process.env.SESSION_SECURE` bei JEDEM Aufruf, was dieser Test nebenbei
  * belegt.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-cookie-secure-flag.js
+ * Ausfuehren: node --test test/test-cookie-secure-flag.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -30,7 +30,7 @@
  * dann den Folgelauf, in dem der Schaden entstand, und zuletzt, dass der Weg
  * nach der Absage wieder frei ist.
  *
- * Ausführen: node --experimental-sqlite --test test/test-caldav-http-refusals.js
+ * Ausführen: node --test test/test-caldav-http-refusals.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -2292,17 +2292,15 @@ test('Gesehen: eine nie gesehene Aufgabe mit UID nach dem alten Muster bleibt Sp
 test('CardDAV-Konto anlegen: eine Absage des Servers kommt als Meldung an, nicht als "Internal error"', async () => {
   reset();
   dav.addCollection('book', { name: 'Kontakte', kind: 'addressbook' });
-  const express = (await import('express')).default;
-  const { default: cardavRouter } = await import('../server/routes/cardav.js');
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => { req.authRole = 'admin'; next(); });
-  app.use('/cardav', cardavRouter);
+  // At its real prefix with the error handler: validateRequest() reads the
+  // operation from the mount (#2810).
+  const { createContactsMealsApp } = await import('./contacts-meals-app.js');
+  const app = await createContactsMealsApp({ mount: ['cardav'], auth: (req, _res, next) => { req.authRole = 'admin'; next(); } });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
     dav.refuse({ method: 'PROPFIND', path: '/cal/', status: 403 });
-    const res = await fetch(`http://127.0.0.1:${server.address().port}/cardav/accounts`, {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/contacts/cardav/accounts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'Fake', cardavUrl: dav.url, username: 'u', password: 'p' }),

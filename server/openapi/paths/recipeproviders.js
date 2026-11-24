@@ -1,4 +1,30 @@
-import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
+import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
+import { MAX_TITLE, MAX_URL } from '../../api/formats.ts';
+import { SUPPORTED_PROVIDERS } from '../../services/recipe-providers/index.js';
+
+/**
+ * The address check of server/routes/recipe-providers.js as a schema pattern
+ * (#2810): the route trims the value and tests `/^https?:\/\//i`. `\s` and
+ * String.prototype.trim() remove the same characters (WhiteSpace and
+ * LineTerminator), the letters are spelled in both cases instead of the `i`
+ * flag (a pattern carries none). Empty or only spaces passes here: the route
+ * answers that itself ("is required", "must not be empty", no reason) or reads
+ * it as "none" (`external_url`). So the pattern fails exactly where the route
+ * answers `recipe_providers_url_invalid` / `..._external_url_invalid`, and only
+ * the pattern carries that reason: a value that is not text was read through
+ * String() there (a list with one address was accepted, `null` was "required").
+ */
+const PROVIDER_URL_PATTERN = '^(?:\\s*[Hh][Tt][Tt][Pp][Ss]?://|\\s*$)';
+
+const API_TOKEN_MAX = 500;
+const ACCOUNT_ID = 'Account ID, plain decimal digits.';
+
+/** A request body that may be left out or sent as `{}` (the app sends `{}`). */
+const OPTIONAL_EMPTY_BODY = {
+  required: false,
+  description: 'No fields are read; the app sends `{}`. Left out is the same.',
+  content: { 'application/json': { schema: { type: 'object' } } },
+};
 
 export function recipeProvidersPaths() {
   return withCaseReasons('recipe-providers', CASE_REASONS, {
@@ -15,49 +41,126 @@ export function recipeProvidersPaths() {
         tag: 'Recipe providers',
         admin: true,
         stateChanging: true,
-        requestBody: jsonBody(null),
+        description: 'Admin only; the admin check comes first, so a member gets 403 for any body. The body is then checked against the schema: '
+          + '`provider` one of the supported providers (left out: `mealie`), `name`, `base_url` and `api_token` text, `external_url` text or null. '
+          + 'A base or external URL that does not start with `http://` or `https://` after trimming answers 400 with its reason and `fields` naming it; '
+          + 'a missing or empty field, or a text over its length, answers 400 without a reason.',
+        requestBody: {
+          required: true,
+          description: 'JSON request body',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'base_url', 'api_token'],
+                properties: {
+                  provider: { type: 'string', enum: [...SUPPORTED_PROVIDERS], description: 'Left out, `mealie`.' },
+                  name: { type: 'string', maxLength: MAX_TITLE, description: `At most ${MAX_TITLE} characters as sent.` },
+                  base_url: {
+                    type: 'string',
+                    maxLength: MAX_URL,
+                    pattern: PROVIDER_URL_PATTERN,
+                    'x-reason': { pattern: 'recipe_providers_url_invalid' },
+                    description: `The provider's address as this server reaches it, \`http://\` or \`https://\`, at most ${MAX_URL} characters as sent.`,
+                  },
+                  external_url: {
+                    type: ['string', 'null'],
+                    maxLength: MAX_URL,
+                    pattern: PROVIDER_URL_PATTERN,
+                    'x-reason': { pattern: 'recipe_providers_external_url_invalid' },
+                    description: 'An address the browser reaches for "open at the provider" links, `http://` or `https://`. `""` or `null` means none: `base_url` serves.',
+                  },
+                  api_token: { type: 'string', maxLength: API_TOKEN_MAX, description: `Write-only, at most ${API_TOKEN_MAX} characters as sent; stored trimmed.` },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: 'Account created' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          409: { description: 'An account with this base URL already exists' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+          502: { description: 'The provider did not accept the connection with these credentials' },
+        },
       }),
     },
     '/api/v1/recipe-providers/accounts/{id}': {
-      patch: op({
+      patch: withValidationRefusal(op({
         summary: 'Update a recipe provider account',
         tag: 'Recipe providers',
         admin: true,
         stateChanging: true,
-        params: [idParam()],
-        requestBody: jsonBody(null),
-      }),
+        params: [idParam('id', ACCOUNT_ID)],
+        description: 'Admin only, checked first. Only the fields sent change; `{}` changes nothing. `provider`, `base_url` and `api_token` cannot be changed here and are ignored. '
+          + 'The body is checked against the schema before the account is looked up: `enabled` must be a real boolean (`"false"` used to switch an account ON), `name` text, `external_url` text or null.',
+        requestBody: {
+          required: true,
+          description: 'JSON request body',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  enabled: { type: 'boolean', description: 'Whether the account takes part in the sync.' },
+                  name: { type: 'string', maxLength: MAX_TITLE, description: `At most ${MAX_TITLE} characters as sent; empty is refused.` },
+                  external_url: {
+                    type: ['string', 'null'],
+                    maxLength: MAX_URL,
+                    pattern: PROVIDER_URL_PATTERN,
+                    'x-reason': { pattern: 'recipe_providers_external_url_invalid' },
+                    description: '`http://` or `https://`; `""` or `null` clears it.',
+                  },
+                },
+              },
+            },
+          },
+        },
+      })),
       delete: op({
         summary: 'Remove a recipe provider account',
         tag: 'Recipe providers',
         admin: true,
         stateChanging: true,
-        params: [idParam()],
+        params: [idParam('id', ACCOUNT_ID)],
+        description: 'Admin only. Removes the account and every recipe mirrored from it.',
+        responses: {
+          204: { description: 'Account removed' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'No such account' },
+          500: { $ref: '#/components/responses/InternalServerError' },
+        },
       }),
     },
     '/api/v1/recipe-providers/accounts/{id}/test': {
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Test one provider connection',
         tag: 'Recipe providers',
         admin: true,
         stateChanging: true,
-        params: [idParam()],
+        params: [idParam('id', ACCOUNT_ID)],
+        requestBody: OPTIONAL_EMPTY_BODY,
         description: 'Contacts the provider once and reports whether the credentials work, so a '
           + 'wrong token surfaces here rather than as a sync that quietly imports nothing. A failed test is '
           + 'stored on the account like a failed sync and answers with `reason` and `params` next to `error` '
           + `(#1909): ${SYNC_FAILURE_REASONS}`,
-      }),
+      })),
     },
     '/api/v1/recipe-providers/accounts/{id}/sync': {
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Sync one provider account now',
         tag: 'Recipe providers',
         admin: true,
         stateChanging: true,
-        params: [idParam()],
+        params: [idParam('id', ACCOUNT_ID)],
+        requestBody: OPTIONAL_EMPTY_BODY,
         description: 'A provider that cannot be read answers 200 with `failed: true`, `error` (the raw message) '
           + `and, since #1909, \`reason\` and \`params\`: ${SYNC_FAILURE_REASONS}`,
-      }),
+      })),
     },
     '/api/v1/recipe-providers/sync': {
       post: op({

@@ -7,13 +7,12 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { createLogger } from '../logger.js';
-import { isAdminRequest } from '../middleware/require-admin.js';
+import { requireAdmin } from '../middleware/require-admin.js';
+import { validateRequest } from '../api/validate-request.ts';
 import {
   householdMemberSql, memberOrderProblem, memberOrderSql, memberPositionSql, writeMemberOrder,
 } from '../services/household-members.js';
 
-const log = createLogger('Family');
 const router = express.Router();
 
 /** Die Mitgliederliste, wie `GET /members` sie zeigt - in der Haushaltsreihenfolge. */
@@ -39,13 +38,9 @@ function listMembers() {
   `).all().map((row) => ({ ...row, birth_year_unknown: row.birth_year_unknown === 1 }));
 }
 
-router.get('/members', (req, res) => {
-  try {
-    res.json({ data: listMembers() });
-  } catch (err) {
-    log.error('GET /members error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+// An unexpected error goes to the central error handler (#2810).
+router.get('/members', validateRequest(), (req, res) => {
+  res.json({ data: listMembers() });
 });
 
 // --------------------------------------------------------
@@ -57,29 +52,22 @@ router.get('/members', (req, res) => {
 //
 // NUR ADMINISTRATOREN. Die Reihenfolge gilt fuer alle, die hinsehen - sie ist
 // eine Einstellung des Haushalts wie die Familienrollen, keine Vorliebe einer
-// Person. Die Absage traegt einen `reason`, weil `requireAdmin` keinen hat und
-// die Oberflaeche sonst nur "Permission denied." weiterreichen koennte.
+// Person. Die Absage ist die eine Admin-Absage (requireAdmin, Phase 2 C2) mit
+// `reason: 'admin_required'`. Sie steht als Routen-Middleware VOR
+// validateRequest() (#2810): ein Mitglied bekommt 403, nie ein 400, das Felder
+// nennt. Die Form der Liste (`invalid_order`, `duplicate_member`) prueft das
+// Schema; ob sie genau die Mitglieder nennt, bleibt Sache des Handlers.
 //
 // KEIN `await` VOR DER DATENBANK: Pruefen und Schreiben laufen ohne
 // Yield-Punkt hintereinander, sonst koennte zwischen beidem ein Mitglied
 // deaktiviert werden und bekaeme trotzdem eine Position.
 // --------------------------------------------------------
-router.patch('/members/reorder', (req, res) => {
-  try {
-    if (!isAdminRequest(req)) {
-      return res.status(403).json({
-        error: 'Only administrators can change the member order.', code: 403, reason: 'admin_required',
-      });
-    }
-    const order = req.body?.order;
-    const problem = memberOrderProblem(order);
-    if (problem) return res.status(400).json({ error: problem.error, code: 400, reason: problem.reason });
-    writeMemberOrder(order);
-    res.json({ data: listMembers() });
-  } catch (err) {
-    log.error('PATCH /members/reorder error:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.patch('/members/reorder', requireAdmin, validateRequest(), (req, res) => {
+  const order = req.body?.order;
+  const problem = memberOrderProblem(order);
+  if (problem) return res.status(400).json({ error: problem.error, code: 400, reason: problem.reason });
+  writeMemberOrder(order);
+  res.json({ data: listMembers() });
 });
 
 export default router;

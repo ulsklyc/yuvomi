@@ -136,3 +136,6 @@ docs/github-pages/
 
 # macOS sync duplicates (" 2" suffix)
 * 2.*
+
+# tsc --build legt je Projekt eine Build-Info an (scripts/check-tsc-baseline.ts)
+*.tsbuildinfo

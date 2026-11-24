@@ -5,7 +5,7 @@
  *        und nicht in der Route, weil zwei Aufrufer dieselbe Antwort brauchen:
  *        `GET /health/nutrition/summary` fuer den Tab und `/dashboard` fuer das
  *        Widget. Zwei Rechnungen waeren zwei Zahlen, die auseinanderlaufen.
- * Abhaengigkeiten: server/routes/health/helpers.js (die Sichtbarkeits-Klausel,
+ * Abhaengigkeiten: server/authorize/care.ts (die Sichtbarkeits-Klausel,
  *        die laut #884 nur dort gebaut werden darf)
  *
  * DIE ACHT SIND FEST (docs/DECISIONS.md Abschnitt 8). Sie stehen hier EINMAL
@@ -15,28 +15,14 @@
  * niemandem auffaellt.
  */
 
-import { careAwareClause, canWriteFor, OPEN_ALL } from '../routes/health/helpers.js';
+import { canWriteFor, careAwareClause, OPEN_ALL } from '../authorize/index.ts';
+import { NUTRIENT_KEYS } from './health-fields.js';
 
-/**
- * Die acht Naehrwerte in ihrer kanonischen Reihenfolge: Energie, Fett, davon
- * gesaettigte Fettsaeuren, Kohlenhydrate, davon Zucker, Eiweiss, Salz,
- * Ballaststoffe. Das ist die Reihenfolge der EU-Naehrwerttabelle auf der
- * Packung, und sie gilt fuer Formular, CSV-Kopfzeile und Anzeige gleichermassen
- * - wer sie hier aendert, aendert sie ueberall.
- */
-export const NUTRIENT_KEYS = Object.freeze([
-  'energy_kcal',
-  'fat_g',
-  'saturated_fat_g',
-  'carbs_g',
-  'sugar_g',
-  'protein_g',
-  'salt_g',
-  'fiber_g',
-]);
-
-/** Die Mahlzeitenarten, die ein Eintrag optional tragen darf. */
-export const MEAL_TYPES = Object.freeze(['breakfast', 'lunch', 'dinner', 'snack']);
+// Die acht Naehrwerte in der Reihenfolge der EU-Naehrwerttabelle: EINE Quelle
+// mit dem OpenAPI-Dokument (#2810), server/services/health-fields.js. Hier
+// weiter exportiert fuer die Leser. Die Mahlzeitenarten (MEAL_TYPES) liest nur
+// noch das Schema; die Route prueft sie seit #2810 nicht mehr selbst.
+export { NUTRIENT_KEYS };
 
 /**
  * Das Tagesziel einer Person, oder `null`.
@@ -74,7 +60,7 @@ export function nutritionTargetFor(database, userId) {
  * `viewer` entscheidet, welche Eintraege ueberhaupt mitzaehlen: der Eigentuemer
  * und eine betreuende Person sehen alle, jeder andere nur die, die der
  * Eigentuemer fuer den Haushalt geoeffnet hat. Die Klausel kommt aus
- * helpers.js, die einzige Stelle, an der sie gebaut werden darf (#884).
+ * authorize/care.ts, die einzige Stelle, an der sie gebaut werden darf (#884).
  *
  * @param {object} database
  * @param {number} viewer   - die lesende Person
@@ -99,7 +85,7 @@ export function nutritionSummaryFor(database, viewer, ownerId, dayKey) {
     // jemanden eintraegt, muss dessen Ziel kennen, jeder andere nicht. Ohne
     // diese Zeile haette die Bilanz das Ziel auch dann ausgeliefert, wenn die
     // Eintraege daneben allesamt weggefiltert waren.
-    target: canWriteFor(viewer, ownerId) ? nutritionTargetFor(database, ownerId) : null,
+    target: canWriteFor(/** @type {import('../authorize/index.ts').Database} */ (database), viewer, ownerId) ? nutritionTargetFor(database, ownerId) : null,
     totals,
     entryCount: Number(row?.entry_count ?? 0),
   };

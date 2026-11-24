@@ -7,16 +7,20 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import * as v from '../middleware/validate.js';
+import * as v from '../api/formats.ts';
+import { validateRequest } from '../api/validate-request.ts';
 import { syncAllBirthdayReminders } from '../services/birthdays.js';
 import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-fanout.js';
-import { deniedModules } from '../permissions.js';
+import {
+  deniedModules,
+  reminderTargetVisible,
+  asksHouseholdAudience,
+  visibleWhere,
+} from '../authorize/index.ts';
 import { tokenAllows } from '../scopes.js';
 import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-origins.js';
-import { reminderTargetVisible, reminderTargetVisibleSql } from '../services/reminder-targets.js';
 import { withoutGoneEvents } from '../services/reminder-deleted-occurrence.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
-import { asksHouseholdAudience } from '../services/visibility.js';
 import { moveNoticeFields } from '../services/shopping-move-notices.js';
 
 const log    = createLogger('Reminders');
@@ -181,7 +185,7 @@ function derivedTypeError(entityType) {
  * Aufgabe sieht. Bis hierher fragte das kein Schreibweg: eine Erinnerung liess
  * sich auf eine geratene Kennung setzen, auch auf eine, die es nicht gibt, und
  * `/pending` nannte danach den Titel. Die Regel selbst steht in
- * services/reminder-targets.js und ist die des jeweiligen Moduls.
+ * authorize/rows/reminders.ts und ist die des jeweiligen Moduls.
  *
  * 404 FUER BEIDES, "gibt es nicht" und "siehst du nicht": der Unterschied
  * zwischen den Antworten waere die Auskunft, die die Sichtbarkeit verweigert.
@@ -295,10 +299,10 @@ function callerReminders(req, {
       AND ${window.sql}
       AND r.entity_type IN (${origins.map(() => '?').join(', ')})
       -- Der Titel wird nur fuer eine Zeile aufgeloest, die der Aufrufer
-      -- sieht (services/reminder-targets.js). Das Modulrecht darueber sagt
+      -- sieht (authorize/rows/reminders.ts). Das Modulrecht darueber sagt
       -- nichts ueber die einzelne Aufgabe, und die Sichtbarkeit aendert sich
       -- nach dem Anlegen. Uebersprungen, nicht geloescht.
-      AND ${reminderTargetVisibleSql(db.get(), 'r')}
+      AND ${visibleWhere('reminders', 'r', 'r.created_by', { database: db.get() })}
       -- Eine 'cycle_period'/'cycle_log_nudge'-Zeile, deren Anker bereits
       -- geloescht wurde (Eigentuemer geloescht, Einstellung geaendert, o.ae.),
       -- aber deren periodischer Sync noch nicht wieder gelaufen ist, darf
@@ -380,6 +384,11 @@ function callerReminders(req, {
   return rows;
 }
 
+// Ein unerwarteter Fehler geht an den zentralen Fehlerhandler (#2810): 500 mit
+// festem Satz, geloggt mit Methode und Routenmuster. Die Routen fangen nichts
+// selbst ab; was das Schema der Operation schon prueft (validateRequest()),
+// prueft der Handler nicht noch einmal.
+
 // --------------------------------------------------------
 // GET /api/v1/reminders/pending
 // Gibt alle fälligen, nicht-verworfenen Erinnerungen des aktuellen Nutzers zurück.
@@ -392,14 +401,9 @@ function callerReminders(req, {
 // auch aus der Sitzung dieser Person. Dieselbe Erkennung wie in GET /dashboard
 // (`asksHouseholdAudience`); Glocke und Toast fragen ohne ihn.
 // --------------------------------------------------------
-router.get('/pending', (req, res) => {
-  try {
-    const now = remindAtCompareKey(new Date().toISOString());
-    res.json({ data: callerReminders(req, { window: { sql: `${REMIND_AT_KEY} <= ?`, params: [now] } }) });
-  } catch (err) {
-    log.error('Error loading due reminders:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+router.get('/pending', validateRequest(), (req, res) => {
+  const now = remindAtCompareKey(new Date().toISOString());
+  res.json({ data: callerReminders(req, { window: { sql: `${REMIND_AT_KEY} <= ?`, params: [now] } }) });
 });
 
 const UPCOMING_MAX_DAYS = 14;
@@ -423,7 +427,11 @@ function windowEdge(value, field) {
   return { value: remindAtCompareKey(ms), ms, error: null };
 }
 
-/** `types=task,event` als Menge; ohne Parameter `null`, also keine Einengung. */
+/**
+ * `types=task,event` als Menge; ohne Parameter `null`, also keine Einengung.
+ * Bleibt neben dem Schema: ein wiederholter Parameter (`types=a&types=b`)
+ * kommt als Liste an, und die liest dieser Weg nicht.
+ */
 function originFilter(value) {
   if (value === undefined) return { value: null, error: null };
   const types = typeof value === 'string' ? value.split(',') : [];
@@ -444,43 +452,43 @@ function originFilter(value) {
 // `fires_at` kommt nur hier dazu, `/pending` bleibt, wie es war.
 // Response: { data: UpcomingReminder[] }
 // --------------------------------------------------------
-router.get('/upcoming', (req, res) => {
-  try {
-    const from  = windowEdge(req.query.from, 'from');
-    const to    = windowEdge(req.query.to, 'to');
-    const types = originFilter(req.query.types);
-    const errors = v.collectErrors([from, to, types]);
-    if (!errors.length && to.ms < from.ms) {
-      errors.push('to must not be before from.');
-    }
-    if (!errors.length && to.ms - from.ms > UPCOMING_MAX_DAYS * 24 * 60 * 60 * 1000) {
-      errors.push(`The window may span at most ${UPCOMING_MAX_DAYS} days.`);
-    }
-    if (errors.length) {
-      return res.status(400).json({ error: errors.join(' '), code: 400 });
-    }
-
-    const now = remindAtCompareKey(new Date());
-    res.json({
-      data: callerReminders(req, {
-        window: {
-          sql: `${REMIND_AT_KEY} > ? AND ${REMIND_AT_KEY} >= ? AND ${REMIND_AT_KEY} <= ?`,
-          params: [now, from.value, to.value],
-        },
-        types: types.value,
-        // Sekunden mit `Z` wie `created_at` und Co.: `.iso8601` in Swift liest
-        // keine Sekundenbruchteile.
-        columns: `, substr(${REMIND_AT_KEY}, 1, 19) || 'Z' AS fires_at`,
-        orderBy: `${REMIND_AT_KEY} ASC, r.id ASC`,
-        limit: UPCOMING_MAX_ROWS,
-        openTasksOnly: true,
-      }),
-    });
-  } catch (err) {
-    log.error('Error loading upcoming reminders:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+router.get('/upcoming', validateRequest(), (req, res) => {
+  const from  = windowEdge(req.query.from, 'from');
+  const to    = windowEdge(req.query.to, 'to');
+  const types = originFilter(req.query.types);
+  const errors = v.collectErrors([from, to, types]);
+  if (!errors.length && to.ms < from.ms) {
+    errors.push('to must not be before from.');
   }
+  if (!errors.length && to.ms - from.ms > UPCOMING_MAX_DAYS * 24 * 60 * 60 * 1000) {
+    errors.push(`The window may span at most ${UPCOMING_MAX_DAYS} days.`);
+  }
+  if (errors.length) {
+    return res.status(400).json({ error: errors.join(' '), code: 400 });
+  }
+
+  const now = remindAtCompareKey(new Date());
+  res.json({
+    data: callerReminders(req, {
+      window: {
+        sql: `${REMIND_AT_KEY} > ? AND ${REMIND_AT_KEY} >= ? AND ${REMIND_AT_KEY} <= ?`,
+        params: [now, from.value, to.value],
+      },
+      types: types.value,
+      // Sekunden mit `Z` wie `created_at` und Co.: `.iso8601` in Swift liest
+      // keine Sekundenbruchteile.
+      columns: `, substr(${REMIND_AT_KEY}, 1, 19) || 'Z' AS fires_at`,
+      orderBy: `${REMIND_AT_KEY} ASC, r.id ASC`,
+      limit: UPCOMING_MAX_ROWS,
+      openTasksOnly: true,
+    }),
+  });
 });
+
+// Die vier Wege mit `entity_type`/`entity_id` in der Query: Typ, Liste und
+// Pflicht prueft das Schema. Ihre Absage `entity_type and entity_id are
+// required.` bleibt fuer `entity_id=0`, das das Schema als ganze Zahl
+// durchlaesst.
 
 // --------------------------------------------------------
 // GET /api/v1/reminders/all?entity_type=event&entity_id=5
@@ -489,31 +497,26 @@ router.get('/upcoming', (req, res) => {
 // nutzen weiterhin den Single-Endpoint (GET /).
 // Response: { data: Reminder[] }
 // --------------------------------------------------------
-router.get('/all', (req, res) => {
-  try {
-    const userId     = req.authUserId || req.session.userId;
-    const entityType = req.query.entity_type;
-    const entityId   = parseInt(req.query.entity_id, 10);
+router.get('/all', validateRequest(), (req, res) => {
+  const userId     = req.authUserId || req.session.userId;
+  const entityType = req.query.entity_type;
+  const entityId   = parseInt(req.query.entity_id, 10);
 
-    if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
-      return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
-    }
-    if (!mayTouchOrigin(req, entityType)) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-    }
-
-    const rows = db.get().prepare(`
-      SELECT r.* FROM reminders r
-      WHERE r.entity_type = ? AND r.entity_id = ? AND r.created_by = ? AND r.dismissed = 0
-        AND ${reminderTargetVisibleSql(db.get(), 'r')}
-      ORDER BY r.remind_at ASC
-    `).all(entityType, entityId, userId);
-
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('Error loading reminders:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
+    return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
   }
+  if (!mayTouchOrigin(req, entityType)) {
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
+  }
+
+  const rows = db.get().prepare(`
+    SELECT r.* FROM reminders r
+    WHERE r.entity_type = ? AND r.entity_id = ? AND r.created_by = ? AND r.dismissed = 0
+      AND ${visibleWhere('reminders', 'r', 'r.created_by', { database: db.get() })}
+    ORDER BY r.remind_at ASC
+  `).all(entityType, entityId, userId);
+
+  res.json({ data: rows });
 });
 
 // --------------------------------------------------------
@@ -521,31 +524,26 @@ router.get('/all', (req, res) => {
 // Gibt die Erinnerung für eine spezifische Entität zurück (oder null).
 // Response: { data: Reminder | null }
 // --------------------------------------------------------
-router.get('/', (req, res) => {
-  try {
-    const userId      = req.authUserId || req.session.userId;
-    const entityType  = req.query.entity_type;
-    const entityId    = parseInt(req.query.entity_id, 10);
+router.get('/', validateRequest(), (req, res) => {
+  const userId      = req.authUserId || req.session.userId;
+  const entityType  = req.query.entity_type;
+  const entityId    = parseInt(req.query.entity_id, 10);
 
-    if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
-      return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
-    }
-    if (!mayTouchOrigin(req, entityType)) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-    }
-
-    const row = db.get().prepare(`
-      SELECT r.* FROM reminders r
-      WHERE r.entity_type = ? AND r.entity_id = ? AND r.created_by = ? AND r.dismissed = 0
-        AND ${reminderTargetVisibleSql(db.get(), 'r')}
-      ORDER BY r.created_at DESC LIMIT 1
-    `).get(entityType, entityId, userId);
-
-    res.json({ data: row || null });
-  } catch (err) {
-    log.error('Error loading reminder:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
+    return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
   }
+  if (!mayTouchOrigin(req, entityType)) {
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
+  }
+
+  const row = db.get().prepare(`
+    SELECT r.* FROM reminders r
+    WHERE r.entity_type = ? AND r.entity_id = ? AND r.created_by = ? AND r.dismissed = 0
+      AND ${visibleWhere('reminders', 'r', 'r.created_by', { database: db.get() })}
+    ORDER BY r.created_at DESC LIMIT 1
+  `).get(entityType, entityId, userId);
+
+  res.json({ data: row || null });
 });
 
 // --------------------------------------------------------
@@ -554,62 +552,55 @@ router.get('/', (req, res) => {
 // Body: { entity_type, entity_id, remind_at }
 // Response: { data: Reminder }
 // --------------------------------------------------------
-router.post('/', (req, res) => {
-  try {
-    const userId = req.authUserId || req.session.userId;
-    const { entity_type, entity_id, remind_at } = req.body;
-    // `remind_at` ist naiv-UTC. Ein `Z` oder Offset wird dorthin umgerechnet
-    // und der GEPRUEFTE Wert gespeichert (#1364): roh gespeichert verglich der
-    // Scheduler `18:00:00+02:00` als Text gegen die UTC-Zeit und meldete sich
-    // zwei Stunden zu spaet.
-    const vRemindAt = v.datetime(remind_at, 'remind_at', true, { to: 'utc' });
+router.post('/', validateRequest(), (req, res) => {
+  const userId = req.authUserId || req.session.userId;
+  const { entity_type, entity_id, remind_at } = req.body;
+  // `remind_at` ist naiv-UTC. Ein `Z` oder Offset wird dorthin umgerechnet
+  // und der GEPRUEFTE Wert gespeichert (#1364): roh gespeichert verglich der
+  // Scheduler `18:00:00+02:00` als Text gegen die UTC-Zeit und meldete sich
+  // zwei Stunden zu spaet.
+  const vRemindAt = v.datetime(remind_at, 'remind_at', true, { to: 'utc' });
 
-    const errors = v.collectErrors([
-      v.id(entity_id,          'entity_id'),
-      vRemindAt,
-    ]);
+  const errors = v.collectErrors([
+    v.id(entity_id,          'entity_id'),
+    vRemindAt,
+  ]);
 
-    // Der `v.oneOf` gegen VALID_ENTITY_TYPES stand hier zusätzlich und sagte
-    // dasselbe ein zweites Mal - seit die abgeleiteten Herkünfte abgewiesen
-    // werden, sagte er sogar etwas anderes: eine Liste, aus der vier Einträge
-    // im nächsten Zweig doch scheitern. Ein Check, eine Antwort.
-    if (!entity_type || !SETTABLE_ENTITY_TYPES.includes(entity_type)) {
-      errors.push(DERIVED_ENTITY_TYPES.includes(entity_type)
-        ? derivedTypeError(entity_type)
-        : `entity_type must be one of: ${SETTABLE_ENTITY_TYPES.join(', ')}.`);
-    }
-
-    if (errors.length) {
-      return res.status(400).json({ error: errors.join(' '), code: 400 });
-    }
-    if (!mayTouchOrigin(req, entity_type, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-    }
-
-    const entityId = parseInt(entity_id, 10);
-    if (!reminderTargetVisible(db.get(), entity_type, entityId, userId)) {
-      return res.status(404).json(TARGET_NOT_FOUND);
-    }
-
-    // Bestehende nicht-verworfene Erinnerungen für diese Entität löschen
-    db.get().prepare(`
-      DELETE FROM reminders
-      WHERE entity_type = ? AND entity_id = ? AND created_by = ?
-    `).run(entity_type, entityId, userId);
-
-    const result = db.get().prepare(`
-      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
-      VALUES (?, ?, ?, ?)
-    `).run(entity_type, entityId, vRemindAt.value, userId);
-
-    syncEventFanout(entity_type, entityId, userId);
-
-    const row = db.get().prepare('SELECT * FROM reminders WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ data: row });
-  } catch (err) {
-    log.error('Error creating reminder:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  // `entity_type` ist laut Schema Pflicht und einer der Typen aus
+  // VALID_ENTITY_TYPES; ein anderer Wert kommt hier nicht an (#2810). Die
+  // abgeleiteten Herkuenfte bleiben die Absage dieses Handlers, mit ihrem
+  // eigenen Satz.
+  if (DERIVED_ENTITY_TYPES.includes(entity_type)) {
+    errors.push(derivedTypeError(entity_type));
   }
+
+  if (errors.length) {
+    return res.status(400).json({ error: errors.join(' '), code: 400 });
+  }
+  if (!mayTouchOrigin(req, entity_type, 'write')) {
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
+  }
+
+  const entityId = parseInt(entity_id, 10);
+  if (!reminderTargetVisible(db.get(), entity_type, entityId, userId)) {
+    return res.status(404).json(TARGET_NOT_FOUND);
+  }
+
+  // Bestehende nicht-verworfene Erinnerungen für diese Entität löschen
+  db.get().prepare(`
+    DELETE FROM reminders
+    WHERE entity_type = ? AND entity_id = ? AND created_by = ?
+  `).run(entity_type, entityId, userId);
+
+  const result = db.get().prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES (?, ?, ?, ?)
+  `).run(entity_type, entityId, vRemindAt.value, userId);
+
+  syncEventFanout(entity_type, entityId, userId);
+
+  const row = db.get().prepare('SELECT * FROM reminders WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ data: row });
 });
 
 // --------------------------------------------------------
@@ -618,92 +609,85 @@ router.post('/', (req, res) => {
 // Body: { remind_ats: string[] } (dedupliziert, max. MAX_REMINDERS_PER_ENTITY)
 // Response: { data: Reminder[] }
 // --------------------------------------------------------
-router.put('/', (req, res) => {
-  try {
-    const userId     = req.authUserId || req.session.userId;
-    const entityType = req.query.entity_type;
-    const entityId   = parseInt(req.query.entity_id, 10);
-    const remindAts  = req.body?.remind_ats;
+router.put('/', validateRequest(), (req, res) => {
+  const userId     = req.authUserId || req.session.userId;
+  const entityType = req.query.entity_type;
+  const entityId   = parseInt(req.query.entity_id, 10);
+  // Eine Liste von Texten, laut Schema Pflicht (#2810).
+  const remindAts  = req.body.remind_ats;
 
-    if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
-      return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
-    }
-    // DERSELBE RIEGEL WIE IN POST. Er fehlte hier zunächst, und das war der
-    // teurere Weg: PUT ersetzt die ganze Menge und darf bis zu fünf Termine
-    // schreiben. Für eine abgeleitete Herkunft zieht der Modul-Sync sie
-    // anschliessend alle auf denselben Zeitpunkt - fünf identische Meldungen
-    // für einen Artikel, statt einer.
-    if (DERIVED_ENTITY_TYPES.includes(entityType)) {
-      return res.status(400).json({ error: derivedTypeError(entityType), code: 400 });
-    }
-    if (!mayTouchOrigin(req, entityType, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-    }
-    if (!reminderTargetVisible(db.get(), entityType, entityId, userId)) {
-      return res.status(404).json(TARGET_NOT_FOUND);
-    }
-    if (!Array.isArray(remindAts)) {
-      return res.status(400).json({ error: 'remind_ats must be an array.', code: 400 });
-    }
+  if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
+    return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
+  }
+  // DERSELBE RIEGEL WIE IN POST. Er fehlte hier zunächst, und das war der
+  // teurere Weg: PUT ersetzt die ganze Menge und darf bis zu fünf Termine
+  // schreiben. Für eine abgeleitete Herkunft zieht der Modul-Sync sie
+  // anschliessend alle auf denselben Zeitpunkt - fünf identische Meldungen
+  // für einen Artikel, statt einer.
+  if (DERIVED_ENTITY_TYPES.includes(entityType)) {
+    return res.status(400).json({ error: derivedTypeError(entityType), code: 400 });
+  }
+  if (!mayTouchOrigin(req, entityType, 'write')) {
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
+  }
+  if (!reminderTargetVisible(db.get(), entityType, entityId, userId)) {
+    return res.status(404).json(TARGET_NOT_FOUND);
+  }
 
-    // Jeden Eintrag validieren und nach naiv-UTC bringen (#1364), DANACH
-    // Duplikate entfernen und den Cap anwenden: `16:00:00` und
-    // `18:00:00+02:00` sind derselbe Zeitpunkt und damit eine Erinnerung.
-    const checked = [...new Set(remindAts)]
-      .map((value, i) => v.datetime(value, `remind_ats[${i}]`, true, { to: 'utc' }));
-    const errors = v.collectErrors(checked);
-    if (errors.length) {
-      return res.status(400).json({ error: errors.join(' '), code: 400 });
-    }
-    const unique = [...new Set(checked.map((result) => result.value))];
-    if (unique.length > MAX_REMINDERS_PER_ENTITY) {
-      return res.status(400).json({ error: `At most ${MAX_REMINDERS_PER_ENTITY} reminders per entity.`, code: 400 });
-    }
+  // Jeden Eintrag validieren und nach naiv-UTC bringen (#1364), DANACH
+  // Duplikate entfernen und den Cap anwenden: `16:00:00` und
+  // `18:00:00+02:00` sind derselbe Zeitpunkt und damit eine Erinnerung.
+  const checked = [...new Set(remindAts)]
+    .map((value, i) => v.datetime(value, `remind_ats[${i}]`, true, { to: 'utc' }));
+  const errors = v.collectErrors(checked);
+  if (errors.length) {
+    return res.status(400).json({ error: errors.join(' '), code: 400 });
+  }
+  const unique = [...new Set(checked.map((result) => result.value))];
+  if (unique.length > MAX_REMINDERS_PER_ENTITY) {
+    return res.status(400).json({ error: `At most ${MAX_REMINDERS_PER_ENTITY} reminders per entity.`, code: 400 });
+  }
 
-    // Ersetzen heisst nicht Neuanlegen: eine eigene Zeile, deren Zeitpunkt in
-    // der neuen Menge wieder vorkommt, bleibt samt ID, `dismissed` und
-    // `pushed_at` stehen. Vorher wurde alles geloescht und neu geschrieben,
-    // und eine gelesene, vergangene Erinnerung meldete sich nach jedem
-    // Speichern derselben Menge erneut. Geerbte Zeilen (`assigned_from`)
-    // weichen wie bisher der eigenen Menge.
-    const replace = db.get().transaction((values) => {
-      const existing = db.get().prepare(`
-        SELECT id, remind_at, assigned_from FROM reminders
-        WHERE entity_type = ? AND entity_id = ? AND created_by = ?
-      `).all(entityType, entityId, userId);
-
-      const kept = new Set();
-      const drop = db.get().prepare('DELETE FROM reminders WHERE id = ?');
-      for (const row of existing) {
-        if (row.assigned_from === null && values.includes(row.remind_at) && !kept.has(row.remind_at)) {
-          kept.add(row.remind_at);
-        } else {
-          drop.run(row.id);
-        }
-      }
-
-      const insert = db.get().prepare(`
-        INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
-        VALUES (?, ?, ?, ?)
-      `);
-      for (const remindAt of values) {
-        if (!kept.has(remindAt)) insert.run(entityType, entityId, remindAt, userId);
-      }
-    });
-    replace(unique);
-    syncEventFanout(entityType, entityId, userId);
-
-    const rows = db.get().prepare(`
-      SELECT * FROM reminders
-      WHERE entity_type = ? AND entity_id = ? AND created_by = ? AND dismissed = 0
-      ORDER BY remind_at ASC
+  // Ersetzen heisst nicht Neuanlegen: eine eigene Zeile, deren Zeitpunkt in
+  // der neuen Menge wieder vorkommt, bleibt samt ID, `dismissed` und
+  // `pushed_at` stehen. Vorher wurde alles geloescht und neu geschrieben,
+  // und eine gelesene, vergangene Erinnerung meldete sich nach jedem
+  // Speichern derselben Menge erneut. Geerbte Zeilen (`assigned_from`)
+  // weichen wie bisher der eigenen Menge.
+  const replace = db.get().transaction((values) => {
+    const existing = db.get().prepare(`
+      SELECT id, remind_at, assigned_from FROM reminders
+      WHERE entity_type = ? AND entity_id = ? AND created_by = ?
     `).all(entityType, entityId, userId);
 
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('Error setting reminders:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+    const kept = new Set();
+    const drop = db.get().prepare('DELETE FROM reminders WHERE id = ?');
+    for (const row of existing) {
+      if (row.assigned_from === null && values.includes(row.remind_at) && !kept.has(row.remind_at)) {
+        kept.add(row.remind_at);
+      } else {
+        drop.run(row.id);
+      }
+    }
+
+    const insert = db.get().prepare(`
+      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES (?, ?, ?, ?)
+    `);
+    for (const remindAt of values) {
+      if (!kept.has(remindAt)) insert.run(entityType, entityId, remindAt, userId);
+    }
+  });
+  replace(unique);
+  syncEventFanout(entityType, entityId, userId);
+
+  const rows = db.get().prepare(`
+    SELECT * FROM reminders
+    WHERE entity_type = ? AND entity_id = ? AND created_by = ? AND dismissed = 0
+    ORDER BY remind_at ASC
+  `).all(entityType, entityId, userId);
+
+  res.json({ data: rows });
 });
 
 // --------------------------------------------------------
@@ -711,35 +695,31 @@ router.put('/', (req, res) => {
 // Markiert eine Erinnerung als verworfen.
 // Response: { data: { id } }
 // --------------------------------------------------------
-router.patch('/:id/dismiss', (req, res) => {
-  try {
-    const userId     = req.authUserId || req.session.userId;
-    const reminderId = parseInt(req.params.id, 10);
+router.patch('/:id/dismiss', validateRequest(), (req, res) => {
+  const userId     = req.authUserId || req.session.userId;
+  const reminderId = parseInt(req.params.id, 10);
 
-    if (!reminderId) {
-      return res.status(400).json({ error: 'Invalid reminder ID.', code: 400 });
-    }
-
-    const reminder = db.get().prepare(
-      'SELECT * FROM reminders WHERE id = ? AND created_by = ?'
-    ).get(reminderId, userId);
-
-    if (!reminder) {
-      return res.status(404).json({ error: 'Reminder not found.', code: 404 });
-    }
-    // Verwerfen ist ein Schreibvorgang am fremden Modul: ein Token mit
-    // `calendar:write` durfte hier bis zur Review von #811 eine Vorrats- oder
-    // Abo-Meldung wegwischen, ohne den Scope dieses Moduls zu besitzen.
-    if (!mayTouchOrigin(req, reminder.entity_type, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-    }
-
-    db.get().prepare('UPDATE reminders SET dismissed = 1 WHERE id = ?').run(reminderId);
-    res.json({ data: { id: reminderId } });
-  } catch (err) {
-    log.error('Error dismissing reminder:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  // Das Schema laesst `0` als ganze Zahl durch.
+  if (!reminderId) {
+    return res.status(400).json({ error: 'Invalid reminder ID.', code: 400 });
   }
+
+  const reminder = db.get().prepare(
+    'SELECT * FROM reminders WHERE id = ? AND created_by = ?'
+  ).get(reminderId, userId);
+
+  if (!reminder) {
+    return res.status(404).json({ error: 'Reminder not found.', code: 404 });
+  }
+  // Verwerfen ist ein Schreibvorgang am fremden Modul: ein Token mit
+  // `calendar:write` durfte hier bis zur Review von #811 eine Vorrats- oder
+  // Abo-Meldung wegwischen, ohne den Scope dieses Moduls zu besitzen.
+  if (!mayTouchOrigin(req, reminder.entity_type, 'write')) {
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
+  }
+
+  db.get().prepare('UPDATE reminders SET dismissed = 1 WHERE id = ?').run(reminderId);
+  res.json({ data: { id: reminderId } });
 });
 
 // --------------------------------------------------------
@@ -747,38 +727,34 @@ router.patch('/:id/dismiss', (req, res) => {
 // Löscht eine Erinnerung dauerhaft.
 // Response: 204 No Content
 // --------------------------------------------------------
-router.delete('/:id', (req, res) => {
-  try {
-    const userId     = req.authUserId || req.session.userId;
-    const reminderId = parseInt(req.params.id, 10);
+router.delete('/:id', validateRequest(), (req, res) => {
+  const userId     = req.authUserId || req.session.userId;
+  const reminderId = parseInt(req.params.id, 10);
 
-    if (!reminderId) {
-      return res.status(400).json({ error: 'Invalid reminder ID.', code: 400 });
-    }
-
-    const reminder = db.get().prepare(
-      'SELECT id, entity_type, entity_id FROM reminders WHERE id = ? AND created_by = ?'
-    ).get(reminderId, userId);
-
-    if (!reminder) {
-      return res.status(404).json({ error: 'Reminder not found.', code: 404 });
-    }
-    if (!mayTouchOrigin(req, reminder.entity_type, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-    }
-    // Dieselbe Sperre wie beim Filter-Weg daneben: ohne sie bliebe eine
-    // Hintertuer mit exakt derselben folgenlosen Wirkung.
-    if (DERIVED_ENTITY_TYPES.includes(reminder.entity_type)) {
-      return res.status(400).json({ error: derivedTypeError(reminder.entity_type), code: 400 });
-    }
-
-    db.get().prepare('DELETE FROM reminders WHERE id = ?').run(reminderId);
-    syncEventFanout(reminder.entity_type, reminder.entity_id, userId);
-    res.status(204).end();
-  } catch (err) {
-    log.error('Error deleting reminder:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  // Das Schema laesst `0` als ganze Zahl durch.
+  if (!reminderId) {
+    return res.status(400).json({ error: 'Invalid reminder ID.', code: 400 });
   }
+
+  const reminder = db.get().prepare(
+    'SELECT id, entity_type, entity_id FROM reminders WHERE id = ? AND created_by = ?'
+  ).get(reminderId, userId);
+
+  if (!reminder) {
+    return res.status(404).json({ error: 'Reminder not found.', code: 404 });
+  }
+  if (!mayTouchOrigin(req, reminder.entity_type, 'write')) {
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
+  }
+  // Dieselbe Sperre wie beim Filter-Weg daneben: ohne sie bliebe eine
+  // Hintertuer mit exakt derselben folgenlosen Wirkung.
+  if (DERIVED_ENTITY_TYPES.includes(reminder.entity_type)) {
+    return res.status(400).json({ error: derivedTypeError(reminder.entity_type), code: 400 });
+  }
+
+  db.get().prepare('DELETE FROM reminders WHERE id = ?').run(reminderId);
+  syncEventFanout(reminder.entity_type, reminder.entity_id, userId);
+  res.status(204).end();
 });
 
 // --------------------------------------------------------
@@ -786,39 +762,34 @@ router.delete('/:id', (req, res) => {
 // Löscht alle Erinnerungen für eine Entität (z.B. bei Task-Löschung).
 // Response: 204 No Content
 // --------------------------------------------------------
-router.delete('/', (req, res) => {
-  try {
-    const userId     = req.authUserId || req.session.userId;
-    const entityType = req.query.entity_type;
-    const entityId   = parseInt(req.query.entity_id, 10);
+router.delete('/', validateRequest(), (req, res) => {
+  const userId     = req.authUserId || req.session.userId;
+  const entityType = req.query.entity_type;
+  const entityId   = parseInt(req.query.entity_id, 10);
 
-    if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
-      return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
-    }
-    if (!mayTouchOrigin(req, entityType, 'write')) {
-      return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-    }
-    // AUCH HIER, aus demselben Grund wie bei POST und PUT - und mit derselben
-    // Wirkungslosigkeit: die geloeschte Zeile legt der naechste Modul-Sync
-    // wieder an, beim Vorrat binnen einer Minute und mit zurueckgesetztem
-    // `pushed_at`, also als frische Meldung. Wer eine abgeleitete Erinnerung
-    // loswerden will, verwirft sie (PATCH /:id/dismiss): das haelt, weil die
-    // Zeile bestehen bleibt.
-    if (DERIVED_ENTITY_TYPES.includes(entityType)) {
-      return res.status(400).json({ error: derivedTypeError(entityType), code: 400 });
-    }
-
-    db.get().prepare(`
-      DELETE FROM reminders
-      WHERE entity_type = ? AND entity_id = ? AND created_by = ?
-    `).run(entityType, entityId, userId);
-    syncEventFanout(entityType, entityId, userId);
-
-    res.status(204).end();
-  } catch (err) {
-    log.error('Error deleting reminders:', err.message);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  if (!VALID_ENTITY_TYPES.includes(entityType) || !entityId) {
+    return res.status(400).json({ error: 'entity_type and entity_id are required.', code: 400 });
   }
+  if (!mayTouchOrigin(req, entityType, 'write')) {
+    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
+  }
+  // AUCH HIER, aus demselben Grund wie bei POST und PUT - und mit derselben
+  // Wirkungslosigkeit: die geloeschte Zeile legt der naechste Modul-Sync
+  // wieder an, beim Vorrat binnen einer Minute und mit zurueckgesetztem
+  // `pushed_at`, also als frische Meldung. Wer eine abgeleitete Erinnerung
+  // loswerden will, verwirft sie (PATCH /:id/dismiss): das haelt, weil die
+  // Zeile bestehen bleibt.
+  if (DERIVED_ENTITY_TYPES.includes(entityType)) {
+    return res.status(400).json({ error: derivedTypeError(entityType), code: 400 });
+  }
+
+  db.get().prepare(`
+    DELETE FROM reminders
+    WHERE entity_type = ? AND entity_id = ? AND created_by = ?
+  `).run(entityType, entityId, userId);
+  syncEventFanout(entityType, entityId, userId);
+
+  res.status(204).end();
 });
 
 export default router;

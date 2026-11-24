@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import express from 'express';
+import { createHealthApp } from './health-app.js';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -16,7 +16,6 @@ const {
   MIGRATIONS,
   _setTestDatabase,
 } = await import('../server/db.js');
-const { default: healthRouter } = await import('../server/routes/health.js');
 const { default: idempotencyMiddleware } = await import('../server/middleware/idempotency.js');
 
 function buildTestDb() {
@@ -42,24 +41,26 @@ const userB = db.prepare(`INSERT INTO users (username, display_name, password_ha
   VALUES ('bob', 'Bob', '$2b$12$x', 'member')`).run().lastInsertRowid;
 
 let session = { userId: userA, role: 'member' };
-const app = express();
 // Grosszuegiger als der express.json()-Standard (100kb): sonst wuerde
 // body-parser einen ueberlangen Cycle-Import-Body schon VOR der Route mit
 // einem HTML-413 abweisen, statt der Route ihre eigene 100-KB-Grenze mit
 // einem JSON-400 pruefen zu lassen - genau wie in server/index.js, wo
 // BODY_LIMIT (server/utils/upload-limit.js) aus demselben Grund groesser ist
 // als jede einzelne Feature-Obergrenze.
-app.use(express.json({ limit: '10mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = session.userId;
-  req.authRole = session.role;
-  req.session = { userId: session.userId, role: session.role };
-  next();
-});
 // Wie in server/index.js: die Idempotenz-Middleware vor den Routen. Ohne
 // `Idempotency-Key` ist sie folgenlos (#822), mit ihm haelt sie #2069.
-app.use('/api/v1', idempotencyMiddleware);
-app.use('/api/v1/health', healthRouter);
+// createHealthApp (test/health-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createHealthApp({
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = session.userId;
+    req.authRole = session.role;
+    req.session = { userId: session.userId, role: session.role };
+    next();
+  },
+  before: [['/api/v1', idempotencyMiddleware]],
+});
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/health`;
@@ -75,6 +76,30 @@ async function call(method, path, body, headers = {}) {
 }
 
 function asA() { session = { userId: userA, role: 'member' }; }
+
+/**
+ * A whole cycle day log as POST /cycle/logs takes it since #2810: every field
+ * the upsert replaces, the ones not named with the value leaving them out
+ * stood for up to v2.93 (`null` = not given, `visibility: null` = private).
+ * `feelings`/`mood` stay optional and are only sent when the case names them.
+ * @param {Record<string, unknown>} fields
+ */
+const wholeDay = (fields) => ({
+  flow: null, note: null, visibility: null, symptoms: null, basal_temp: null, basal_temp_unit: null,
+  cervix_mucus: null, lh_test: null, pregnancy_test: null, intimacy: null, ...fields,
+});
+
+/**
+ * Whole cycle settings as PUT /cycle/settings takes them since #2810, the
+ * fields not named with the default leaving them out stood for up to v2.93.
+ * @param {Record<string, unknown>} fields
+ */
+const wholeSettings = (fields) => ({
+  cycle_length_avg: null, period_length_avg: null, luteal_length: null, track_fertility: true, pregnancy_mode: false,
+  pregnancy_due_date: null, default_visibility: null, remind_period_days_before: null, remind_log_daily: false,
+  contraception: null, perimenopause_mode: false, show_pms: true, notify_partner_user_id: null, notify_partner_days_before: null,
+  ...fields,
+});
 function asB() { session = { userId: userB, role: 'member' }; }
 
 // ========================================================
@@ -453,10 +478,11 @@ test('Schedules: GET listet, PATCH und DELETE durch Eigentümer', async () => {
   assert.equal(del.status, 204);
 });
 
-test('Logs: POST erstellt Dosis-Eintrag (default pending)', async () => {
+test('Logs: POST erstellt Dosis-Eintrag (status null: pending)', async () => {
   asA();
+  // `status` ist seit #2810 Pflicht; `null` steht weiter fuer pending.
   const res = await call('POST', `/medications/${medId}/logs`, {
-    scheduled_at: '2026-06-04T08:00',
+    scheduled_at: '2026-06-04T08:00', status: null,
   });
   assert.equal(res.status, 201);
   assert.equal(res.body.data.status, 'pending');
@@ -952,7 +978,7 @@ test('Cycle: Scoping — Bob sieht Alices private Periode nicht, family schon', 
 
 test('Cycle-Log: Upsert je Person/Tag (zweiter POST aktualisiert)', async () => {
   asA();
-  const first = await call('POST', '/cycle/logs', { log_date: '2026-05-02', flow: 'light', symptoms: ['cramps', 'fatigue'], mood: 'sad' });
+  const first = await call('POST', '/cycle/logs', wholeDay({ log_date: '2026-05-02', flow: 'light', symptoms: ['cramps', 'fatigue'], mood: 'sad' }));
   assert.equal(first.status, 201);
   assert.equal(first.body.data.flow, 'light');
   // symptoms ist seit Phase 2 {key, intensity}[] statt einer Komma-Zeile - das
@@ -961,7 +987,7 @@ test('Cycle-Log: Upsert je Person/Tag (zweiter POST aktualisiert)', async () => 
   assert.deepEqual(first.body.data.symptoms, [{ key: 'cramps', intensity: null }, { key: 'fatigue', intensity: null }]);
   const firstId = first.body.data.id;
 
-  const second = await call('POST', '/cycle/logs', { log_date: '2026-05-02', flow: 'heavy', symptoms: [{ key: 'cramps', intensity: 2 }] });
+  const second = await call('POST', '/cycle/logs', wholeDay({ log_date: '2026-05-02', flow: 'heavy', symptoms: [{ key: 'cramps', intensity: 2 }] }));
   assert.equal(second.body.data.id, firstId); // gleiche Zeile
   assert.equal(second.body.data.flow, 'heavy');
   // Voller Ersatz, kein Merge: 'fatigue' aus dem ersten POST ist weg.
@@ -973,7 +999,7 @@ test('Cycle-Log: Upsert je Person/Tag (zweiter POST aktualisiert)', async () => 
 
 test('Cycle-Log: ungültiger Flow-Wert wird abgelehnt', async () => {
   asA();
-  const res = await call('POST', '/cycle/logs', { log_date: '2026-05-03', flow: 'gushing' });
+  const res = await call('POST', '/cycle/logs', wholeDay({ log_date: '2026-05-03', flow: 'gushing' }));
   assert.equal(res.status, 400);
 });
 
@@ -984,7 +1010,7 @@ test('Cycle-Settings: Default ohne Zeile, dann Upsert', async () => {
   assert.equal(def.body.data.luteal_length, 14);
   assert.equal(def.body.data.cycle_length_avg, null);
 
-  const saved = await call('PUT', '/cycle/settings', { cycle_length_avg: 30, period_length_avg: 6, luteal_length: 13, track_fertility: false });
+  const saved = await call('PUT', '/cycle/settings', wholeSettings({ cycle_length_avg: 30, period_length_avg: 6, luteal_length: 13, track_fertility: false }));
   assert.equal(saved.body.data.cycle_length_avg, 30);
   assert.equal(saved.body.data.track_fertility, 0);
 
@@ -994,7 +1020,7 @@ test('Cycle-Settings: Default ohne Zeile, dann Upsert', async () => {
 
 test('Cycle-Settings: Werte außerhalb des Bereichs werden abgelehnt', async () => {
   asA();
-  const res = await call('PUT', '/cycle/settings', { cycle_length_avg: 99 });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ cycle_length_avg: 99 }));
   assert.equal(res.status, 400);
 });
 
@@ -1004,21 +1030,21 @@ test('Cycle-Settings: Schwangerschafts-Modus + Entbindungstermin (#450)', async 
   assert.equal(def.body.data.pregnancy_mode, 0);
   assert.equal(def.body.data.pregnancy_due_date, null);
 
-  const saved = await call('PUT', '/cycle/settings', { pregnancy_mode: true, pregnancy_due_date: '2027-01-15' });
+  const saved = await call('PUT', '/cycle/settings', wholeSettings({ pregnancy_mode: true, pregnancy_due_date: '2027-01-15' }));
   assert.equal(saved.status, 200);
   assert.equal(saved.body.data.pregnancy_mode, 1);
   assert.equal(saved.body.data.pregnancy_due_date, '2027-01-15');
 
   // Modus aus → Termin bleibt erhalten (nur im aktiven Modus genutzt), damit
   // versehentliches Umschalten die Eingabe nicht löscht.
-  const off = await call('PUT', '/cycle/settings', { pregnancy_mode: false, pregnancy_due_date: '2027-01-15' });
+  const off = await call('PUT', '/cycle/settings', wholeSettings({ pregnancy_mode: false, pregnancy_due_date: '2027-01-15' }));
   assert.equal(off.body.data.pregnancy_mode, 0);
   assert.equal(off.body.data.pregnancy_due_date, '2027-01-15');
 });
 
 test('Cycle-Settings: ungültiges Entbindungsdatum wird abgelehnt', async () => {
   asA();
-  const res = await call('PUT', '/cycle/settings', { pregnancy_mode: true, pregnancy_due_date: '15.01.2027' });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ pregnancy_mode: true, pregnancy_due_date: '15.01.2027' }));
   assert.equal(res.status, 400);
 });
 
@@ -1027,11 +1053,11 @@ test('Cycle-Settings: default_visibility – Default privat, Upsert, Validierung
   const def = await call('GET', '/cycle/settings');
   assert.equal(def.body.data.default_visibility, 'private');
 
-  const saved = await call('PUT', '/cycle/settings', { default_visibility: 'family' });
+  const saved = await call('PUT', '/cycle/settings', wholeSettings({ default_visibility: 'family' }));
   assert.equal(saved.status, 200);
   assert.equal(saved.body.data.default_visibility, 'family');
 
-  const bad = await call('PUT', '/cycle/settings', { default_visibility: 'public' });
+  const bad = await call('PUT', '/cycle/settings', wholeSettings({ default_visibility: 'public' }));
   assert.equal(bad.status, 400);
 });
 
@@ -1044,9 +1070,9 @@ test('Cycle-Settings: neue Felder - Default, Upsert (Verhütung, Perimenopause, 
   assert.equal(def.body.data.notify_partner_user_id, null);
   assert.equal(def.body.data.notify_partner_days_before, null);
 
-  const saved = await call('PUT', '/cycle/settings', {
+  const saved = await call('PUT', '/cycle/settings', wholeSettings({
     contraception: 'hormonal_iud', perimenopause_mode: true, show_pms: false,
-  });
+  }));
   assert.equal(saved.status, 200);
   assert.equal(saved.body.data.contraception, 'hormonal_iud');
   assert.equal(saved.body.data.perimenopause_mode, 1);
@@ -1058,31 +1084,35 @@ test('Cycle-Settings: neue Felder - Default, Upsert (Verhütung, Perimenopause, 
 
 test('Cycle-Settings: ungültiger contraception-Wert wird abgelehnt', async () => {
   asB();
-  const res = await call('PUT', '/cycle/settings', { contraception: 'herbal' });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ contraception: 'herbal' }));
   assert.equal(res.status, 400);
 });
 
-test('Cycle-Settings: Partner-Benachrichtigung - gültiges Haushaltsmitglied, dann per Voll-Ersetzen wieder gelöscht', async () => {
+test('Cycle-Settings: Partner-Benachrichtigung - gültiges Haushaltsmitglied, dann per null wieder gelöscht', async () => {
   asA();
-  const saved = await call('PUT', '/cycle/settings', {
+  const saved = await call('PUT', '/cycle/settings', wholeSettings({
     notify_partner_user_id: userB, notify_partner_days_before: 2,
-  });
+  }));
   assert.equal(saved.status, 200);
   assert.equal(saved.body.data.notify_partner_user_id, userB);
   assert.equal(saved.body.data.notify_partner_days_before, 2);
 
-  // Diese Route ersetzt vollständig (wie jedes andere Feld hier) - ein PUT
-  // ohne das Feld räumt es wieder ab, statt den Bestandswert zu erhalten.
-  const cleared = await call('PUT', '/cycle/settings', {});
+  // Diese Route ersetzt vollständig (wie jedes andere Feld hier). Seit #2810
+  // ist ein PUT ohne das Feld ein 400, der den Partner stehen laesst; geraeumt
+  // wird er mit `null`.
+  const missing = await call('PUT', '/cycle/settings', {});
+  assert.equal(missing.status, 400);
+  assert.equal(db.prepare('SELECT notify_partner_user_id FROM cycle_settings WHERE user_id = ?').get(userA).notify_partner_user_id, userB);
+  const cleared = await call('PUT', '/cycle/settings', wholeSettings({}));
   assert.equal(cleared.status, 200);
   assert.equal(cleared.body.data.notify_partner_user_id, null);
 });
 
 test('Cycle-Settings: PUT liefert eligible_partners mit, damit zwei Saves hintereinander den Partner nicht verlieren', async () => {
   asA();
-  const first = await call('PUT', '/cycle/settings', {
+  const first = await call('PUT', '/cycle/settings', wholeSettings({
     notify_partner_user_id: userB, notify_partner_days_before: 2,
-  });
+  }));
   assert.equal(first.status, 200);
   assert.ok(Array.isArray(first.body.data.eligible_partners), 'PUT muss eligible_partners wie GET mitliefern');
   assert.ok(first.body.data.eligible_partners.some((p) => p.id === userB));
@@ -1093,11 +1123,11 @@ test('Cycle-Settings: PUT liefert eligible_partners mit, damit zwei Saves hinter
   // eligible_partners in der ersten Antwort waere die Partner-Auswahl im
   // Modal beim erneuten Oeffnen leer gewesen und ein Save haette
   // notify_partner_user_id stillschweigend auf null gesetzt.
-  const second = await call('PUT', '/cycle/settings', {
+  const second = await call('PUT', '/cycle/settings', wholeSettings({
     notify_partner_user_id: first.body.data.notify_partner_user_id,
     notify_partner_days_before: first.body.data.notify_partner_days_before,
     show_pms: false,
-  });
+  }));
   assert.equal(second.status, 200);
   assert.equal(second.body.data.notify_partner_user_id, userB, 'der Partner muss den zweiten Save unveraendert ueberleben');
   assert.equal(second.body.data.show_pms, 0);
@@ -1107,7 +1137,7 @@ test('Cycle-Settings: PUT liefert eligible_partners mit, damit zwei Saves hinter
 
 test('Cycle-Settings: notify_partner_user_id lehnt eine unbekannte Person ab (400)', async () => {
   asA();
-  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: 999999 });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ notify_partner_user_id: 999999 }));
   assert.equal(res.status, 400);
 });
 
@@ -1117,19 +1147,19 @@ test('Cycle-Settings: notify_partner_user_id lehnt einen nicht-numerischen Wert 
   // wuerde still `${userB}` lesen und die eigentlich unsinnige Eingabe als
   // gueltigen, sogar berechtigten Partner akzeptieren - Number.isInteger()
   // auf Number(...) muss den Wert als Ganzes ablehnen.
-  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: `${userB}abc` });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ notify_partner_user_id: `${userB}abc` }));
   assert.equal(res.status, 400);
 });
 
 test('Cycle-Settings: notify_partner_user_id lehnt die aufrufende Person selbst ab (400)', async () => {
   asA();
-  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userA });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ notify_partner_user_id: userA }));
   assert.equal(res.status, 400);
 });
 
 test('Cycle-Settings: notify_partner_days_before außerhalb 0-14 wird abgelehnt', async () => {
   asA();
-  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userB, notify_partner_days_before: 30 });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ notify_partner_user_id: userB, notify_partner_days_before: 30 }));
   assert.equal(res.status, 400);
 });
 
@@ -1158,13 +1188,13 @@ test('Cycle-Settings: eligible_partners nennt Haushaltsmitglieder mit Health-Zug
 
 test('Cycle-Settings: notify_partner_user_id lehnt ein Kind ab (400)', async () => {
   asA();
-  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userChild });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ notify_partner_user_id: userChild }));
   assert.equal(res.status, 400);
 });
 
 test('Cycle-Settings: notify_partner_user_id lehnt ein Haushaltsmitglied ohne Health-Zugriff ab (400)', async () => {
   asA();
-  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userNoHealth });
+  const res = await call('PUT', '/cycle/settings', wholeSettings({ notify_partner_user_id: userNoHealth }));
   assert.equal(res.status, 400);
 });
 
@@ -1174,7 +1204,7 @@ test('Cycle: Bulk-Sichtbarkeit flippt eigene Einträge, fremde bleiben unberühr
 
   asB();
   const p = await call('POST', '/cycle/periods', { start_date: '2026-09-02', note: 'bulk-B-period' });
-  const l = await call('POST', '/cycle/logs', { log_date: '2026-09-02', flow: 'light' });
+  const l = await call('POST', '/cycle/logs', wholeDay({ log_date: '2026-09-02', flow: 'light' }));
   assert.equal(p.body.data.visibility, 'private');
   assert.equal(l.body.data.visibility, 'private');
 
@@ -1315,7 +1345,7 @@ test('Cycle-Import: CSV über 100 KB wird abgelehnt (400)', async () => {
 
 test('Cycle-Import: übernimmt die eigene default_visibility aus den Cycle-Settings', async () => {
   asA();
-  await call('PUT', '/cycle/settings', { default_visibility: 'family' });
+  await call('PUT', '/cycle/settings', wholeSettings({ default_visibility: 'family' }));
   const csv = 'start_date,end_date\n2031-01-01,2031-01-05\n';
   const res = await call('POST', '/cycle/import', { csv });
   assert.equal(res.status, 201);
@@ -1324,7 +1354,7 @@ test('Cycle-Import: übernimmt die eigene default_visibility aus den Cycle-Setti
   const list = await call('GET', '/cycle/periods?from=2031-01-01&to=2031-01-02');
   assert.equal(list.body.data.find((p) => p.start_date === '2031-01-01').visibility, 'family');
 
-  await call('PUT', '/cycle/settings', { default_visibility: 'private' });
+  await call('PUT', '/cycle/settings', wholeSettings({ default_visibility: 'private' }));
 });
 
 test('Cycle-Import: importierte Perioden bleiben scoped wie jede andere - Bob sieht Alices Import nicht', async () => {
@@ -1343,11 +1373,11 @@ test('Cycle-Import: importierte Perioden bleiben scoped wie jede andere - Bob si
 
 test('Cycle-Log: neue Skalarfelder + feelings im Round-Trip', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', {
+  const created = await call('POST', '/cycle/logs', wholeDay({
     log_date: '2030-01-01', flow: 'light',
     cervix_mucus: 'eggwhite', lh_test: 'positive', pregnancy_test: 'negative',
     intimacy: 'protected', feelings: ['good', 'irritable'],
-  });
+  }));
   assert.equal(created.status, 201);
   assert.equal(created.body.data.cervix_mucus, 'eggwhite');
   assert.equal(created.body.data.lh_test, 'positive');
@@ -1374,20 +1404,20 @@ test('Cycle-Log: ungültige Werte für die neuen Enum-Felder werden je einzeln a
     { intimacy: 'yes' },
   ];
   for (const extra of cases) {
-    const res = await call('POST', '/cycle/logs', { log_date: '2030-01-02', ...extra });
+    const res = await call('POST', '/cycle/logs', wholeDay({ log_date: '2030-01-02', ...extra }));
     assert.equal(res.status, 400, JSON.stringify(extra));
   }
 });
 
 test('Cycle-Log: unbekannter feelings-Schlüssel wird abgelehnt (400)', async () => {
   asA();
-  const res = await call('POST', '/cycle/logs', { log_date: '2030-01-03', feelings: ['ecstatic'] });
+  const res = await call('POST', '/cycle/logs', wholeDay({ log_date: '2030-01-03', feelings: ['ecstatic'] }));
   assert.equal(res.status, 400);
 });
 
 test('Cycle-Log: legacy mood ohne feelings wird zu feelings:[mood], mood-Spalte bleibt NULL', async () => {
   asA();
-  const res = await call('POST', '/cycle/logs', { log_date: '2030-01-04', mood: 'sensitive' });
+  const res = await call('POST', '/cycle/logs', wholeDay({ log_date: '2030-01-04', mood: 'sensitive' }));
   assert.equal(res.status, 201);
   assert.deepEqual(res.body.data.feelings, ['sensitive']);
   assert.equal(res.body.data.mood, null);
@@ -1395,7 +1425,7 @@ test('Cycle-Log: legacy mood ohne feelings wird zu feelings:[mood], mood-Spalte 
 
 test('Cycle-Log: ungültiger legacy mood-Wert wird abgelehnt wie ein ungültiges feelings-Element', async () => {
   asA();
-  const res = await call('POST', '/cycle/logs', { log_date: '2030-01-05', mood: 'furious' });
+  const res = await call('POST', '/cycle/logs', wholeDay({ log_date: '2030-01-05', mood: 'furious' }));
   assert.equal(res.status, 400);
 });
 
@@ -1408,7 +1438,7 @@ test('Cycle-Log: ungültiger legacy mood-Wert wird abgelehnt wie ein ungültiges
 // echten Freitext-Mood.
 test('Cycle-Log: ein eingefrorener Legacy-mood-Wert wird genullt, wenn feelings/mood explizit mitgeschickt werden', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', { log_date: '2030-01-06', flow: 'light' });
+  const created = await call('POST', '/cycle/logs', wholeDay({ log_date: '2030-01-06', flow: 'light' }));
   assert.equal(created.status, 201);
   const id = created.body.data.id;
 
@@ -1421,7 +1451,7 @@ test('Cycle-Log: ein eingefrorener Legacy-mood-Wert wird genullt, wenn feelings/
   // Erneutes Speichern desselben Tages MIT `feelings` im Body (auch ein
   // leeres Array zaehlt, siehe normalizeFeelings()) - muss die Spalte jetzt
   // aktiv leeren.
-  const updated = await call('POST', '/cycle/logs', { log_date: '2030-01-06', flow: 'heavy', feelings: [] });
+  const updated = await call('POST', '/cycle/logs', wholeDay({ log_date: '2030-01-06', flow: 'heavy', feelings: [] }));
   assert.equal(updated.status, 201);
   assert.equal(updated.body.data.id, id);
   assert.equal(updated.body.data.mood, null);
@@ -1434,7 +1464,7 @@ test('Cycle-Log: ein eingefrorener Legacy-mood-Wert bleibt erhalten, wenn ein Sa
   // Gefuehls-Angabe) - sonst waere "feelings bleibt leer" weiter unten trivial
   // wahr und ein Bug, der bestehende Gefuehle bei jedem Save loescht, wuerde
   // gar nicht auffallen.
-  const created = await call('POST', '/cycle/logs', { log_date: '2030-01-07', flow: 'light', feelings: ['good'] });
+  const created = await call('POST', '/cycle/logs', wholeDay({ log_date: '2030-01-07', flow: 'light', feelings: ['good'] }));
   assert.equal(created.status, 201);
   const id = created.body.data.id;
   assert.deepEqual(created.body.data.feelings, ['good']);
@@ -1446,9 +1476,9 @@ test('Cycle-Log: ein eingefrorener Legacy-mood-Wert bleibt erhalten, wenn ein Sa
   // Erneutes Speichern desselben Tages OHNE `feelings`/`mood` im Body - nur
   // unbeteiligte Felder (flow, note, basal_temp) aendern sich. Der Altwert
   // muss unangetastet bleiben.
-  const updated = await call('POST', '/cycle/logs', {
+  const updated = await call('POST', '/cycle/logs', wholeDay({
     log_date: '2030-01-07', flow: 'heavy', note: 'nur eine Notiz', basal_temp: 36.6, basal_temp_unit: 'c',
-  });
+  }));
   assert.equal(updated.status, 201);
   assert.equal(updated.body.data.id, id);
   assert.equal(updated.body.data.flow, 'heavy');
@@ -1461,9 +1491,9 @@ test('Cycle-Log: ein eingefrorener Legacy-mood-Wert bleibt erhalten, wenn ein Sa
 
 test('Cycle-Log: intimacy ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', {
+  const created = await call('POST', '/cycle/logs', wholeDay({
     log_date: '2030-01-06', flow: 'medium', intimacy: 'unprotected', visibility: 'family',
-  });
+  }));
   assert.equal(created.body.data.intimacy, 'unprotected');
 
   asB();
@@ -1479,7 +1509,7 @@ test('Cycle-Log: intimacy ist hart privat - Eigentümer sieht es, family-Mitglie
 
 test('Cycle: Bulk-Sichtbarkeit auf family lässt intimacy trotzdem verborgen', async () => {
   asA();
-  await call('POST', '/cycle/logs', { log_date: '2030-01-07', intimacy: 'solo', visibility: 'private' });
+  await call('POST', '/cycle/logs', wholeDay({ log_date: '2030-01-07', intimacy: 'solo', visibility: 'private' }));
   const bulk = await call('PATCH', '/cycle/visibility', { visibility: 'family' });
   assert.equal(bulk.status, 200);
 
@@ -1495,9 +1525,9 @@ test('Cycle: Bulk-Sichtbarkeit auf family lässt intimacy trotzdem verborgen', a
 // Erwartung, drei Felder, je ein eigener Test.
 test('Cycle-Log: cervix_mucus ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', {
+  const created = await call('POST', '/cycle/logs', wholeDay({
     log_date: '2030-01-08', flow: 'medium', cervix_mucus: 'eggwhite', visibility: 'family',
-  });
+  }));
   assert.equal(created.body.data.cervix_mucus, 'eggwhite');
 
   asB();
@@ -1513,9 +1543,9 @@ test('Cycle-Log: cervix_mucus ist hart privat - Eigentümer sieht es, family-Mit
 
 test('Cycle-Log: lh_test ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', {
+  const created = await call('POST', '/cycle/logs', wholeDay({
     log_date: '2030-01-09', flow: 'medium', lh_test: 'positive', visibility: 'family',
-  });
+  }));
   assert.equal(created.body.data.lh_test, 'positive');
 
   asB();
@@ -1531,9 +1561,9 @@ test('Cycle-Log: lh_test ist hart privat - Eigentümer sieht es, family-Mitglied
 
 test('Cycle-Log: pregnancy_test ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', {
+  const created = await call('POST', '/cycle/logs', wholeDay({
     log_date: '2030-01-10', flow: 'medium', pregnancy_test: 'negative', visibility: 'family',
-  });
+  }));
   assert.equal(created.body.data.pregnancy_test, 'negative');
 
   asB();
@@ -1549,9 +1579,9 @@ test('Cycle-Log: pregnancy_test ist hart privat - Eigentümer sieht es, family-M
 
 test('Cycle: Bulk-Sichtbarkeit auf family lässt cervix_mucus/lh_test/pregnancy_test trotzdem verborgen', async () => {
   asA();
-  await call('POST', '/cycle/logs', {
+  await call('POST', '/cycle/logs', wholeDay({
     log_date: '2030-01-11', cervix_mucus: 'watery', lh_test: 'negative', pregnancy_test: 'negative', visibility: 'private',
-  });
+  }));
   const bulk = await call('PATCH', '/cycle/visibility', { visibility: 'family' });
   assert.equal(bulk.status, 200);
 
@@ -1662,7 +1692,7 @@ test('Logs: POST mit gültiger schedule_id verknüpft, fremde schedule_id → 40
 
   const medB = await call('POST', '/medications', { name: 'LogMedB' });
   const schedB = await call('POST', `/medications/${medB.body.data.id}/schedules`, { time_of_day: '09:00' });
-  const bad = await call('POST', `/medications/${medAId}/logs`, { scheduled_at: '2026-06-11T08:00', schedule_id: schedB.body.data.id });
+  const bad = await call('POST', `/medications/${medAId}/logs`, { status: 'pending', scheduled_at: '2026-06-11T08:00', schedule_id: schedB.body.data.id });
   assert.equal(bad.status, 400, 'schedule_id fremder Medikamente wird abgelehnt');
 });
 
@@ -1670,8 +1700,8 @@ test('Logs: GET from/to-Filter + take mit ungültigem taken_at → 400', async (
   asA();
   const med = await call('POST', '/medications', { name: 'FilterLogMed' });
   const medId = med.body.data.id;
-  await call('POST', `/medications/${medId}/logs`, { scheduled_at: '2026-08-01T08:00', note: 'log-in' });
-  const out = await call('POST', `/medications/${medId}/logs`, { scheduled_at: '2026-08-20T08:00', note: 'log-out' });
+  await call('POST', `/medications/${medId}/logs`, { status: 'pending', scheduled_at: '2026-08-01T08:00', note: 'log-in' });
+  const out = await call('POST', `/medications/${medId}/logs`, { status: 'pending', scheduled_at: '2026-08-20T08:00', note: 'log-out' });
   const list = await call('GET', `/medications/${medId}/logs?from=2026-08-01T00:00&to=2026-08-05T00:00`);
   const notes = list.body.data.map((x) => x.note);
   assert.ok(notes.includes('log-in') && !notes.includes('log-out'));
@@ -1778,7 +1808,7 @@ test('Cycle: Perioden from/to-Filter + Log löschen', async () => {
   const notes = filtered.body.data.map((x) => x.note);
   assert.ok(notes.includes('per-in') && !notes.includes('per-out'));
 
-  const logged = await call('POST', '/cycle/logs', { log_date: '2028-03-05', flow: 'light' });
+  const logged = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-03-05', flow: 'light' }));
   const logsFiltered = await call('GET', '/cycle/logs?from=2028-03-01&to=2028-03-31');
   assert.ok(logsFiltered.body.data.some((l) => l.id === logged.body.data.id));
   const del = await call('DELETE', `/cycle/logs/${logged.body.data.id}`);
@@ -1791,16 +1821,16 @@ test('Cycle-Log: zu lange Symptomliste → 400', async () => {
   // mehr auf der Zeichenlänge einer Komma-Zeile - 41 eindeutige Einträge
   // reißen die Grenze, 40 selbst nicht.
   const many = Array.from({ length: 41 }, (_, i) => `symptomlongtoken${i}`);
-  const r = await call('POST', '/cycle/logs', { log_date: '2028-05-01', symptoms: many });
+  const r = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-05-01', symptoms: many }));
   assert.equal(r.status, 400);
 });
 
 test('Cycle-Log: Symptom-Intensität wird gespeichert, gelesen und über PATCH-artigen Re-POST ersetzt', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', {
+  const created = await call('POST', '/cycle/logs', wholeDay({
     log_date: '2028-05-02',
     symptoms: [{ key: 'headache', intensity: 3 }, { key: 'nausea' }],
-  });
+  }));
   assert.equal(created.status, 201);
   assert.deepEqual(created.body.data.symptoms, [{ key: 'headache', intensity: 3 }, { key: 'nausea', intensity: null }]);
 
@@ -1809,9 +1839,9 @@ test('Cycle-Log: Symptom-Intensität wird gespeichert, gelesen und über PATCH-a
   assert.deepEqual(row.symptoms, [{ key: 'headache', intensity: 3 }, { key: 'nausea', intensity: null }]);
 });
 
-test('Cycle-Log: Basaltemperatur wird gespeichert, gelesen und beim Weglassen gelöscht', async () => {
+test('Cycle-Log: Basaltemperatur wird gespeichert, gelesen und mit null gelöscht', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', { log_date: '2028-05-03', basal_temp: 36.42, basal_temp_unit: 'c' });
+  const created = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-05-03', basal_temp: 36.42, basal_temp_unit: 'c' }));
   assert.equal(created.status, 201);
   assert.equal(created.body.data.basal_temp, 36.42);
   assert.equal(created.body.data.basal_temp_unit, 'c');
@@ -1821,30 +1851,31 @@ test('Cycle-Log: Basaltemperatur wird gespeichert, gelesen und beim Weglassen ge
   assert.equal(row.basal_temp, 36.42);
   assert.equal(row.basal_temp_unit, 'c');
 
-  // Voller Ersatz wie bei allen anderen Feldern dieser Route: weggelassen heißt geloescht.
-  const cleared = await call('POST', '/cycle/logs', { log_date: '2028-05-03', flow: 'light' });
+  // Voller Ersatz wie bei allen anderen Feldern dieser Route: `null` loescht
+  // (weglassen ist seit #2810 ein 400, test:validate-health).
+  const cleared = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-05-03', flow: 'light' }));
   assert.equal(cleared.body.data.basal_temp, null);
   assert.equal(cleared.body.data.basal_temp_unit, null);
 });
 
 test('Cycle-Log: Basaltemperatur ohne Einheit, mit unbekannter Einheit oder außerhalb des Plausibilitätsbereichs → 400', async () => {
   asA();
-  const noUnit = await call('POST', '/cycle/logs', { log_date: '2028-05-04', basal_temp: 36.5 });
+  const noUnit = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-05-04', basal_temp: 36.5 }));
   assert.equal(noUnit.status, 400);
 
-  const badUnit = await call('POST', '/cycle/logs', { log_date: '2028-05-04', basal_temp: 36.5, basal_temp_unit: 'k' });
+  const badUnit = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-05-04', basal_temp: 36.5, basal_temp_unit: 'k' }));
   assert.equal(badUnit.status, 400);
 
-  const tooLowC = await call('POST', '/cycle/logs', { log_date: '2028-05-04', basal_temp: 10, basal_temp_unit: 'c' });
+  const tooLowC = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-05-04', basal_temp: 10, basal_temp_unit: 'c' }));
   assert.equal(tooLowC.status, 400);
 
-  const tooHighF = await call('POST', '/cycle/logs', { log_date: '2028-05-04', basal_temp: 200, basal_temp_unit: 'f' });
+  const tooHighF = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-05-04', basal_temp: 200, basal_temp_unit: 'f' }));
   assert.equal(tooHighF.status, 400);
 });
 
 test('Cycle-Log: Basaltemperatur in Fahrenheit wird unverändert gespeichert (keine serverseitige Umrechnung)', async () => {
   asA();
-  const r = await call('POST', '/cycle/logs', { log_date: '2028-05-05', basal_temp: 97.9, basal_temp_unit: 'f' });
+  const r = await call('POST', '/cycle/logs', wholeDay({ log_date: '2028-05-05', basal_temp: 97.9, basal_temp_unit: 'f' }));
   assert.equal(r.status, 201);
   assert.equal(r.body.data.basal_temp, 97.9);
   assert.equal(r.body.data.basal_temp_unit, 'f');
@@ -1862,9 +1893,9 @@ test('Cycle-Periode: PATCH aller Felder + Fremdzugriff-404', async () => {
 
 test('Cycle-Settings: nicht-boolesche track_fertility/pregnancy_mode → 400', async () => {
   asA();
-  const bad1 = await call('PUT', '/cycle/settings', { track_fertility: 'ja' });
+  const bad1 = await call('PUT', '/cycle/settings', wholeSettings({ track_fertility: 'ja' }));
   assert.equal(bad1.status, 400);
-  const bad2 = await call('PUT', '/cycle/settings', { pregnancy_mode: 'ja' });
+  const bad2 = await call('PUT', '/cycle/settings', wholeSettings({ pregnancy_mode: 'ja' }));
   assert.equal(bad2.status, 400);
 });
 
@@ -1875,7 +1906,7 @@ test('Nicht-Eigentümer: DELETE auf Schedule/Result/Cycle-Period/Cycle-Log → 4
   const lab = await call('POST', '/labs', { report_date: '2026-07-01', results: [{ analyte: 'X', value_num: 1 }] });
   const resultId = lab.body.data.results[0].id;
   const period = await call('POST', '/cycle/periods', { start_date: '2029-01-01' });
-  const log = await call('POST', '/cycle/logs', { log_date: '2029-01-02', flow: 'light' });
+  const log = await call('POST', '/cycle/logs', wholeDay({ log_date: '2029-01-02', flow: 'light' }));
 
   asB();
   assert.equal((await call('DELETE', `/schedules/${sched.body.data.id}`)).status, 404);
@@ -1887,7 +1918,7 @@ test('Nicht-Eigentümer: DELETE auf Schedule/Result/Cycle-Period/Cycle-Log → 4
 test('Logs: take ohne taken_at setzt Zeitstempel automatisch', async () => {
   asA();
   const med = await call('POST', '/medications', { name: 'TakeNowMed' });
-  const logRow = await call('POST', `/medications/${med.body.data.id}/logs`, { scheduled_at: '2026-06-15T08:00' });
+  const logRow = await call('POST', `/medications/${med.body.data.id}/logs`, { status: 'pending', scheduled_at: '2026-06-15T08:00' });
   const r = await call('POST', `/logs/${logRow.body.data.id}/take`);
   assert.equal(r.status, 200);
   assert.equal(r.body.data.status, 'taken');
@@ -2140,11 +2171,12 @@ test.after(() => { server.close(); });
 
 test('PRN: 0 als Mindestabstand nennt seine Grenze richtig', async () => {
   // Die Meldung sagte „between 0 and 672", wies die 0 aber ab - und das
-  // Formularfeld liess sie zu. Wer 0 eintippt, soll lesen, was gilt.
+  // Formularfeld liess sie zu. Wer 0 eintippt, soll lesen, was gilt. Seit
+  // #2810 sagt es das Schema (`exclusiveMinimum: 0`) vor der Route.
   asA();
   const res = await call('POST', '/medications', { name: 'Grenzfall', prn: true, min_interval_hours: 0 });
   assert.equal(res.status, 400);
-  assert.match(JSON.stringify(res.body), /greater than 0 and at most 672/);
+  assert.deepEqual(res.body.fields, [{ path: 'body/min_interval_hours', rule: 'exclusiveMinimum' }]);
 });
 
 test('PRN: eine negative Bedarfsdosis wird abgewiesen', async () => {
@@ -2183,7 +2215,7 @@ test('Logs: POST taken mit stock_deduct zieht den Bestand in derselben Anfrage a
   assert.equal(stockOf(id), 8);
   // Nur eine genommene Dosis zieht ab.
   await call('POST', `/medications/${id}/logs`, { status: 'skipped', dose_qty: 2, stock_deduct: 2 });
-  await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-05T08:00', stock_deduct: 2 });
+  await call('POST', `/medications/${id}/logs`, { status: 'pending', scheduled_at: '2026-06-05T08:00', stock_deduct: 2 });
   assert.equal(stockOf(id), 8);
   // Nie unter 0.
   await call('POST', `/medications/${id}/logs`, { status: 'taken', stock_deduct: 50 });
@@ -2213,7 +2245,7 @@ test('Logs: /take mit stock_deduct zieht einmal ab, ein wiederholtes /take nicht
   asA();
   const med = await call('POST', '/medications', { name: 'Planprobe', stock_qty: 6 });
   const id = med.body.data.id;
-  const pending = await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-04T08:00' });
+  const pending = await call('POST', `/medications/${id}/logs`, { status: 'pending', scheduled_at: '2026-06-04T08:00' });
   const lid = pending.body.data.id;
   const first = await call('POST', `/logs/${lid}/take`, { stock_deduct: 2 });
   assert.equal(first.status, 200);
@@ -2305,7 +2337,8 @@ test('#2054: ein ungueltiges Zeitfenster weist alles ab, es bleibt kein Medikame
     name: 'Halbangelegt', schedules: [{ time_of_day: '08:00' }, { time_of_day: '09:00', days_mask: 200 }],
   });
   assert.equal(res.status, 400);
-  assert.match(res.body.error, /schedules\[1\]/, 'die Meldung nennt das Zeitfenster');
+  // Seit #2810 nennt das Schema das Zeitfenster und die Regel (vorher der Satz der Route).
+  assert.deepEqual(res.body.fields, [{ path: 'body/schedules/1/days_mask', rule: 'maximum' }], 'die Absage nennt das Zeitfenster');
   assert.equal(countMeds('Halbangelegt'), 0);
 
   for (const schedules of ['08:00', [null], [[]], Array.from({ length: 49 }, () => ({ time_of_day: '08:00' }))]) {
@@ -2356,7 +2389,7 @@ test('R23 D6: /take meldet stock_deducted, /undo stellt Eintrag und Bestand wied
   const id = med.body.data.id;
   const sched = await call('POST', `/medications/${id}/schedules`, { time_of_day: '08:00', dose_qty: 2 });
   assert.equal(sched.status, 201);
-  const pending = await call('POST', `/medications/${id}/logs`, { scheduled_at: '2026-06-06T08:00', schedule_id: sched.body.data.id });
+  const pending = await call('POST', `/medications/${id}/logs`, { status: 'pending', scheduled_at: '2026-06-06T08:00', schedule_id: sched.body.data.id });
   const lid = pending.body.data.id;
   const taken = await call('POST', `/logs/${lid}/take`, { stock_deduct: 2 });
   assert.equal(taken.body.stock_deducted, 2, 'die Antwort nennt, was abging');
@@ -2427,13 +2460,13 @@ test('R23 S11: GET /medications?include=schedules,logs bringt Plaene und Eintrae
   asA();
   const mine = (await call('POST', '/medications', { name: 'Buendel-Eigen' })).body.data.id;
   await call('POST', `/medications/${mine}/schedules`, { time_of_day: '07:30' });
-  const inWindow = (await call('POST', `/medications/${mine}/logs`, { scheduled_at: '2031-03-10T07:30' })).body.data.id;
-  await call('POST', `/medications/${mine}/logs`, { scheduled_at: '2031-01-01T07:30' });
+  const inWindow = (await call('POST', `/medications/${mine}/logs`, { status: 'pending', scheduled_at: '2031-03-10T07:30' })).body.data.id;
+  await call('POST', `/medications/${mine}/logs`, { status: 'pending', scheduled_at: '2031-01-01T07:30' });
   asB();
   const shared = (await call('POST', '/medications', { name: 'Buendel-Familie', visibility: 'family' })).body.data.id;
-  const sharedLog = (await call('POST', `/medications/${shared}/logs`, { scheduled_at: '2031-03-11T09:00' })).body.data.id;
+  const sharedLog = (await call('POST', `/medications/${shared}/logs`, { status: 'pending', scheduled_at: '2031-03-11T09:00' })).body.data.id;
   const hidden = (await call('POST', '/medications', { name: 'Buendel-Privat' })).body.data.id;
-  await call('POST', `/medications/${hidden}/logs`, { scheduled_at: '2031-03-11T09:00' });
+  await call('POST', `/medications/${hidden}/logs`, { status: 'pending', scheduled_at: '2031-03-11T09:00' });
 
   asA();
   const res = await call('GET', '/medications?include=schedules,logs&logs_from=2031-03-01T00:00&logs_to=2031-03-31T23:59');
@@ -2450,4 +2483,98 @@ test('R23 S11: GET /medications?include=schedules,logs bringt Plaene und Eintrae
   const plain = await call('GET', '/medications');
   assert.ok(plain.body.data.every((m) => !('schedules' in m) && !('logs' in m)), 'ohne include bleibt die Liste, wie sie war');
   for (const id of [mine, shared, hidden]) db.prepare('DELETE FROM medications WHERE id = ?').run(id);
+});
+
+// Phase 2 B9: GET /caregivers and PUT /caregivers/:subjectId hold their whole answer
+// and the table behind it before the grant table moves behind server/authorize/.
+// Held elsewhere already: 403 for a non-admin, the person herself dropped and an
+// unknown id refused (tests above, status and list only); a deactivated caregiver
+// or subject (test-user-deactivation.js, status and reason only).
+// With PRAGMA reverse_unordered_selects a list without ORDER BY comes back
+// reversed, so the order is held as a promise, not as a planner accident.
+test('B9: caregivers - whole answers and the table after each write', async () => {
+  const saved = db.prepare('SELECT subject_id, caregiver_id FROM health_care_grants ORDER BY rowid').all();
+  db.prepare('DELETE FROM health_care_grants').run();
+  const add = (/** @type {string} */ name) => Number(db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES (?, ?, '$2b$12$x', 'member')`).run(`b9${name}`, `B9 ${name}`).lastInsertRowid);
+  const [d, e, f, g] = ['d', 'e', 'f', 'g'].map(add);
+  const table = () => db.prepare('SELECT subject_id, caregiver_id FROM health_care_grants ORDER BY rowid').all()
+    .map((/** @type {any} */ r) => [r.subject_id, r.caregiver_id]);
+  const deactivate = (/** @type {number} */ id) => db.prepare("UPDATE users SET deactivated_at = '2026-01-01T00:00:00Z' WHERE id = ?").run(id);
+  db.pragma('reverse_unordered_selects = ON');
+  try {
+    // Entered against the sorted order.
+    const grant = db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)');
+    grant.run(e, g); grant.run(e, f); grant.run(d, g); grant.run(d, f);
+    asAdmin();
+    const list = await call('GET', '/caregivers');
+    assert.equal(list.status, 200);
+    assert.deepEqual(list.body, { data: { [d]: [f, g], [e]: [f, g] } });
+
+    const put = (/** @type {number} */ subject, /** @type {unknown} */ ids) => call('PUT', `/caregivers/${subject}`, { caregiver_ids: ids });
+
+    // Replace: the stored list goes, the new one is written in the given order.
+    let r = await put(d, [g, userA]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: d, caregiver_ids: [g, userA] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f], [d, g], [d, userA]]);
+    // Shorten.
+    r = await put(d, [userA]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: d, caregiver_ids: [userA] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f], [d, userA]]);
+    // Duplicates, a string id and the person herself fall out silently.
+    r = await put(d, [f, String(f), f, d, g]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: d, caregiver_ids: [f, g] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f], [d, f], [d, g]]);
+    // Empty.
+    r = await put(d, []);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: d, caregiver_ids: [] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f]]);
+    // Unknown id: refused, nothing written.
+    r = await put(d, [f, 999999]);
+    assert.deepEqual([r.status, r.body], [400, { error: 'caregiver_ids contains an unknown user.', code: 400 }]);
+    assert.deepEqual(table(), [[e, g], [e, f]]);
+    // Invalid subject, unknown subject, no list.
+    // Seit #2810 sind Pfad-ID und Liste Sache des Schemas (vorher 'Invalid user_id.'
+    // und 'caregiver_ids must be an array.' der Route).
+    r = await call('PUT', '/caregivers/abc', { caregiver_ids: [f] });
+    assert.deepEqual([r.status, r.body.fields], [400, [{ path: 'path/subjectId', rule: 'type' }]]);
+    r = await put(999999, [f]);
+    assert.deepEqual([r.status, r.body], [404, { error: 'User not found.', code: 404 }]);
+    r = await put(d, 'f');
+    assert.deepEqual([r.status, r.body.fields], [400, [{ path: 'body/caregiver_ids', rule: 'type' }]]);
+
+    // A deactivated caregiver: stored stays allowed, new is refused.
+    deactivate(g);
+    r = await put(e, [f, g]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: e, caregiver_ids: [f, g] } }]);
+    assert.deepEqual(table(), [[e, f], [e, g]]);
+    r = await put(d, [f, g]);
+    assert.deepEqual([r.status, r.body], [400, {
+      error: `A deactivated account cannot be a caregiver - user ${g}.`, code: 400, reason: 'account_deactivated',
+    }]);
+    assert.deepEqual(table(), [[e, f], [e, g]]);
+    // A deactivated subject: the stored list may stay or shrink, nobody new comes in.
+    deactivate(e);
+    r = await put(e, [g, f]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: e, caregiver_ids: [g, f] } }]);
+    assert.deepEqual(table(), [[e, g], [e, f]]);
+    r = await put(e, [f, userA]);
+    assert.deepEqual([r.status, r.body], [400, {
+      error: 'A deactivated account cannot get new caregivers.', code: 400, reason: 'account_deactivated',
+    }]);
+    assert.deepEqual(table(), [[e, g], [e, f]]);
+    r = await put(e, [f]);
+    assert.deepEqual([r.status, r.body], [200, { data: { subject_id: e, caregiver_ids: [f] } }]);
+    assert.deepEqual(table(), [[e, f]]);
+
+    const after = await call('GET', '/caregivers');
+    assert.deepEqual([after.status, after.body], [200, { data: { [e]: [f] } }]);
+    db.prepare('DELETE FROM health_care_grants').run();
+    assert.deepEqual((await call('GET', '/caregivers')).body, { data: {} });
+  } finally {
+    db.pragma('reverse_unordered_selects = OFF');
+    db.prepare('DELETE FROM health_care_grants').run();
+    for (const row of saved) db.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)').run(row.subject_id, row.caregiver_id);
+    for (const id of [d, e, f, g]) db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  }
 });

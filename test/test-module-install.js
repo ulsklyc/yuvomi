@@ -62,7 +62,7 @@
  *        createGithubInstaller({ request })). MODULES_DIR zeigt auf einen
  *        Temp-Ordner, die DB ist In-Memory. Der Schalter steht fuer die Suite auf
  *        true (vor dem Import gesetzt); der Aus-Fall nimmt den Test-Hook.
- * Ausführen: node --experimental-sqlite --test test/test-module-install.js
+ * Ausführen: node --test test/test-module-install.js
  */
 
 import path from 'node:path';
@@ -90,6 +90,7 @@ const modulesSvc = await import('../server/services/modules.js');
 const install = await import('../server/services/module-install.js');
 const github = await import('../server/services/module-github.js');
 const { default: modulesRouter } = await import('../server/routes/modules.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 // ── Kleiner ZIP-Schreiber (deflate) ─────────────────────────────────────────
@@ -173,9 +174,12 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', modulesRouter);
+// At its real prefix, with the central error handler: validateRequest() finds
+// its operation by the mount and hands its 400 on (#2810).
+app.use('/api/v1/modules', modulesRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/modules`)));
 
 async function call(method, route, { actor: a, json, raw, contentType = 'application/zip' } = {}) {
   actor = a || admin();
@@ -794,13 +798,13 @@ test('leerer ZIP-Body mit richtigem Content-Type → not_zip mit dem Satz der Ro
     };
     next();
   });
-  spyApp.use('/', modulesRouter);
+  spyApp.use('/api/v1/modules', modulesRouter);
   const spy = spyApp.listen(0, '127.0.0.1');
   await new Promise((r) => spy.on('listening', r));
   try {
     const sock = net.connect(spy.address().port, '127.0.0.1');
     sock.on('error', () => {});
-    sock.write(`POST /install/zip HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/zip\r\nContent-Length: 100\r\n\r\n${'PK'.padEnd(10, 'x')}`);
+    sock.write(`POST /api/v1/modules/install/zip HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/zip\r\nContent-Length: 100\r\n\r\n${'PK'.padEnd(10, 'x')}`);
     await enteredP;
     sock.destroy();
     let fallback;
@@ -1646,7 +1650,10 @@ test('POST /install/github ohne oder mit leerer url → 400 bad_url sofort, auch
       const r = await call('POST', '/install/github', { json });
       assert.equal(r.status, 400, `${JSON.stringify(json)} → ${JSON.stringify(r.body)}`);
       assert.equal(r.body.reason, 'bad_url');
-      assert.match(r.body.error, /github\.com\/owner\/repo/);
+      // Since #2810 a missing or non-text url is refused by the schema of the
+      // operation, with the same reason and `fields`; an empty one by the route.
+      if (typeof json.url === 'string') assert.match(r.body.error, /github\.com\/owner\/repo/);
+      else assert.equal(r.body.fields?.[0]?.path, 'body/url', JSON.stringify(r.body));
     }
     assert.equal(requests, 0);
   } finally {
@@ -1971,7 +1978,7 @@ test('ein unerwarteter Fehler beim Installieren → 500 mit festem Satz, ohne di
   try {
     const r = await postZip(makeZip(moduleFiles('raw500-mod')));
     assert.equal(r.status, 500);
-    assert.deepEqual(r.body, { error: 'Module install failed.', code: 500 }, 'kein EIO, kein Serverpfad');
+    assert.deepEqual(r.body, { error: 'Internal server error.', code: 500 }, 'kein EIO, kein Serverpfad');
   } finally {
     restore();
   }
@@ -2407,7 +2414,7 @@ test('Admin-Liste nennt, wer installiert hat (installedByName); geloeschtes Kont
   assert.equal(recordOf('anon-mod').installedBy, null);
 });
 
-// Phase 0 section H (test:client-error-text-guard): a filesystem error without
+// Phase 0 section H (lint rule ERROR-TEXT): a filesystem error without
 // `status` must not reach the browser with its message - it names the absolute
 // path of modules/. The source reader cannot tell this catch from a gated one,
 // so it runs as a program: modules/ is replaced by a FILE, and the mkdir in
@@ -2422,7 +2429,7 @@ test('asset route: a filesystem error answers with a fixed sentence, never the p
     const text = r.buf.toString('utf8');
     assert.ok(!text.includes(TMP_ROOT) && !text.includes('modules'), `no path in the answer: ${text}`);
     assert.ok(!/EEXIST|ENOTDIR|mkdir/.test(text), `no error class text in the answer: ${text}`);
-    assert.equal(r.body.error, 'Module asset failed.');
+    assert.equal(r.body.error, 'Internal server error.');
     assert.equal(r.body.code, 500);
   } finally {
     if (fs.existsSync(aside)) {

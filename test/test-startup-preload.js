@@ -5,13 +5,13 @@
  *
  * 1. MODULEPRELOAD IST DER GRAPH, NICHT EINE SCHAETZUNG. Ohne die Liste fand der
  *    Browser die Module Ebene fuer Ebene (sieben Rundreisen bis zur Uebersicht,
- *    gemessen am Telefon mit 4x CPU und Fast 4G). Die Liste muss genau der
- *    statische Importgraph der Modulskripte aus index.html plus der der
- *    Startseite (/pages/dashboard.js) sein: fehlt ein Modul, kommt seine Ebene
- *    zurueck; steht eines zu viel da, laedt jeder Start etwas fuer nichts.
- *    Der Teil der Uebersicht hat niedrige Prioritaet, damit die ersten
- *    API-Abrufe nicht hinter ihm warten, und die Liste steht hinter den
- *    Blaettern und den Startskripten.
+ *    gemessen am Telefon mit 4x CPU und Fast 4G). Seit dem Build (Phase 1a,
+ *    Abschnitt D) schreibt Vite die Liste: public/index.html traegt keine Zeile
+ *    mehr von Hand (bis dahin 128, gegen den Graphen nachgerechnet), und die
+ *    gebaute dist/index.html laedt genau den statischen Importgraph des
+ *    Eintrags vor, dazu den der Startseite (/pages/dashboard.js) mit niedriger
+ *    Prioritaet hinter der Shell, damit die ersten API-Abrufe nicht hinter ihr
+ *    warten - alles hinter Blaettern und Startskripten.
  * 2. KOMPONENTEN-BLAETTER STEHEN NICHT IM START. Datumsfeld, Kategorien,
  *    Symbolauswahl, Dokumentanhang und Bildschirmschoner laden ihr Blatt selbst
  *    (utils/component-style.js) und warten darauf; auth.css ist das
@@ -26,6 +26,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { posix } from 'node:path';
 import { moduleSpecifiers, withoutHtmlComments, withoutCommentsKeepingLines } from './source-text.js';
 import { eachRule } from './css-rules.js';
+import { distManifest, isPrecachedSource, readDist } from './dist-build.js';
 
 const PUBLIC = new URL('../public/', import.meta.url);
 const read = (rel) => readFileSync(new URL(rel.replace(/^\//, ''), PUBLIC), 'utf8');
@@ -57,38 +58,104 @@ function closure(entries, known = new Set()) {
 }
 
 const moduleScripts = [...html.matchAll(/<script\b[^>]*\btype="module"[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]);
-const preloads = [...head.matchAll(/<link rel="modulepreload"([^>]*)\bhref="([^"]+)"[^>]*>/g)]
-  .map((m) => ({ href: m[2], low: /fetchpriority="low"/.test(m[0]), index: m.index }));
 
-test('modulepreload nennt genau den Startgraphen: Modulskripte aus index.html und die Uebersicht', () => {
+test('public/index.html traegt keine Vorab-Ladung von Hand: die schreibt der Build', () => {
   assert.ok(moduleScripts.includes('/router.js') && moduleScripts.includes('/api.js'), 'index.html laedt router.js/api.js nicht mehr als Modul');
-  const known = new Set();
-  const shell = closure(moduleScripts, known);
-  const dashboard = closure(['/pages/dashboard.js'], known);
+  const raw = read('index.html');
+  const byHand = raw.split('\n').filter((line) => /modulepreload/i.test(line));
+  assert.deepEqual(byHand, [], 'modulepreload in public/index.html - Vite schreibt die Liste aus dem Graphen, eine Hand-Zeile zeigt auf eine ungebaute Datei');
+});
+
+/**
+ * Die gebaute Fassung. `imports` im Manifest sind die statischen Kanten eines
+ * Chunks; der Eintrag ist index.html, die Startseite ihr dynamischer Eintrag.
+ */
+function builtStart() {
+  const manifest = distManifest();
+  const built = readDist('index.html');
+  const builtHead = built.slice(0, built.indexOf('</head>'));
+  /** @param {string} key */
+  const staticClosure = (key) => {
+    const out = [];
+    const queue = [key];
+    const seen = new Set(queue);
+    while (queue.length) {
+      const k = /** @type {string} */ (queue.shift());
+      out.push(`/${manifest[k].file}`);
+      for (const dep of manifest[k].imports ?? []) if (!seen.has(dep)) { seen.add(dep); queue.push(dep); }
+    }
+    return out;
+  };
+  const entry = manifest['index.html'];
+  assert.ok(entry?.isEntry, 'index.html ist kein Eintrag im Manifest');
+  assert.ok(manifest['pages/dashboard.js'], 'die Startseite fehlt im Manifest');
+  const shell = staticClosure('index.html').slice(1);
+  const dashboard = staticClosure('pages/dashboard.js').filter((f) => !shell.includes(f) && f !== `/${entry.file}`);
+  const preloads = [...builtHead.matchAll(/<link rel="modulepreload"([^>]*)>/g)]
+    .map((m) => ({ href: m[1].match(/\bhref="([^"]+)"/)?.[1] ?? '', low: /fetchpriority="low"/.test(m[1]), index: m.index }));
+  return { entry, builtHead, shell, dashboard, preloads };
+}
+
+test('die gebaute index.html laedt genau den Startgraphen vor: Eintrag und Uebersicht', () => {
+  const { entry, builtHead, shell, dashboard, preloads } = builtStart();
+  assert.ok(builtHead.includes(`<script type="module" crossorigin src="/${entry.file}"></script>`), 'der gebaute Eintrag steht nicht im <head>');
   const expected = new Set([...shell, ...dashboard]);
   const listed = new Set(preloads.map((p) => p.href));
-  const missing = [...expected].filter((href) => !listed.has(href));
-  const extra = [...listed].filter((href) => !expected.has(href));
-  assert.deepEqual(missing, [], 'diese Module laedt der Start, ohne dass index.html sie vorab nennt - der Browser findet sie erst eine Ebene spaeter');
-  assert.deepEqual(extra, [], 'diese Vorab-Ladungen gehoeren nicht zum Start');
-  assert.equal(preloads.length, listed.size, 'ein Modul steht doppelt in der Liste');
+  assert.ok(shell.length >= 3 && dashboard.length >= 3, `Startgraph zu klein (${shell.length}/${dashboard.length}) - das Manifest wird nicht mehr gelesen`);
+  assert.deepEqual([...expected].filter((href) => !listed.has(href)), [], 'diese Chunks laedt der Start, ohne dass dist/index.html sie vorab nennt');
+  assert.deepEqual([...listed].filter((href) => !expected.has(href)), [], 'diese Vorab-Ladungen gehoeren nicht zum Start');
+  assert.equal(preloads.length, listed.size, 'ein Chunk steht doppelt in der Liste');
+});
+
+/**
+ * Die Adresse, die das Vorwaermen in `link.href` schreibt, kommt aus DOM-Text
+ * (#yuvomi-page-urls). Angenommen wird nur, was wie ein gebauter Chunk aussieht;
+ * alles andere faellt auf den Quellpfad der Route zurueck (CodeQL auf #2631).
+ */
+test('pageModuleUrl nimmt aus der Liste nur gebaute Chunks, nie eine fremde Adresse', () => {
+  const router = read('router.js');
+  const start = router.indexOf('function pageModuleUrl(');
+  assert.ok(start > 0, 'pageModuleUrl fehlt in router.js');
+  const fn = router.slice(start, router.indexOf('\n}\n', start) + 2);
+  /** @param {Record<string, string>} table */
+  const make = (table) => new Function('document', `let _pageUrls = null;\n${fn}\nreturn pageModuleUrl;`)({
+    getElementById: () => ({ textContent: JSON.stringify(table) }),
+  });
+  const pick = make({
+    '/pages/tasks.js': '/assets/tasks-B4py-J9e.js',
+    '/pages/a.js': 'javascript:alert(1)',
+    '/pages/b.js': '//evil.example/x.js',
+    '/pages/c.js': 'https://evil.example/assets/x.js',
+    '/pages/d.js': '/assets/../api/v1/x.js',
+    '/pages/e.js': '/assets/x.js?y=1',
+  });
+  assert.equal(pick('/pages/tasks.js'), '/assets/tasks-B4py-J9e.js');
+  for (const page of ['/pages/a.js', '/pages/b.js', '/pages/c.js', '/pages/d.js', '/pages/e.js']) {
+    assert.equal(pick(page), page, `${page}: eine fremde Adresse landete im href`);
+  }
+  assert.equal(pick('/api/v1/modules/assets/x/index.js'), '/api/v1/modules/assets/x/index.js', 'Drittmodule laufen unveraendert durch');
+  // Die Muster muessen zu dem passen, was der Build schreibt.
+  const built = Object.values(JSON.parse(readDist('index.html').match(/<script type="application\/json" id="yuvomi-page-urls">(.*?)<\/script>/)?.[1] ?? '{}'));
+  assert.ok(built.length >= 25, `nur ${built.length} gebaute Seiten in der Liste`);
+  const real = make(Object.fromEntries(built.map((url, i) => [`/p${i}`, url])));
+  assert.deepEqual(built.filter((url, i) => real(`/p${i}`) !== url), [], 'gebaute Adressen werden abgewiesen - Muster und vite.config passen nicht zusammen');
 });
 
 test('der Teil der Uebersicht laedt mit niedriger Prioritaet, hinter dem der Shell', () => {
-  const known = new Set();
-  const shell = new Set(closure(moduleScripts, known));
-  const dashboard = new Set(closure(['/pages/dashboard.js'], known));
-  const wrongPriority = preloads.filter((p) => (dashboard.has(p.href) ? !p.low : p.low)).map((p) => p.href);
+  const { shell, dashboard, preloads } = builtStart();
+  const dash = new Set(dashboard);
+  const wrongPriority = preloads.filter((p) => (dash.has(p.href) ? !p.low : p.low)).map((p) => p.href);
   assert.deepEqual(wrongPriority, [], 'Shell hoch, Uebersicht niedrig - sonst warten /auth/me und /preferences hinter der Uebersicht');
-  const lastShell = Math.max(...preloads.filter((p) => shell.has(p.href)).map((p) => p.index));
-  const firstDashboard = Math.min(...preloads.filter((p) => dashboard.has(p.href)).map((p) => p.index));
+  const lastShell = Math.max(...preloads.filter((p) => shell.includes(p.href)).map((p) => p.index));
+  const firstDashboard = Math.min(...preloads.filter((p) => dash.has(p.href)).map((p) => p.index));
   assert.ok(lastShell < firstDashboard, 'die Shell steht vor der Uebersicht');
 });
 
 test('die Vorab-Ladungen stehen hinter den Blaettern und den Startskripten', () => {
+  const { builtHead, preloads } = builtStart();
   const firstPreload = Math.min(...preloads.map((p) => p.index));
-  const lastSheet = Math.max(...[...head.matchAll(/<link rel="stylesheet"/g)].map((m) => m.index));
-  const lastScript = Math.max(...[...head.matchAll(/<script\b/g)].map((m) => m.index));
+  const lastSheet = Math.max(...[...builtHead.matchAll(/<link rel="stylesheet"/g)].map((m) => m.index));
+  const lastScript = Math.max(...[...builtHead.matchAll(/<script\b(?![^>]*type="(?:module|application\/json)")/g)].map((m) => m.index));
   assert.ok(firstPreload > lastSheet, 'eine modulepreload-Zeile steht vor einem Stylesheet und draengelt sich davor');
   assert.ok(firstPreload > lastScript, 'eine modulepreload-Zeile steht vor einem Startskript - theme-init/lang-init blockieren den Parser');
 });
@@ -211,9 +278,8 @@ test('auth.css ist das Seitenblatt jeder Zugangsseite', () => {
 });
 
 test('der Service Worker haelt jedes nachgeladene Blatt offline bereit', () => {
-  const sw = read('sw.js');
-  for (const name of [...Object.keys(LAZY), 'auth']) assert.ok(sw.includes(`'/styles/${name}.css'`), `${name}.css fehlt im Precache`);
-  assert.ok(sw.includes("'/utils/component-style.js'"));
+  for (const name of [...Object.keys(LAZY), 'auth']) assert.ok(isPrecachedSource(`/styles/${name}.css`), `${name}.css fehlt im Precache`);
+  assert.ok(isPrecachedSource('/utils/component-style.js'));
 });
 
 // Ein kleines Dokument: genau das, was component-style.js anfasst.
@@ -333,6 +399,7 @@ test('das Haltezeichen hat eine Regel im globalen Blatt', () => {
 
 test('die Sprachdateien kommen mit dem Start und gleichzeitig', () => {
   assert.match(head, /<link rel="preload" href="\/locales\/de\.json" as="fetch" crossorigin \/>/, 'die Rueckfallsprache wird nicht vorab angefordert');
+  assert.match(readDist('index.html'), /<link rel="preload" href="\/locales\/de\.json" as="fetch" crossorigin\s*\/>/, 'die gebaute Fassung fragt die Rueckfallsprache nicht mehr unter ihrem Pfad an (markNonModuleTags in scripts/build/vite-plugins.ts)');
   const lang = read('lang-init.js');
   assert.match(lang, /hint\.rel = 'preload';[\s\S]*?hint\.as = 'fetch';[\s\S]*?hint\.crossOrigin = 'anonymous';[\s\S]*?'\/locales\/' \+ locale \+ '\.json'/);
   const i18n = read('i18n.js');

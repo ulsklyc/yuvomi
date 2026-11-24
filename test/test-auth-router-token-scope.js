@@ -14,7 +14,7 @@
  * kein scopebares Modul, das globale Gate wuerde jedes gescopte Token ohnehin
  * verwerfen - diese Sperre zieht dieselbe Grenze schon am Router-Eingang.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-auth-router-token-scope.js
+ * Ausfuehren: node --test test/test-auth-router-token-scope.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'auth-router-scope-test-secret';
 process.env.DB_PATH = ':memory:';
@@ -23,7 +23,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import test from 'node:test';
 
-import express from 'express';
+import { createAuthApp } from './auth-app.js';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter } = await import('../server/auth.js');
@@ -52,9 +52,7 @@ function mintToken(value, scopes) {
 const scopedToken = mintToken('yuvomi_scoped_notes_read_token', ['notes:read']);
 const legacyToken = mintToken('yuvomi_legacy_unscoped_token', null);
 
-const app = express();
-app.use(express.json());
-app.use('/api/v1/auth', authRouter);
+const app = await createAuthApp({ routers: [authRouter] });
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

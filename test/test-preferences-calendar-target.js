@@ -5,7 +5,7 @@
  *        weist Unfug mit 400 ab und speichert PRO NUTZER, nicht haushaltweit.
  *        Der Wert muss auch in der PUT-Antwort stehen, sonst verliert der
  *        Frontend-Cache ihn nach dem ersten Speichern eines anderen Feldes.
- * Ausführen: node --experimental-sqlite --test test/test-preferences-calendar-target.js
+ * Ausführen: node --test test/test-preferences-calendar-target.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -13,22 +13,21 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createPreferencesApp, PREFERENCES_PREFIX } from './preferences-app.js';
 
 await import('../server/db.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 
 let currentUserId = 1;
 let currentRole = 'member';
 
-function startApp() {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => { req.authUserId = currentUserId; req.authRole = currentRole; next(); });
-  app.use('/', preferencesRouter);
+async function startApp() {
+  const app = await createPreferencesApp({
+    mount: ['preferences'],
+    auth: (req, _res, next) => { req.authUserId = currentUserId; req.authRole = currentRole; next(); },
+  });
   return new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve({
-      baseUrl: `http://127.0.0.1:${s.address().port}`,
+      baseUrl: `http://127.0.0.1:${s.address().port}${PREFERENCES_PREFIX}`,
       close: () => new Promise((r) => s.close(r)),
     }));
   });

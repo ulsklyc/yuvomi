@@ -17,7 +17,8 @@
  */
 
 import express from 'express';
-import { mayWriteModule } from '../../permissions.js';
+import { validateRequest } from '../../api/validate-request.ts';
+import { mayWriteModule } from '../../authorize/index.ts';
 import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 
 import { createLogger } from '../../logger.js';
@@ -128,35 +129,30 @@ function listOutlookTargets() {
  * Die Google-Liste kann das Token erneuern, und der `tokens`-Listener speichert
  * es nach dem Warten auf Google - deshalb `refuseWhileRestoring` (#1551).
  */
-router.get('/sync-targets', refuseWhileRestoring, async (req, res) => {
-  try {
-    // Dieselbe Erwaegung wie bei /tasks/sync-targets: die Liste fuellt das
-    // Ziel-Feld des Termindialogs und nennt dabei die angebundenen Konten mit
-    // ihren Kalender-URLs. Wer nicht schreiben darf, braucht sie nicht.
-    if (!mayWriteModule(req, 'calendar')) {
-      return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
-    }
-    const [google, caldav] = await Promise.all([
-      listGoogleTargets().catch((err) => {
-        log.warn('Sync targets: Google list failed:', err);
-        return [];
-      }),
-      listCaldavTargets().catch((err) => {
-        log.warn('Sync targets: CalDAV list failed:', err);
-        return [];
-      }),
-    ]);
-    let outlook = [];
-    try {
-      outlook = listOutlookTargets();
-    } catch (err) {
-      log.warn('Sync targets: Outlook list failed:', err);
-    }
-    res.json({ data: { google, caldav, outlook } });
-  } catch (err) {
-    log.error('Sync target list failed:', err);
-    res.status(500).json({ error: 'Failed to list sync targets.', code: 500 });
+router.get('/sync-targets', refuseWhileRestoring, validateRequest(), async (req, res) => {
+  // Dieselbe Erwaegung wie bei /tasks/sync-targets: die Liste fuellt das
+  // Ziel-Feld des Termindialogs und nennt dabei die angebundenen Konten mit
+  // ihren Kalender-URLs. Wer nicht schreiben darf, braucht sie nicht.
+  if (!mayWriteModule(req, 'calendar')) {
+    return res.status(403).json({ error: 'Write access to the calendar is required.', code: 403, reason: 'cross_module_access' });
   }
+  const [google, caldav] = await Promise.all([
+    listGoogleTargets().catch((err) => {
+      log.warn('Sync targets: Google list failed:', err);
+      return [];
+    }),
+    listCaldavTargets().catch((err) => {
+      log.warn('Sync targets: CalDAV list failed:', err);
+      return [];
+    }),
+  ]);
+  let outlook = [];
+  try {
+    outlook = listOutlookTargets();
+  } catch (err) {
+    log.warn('Sync targets: Outlook list failed:', err);
+  }
+  res.json({ data: { google, caldav, outlook } });
 });
 
 export default router;

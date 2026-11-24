@@ -18,7 +18,7 @@
  *
  * Geprüft wird der echte Vertrag über Birthdays-, Kalender- und
  * Preferences-Router auf der migrierten DB, plus buildFeed() für den ICS-Export.
- * Ausführen: node --experimental-sqlite --test test/test-birthday-localization.js
+ * Ausführen: node --test test/test-birthday-localization.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -26,12 +26,11 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { readFileSync } from 'node:fs';
 
 const dbmod = await import('../server/db.js');
 const { default: birthdaysRouter } = await import('../server/routes/birthdays.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 const { buildFeed } = await import('../server/services/ics-export.js');
 const { hydrateBirthday, syncBirthdayArtifacts } = await import('../server/services/birthdays.js');
@@ -42,20 +41,23 @@ const USER = db.prepare(
 ).run().lastInsertRowid;
 
 const actor = { id: USER, role: 'member' };
-const app = express();
-app.use(express.json({ limit: '12mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '12mb',
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
+  before: [['/api/v1/birthdays', birthdaysRouter]],
+  after: [['/api/v1/preferences', preferencesRouter]],
 });
-app.use('/birthdays', birthdaysRouter);
-app.use('/calendar', calendarRouter);
-app.use('/preferences', preferencesRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) =>
-  server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+  server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {

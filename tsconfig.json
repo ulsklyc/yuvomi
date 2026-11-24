@@ -1,0 +1,8 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./server" },
+    { "path": "./public" },
+    { "path": "./test" }
+  ]
+}

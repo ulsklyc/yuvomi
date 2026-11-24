@@ -1856,13 +1856,13 @@ const FAMILY_CLAIMS = [
     key: 'fam_3_d', what: 'drei Zugriffsstufen je Modul',
     says: { en: /full, read only or not at all/, de: /voll, nur lesen oder gar nicht/ },
     holds: (s) => /MODULE_ACCESS_LEVELS = Object\.freeze\(\['none', 'read', 'write'\]\)/.test(s.permissions),
-    where: 'server/permissions.js MODULE_ACCESS_LEVELS',
+    where: 'server/authorize/catalog.ts MODULE_ACCESS_LEVELS',
   },
   {
     key: 'fam_3_d', what: 'ein Kind als Familienrolle',
     says: { en: /child/, de: /Kind/ },
     holds: (s) => /FAMILY_ROLES = Object\.freeze\(\[[^\]]*'child'/.test(s.permissions),
-    where: "server/permissions.js FAMILY_ROLES ('child')",
+    where: "server/authorize/catalog.ts FAMILY_ROLES ('child')",
   },  // Der Weg der Eingeladenen (Re-Critique R3): die Karte unter den drei
   // Szenen nennt die Gueltigkeit des Links. Aendert sich die Frist im Dienst,
   // stimmt die Zahl auf der Seite nicht mehr.
@@ -1885,7 +1885,7 @@ function familySources() {
   return {
     display: src('server/display-scopes.js'),
     sw: src('public/sw.js'),
-    permissions: src('server/permissions.js'),
+    permissions: src('server/authorize/catalog.ts'),
     spec: read('SPEC.md'),
     invites: src('server/services/invites.js'),
     auth: src('server/auth.js'),
@@ -3235,7 +3235,8 @@ function serverSources(dir = resolve(ROOT, 'server')) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = resolve(dir, e.name);
     if (e.isDirectory()) out.push(...serverSources(p));
-    else if (e.name.endsWith('.js')) out.push(readFileSync(p, 'utf8'));
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(js|ts)$/.test(e.name)) out.push(readFileSync(p, 'utf8'));
   }
   return out;
 }

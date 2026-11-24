@@ -9,7 +9,8 @@
 
 import crypto from 'node:crypto';
 import { todayKey, shiftDateKey, householdTimeZone } from '../utils/timezone.js';
-import { str } from '../middleware/validate.js';
+import { str } from '../api/formats.ts';
+import { SOURCE_NAME_MAX, MAPPING_PROFILE_VERSION } from './waste-fields.js';
 import {
   validateType, validateOneOff, scheduleRecurrenceProblems, overrideProblems, validateRange,
   resolveOccurrences, nextPerType, expandSchedule, WEEKDAY_CODES, OCCURRENCE_RANGE_MAX_DAYS,
@@ -590,7 +591,7 @@ export function mappingsByLabel(d, sourceId) {
 export function renameSource(d, id, name) {
   const existing = getSource(d, id);
   if (!existing) throw new WasteNotFoundError('Waste import source not found.', 'waste_source_not_found');
-  const v = str(name, 'name', { max: 150 });
+  const v = str(name, 'name', { max: SOURCE_NAME_MAX });
   if (v.error) throw new WasteValidationError([v.error]);
   d.prepare('UPDATE waste_sources SET name = ? WHERE id = ?').run(v.value, id);
   return getSource(d, id);
@@ -615,7 +616,7 @@ export function deleteSource(d, id) {
  * only owns the SQL insert, never the network fetch.
  */
 export function createUrlSourcePlaceholder(d, { name, url, refreshIntervalMinutes, userId }) {
-  const nameV = str(name, 'name', { max: 150 });
+  const nameV = str(name, 'name', { max: SOURCE_NAME_MAX });
   if (nameV.error) throw new WasteValidationError([nameV.error]);
   const result = d.prepare(`
     INSERT INTO waste_sources
@@ -809,7 +810,7 @@ export function commitImport(d, {
     throw new WasteValidationError(unresolved.map((diag) => diag.message));
   }
 
-  const nameValidation = str(name ?? source?.name, 'name', { max: 150 });
+  const nameValidation = str(name ?? source?.name, 'name', { max: SOURCE_NAME_MAX });
   if (nameValidation.error) throw new WasteValidationError([nameValidation.error]);
 
   // Every label present in this parse needs exactly one decision - map to
@@ -1133,7 +1134,7 @@ export function exportMappingProfile(d, sourceId) {
     .flatMap((m) => m.type_ids.filter((id) => typesById.has(id))
       .map((id) => ({ pattern: m.normalized_label, type_name: typesById.get(id).name })))
     .sort((a, b) => a.pattern.localeCompare(b.pattern) || a.type_name.localeCompare(b.type_name));
-  return { version: 1, source_name: source.name, mappings };
+  return { version: MAPPING_PROFILE_VERSION, source_name: source.name, mappings };
 }
 
 /**

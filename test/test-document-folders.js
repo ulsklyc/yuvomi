@@ -12,14 +12,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'document-folders-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -53,21 +52,22 @@ function buildMigratedDatabase(migrations) {
   return db;
 }
 
-function createHarness({ userId = ADMIN_ID, role = 'admin', moduleAccess = null, scopes = null } = {}) {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.authUserId = userId;
-    req.authRole = role;
-    req.session = { userId, role };
-    // Beide Achsen wie in server/auth.js: Modulrechte der Sitzung und der
-    // Scope eines API-Tokens (`null` = ungescopt).
-    req.sessionModuleAccess = moduleAccess;
-    req.authScopes = scopes;
-    next();
+async function createHarness({ userId = ADMIN_ID, role = 'admin', moduleAccess = null, scopes = null } = {}) {
+  const app = await createTasksApp({
+    auth: (req, _res, next) => {
+      req.authUserId = userId;
+      req.authRole = role;
+      req.session = { userId, role };
+      // Beide Achsen wie in server/auth.js: Modulrechte der Sitzung und der
+      // Scope eines API-Tokens (`null` = ungescopt).
+      req.sessionModuleAccess = moduleAccess;
+      req.authScopes = scopes;
+      next();
+    },
+    before: [
+      ['/api/v1/documents', documentsRouter],
+    ],
   });
-  app.use('/api/v1/documents', documentsRouter);
-  app.use('/api/v1/tasks', tasksRouter);
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {
@@ -110,7 +110,7 @@ function seedUser() {
 }
 
 test('PUT /folders/:id renames a folder', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const created = await h.call('POST', '/folders', { name: 'Vorher' });
     assert.equal(created.status, 201);
@@ -128,7 +128,7 @@ test('PUT /folders/:id renames a folder', async () => {
 });
 
 test('PUT /folders/:id rejects empty name (400) and unknown id (404)', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const created = await h.call('POST', '/folders', { name: `Ordner-${randomUUID()}` });
     const id = created.body.data.id;
@@ -144,7 +144,7 @@ test('PUT /folders/:id rejects empty name (400) and unknown id (404)', async () 
 });
 
 test('DELETE /folders/:id removes the folder but keeps its documents (folder_id → NULL)', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const userId = ADMIN_ID;
     const created = await h.call('POST', '/folders', { name: `Löschbar-${randomUUID()}` });
@@ -175,7 +175,7 @@ test('DELETE /folders/:id removes the folder but keeps its documents (folder_id 
 });
 
 test('DELETE /folders/:id?documents=delete removes documents from the entire folder subtree', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const root = await h.call('POST', '/folders', { name: `Delete-tree-${randomUUID()}` });
     const child = await h.call('POST', '/folders', { name: 'Child', parent_id: root.body.data.id });
@@ -204,7 +204,7 @@ test('DELETE /folders/:id?documents=delete removes documents from the entire fol
 });
 
 test('GET /folders/:id/delete-impact counts documents and subfolders across the entire subtree', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const root = await h.call('POST', '/folders', { name: `Impact-tree-${randomUUID()}` });
     const child = await h.call('POST', '/folders', { name: 'Archived', parent_id: root.body.data.id });
@@ -237,7 +237,7 @@ test('GET /folders/:id/delete-impact counts documents and subfolders across the 
 });
 
 test('GET delete impact names every module whose document links will change', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   const otherUserId = get().prepare(`
     INSERT INTO users (username, display_name, password_hash, role)
     VALUES (?, ?, 'hash', 'member')
@@ -313,7 +313,7 @@ test('GET delete impact names every module whose document links will change', as
 });
 
 test('DELETE rejects a collateral-link change made after the impact preview', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Linked-race-${randomUUID()}` });
     const documentId = get().prepare(`
@@ -348,8 +348,8 @@ test('DELETE with documents rejects a member before deleting any owned document'
     INSERT INTO users (username, display_name, password_hash, role)
     VALUES (?, ?, 'hash', 'member')
   `).run(`folder-member-${randomUUID()}`, 'Folder Member').lastInsertRowid;
-  const adminHarness = createHarness();
-  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  const adminHarness = await createHarness();
+  const memberHarness = await createHarness({ userId: memberId, role: 'member' });
   try {
     const folder = await adminHarness.call('POST', '/folders', { name: `Protected-${randomUUID()}` });
     const insert = get().prepare(`
@@ -407,7 +407,7 @@ test('delete impact does not count a hidden private document and a folder delete
     INSERT INTO users (username, display_name, password_hash, role)
     VALUES (?, ?, 'hash', 'member')
   `).run(`private-owner-${randomUUID()}`, 'Private document owner').lastInsertRowid;
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Private-impact-${randomUUID()}` });
     const insert = get().prepare(`
@@ -469,7 +469,7 @@ test('delete impact does not count a hidden private document and a folder delete
 });
 
 test('DELETE /folders/:id rejects an unknown document action without changing the folder', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Unknown-action-${randomUUID()}` });
 
@@ -483,7 +483,7 @@ test('DELETE /folders/:id rejects an unknown document action without changing th
 });
 
 test('DELETE with documents rejects a changed subtree before deleting anything', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Changed-impact-${randomUUID()}` });
     const insert = get().prepare(`
@@ -512,7 +512,7 @@ test('DELETE with documents rejects a changed subtree before deleting anything',
 });
 
 test('DELETE with documents rejects an identity swap even when counts stay unchanged', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Changed-identity-${randomUUID()}` });
     const other = await h.call('POST', '/folders', { name: `Changed-identity-other-${randomUUID()}` });
@@ -543,7 +543,7 @@ test('DELETE with documents rejects an identity swap even when counts stay uncha
 });
 
 test('DELETE with documents requires a delete-impact snapshot', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Missing-snapshot-${randomUUID()}` });
     const documentId = get().prepare(`
@@ -563,7 +563,7 @@ test('DELETE with documents requires a delete-impact snapshot', async () => {
 });
 
 test('DELETE with documents rejects a snapshot created for another folder', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const first = await h.call('POST', '/folders', { name: `Snapshot-first-${randomUUID()}` });
     const second = await h.call('POST', '/folders', { name: `Snapshot-second-${randomUUID()}` });
@@ -591,7 +591,7 @@ test('DELETE with documents rejects a snapshot created for another folder', asyn
 });
 
 test('DELETE with documents rejects a malformed snapshot with an explicit validation error', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Malformed-snapshot-${randomUUID()}` });
 
@@ -601,7 +601,8 @@ test('DELETE with documents rejects a malformed snapshot with an explicit valida
     );
 
     assert.equal(del.status, 400);
-    assert.equal(del.body.error, 'Invalid expected folder snapshot.');
+    // Seit #2810 die Absage des Schemas, die den Parameter nennt.
+    assert.deepEqual(del.body.fields, [{ path: 'query/expected_snapshot', rule: 'pattern' }]);
     assert.ok(get().prepare('SELECT id FROM family_document_folders WHERE id = ?').get(folder.body.data.id));
   } finally {
     await h.close();
@@ -613,7 +614,7 @@ test('DELETE with documents reports partial storage failures and retains the fol
   const previousStoragePath = process.env.DOCUMENT_STORAGE_LOCAL_PATH;
   process.env.DOCUMENT_STORAGE_LOCAL_PATH = storageRoot;
   mkdirSync(join(storageRoot, 'cannot-unlink-directory'));
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Partial-${randomUUID()}` });
     const insert = get().prepare(`
@@ -663,7 +664,7 @@ test('DELETE with documents distinguishes a database-row failure after storage w
   process.env.DOCUMENT_STORAGE_LOCAL_PATH = storageRoot;
   const storageKey = 'database-failure.txt';
   writeFileSync(join(storageRoot, storageKey), 'stored bytes');
-  const h = createHarness();
+  const h = await createHarness();
   let triggerName;
   try {
     const folder = await h.call('POST', '/folders', { name: `Database-failure-${randomUUID()}` });
@@ -711,7 +712,7 @@ test('DELETE with documents retains the folder when its contents change during s
   const storageRoot = mkdtempSync(join(tmpdir(), 'yuvomi-folder-delete-race-'));
   const previousStoragePath = process.env.DOCUMENT_STORAGE_LOCAL_PATH;
   process.env.DOCUMENT_STORAGE_LOCAL_PATH = storageRoot;
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Concurrent-${randomUUID()}` });
     const insert = get().prepare(`
@@ -772,8 +773,8 @@ test('DELETE with documents locks previewed documents and folders against concur
     INSERT INTO users (username, display_name, password_hash, role)
     VALUES (?, ?, 'hash', 'member')
   `).run(`folder-lock-member-${randomUUID()}`, 'Folder Lock Member').lastInsertRowid;
-  const h = createHarness();
-  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  const h = await createHarness();
+  const memberHarness = await createHarness({ userId: memberId, role: 'member' });
   try {
     const root = await h.call('POST', '/folders', { name: `Locked-${randomUUID()}` });
     const child = await h.call('POST', '/folders', { name: 'Child', parent_id: root.body.data.id });
@@ -837,12 +838,12 @@ test('DELETE with documents locks previewed documents and folders against concur
         document_ids: [documents[0].id],
       }),
       h.call('PATCH', `/${documents[1].id}/archive`, { archived: true }),
-      memberHarness.call('PUT', `/${documents.at(-1).id}`, { folder_id: outside.body.data.id }),
+      memberHarness.call('PUT', `/${documents.at(-1).id}`, { folder_id: outside.body.data.id, allowed_member_ids: [] }),
       memberHarness.call('DELETE', `/${documents.at(-1).id}`),
-      h.call('PUT', `/${documents.at(-1).id}`, { folder_id: outside.body.data.id }),
+      h.call('PUT', `/${documents.at(-1).id}`, { folder_id: outside.body.data.id, allowed_member_ids: [] }),
       h.call('PUT', `/folders/${child.body.data.id}`, { parent_id: outside.body.data.id }),
       h.call('PUT', `/folders/${outside.body.data.id}`, { parent_id: root.body.data.id }),
-      h.call('PUT', `/${outsideDocumentId}`, { folder_id: child.body.data.id }),
+      h.call('PUT', `/${outsideDocumentId}`, { folder_id: child.body.data.id, allowed_member_ids: [] }),
       h.call('DELETE', `/${documents[2].id}`),
     ]);
 
@@ -896,8 +897,8 @@ function insertFolderDocument(folderId, createdBy, visibility, name = `doc-${ran
 test('the delete-impact snapshot ignores every change to documents the caller cannot see (#1355)', async () => {
   const memberId = seedMember('snapshot-member');
   const ownerId = seedMember('snapshot-owner');
-  const memberHarness = createHarness({ userId: memberId, role: 'member' });
-  const adminHarness = createHarness();
+  const memberHarness = await createHarness({ userId: memberId, role: 'member' });
+  const adminHarness = await createHarness();
   try {
     const folder = await adminHarness.call('POST', '/folders', { name: `Hidden-activity-${randomUUID()}` });
     const folderId = folder.body.data.id;
@@ -936,7 +937,7 @@ test('the delete-impact snapshot ignores every change to documents the caller ca
 test('a changed branch answers 409 before the ownership check, and that check sees only visible documents', async () => {
   const memberId = seedMember('race-member');
   const ownerId = seedMember('race-owner');
-  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  const memberHarness = await createHarness({ userId: memberId, role: 'member' });
   try {
     const folder = await memberHarness.call('POST', '/folders', { name: `Race-${randomUUID()}` });
     const folderId = folder.body.data.id;
@@ -980,7 +981,7 @@ test('unfile is not blocked by somebody else\'s single-document delete in progre
   const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
   const memberId = seedMember('unfile-member');
   const ownerId = seedMember('unfile-owner');
-  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  const memberHarness = await createHarness({ userId: memberId, role: 'member' });
   const lockedIds = [];
   try {
     const folder = await memberHarness.call('POST', '/folders', { name: `Unfile-lock-${randomUUID()}` });
@@ -1014,7 +1015,7 @@ test('unfile is not blocked by somebody else\'s single-document delete in progre
 
 test('destructive delete still waits for a single-document delete in progress (#1355)', async () => {
   const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
-  const h = createHarness();
+  const h = await createHarness();
   let documentId = null;
   try {
     const folder = await h.call('POST', '/folders', { name: `Delete-lock-${randomUUID()}` });
@@ -1085,9 +1086,9 @@ test('delete impact counts no linked records from a module the caller may not re
   const everyLinkedModule = {
     calendar: 'none', housekeeping: 'none', tasks: 'none', budget: 'none', inventory: 'none',
   };
-  const adminHarness = createHarness();
-  const noModules = createHarness({ userId: memberId, role: 'member', moduleAccess: everyLinkedModule });
-  const documentsToken = createHarness({ userId: memberId, role: 'member', scopes: ['documents:read'] });
+  const adminHarness = await createHarness();
+  const noModules = await createHarness({ userId: memberId, role: 'member', moduleAccess: everyLinkedModule });
+  const documentsToken = await createHarness({ userId: memberId, role: 'member', scopes: ['documents:read'] });
   try {
     const folder = await adminHarness.call('POST', '/folders', { name: `Module-rights-${randomUUID()}` });
     const folderId = folder.body.data.id;
@@ -1111,7 +1112,7 @@ test('delete impact counts no linked records from a module the caller may not re
         `${label}: a link from a module the caller may not read must not change the snapshot`);
     }
     // Gegenprobe: mit Modulrecht und passendem Scope zaehlt dieselbe Vorschau.
-    const fullToken = createHarness({
+    const fullToken = await createHarness({
       userId: memberId,
       role: 'member',
       scopes: ['documents:read', 'calendar:read', 'housekeeping:read', 'tasks:read', 'budget:read', 'inventory:read'],
@@ -1134,7 +1135,7 @@ test('delete impact counts no linked record the caller cannot see', async () => 
   const otherId = seedMember('impact-hidden-owner');
   const previousMode = get().prepare("SELECT value FROM sync_config WHERE key = 'budget_mode'").get();
   get().prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('budget_mode', 'personal')").run();
-  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  const memberHarness = await createHarness({ userId: memberId, role: 'member' });
   try {
     const folder = await memberHarness.call('POST', '/folders', { name: `Hidden-records-${randomUUID()}` });
     const folderId = folder.body.data.id;
@@ -1170,7 +1171,7 @@ test('delete impact counts no linked record the caller cannot see', async () => 
 test('a hidden document never changes the answer of a destructive folder delete', async () => {
   const memberId = seedMember('probe-member');
   const ownerId = seedMember('probe-owner');
-  const memberHarness = createHarness({ userId: memberId, role: 'member' });
+  const memberHarness = await createHarness({ userId: memberId, role: 'member' });
   const wrongSnapshot = 'f'.repeat(64);
   try {
     const probe = async (withHidden) => {
@@ -1221,7 +1222,7 @@ test('a hidden document that arrives during the deletion is not named in the 207
   const previousStoragePath = process.env.DOCUMENT_STORAGE_LOCAL_PATH;
   process.env.DOCUMENT_STORAGE_LOCAL_PATH = storageRoot;
   const ownerId = seedMember('race-hidden-owner');
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const folder = await h.call('POST', '/folders', { name: `Hidden-race-${randomUUID()}` });
     const insert = get().prepare(`
@@ -1269,7 +1270,7 @@ test('a hidden document that arrives during the deletion is not named in the 207
 });
 
 test('DELETE /folders/:id returns 404 for unknown id', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const del = await h.call('DELETE', '/folders/999999');
     assert.equal(del.status, 404);
@@ -1290,7 +1291,7 @@ async function mkFolder(h, name, parentId) {
 }
 
 test('ein Ordner kann unter einem anderen liegen', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const wohnung = await mkFolder(h, `Wohnung-${randomUUID()}`);
     const miete = await mkFolder(h, 'Miete', wohnung.id);
@@ -1306,7 +1307,7 @@ test('ein Ordner kann unter einem anderen liegen', async () => {
 });
 
 test('derselbe Name darf unter verschiedenen Eltern stehen', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     // Das ist der Grund fuer den Tabellen-Neubau in v164: mit dem alten
     // globalen UNIQUE(name) waere der zweite Aufruf ein 409 gewesen, und ein
@@ -1324,7 +1325,7 @@ test('derselbe Name darf unter verschiedenen Eltern stehen', async () => {
 });
 
 test('derselbe Name unter DEMSELBEN Elternteil bleibt abgewiesen', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const auto = await mkFolder(h, `Auto-${randomUUID()}`);
     await mkFolder(h, 'Rechnungen', auto.id);
@@ -1337,7 +1338,7 @@ test('derselbe Name unter DEMSELBEN Elternteil bleibt abgewiesen', async () => {
 });
 
 test('ein Ordner kann nicht in sich selbst oder in sein eigenes Kind wandern', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     // Ohne diese Absage schneidet der Zweig sich vom Baum ab: er waere in
     // keiner Ansicht mehr erreichbar, aber weiter da.
@@ -1358,7 +1359,7 @@ test('ein Ordner kann nicht in sich selbst oder in sein eigenes Kind wandern', a
 });
 
 test('umbenennen allein laesst den Ordner stehen, wo er ist', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     // Ein Feld, das nicht mitkommt, ist keine Ansage. Ohne diese Trennung
     // naehme jedes Umbenennen den Ordner an die Wurzel mit.
@@ -1375,7 +1376,7 @@ test('umbenennen allein laesst den Ordner stehen, wo er ist', async () => {
 });
 
 test('parent_id: null holt einen Ordner an die Wurzel zurueck', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const oben = await mkFolder(h, `Oben-${randomUUID()}`);
     const kind = await mkFolder(h, `Kind-${randomUUID()}`, oben.id);
@@ -1389,7 +1390,7 @@ test('parent_id: null holt einen Ordner an die Wurzel zurueck', async () => {
 });
 
 test('die Tiefe ist begrenzt - und der ganze Zweig zaehlt mit', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     // Fuenf Ebenen sind erlaubt, die sechste nicht.
     let parent = null;
@@ -1417,7 +1418,7 @@ test('die Tiefe ist begrenzt - und der ganze Zweig zaehlt mit', async () => {
 });
 
 test('ein Ordner zeigt auch die Dokumente seiner Unterordner', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const wohnung = await mkFolder(h, `Wohnung-${randomUUID()}`);
     const miete = await mkFolder(h, 'Miete', wohnung.id);
@@ -1442,7 +1443,7 @@ test('ein Ordner zeigt auch die Dokumente seiner Unterordner', async () => {
 });
 
 test('ein unbekannter Ordner zeigt nichts - nicht alles', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const insert = get().prepare(`
       INSERT INTO family_documents (name, category, status, visibility, original_name,
@@ -1463,7 +1464,7 @@ test('ein unbekannter Ordner zeigt nichts - nicht alles', async () => {
 });
 
 test('ein geloeschter Ordner nimmt seinen Zweig mit - aber kein Dokument', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const wohnung = await mkFolder(h, `Wohnung-${randomUUID()}`);
     const miete = await mkFolder(h, 'Miete', wohnung.id);
@@ -1495,7 +1496,7 @@ test('ein geloeschter Ordner nimmt seinen Zweig mit - aber kein Dokument', async
 });
 
 test('ein Modulordner behaelt seinen Schluessel, wenn er verschoben wird', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     // Der Schluessel traegt die IDENTITAET (v157), nicht die Position - sonst
     // verloeren sechs Module ihren Ablageort, sobald jemand aufraeumt.

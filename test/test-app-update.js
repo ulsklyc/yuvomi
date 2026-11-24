@@ -19,6 +19,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createUpdateFlow, isTyping, isUserBusy } from '../public/utils/app-update.js';
+import { isPrecachedSource } from './dist-build.js';
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -350,5 +351,6 @@ test('sw-register.js reloads only as the orphan fallback', () => {
 });
 
 test('the update module ships with the shell', () => {
-  assert.match(read('../public/sw.js'), /'\/utils\/app-update\.js',/);
+  // Seit dem Build: die Liste schreibt Vite (dist/sw.js), das Modul liegt in einem precachten Chunk.
+  assert.ok(isPrecachedSource('/utils/app-update.js'), '/utils/app-update.js liegt in keinem precachten Chunk');
 });

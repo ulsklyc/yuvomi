@@ -4,7 +4,7 @@
  *        Datumsüberlappung, Layer-Toggles, Subdivision-Matching und Farb-
  *        Zuordnung; sowie sync()/getCountries()/getSubdivisions() gegen eine
  *        gemockte OpenHolidays-API (kein Netzwerk).
- * Ausführen: node --experimental-sqlite test/test-holidays.js
+ * Ausführen: node test/test-holidays.js
  */
 
 import assert from 'node:assert/strict';

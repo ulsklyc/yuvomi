@@ -9,13 +9,12 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'budget-accounts-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -68,16 +67,18 @@ function pickCategory(type) {
 }
 
 function createHarness({ userId = ADMIN_ID, role = 'admin' } = {}) {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.authUserId = userId;
-    req.authRole = role;
-    req.session = { userId, role };
-    next();
+  // At their real prefix with the central error handler (#2810): validateRequest()
+  // finds its operation by the mount and answers through next(err).
+  const app = createBudgetApp({
+    mount: ['budget'],
+    auth: (req, _res, next) => {
+      req.authUserId = userId;
+      req.authRole = role;
+      req.session = { userId, role };
+      next();
+    },
   });
-  app.use('/api/v1/budget', budgetRouter);
-  const server = http.createServer(app);
+  const server = http.createServer((req, res) => { app.then((handler) => handler(req, res)); });
   return {
     async call(method, pathname, body) {
       if (!server.listening) {
@@ -315,9 +316,10 @@ test('Kreditkarte: Bank und Kreditrahmen werden gespeichert und wieder geliefert
     assert.equal(updated.body.data.credit_bank, 'Andere Bank');
     assert.equal(updated.body.data.credit_limit, 3500);
 
-    // Leerer String löscht, undefined lässt unangetastet: ein Teil-Update darf
-    // Bank und Rahmen nicht nebenbei verwerfen.
-    const cleared = await h.call('PUT', `/accounts/${res.body.data.id}`, { credit_bank: '', credit_limit: '' });
+    // Leerer String bzw. null löscht, undefined lässt unangetastet: ein Teil-Update
+    // darf Bank und Rahmen nicht nebenbei verwerfen. Den Rahmen leert seit #2810
+    // `null` (wie die Seite es schickt); `''` an einem Betrag ist eine Absage.
+    const cleared = await h.call('PUT', `/accounts/${res.body.data.id}`, { credit_bank: '', credit_limit: null });
     assert.equal(cleared.body.data.credit_bank, null);
     assert.equal(cleared.body.data.credit_limit, null);
 

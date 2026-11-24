@@ -4,12 +4,11 @@
  */
 
 import express from 'express';
-import { createLogger } from '../../logger.js';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
 import { bookedOnly, computeStatsRange, cents, budgetFilter, budgetCategoryExpr, todayLocalDateKey, STATS_RANGES, DATE_RE } from './helpers.js';
 import { BUDGET_SAVINGS_KEY } from './plans.js';
 
-const log = createLogger('Budget');
 const router = express.Router();
 
 /**
@@ -94,24 +93,19 @@ export function computeStats(database, { range, anchor }, filter = { clause: '',
  * Query: ?range=week|month|year&anchor=YYYY-MM-DD
  */
 export function statsHandler(req, res) {
-  try {
-    const range  = req.query.range || 'month';
-    const anchor = req.query.anchor || todayLocalDateKey();
-    if (!STATS_RANGES.has(range))
-      return res.status(400).json({ error: 'range must be one of: week, month, year.', code: 400 });
-    if (!DATE_RE.test(anchor))
-      return res.status(400).json({ error: 'anchor must be in YYYY-MM-DD format.', code: 400 });
+  const range  = req.query.range || 'month';
+  const anchor = req.query.anchor || todayLocalDateKey();
+  if (!STATS_RANGES.has(range))
+    return res.status(400).json({ error: 'range must be one of: week, month, year.', code: 400 });
+  if (!DATE_RE.test(anchor))
+    return res.status(400).json({ error: 'anchor must be in YYYY-MM-DD format.', code: 400 });
 
-    res.json({
-      data: computeStats(db.get(), { range, anchor },
-        budgetFilter(req, 'budget_entries'), budgetCategoryExpr(req, 'budget_entries')),
-    });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal error', code: 500 });
-  }
+  res.json({
+    data: computeStats(db.get(), { range, anchor },
+      budgetFilter(req, 'budget_entries'), budgetCategoryExpr(req, 'budget_entries')),
+  });
 }
 
-router.get('/stats', statsHandler);
+router.get('/stats', validateRequest(), statsHandler);
 
 export default router;

@@ -7,7 +7,7 @@
  *        Spalte users.inventory_deadlines_feed_token (Migration 144), inklusive
  *        der Isolation, für die es sie gibt: ein Rückzug trifft ein Abo.
  *        (3) Der Verwaltungs-Router (/inventory/deadlines-feed) end-to-end.
- * Ausführen: node --experimental-sqlite --test test/test-inventory-deadlines-feed.js
+ * Ausführen: node --test test/test-inventory-deadlines-feed.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -21,6 +21,8 @@ const dbmod = await import('../server/db.js');
 const deadlinesIcs = await import('../server/services/inventory-deadlines-ics.js');
 const { default: deadlinesFeedRouter } = await import('../server/routes/inventory/deadlines-feed.js');
 const { default: itemsRouter } = await import('../server/routes/inventory/items.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 // Der ICS-Text folgt der Datensprache des Haushalts (sync_config.language),
@@ -66,7 +68,7 @@ test('buildInventoryDeadlinesFeed escaped Sonderzeichen im Namen', () => {
 test('buildInventoryDeadlinesFeed überspringt unparsbare Kaufdaten statt den Feed zu sprengen', () => {
   db.exec('DELETE FROM inventory_items');
   // Kalendarisch unmögliches Datum - so etwas kam frueher durch die reine
-  // Formatpruefung in server/middleware/validate.js#date. Eine einzige solche
+  // Formatpruefung in server/api/formats.ts#date. Eine einzige solche
   // Zeile darf den Feed nicht fuer alle Abonnenten stilllegen.
   insertItem({ name: 'Kaputtes Datum', purchase_date: '2026-02-30', warranty_months: 12 });
   insertItem({ name: 'Heiles Datum', purchase_date: '2026-01-01', warranty_months: 12 });
@@ -114,8 +116,12 @@ test('ein vorgerolltes Datum ("Erledigt" mit interval_months) behaelt seine UID 
 
   const itemsApp = express();
   itemsApp.use(express.json());
+  itemsApp.use(defaultEmptyBody);
   itemsApp.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  itemsApp.use('/items', itemsRouter);
+  // At its real prefix: validateRequest() reads the operation from the mount (#2810).
+  itemsApp.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/items(\/|\?|$)/.test(req.url)) req.url = `/api/v1/inventory${req.url}`; next(); });
+  itemsApp.use('/api/v1/inventory/items', itemsRouter);
+  itemsApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const itemsServer = itemsApp.listen(0, '127.0.0.1');
   const itemsBaseUrl = await new Promise((r) => itemsServer.on('listening', () => r(`http://127.0.0.1:${itemsServer.address().port}`)));
 
@@ -255,8 +261,12 @@ test('Kalender- und Inventar-Token sind getrennte Instanzen desselben Musters', 
 let actorId = alice;
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => { req.authUserId = actorId; next(); });
-app.use('/inventory/deadlines-feed', deadlinesFeedRouter);
+// At its real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/inventory\//.test(req.url)) req.url = `/api/v1${req.url}`; next(); });
+app.use('/api/v1/inventory/deadlines-feed', deadlinesFeedRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

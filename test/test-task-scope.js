@@ -23,14 +23,13 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'task-scope-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: tasksRouter } = await import('../server/routes/tasks.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { taskScopeWhere, taskScopeNeedsToday } = await import('../server/services/task-scope.js');
 
 const moduleDatabase = get();
@@ -99,17 +98,19 @@ db.prepare("UPDATE tasks SET status = 'done' WHERE id = ?").run(doneSubtask);
 // --------------------------------------------------------------------------
 // Beide echten Router am selben Bestand.
 // --------------------------------------------------------------------------
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = ALICE;
-  req.authRole = 'admin';
-  req.session = { userId: ALICE, role: 'admin' };
-  req.sessionModuleAccess = null;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    req.authUserId = ALICE;
+    req.authRole = 'admin';
+    req.session = { userId: ALICE, role: 'admin' };
+    req.sessionModuleAccess = null;
+    next();
+  },
+  before: [['/api/v1/tasks', tasksRouter]],
 });
-app.use('/api/v1/tasks', tasksRouter);
-app.use('/api/v1/dashboard', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1`;

@@ -6,7 +6,7 @@
  *        von pushed_at/dismissed), Anker-Aufräumen bei einer verschobenen
  *        Vorhersage, und die drei Abschalt-Wege (keine Einstellung, Zyklus-
  *        Tab gesperrt, Health-Modul entzogen).
- * Ausführen: node --experimental-sqlite --test test/test-cycle-reminders.js
+ * Ausführen: node --test test/test-cycle-reminders.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -187,6 +187,25 @@ test('Zyklus-Tab haushaltweit gesperrt raeumt beide Arten ab, auch mit aktiven E
   assert.deepEqual(anchorsFor(u), []);
 
   db.prepare("DELETE FROM sync_config WHERE key = 'health_cycle_enabled'").run();
+});
+
+// Die zweite Haelfte der Regel (#760): das persoenliche Opt-out raeumt genauso
+// ab, waehrend der Haushalt den Tab erlaubt. Gelesen wird die geltende Sicht
+// (`health_cycle_effective` im Einstellungs-Register), nicht der Haushaltsschalter
+// allein (Phase 2, C3).
+test('Zyklus-Tab persoenlich abgewaehlt raeumt beide Arten ab, auch mit aktiven Einstellungen', () => {
+  const u = makeUser();
+  seedFourPeriods(u);
+  upsertSettings(u, { remind_period_days_before: 3, remind_log_daily: 1 });
+  syncCycleRemindersForUser(db, u, NOW);
+  assert.equal(anchorsFor(u).length, 2);
+
+  db.prepare("INSERT INTO sync_config (key, value) VALUES (?, '0') ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run(`health_cycle_enabled:user:${u}`);
+  syncCycleRemindersForUser(db, u, NOW);
+  assert.deepEqual(anchorsFor(u), []);
+
+  db.prepare('DELETE FROM sync_config WHERE key = ?').run(`health_cycle_enabled:user:${u}`);
 });
 
 test('syncAllCycleReminders erreicht auch Nutzer, die nur noch Anker tragen (abgeschaltete Berechtigung)', () => {

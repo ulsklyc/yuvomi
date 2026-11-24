@@ -51,12 +51,16 @@ function showToast(message, tone = 'default') {
  * `errorCode`; `err.message` ist nur eine englische Entwickler-Notiz -
  * unübersetzt angezeigt wäre sie in 26 von 27 Locales ein Fremdkörper (#1909).
  *
- * @param {Error & { data?: { errorCode?: string } }} err
+ * @param {Error & { data?: { errorCode?: string, reason?: string } }} err
  * @param {string} [fallbackKey] - der allgemeine Satz dieser Stelle
  * @returns {string} übersetzte, anzeigbare Meldung
  */
 function errorMessage(err, fallbackKey = 'common.errorGeneric') {
-  const code = err?.data?.errorCode;
+  // Die Pruefung gegen das Schema (#2810) antwortet vor der Route, ohne
+  // `errorCode`, mit `reason: 'validation'` - derselbe Fall wie `validation`
+  // unten, also derselbe Satz.
+  const code = err?.data?.errorCode ?? (err?.data?.reason === 'validation' ? 'validation' : undefined);
+  /** @type {Record<string, string>} */
   const KEYS = {
     account_duplicate: 'settings.cardavErrorDuplicate',
     account_not_found: 'settings.cardavErrorAccountNotFound',
@@ -69,7 +73,9 @@ function errorMessage(err, fallbackKey = 'common.errorGeneric') {
     // daran vorbeigeht.
     validation: 'common.invalidInput',
   };
-  if (KEYS[code]) return t(KEYS[code]);
+  // Nur eigene Schluessel: ein `errorCode` wie `constructor` fand sonst eine
+  // Funktion des Prototyps und gab sie an t() weiter.
+  if (typeof code === 'string' && Object.hasOwn(KEYS, code)) return t(KEYS[code]);
   return errorSentence(err, fallbackKey);
 }
 
@@ -644,4 +650,4 @@ export async function render(container, { user }) {
 }
 
 // #1997: der Konto-Dialog, bis in seinen Speichern-Weg.
-export const __test = { openAccountModal };
+export const __test = { openAccountModal, errorMessage };

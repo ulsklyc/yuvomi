@@ -21,13 +21,12 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'task-tags-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { normalizeTags, tagsKey, setTags, loadTags, allTags, setItemTags, loadItemTags,
   MAX_TAGS, MAX_TAG_LEN } = await import('../server/utils/task-tags.js');
 const { runSearch } = await import('../server/services/search.js');
@@ -84,16 +83,15 @@ function seedTask({ createdBy = ALICE, category = undefined } = {}) {
         .run(`Task-${randomUUID()}`, createdBy, category).lastInsertRowid;
 }
 
-function createHarness({ userId = ALICE, role = 'admin' } = {}) {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.authUserId = userId;
-    req.authRole = role;
-    req.session = { userId, role };
-    next();
+async function createHarness({ userId = ALICE, role = 'admin' } = {}) {
+  const app = await createTasksApp({
+    auth: (req, _res, next) => {
+      req.authUserId = userId;
+      req.authRole = role;
+      req.session = { userId, role };
+      next();
+    },
   });
-  app.use('/api/v1/tasks', tasksRouter);
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {
@@ -223,7 +221,7 @@ test('allTags zählt über Aufgaben hinweg', () => {
 // ── API ────────────────────────────────────────────────────────────────────────
 
 test('POST legt Tags an, GET liefert sie zurück', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const post = await h.call('POST', '/', { title: 'Rasen mähen', tags: ['Garten', 'Sommer'] });
     assert.equal(post.status, 201);
@@ -237,7 +235,7 @@ test('POST legt Tags an, GET liefert sie zurück', async () => {
 });
 
 test('PUT ohne tags-Feld lässt die Tags unangetastet', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const post = await h.call('POST', '/', { title: 'Unberührt', tags: ['Garten'] });
     const id = post.body.data.id;
@@ -252,7 +250,7 @@ test('PUT ohne tags-Feld lässt die Tags unangetastet', async () => {
 });
 
 test('PUT mit leerem Array entfernt alle Tags', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const post = await h.call('POST', '/', { title: 'Leeren', tags: ['Garten'] });
     const put = await h.call('PUT', `/${post.body.data.id}`, { tags: [] });
@@ -263,7 +261,7 @@ test('PUT mit leerem Array entfernt alle Tags', async () => {
 });
 
 test('POST weist eine Tag-Liste ab, die keine ist', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const res = await h.call('POST', '/', { title: 'Kaputt', tags: { garten: true } });
     assert.equal(res.status, 400, 'Ein Objekt darf nicht als leere Liste durchgehen');
@@ -273,7 +271,7 @@ test('POST weist eine Tag-Liste ab, die keine ist', async () => {
 });
 
 test('GET ?tag= filtert ohne Rücksicht auf Groß-/Kleinschreibung', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const marker = `Filtertest-${randomUUID().slice(0, 8)}`;
     const withTag = await h.call('POST', '/', { title: 'Mit Tag', tags: [marker] });
@@ -288,7 +286,7 @@ test('GET ?tag= filtert ohne Rücksicht auf Groß-/Kleinschreibung', async () =>
 });
 
 test('Tags und Kategorie bleiben getrennte Achsen', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     // Der ganze Grund für die eigene Tabelle: ein Tag darf die Schublade nicht
     // umstellen, und alle Werte müssen überleben - nicht nur der erste.
@@ -303,7 +301,7 @@ test('Tags und Kategorie bleiben getrennte Achsen', async () => {
 });
 
 test('GET /tags listet die vergebenen Tags mit Häufigkeit', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const marker = `Liste-${randomUUID().slice(0, 8)}`;
     await h.call('POST', '/', { title: 'A', tags: [marker] });
@@ -319,7 +317,7 @@ test('GET /tags listet die vergebenen Tags mit Häufigkeit', async () => {
 });
 
 test('meta/options liefert die Tags für die Filterleiste mit', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const marker = `Meta-${randomUUID().slice(0, 8)}`;
     await h.call('POST', '/', { title: 'Meta', tags: [marker] });
@@ -341,8 +339,8 @@ test('meta/options liefert die Tags für die Filterleiste mit', async () => {
 
 test('GET /tags verschweigt die Tags einer privaten Aufgabe', async () => {
   const bob = seedUser('bob', 'member');
-  const owner = createHarness();
-  const other = createHarness({ userId: bob, role: 'member' });
+  const owner = await createHarness();
+  const other = await createHarness({ userId: bob, role: 'member' });
   try {
     const marker = `Geheim-${randomUUID().slice(0, 8)}`;
     await owner.call('POST', '/', { title: 'Geschenk kaufen', visibility: 'private', tags: [marker] });
@@ -365,8 +363,8 @@ test('meta/options verschweigt sie ebenso', async () => {
   // aus meta/options gefüllt und erst danach aus /tags nachgeladen. Ein Leck an
   // nur einer der beiden Stellen fiele beim Testen der anderen nicht auf.
   const bob = seedUser('bob', 'member');
-  const owner = createHarness();
-  const other = createHarness({ userId: bob, role: 'member' });
+  const owner = await createHarness();
+  const other = await createHarness({ userId: bob, role: 'member' });
   try {
     const marker = `Geheim-${randomUUID().slice(0, 8)}`;
     await owner.call('POST', '/', { title: 'Zweiter Pfad', visibility: 'private', tags: [marker] });
@@ -384,8 +382,8 @@ test('der Zähler in /tags überspringt die unsichtbaren Aufgaben', async () => 
   // private Aufgabe im Zähler eines sonst öffentlichen Tags, wäre ihre Existenz
   // ablesbar, ohne dass sie in irgendeiner Liste auftaucht.
   const bob = seedUser('bob', 'member');
-  const owner = createHarness();
-  const other = createHarness({ userId: bob, role: 'member' });
+  const owner = await createHarness();
+  const other = await createHarness({ userId: bob, role: 'member' });
   try {
     const marker = `Zähler-${randomUUID().slice(0, 8)}`;
     await owner.call('POST', '/', { title: 'Für alle', tags: [marker] });
@@ -407,7 +405,7 @@ test('der Zähler in /tags überspringt die unsichtbaren Aufgaben', async () => 
 test('mehrere Tags verbinden sich mit UND, nicht mit ODER', async () => {
   // Jeder weitere Filter in derselben Leiste engt ein (Status UND Priorität UND
   // Person). Ein Tag, der die Liste plötzlich wachsen ließe, wäre dort ein Bruch.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const beide  = await h.call('POST', '/', { title: 'A', tags: [`x${m}`, `y${m}`] });
@@ -425,7 +423,7 @@ test('ein einzelnes ?tag= ist genau EIN Tag, auch mit Komma darin', async () => 
   // Vorkommen liefert Express einen String, nicht ein Array. Wurde der am Komma
   // getrennt, suchte "Haus, Hof" nach zwei Tags und fand garantiert nichts -
   // dabei ist genau das ein Tag, den CATEGORIES ausdrücklich zulässt.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const tag = `Haus, Hof ${m}`;
@@ -443,7 +441,7 @@ test('der Tag-Filter faltet auch Umlaute', async () => {
   // SQLites COLLATE NOCASE faltet nur ASCII: "Äpfel" wäre über "äpfel" nicht
   // auffindbar, über "ÄPFEL" schon. Deshalb liegt der Vergleich auf einer
   // eigenen, in JS normalisierten Spalte.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const post = await h.call('POST', '/', { title: 'Obst', tags: [`Äpfel${m}`] });
@@ -459,7 +457,7 @@ test('der Tag-Filter faltet auch Umlaute', async () => {
 });
 
 test('Umlaut-Schreibweisen gelten auch beim Zählen und Umbenennen als ein Tag', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     await h.call('POST', '/', { title: 'A', tags: [`Öl${m}`] });
@@ -480,7 +478,7 @@ test('Umlaut-Schreibweisen gelten auch beim Zählen und Umbenennen als ein Tag',
 // ── Verwaltung: umbenennen, entfernen, bulk ────────────────────────────────────
 
 test('PUT /tags/:tag benennt auf allen sichtbaren Aufgaben um', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const a = await h.call('POST', '/', { title: 'A', tags: [`alt${m}`, 'Haus'] });
@@ -501,7 +499,7 @@ test('Umbenennen auf einen vorhandenen Tag führt beide zusammen, ohne Dublette'
   // Der Fall, an dem ein naives UPDATE task_tags SET tag=? scheitert: der
   // Primärschlüssel vergleicht Bytes, "Haus" und "haus" wären zwei Zeilen, und
   // die Aufgabe trüge hinterher beide Schreibweisen desselben Etiketts.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const a = await h.call('POST', '/', { title: 'A', tags: [`alt${m}`, `ziel${m}`] });
@@ -518,7 +516,7 @@ test('die Zusammenführung eint auch die Aufgaben, die nur den Zieltag tragen', 
   // Sonst stünde dasselbe Etikett hinterher in zwei Schreibweisen im Bestand.
   // allTags gruppiert NOCASE und zeigt davon genau eine - welche, entscheidet
   // dann die Zeile, die SQLite zuerst greift.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const mitAlt  = await h.call('POST', '/', { title: 'A', tags: [`alt${m}`] });
@@ -538,7 +536,7 @@ test('die Zusammenführung eint auch die Aufgaben, die nur den Zieltag tragen', 
 });
 
 test('Umbenennen kann allein die Schreibweise ändern', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const a = await h.call('POST', '/', { title: 'A', tags: [`klein${m}`] });
@@ -552,7 +550,7 @@ test('Umbenennen kann allein die Schreibweise ändern', async () => {
 });
 
 test('DELETE /tags/:tag löst den Tag, lässt die Aufgaben stehen', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const a = await h.call('POST', '/', { title: 'Bleibt', tags: [`weg${m}`, 'Haus'] });
@@ -571,8 +569,8 @@ test('Umbenennen und Löschen fassen fremde private Aufgaben nicht an', async ()
   // sie auch nicht ändern. Sonst verriete allein die gemeldete Trefferzahl, dass
   // es sie gibt.
   const bob = seedUser('bob', 'member');
-  const owner = createHarness();
-  const other = createHarness({ userId: bob, role: 'member' });
+  const owner = await createHarness();
+  const other = await createHarness({ userId: bob, role: 'member' });
   try {
     const m = randomUUID().slice(0, 6);
     const geheim = await owner.call('POST', '/', {
@@ -592,7 +590,7 @@ test('Umbenennen und Löschen fassen fremde private Aufgaben nicht an', async ()
 });
 
 test('PUT /tags/:tag auf einen unbekannten Tag → 404', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const res = await h.call('PUT', `/tags/gibtesnicht-${randomUUID().slice(0, 8)}`, { name: 'X' });
     assert.equal(res.status, 404);
@@ -602,7 +600,7 @@ test('PUT /tags/:tag auf einen unbekannten Tag → 404', async () => {
 });
 
 test('POST /tags/apply hängt an und nimmt weg, in einem Aufruf', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const a = await h.call('POST', '/', { title: 'A', tags: [`weg${m}`] });
@@ -623,7 +621,7 @@ test('POST /tags/apply hängt an und nimmt weg, in einem Aufruf', async () => {
 test('POST /tags/apply zählt nur, was sich wirklich geändert hat', async () => {
   // Sonst meldete "3 Aufgaben aktualisiert", wo zwei den Tag schon trugen - und
   // jede unveränderte Aufgabe liefe zusätzlich als Push zum CalDAV-Server.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const a = await h.call('POST', '/', { title: 'A', tags: [`da${m}`] });
@@ -640,8 +638,8 @@ test('POST /tags/apply zählt nur, was sich wirklich geändert hat', async () =>
 
 test('POST /tags/apply überspringt Aufgaben, die die Person nicht sehen darf', async () => {
   const bob = seedUser('bob', 'member');
-  const owner = createHarness();
-  const other = createHarness({ userId: bob, role: 'member' });
+  const owner = await createHarness();
+  const other = await createHarness({ userId: bob, role: 'member' });
   try {
     const m = randomUUID().slice(0, 6);
     const geheim = await owner.call('POST', '/', { title: 'Geheim', visibility: 'private' });
@@ -659,7 +657,7 @@ test('POST /tags/apply überspringt Aufgaben, die die Person nicht sehen darf', 
 });
 
 test('POST /tags/apply ohne ids oder ohne Änderung → 400', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     assert.equal((await h.call('POST', '/tags/apply', { add: ['X'] })).status, 400);
     const task = await h.call('POST', '/', { title: 'Leer' });
@@ -675,7 +673,7 @@ test('die Folgeinstanz einer Serie erbt die Tags', async () => {
   // Tags gehören zur Aufgabe, nicht zum einzelnen Durchlauf. Ohne das Erben
   // verlöre eine wöchentliche Aufgabe ihre Etiketten beim ersten Abhaken, und
   // zwar lautlos: die Folgeinstanz sieht ansonsten vollständig aus.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const marker = `Serie-${randomUUID().slice(0, 8)}`;
     const past = new Date(Date.now() - 21 * 86400_000).toISOString().slice(0, 10);
@@ -706,7 +704,7 @@ test('die Folgeinstanz einer Serie erbt die Tags', async () => {
 // Treffer oder zu keinem.
 
 test('die Suche findet eine Aufgabe über ihren Tag', async () => {
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const marker = `suchtag${randomUUID().slice(0, 6)}`;
     const post = await h.call('POST', '/', { title: 'Nichts Passendes im Titel', tags: [marker] });
@@ -798,7 +796,7 @@ test('die Kategorie eines Einkaufspostens bleibt von den Tags unberührt', () =>
 test('eine Unteraufgabe liefert ihre Tags mit', async () => {
   // Sonst fehlten sie in der Antwort, und ein PUT auf Basis dieser Zeile
   // schriebe sie still weg.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const parent = await h.call('POST', '/', { title: 'Eltern' });
     const marker = `unter${randomUUID().slice(0, 6)}`;
@@ -819,8 +817,8 @@ test('eine private Unteraufgabe bleibt Fremden verborgen, samt ihrer Tags', asyn
   // Elternaufgabe wurde eine private Unteraufgabe samt Titel ausgeliefert. Mit
   // den Tags käme deren Freitext dazu.
   const bob = seedUser('bob', 'member');
-  const owner = createHarness();
-  const other = createHarness({ userId: bob, role: 'member' });
+  const owner = await createHarness();
+  const other = await createHarness({ userId: bob, role: 'member' });
   try {
     const m = randomUUID().slice(0, 6);
     const parent = await owner.call('POST', '/', { title: 'Geteilte Eltern' });
@@ -890,7 +888,7 @@ test('Umbenennen nimmt einen Namen mit Komma als EINEN Tag', async () => {
   // Derselbe Fehler wie beim Filter, eine Funktion weiter: die String-Form von
   // normalizeTags trennt am Komma, "Haus, Hof" wäre zu "Haus" geworden - bei
   // gemeldetem Erfolg.
-  const h = createHarness();
+  const h = await createHarness();
   try {
     const m = randomUUID().slice(0, 6);
     const a = await h.call('POST', '/', { title: 'A', tags: [`alt${m}`] });

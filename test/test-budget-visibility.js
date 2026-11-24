@@ -8,7 +8,7 @@
  * in die SUMMEN einfliesst und ob er seine DETAILS zeigt. Die Tests unten
  * pruefen beide Achsen einzeln - eine Stufe, die nur in einer Achse richtig
  * liegt, ist entweder ein Leck oder ein falscher Saldo.
- * Ausführen: node --experimental-sqlite test/test-budget-visibility.js
+ * Ausführen: node test/test-budget-visibility.js
  */
 
 import { DatabaseSync } from 'node:sqlite';
@@ -19,14 +19,16 @@ import {
   BUDGET_MASKED_CATEGORY,
   normalizeBudgetVisibility,
   normalizeObjectVisibility,
-  budgetVisibilityWhere,
   budgetDetailsVisibleWhere,
   budgetDetailsHiddenWhere,
   budgetScopeWhere,
   hidesBudgetDetails,
   maskBudgetEntry,
   canEditEntry,
-} from '../server/services/budget-visibility.js';
+} from '../server/authorize/index.ts';
+// The single-type fragment behind visibleWhere('budget', ...): an inner seam, not
+// exported from index.ts since B3.
+import { budgetVisibilityWhere } from '../server/authorize/rows/budget.ts';
 
 let passed = 0;
 let failed = 0;

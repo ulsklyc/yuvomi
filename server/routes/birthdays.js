@@ -1,10 +1,10 @@
 import express from 'express';
 import birthdayFeedRouter from './birthday-feed.js';
-import { createLogger } from '../logger.js';
 import * as db from '../db.js';
-import { collectErrors, date as validateDate, oneOf, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { validateRequest } from '../api/validate-request.ts';
+import { collectErrors, date as validateDate, oneOf, str, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
-import { mayReadModule } from '../permissions.js';
+import { mayReadModule } from '../authorize/index.ts';
 import {
   deleteBirthdayArtifacts,
   hydrateBirthday,
@@ -19,7 +19,6 @@ import {
   contactBirthdayMatch,
 } from '../services/birthdays.js';
 
-const log = createLogger('Birthdays');
 const router = express.Router();
 router.use('/feed', birthdayFeedRouter);
 const MAX_PHOTO_LENGTH = 6_990_507; // ~5 MB raw image in base64
@@ -273,44 +272,37 @@ function withContactLinks(req, birthdays) {
   });
 }
 
-router.get('/', (req, res) => {
-  try {
-    const userId = req.authUserId || req.session.userId;
-    syncAllBirthdayReminders(db.get(), userId);
+// Ein unerwarteter Fehler geht an den zentralen Fehlerhandler (#2810): 500 mit
+// festem Satz. Ein `catch` steht nur, wo ein erwarteter Fehler seine eigene
+// Antwort hat.
+router.get('/', validateRequest(), (req, res) => {
+  const userId = req.authUserId || req.session.userId;
+  syncAllBirthdayReminders(db.get(), userId);
 
-    // Spalten qualifiziert: seit dem Join auf `users` waere `name` mehrdeutig.
-    let sql = `${BIRTHDAY_SELECT} WHERE 1=1`;
-    const params = [];
+  // Spalten qualifiziert: seit dem Join auf `users` waere `name` mehrdeutig.
+  let sql = `${BIRTHDAY_SELECT} WHERE 1=1`;
+  const params = [];
 
-    if (req.query.q) {
-      sql += ' AND birthdays.name LIKE ?';
-      params.push(`%${String(req.query.q).trim()}%`);
-    }
-
-    sql += ' ORDER BY birthdays.name COLLATE NOCASE ASC';
-
-    const rows = db.get().prepare(sql).all(...params);
-    res.json({ data: withContactLinks(req, sortHydrated(rows)) });
-  } catch (err) {
-    log.error('GET / error:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  if (req.query.q) {
+    sql += ' AND birthdays.name LIKE ?';
+    params.push(`%${String(req.query.q).trim()}%`);
   }
+
+  sql += ' ORDER BY birthdays.name COLLATE NOCASE ASC';
+
+  const rows = db.get().prepare(sql).all(...params);
+  res.json({ data: withContactLinks(req, sortHydrated(rows)) });
 });
 
-router.get('/upcoming', (req, res) => {
-  try {
-    const userId = req.authUserId || req.session.userId;
-    syncAllBirthdayReminders(db.get(), userId);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
-    const rows = db.get().prepare(`${BIRTHDAY_SELECT} ORDER BY birthdays.name COLLATE NOCASE ASC`).all();
-    res.json({ data: sortHydrated(rows).slice(0, limit) });
-  } catch (err) {
-    log.error('GET /upcoming error:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+router.get('/upcoming', validateRequest(), (req, res) => {
+  const userId = req.authUserId || req.session.userId;
+  syncAllBirthdayReminders(db.get(), userId);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 50);
+  const rows = db.get().prepare(`${BIRTHDAY_SELECT} ORDER BY birthdays.name COLLATE NOCASE ASC`).all();
+  res.json({ data: sortHydrated(rows).slice(0, limit) });
 });
 
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
     const vYearUnknown = validateYearUnknown(req.body.year_unknown, 'year_unknown');
@@ -346,8 +338,7 @@ router.post('/', (req, res) => {
     res.status(201).json({ data: hydrateBirthday(db.get(), loadBirthday(synced.id)) });
   } catch (err) {
     if (isContactLinkConflict(err)) return refuseContactLink(res, 'taken');
-    log.error('POST / error:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    throw err;
   }
 });
 
@@ -374,45 +365,29 @@ function contactsHidden(req) {
   return !mayReadModule(req, 'contacts');
 }
 
-router.get('/import/candidates', (req, res) => {
-  try {
-    if (contactsHidden(req)) {
-      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
-    }
-    const data = listBirthdayImportCandidates(db.get());
-    res.json({ data });
-  } catch (err) {
-    log.error('GET /import/candidates error:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+router.get('/import/candidates', validateRequest(), (req, res) => {
+  if (contactsHidden(req)) {
+    return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
   }
+  const data = listBirthdayImportCandidates(db.get());
+  res.json({ data });
 });
 
-router.post('/import', (req, res) => {
-  try {
-    // Schreibt Geburtstage, LIEST aber Kontakte: ohne diesen Riegel waere der
-    // Umweg offen, sich die abgewiesene Liste ueber die angelegten
-    // Geburtstagseintraege doch noch zusammenzusetzen.
-    if (contactsHidden(req)) {
-      return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
-    }
-    const userId = req.authUserId || req.session.userId;
-    const ids = Array.isArray(req.body.contact_ids) ? req.body.contact_ids : null;
-    if (!ids || ids.length === 0) {
-      return res.status(400).json({ error: 'contact_ids must be a non-empty array.', code: 400 });
-    }
-    if (ids.length > 500) {
-      return res.status(400).json({ error: 'Too many contacts selected.', code: 400 });
-    }
-
-    const result = db.transaction(() => importBirthdaysFromContacts(db.get(), ids, userId));
-    res.status(201).json({ data: result });
-  } catch (err) {
-    log.error('POST /import error:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+router.post('/import', validateRequest(), (req, res) => {
+  // Schreibt Geburtstage, LIEST aber Kontakte: ohne diesen Riegel waere der
+  // Umweg offen, sich die abgewiesene Liste ueber die angelegten
+  // Geburtstagseintraege doch noch zusammenzusetzen.
+  if (contactsHidden(req)) {
+    return res.status(403).json({ error: 'Contact access is required to import birthdays.', code: 403, reason: 'cross_module_access' });
   }
+  const userId = req.authUserId || req.session.userId;
+  // 1 bis 500 ganze Zahlen: das Schema (BirthdayImportInput) prueft sie.
+  const ids = req.body.contact_ids;
+  const result = db.transaction(() => importBirthdaysFromContacts(db.get(), ids, userId));
+  res.status(201).json({ data: result });
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const userId = req.authUserId || req.session.userId;
     const id = parseInt(req.params.id, 10);
@@ -479,31 +454,25 @@ router.put('/:id', (req, res) => {
     res.json({ data: hydrateBirthday(db.get(), loadBirthday(id)) });
   } catch (err) {
     if (isContactLinkConflict(err)) return refuseContactLink(res, 'taken');
-    log.error('PUT /:id error:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    throw err;
   }
 });
 
-router.delete('/:id', (req, res) => {
-  try {
-    const userId = req.authUserId || req.session.userId;
-    const id = parseInt(req.params.id, 10);
-    const existing = loadBirthday(id);
-    if (!existing) return res.status(404).json({ error: 'Birthday not found.', code: 404, reason: 'birthdays_birthday_not_found' });
+router.delete('/:id', validateRequest(), (req, res) => {
+  const userId = req.authUserId || req.session.userId;
+  const id = parseInt(req.params.id, 10);
+  const existing = loadBirthday(id);
+  if (!existing) return res.status(404).json({ error: 'Birthday not found.', code: 404, reason: 'birthdays_birthday_not_found' });
 
-    db.transaction(() => {
-      deleteBirthdayArtifacts(db.get(), existing);
-      db.get().prepare('DELETE FROM birthdays WHERE id = ?').run(id);
-    });
+  db.transaction(() => {
+    deleteBirthdayArtifacts(db.get(), existing);
+    db.get().prepare('DELETE FROM birthdays WHERE id = ?').run(id);
+  });
 
-    res.status(204).end();
-  } catch (err) {
-    log.error('DELETE /:id error:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  res.status(204).end();
 });
 
-router.get('/meta/options', (_req, res) => {
+router.get('/meta/options', validateRequest(), (_req, res) => {
   res.json({ data: { photoMaxBytes: MAX_PHOTO_LENGTH, acceptedImageTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] } });
 });
 

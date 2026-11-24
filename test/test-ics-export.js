@@ -793,7 +793,8 @@ test('kein Modul baut die RRULE-Zeile an der Normalisierung vorbei (#761)', () =
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const child = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
       if (entry.isDirectory()) { walk(child); continue; }
-      if (!entry.name.endsWith('.js')) continue;
+      // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+      if (!/\.(js|ts)$/.test(entry.name)) continue;
       if (entry.name === 'recurrence.js') continue; // dort WOHNT die Regel
 
       const src = readFileSync(child, 'utf8');

@@ -20,6 +20,29 @@ const BIRTHDAY_RRULE = 'FREQ=YEARLY;INTERVAL=1';
 // server/services/recurrence.js:18 nimmt sie entgegen). Als Vergleichswert wäre
 // sie also nur eine weitere Quelle für Scheinänderungen.
 const AUTHORED_FIELDS = ['title', 'description', 'start_datetime'];
+// Was der Abgleich an einem NICHT gespiegelten Termin schreibt. Die Farbe fehlt
+// mit Absicht (sie gehoert nach dem Anlegen dem Kalender), siehe unten.
+const LOCAL_FIELDS = [
+  'title', 'description', 'start_datetime', 'end_datetime', 'all_day',
+  'location', 'icon', 'assigned_to', 'recurrence_rule', 'created_by',
+];
+
+/**
+ * Weicht die Zeile in einem der Felder vom Soll ab?
+ *
+ * Der Abgleich laeuft an jedem GET /birthdays, an jeder Erinnerungsabfrage und
+ * im Benachrichtigungslauf alle 60 Sekunden je aktivem Konto. Ein UPDATE ohne
+ * Aenderung ist dort nicht umsonst: der Trigger setzt `updated_at` neu, der
+ * Suchindex loescht die Zeile und traegt sie wieder ein, und das fuer jeden
+ * Geburtstag, jede Minute. Geschrieben wird deshalb nur, was sich aendert.
+ *
+ * @param {Record<string, unknown>} existing
+ * @param {Record<string, unknown>} payload
+ * @param {string[]} fields
+ */
+function differsIn(existing, payload, fields) {
+  return fields.some((f) => (existing[f] ?? null) !== (payload[f] ?? null));
+}
 
 /**
  * DAS JAHR EINES GEBURTSTAGS OHNE JAHR (#2095). `birth_date` bleibt ein volles
@@ -282,27 +305,30 @@ function syncBirthdayCalendarEvent(database, birthday, kind = 'birthday') {
         // Beginn - die Outbound-Serializer machen daraus ein DTEND vor DTSTART
         // bzw. einen mehrtägigen Geburtstag. NULL bleibt NULL, damit ein noch
         // nicht normalisierter Termin keine Scheinänderung bekommt.
-        database.prepare(`
-          UPDATE calendar_events
-          SET title = ?, description = ?, start_datetime = ?,
-              end_datetime = CASE WHEN end_datetime IS NULL THEN NULL ELSE ? END
-          WHERE id = ?
-        `).run(
-          payload.title,
-          payload.description,
-          payload.start_datetime,
-          payload.start_datetime,
-          linkedEventId,
-        );
+        const authoredChanged = differsIn(existing, payload, AUTHORED_FIELDS);
+        const endDrifted = existing.end_datetime !== null && existing.end_datetime !== payload.start_datetime;
+        if (authoredChanged || endDrifted) {
+          database.prepare(`
+            UPDATE calendar_events
+            SET title = ?, description = ?, start_datetime = ?,
+                end_datetime = CASE WHEN end_datetime IS NULL THEN NULL ELSE ? END
+            WHERE id = ?
+          `).run(
+            payload.title,
+            payload.description,
+            payload.start_datetime,
+            payload.start_datetime,
+            linkedEventId,
+          );
+        }
 
         // Vorgemerkt wird über markInlineOutbound (ein Leser mit housekeeping.js,
         // #1860): es schreibt über die übergebene Verbindung, lehnt keinen
         // schreibgeschützten Provider ab und lässt einen CalDAV-Termin ohne
         // Konto in Ruhe. Verglichen wird genau das, was oben geschrieben wurde -
         // alles andere ist Provider-Normalisierung und darf keinen Push auslösen.
-        const authoredChanged = AUTHORED_FIELDS.some((f) => existing[f] !== payload[f]);
         if (authoredChanged) markInlineOutbound(database, existing);
-      } else {
+      } else if (differsIn(existing, payload, LOCAL_FIELDS)) {
         // Die Farbe faellt nur beim Anlegen auf BIRTHDAY_COLOR, danach gehoert
         // sie dem Kalender. Dieser Abgleich laeuft an jedem GET /birthdays und
         // jeder Erinnerungsabfrage; schrieb er die Farbe mit, hielt nur der

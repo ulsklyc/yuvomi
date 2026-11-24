@@ -4,13 +4,19 @@
  * Abhängigkeiten: express, server/db.js, server/auth.js
  */
 
-import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, color, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { validateRequest } from '../api/validate-request.ts';
+import { str, collectErrors, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
-import { mayChangeRecord, resolvePermissions, userForRequest, sendNotOwner } from '../permissions.js';
+import {
+  mayChangeRecord,
+  resolvePermissions,
+  userForRequest,
+  sendNotOwner,
+  visibleWhere,
+} from '../authorize/index.ts';
 import {
   categoryNameKey,
   hydrateNotesWithCategories,
@@ -21,15 +27,12 @@ import {
   validateCategoryName,
 } from '../services/note-categories.js';
 import { personAvatarUrlSql } from '../services/person-avatar.js';
-import { noteVisibleWhere } from '../services/visibility.js';
 import {
   mayChangeNoteLock,
   mayChangeNoteVisibility,
   noteLockedFor,
   noteVisibilityValue,
 } from '../../public/utils/note-access.js';
-
-const log = createLogger('Notes');
 
 const router  = express.Router();
 
@@ -85,24 +88,20 @@ function viewerOf(req) {
  * eine geloeschte: 404, denn schon ein 403 sagte, dass es sie gibt.
  */
 function findVisibleNote(req, id) {
-  return db.get().prepare(`SELECT * FROM notes n WHERE n.id = ? AND ${noteVisibleWhere('n')}`)
+  return db.get().prepare(`SELECT * FROM notes n WHERE n.id = ? AND ${visibleWhere('notes', 'n', '?')}`)
     .get(id, actorId(req));
 }
 
 /**
  * Sichtbarkeit und Sperre aus dem Rumpf (#1514, #1602). Nicht mitgeschickt
- * heisst "nicht angefasst" (`undefined`).
+ * heisst "nicht angefasst" (`undefined`). Die Werte prueft das Schema der
+ * Operation (`visibility` eine der vier Stufen, `locked` true/false/0/1,
+ * #2810); hier bleibt nur die Umformung.
  */
 function readAccessFields(body) {
   const out = {};
-  if (body?.visibility !== undefined) {
-    out.visibility = noteVisibilityValue(body.visibility);
-    if (!out.visibility) return { error: 'visibility must be "all" or "private".' };
-  }
-  if (body?.locked !== undefined) {
-    if (![true, false, 0, 1].includes(body.locked)) return { error: 'locked must be a boolean.' };
-    out.locked = body.locked ? 1 : 0;
-  }
+  if (body?.visibility !== undefined) out.visibility = noteVisibilityValue(body.visibility);
+  if (body?.locked !== undefined) out.locked = body.locked ? 1 : 0;
   return out;
 }
 
@@ -159,26 +158,23 @@ function editableCategory(req, id) {
 
 // Kategorien stehen vor /:id, damit Express "categories" nicht als Notiz-ID
 // interpretiert. Der Katalog ist leer, bis Nutzer selbst Eintraege anlegen.
-router.get('/categories', (req, res) => {
-  try {
-    res.json({
-      data: listVisibleCategories(db.get(), actorId(req)).map(categoryPayload),
-      meta: { can_manage_household: canManageHousehold(req) },
-    });
-  } catch (err) {
-    log.error('Category list:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+//
+// UNERWARTETE FEHLER gehen an den zentralen Fehlerhandler (#2810): Express 5
+// reicht einen synchronen Wurf weiter, der Handler antwortet 500 mit festem
+// Satz. Ein `catch` steht nur noch dort, wo ein erwarteter Fehler (doppelter
+// Name, Kategorie weg) seine eigene Antwort hat; alles andere wirft er weiter.
+router.get('/categories', validateRequest(), (req, res) => {
+  res.json({
+    data: listVisibleCategories(db.get(), actorId(req)).map(categoryPayload),
+    meta: { can_manage_household: canManageHousehold(req) },
+  });
 });
 
-router.post('/categories', (req, res) => {
+router.post('/categories', validateRequest(), (req, res) => {
   try {
     const name = validateCategoryName(req.body?.name);
-    const requestedScope = req.body?.scope;
-    const scope = requestedScope === undefined ? 'personal' : requestedScope;
-    if (!['personal', 'household'].includes(scope)) {
-      return res.status(400).json({ error: 'Invalid category scope.', code: 400 });
-    }
+    // `scope` ist laut Schema `personal` oder `household`, fehlt es: personal.
+    const scope = req.body?.scope === undefined ? 'personal' : req.body.scope;
     if (scope === 'household' && !canManageHousehold(req)) {
       return res.status(403).json({ error: 'Household category management is not allowed.', code: 403 });
     }
@@ -198,42 +194,35 @@ router.post('/categories', (req, res) => {
       return res.status(409).json({ error: 'A category with this name already exists.', code: 409, reason: 'category_exists' });
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
-    log.error('Category create:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
-router.patch('/categories/reorder', (req, res) => {
-  try {
-    const order = req.body?.order;
-    if (!Array.isArray(order) || order.length > 100) {
-      return res.status(400).json({ error: 'Invalid category order.', code: 400 });
-    }
-    const ids = order.map(Number);
-    if (ids.some((id) => !Number.isInteger(id) || id <= 0) || new Set(ids).size !== ids.length) {
-      return res.status(400).json({ error: 'Invalid category order.', code: 400 });
-    }
-    const verdicts = ids.map((id) => editableCategory(req, id));
-    for (const verdict of verdicts) {
-      if (!verdict.category) return categoryRefusal(res, verdict);
-    }
-    if (new Set(verdicts.map((verdict) => verdict.category.scope)).size > 1) {
-      return res.status(400).json({ error: 'Categories can only be reordered within one scope.', code: 400 });
-    }
-    const update = db.get().prepare('UPDATE note_categories SET sort_order = ? WHERE id = ?');
-    const transaction = db.get().transaction(() => ids.forEach((id, index) => update.run(index, id)));
-    transaction();
-    res.json({
-      data: listVisibleCategories(db.get(), actorId(req)).map(categoryPayload),
-      meta: { can_manage_household: canManageHousehold(req) },
-    });
-  } catch (err) {
-    log.error('Category reorder:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+router.patch('/categories/reorder', validateRequest(), (req, res) => {
+  // Liste und Laenge prueft das Schema. Die Eintraege duerfen Zahl oder
+  // Ziffern-Text sein: erst nach Number() zeigt sich, ob zwei dieselbe
+  // Kategorie meinen (3 und "3") oder ein Ziffern-Text keine Zahl mehr ist.
+  const ids = /** @type {unknown[]} */ (req.body.order).map(Number);
+  if (ids.some((id) => !Number.isInteger(id) || id <= 0) || new Set(ids).size !== ids.length) {
+    return res.status(400).json({ error: 'Invalid category order.', code: 400 });
   }
+  const verdicts = ids.map((id) => editableCategory(req, id));
+  for (const verdict of verdicts) {
+    if (!verdict.category) return categoryRefusal(res, verdict);
+  }
+  if (new Set(verdicts.map((verdict) => verdict.category.scope)).size > 1) {
+    return res.status(400).json({ error: 'Categories can only be reordered within one scope.', code: 400 });
+  }
+  const update = db.get().prepare('UPDATE note_categories SET sort_order = ? WHERE id = ?');
+  const transaction = db.get().transaction(() => ids.forEach((id, index) => update.run(index, id)));
+  transaction();
+  res.json({
+    data: listVisibleCategories(db.get(), actorId(req)).map(categoryPayload),
+    meta: { can_manage_household: canManageHousehold(req) },
+  });
 });
 
-router.put('/categories/:id', (req, res) => {
+router.put('/categories/:id', validateRequest(), (req, res) => {
   try {
     const id = Number(req.params.id);
     const verdict = editableCategory(req, id);
@@ -250,27 +239,21 @@ router.put('/categories/:id', (req, res) => {
       return res.status(409).json({ error: 'A category with this name already exists.', code: 409, reason: 'category_exists' });
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
-    log.error('Category update:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
-router.delete('/categories/:id', (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const verdict = editableCategory(req, id);
-    if (!verdict.category) return categoryRefusal(res, verdict);
-    const database = db.get();
-    const remove = database.transaction(() => {
-      database.prepare('DELETE FROM note_categories WHERE id = ?').run(id);
-      pruneCategoryFromDashboardConfigs(database, id);
-    });
-    remove();
-    res.status(204).end();
-  } catch (err) {
-    log.error('Category delete:', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.delete('/categories/:id', validateRequest(), (req, res) => {
+  const id = Number(req.params.id);
+  const verdict = editableCategory(req, id);
+  if (!verdict.category) return categoryRefusal(res, verdict);
+  const database = db.get();
+  const remove = database.transaction(() => {
+    database.prepare('DELETE FROM note_categories WHERE id = ?').run(id);
+    pruneCategoryFromDashboardConfigs(database, id);
+  });
+  remove();
+  res.status(204).end();
 });
 
 /**
@@ -278,20 +261,15 @@ router.delete('/categories/:id', (req, res) => {
  * Alle Notizen, angepinnte zuerst, dann nach updated_at DESC.
  * Response: { data: Note[] }
  */
-router.get('/', (req, res) => {
-  try {
-    const notes = db.get().prepare(`
-      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
-      FROM notes n
-      LEFT JOIN users u ON u.id = n.created_by
-      WHERE ${noteVisibleWhere('n')}
-      ORDER BY n.pinned DESC, n.updated_at DESC
-    `).all(actorId(req));
-    res.json({ data: hydrateNotesWithCategories(db.get(), notes, actorId(req)) });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/', validateRequest(), (req, res) => {
+  const notes = db.get().prepare(`
+    SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
+    FROM notes n
+    LEFT JOIN users u ON u.id = n.created_by
+    WHERE ${visibleWhere('notes', 'n', '?')}
+    ORDER BY n.pinned DESC, n.updated_at DESC
+  `).all(actorId(req));
+  res.json({ data: hydrateNotesWithCategories(db.get(), notes, actorId(req)) });
 });
 
 /**
@@ -300,23 +278,23 @@ router.get('/', (req, res) => {
  * Body: { content, title?, color?, pinned? }
  * Response: { data: Note }
  */
-router.post('/', (req, res) => {
+router.post('/', validateRequest(), (req, res) => {
   try {
     const { pinned = 0 } = req.body;
+    // Leere und Laenge nach trim prueft str(); Form und Farbe das Schema
+    // (`color` ist `#RRGGBB`, null oder "" - leer heisst die Standardfarbe).
     const vContent = str(req.body.content, 'content', { max: MAX_TEXT });
     const vTitle   = str(req.body.title,   'title',  { max: MAX_TITLE, required: false });
-    const vColor   = color(req.body.color || '#FFEB3B', 'color');
-    const errors   = collectErrors([vContent, vTitle, vColor]);
+    const errors   = collectErrors([vContent, vTitle]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     const access = readAccessFields(req.body);
-    if (access.error) return res.status(400).json({ error: access.error, code: 400 });
 
     const database = db.get();
     const create = database.transaction(() => {
       const result = database.prepare(`
         INSERT INTO notes (content, title, color, pinned, created_by, visibility, locked)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(vContent.value, vTitle.value, vColor.value, pinned ? 1 : 0, actorId(req),
+      `).run(vContent.value, vTitle.value, req.body.color || '#FFEB3B', pinned ? 1 : 0, actorId(req),
         access.visibility ?? 'all', access.locked ?? 0);
       if (req.body.category_ids !== undefined) {
         replaceEditableAssignments(database, {
@@ -341,8 +319,7 @@ router.post('/', (req, res) => {
       return res.status(409).json({ error: 'Categories changed. Refresh and try again.', code: 409, reason: 'notes_selected_category_not_found' });
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
@@ -352,7 +329,7 @@ router.post('/', (req, res) => {
  * Body: { content?, title?, color?, pinned? }
  * Response: { data: Note }
  */
-router.put('/:id', (req, res) => {
+router.put('/:id', validateRequest(), (req, res) => {
   try {
     const id   = parseInt(req.params.id, 10);
     const note = findVisibleNote(req, id);
@@ -365,17 +342,16 @@ router.put('/:id', (req, res) => {
     // Bestand, nicht die blosse Anwesenheit: ein Client, der den ganzen Zettel
     // unveraendert zurueckschickt, stellt nichts um.
     const access = readAccessFields(req.body);
-    if (access.error) return res.status(400).json({ error: access.error, code: 400 });
     const visibility = access.visibility ?? note.visibility;
     const locked = access.locked ?? note.locked;
     if (visibility !== note.visibility && !mayChangeNoteVisibility(note, viewerOf(req))) return sendNotOwner(res);
     if (locked !== note.locked && !mayChangeNoteLock(note, viewerOf(req))) return sendNotOwner(res);
 
+    // Laenge nach trim prueft str(); die Farbe das Schema.
     const { pinned } = req.body;
     const checks = [];
     if (req.body.content !== undefined) checks.push(str(req.body.content, 'content', { max: MAX_TEXT, required: false }));
     if (req.body.title !== undefined)   checks.push(str(req.body.title,   'title',  { max: MAX_TITLE, required: false }));
-    if (req.body.color !== undefined)   checks.push(color(req.body.color, 'color'));
     const errors = collectErrors(checks);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
@@ -422,8 +398,7 @@ router.put('/:id', (req, res) => {
       return res.status(409).json({ error: 'Categories changed. Refresh and try again.', code: 409, reason: 'notes_selected_category_not_found' });
     }
     if (categoryInputError(err)) return categoryErrorResponse(res, err);
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+    throw err;
   }
 });
 
@@ -432,20 +407,15 @@ router.put('/:id', (req, res) => {
  * Pin-Status toggeln.
  * Response: { data: { id, pinned } }
  */
-router.patch('/:id/pin', (req, res) => {
-  try {
-    const id   = parseInt(req.params.id, 10);
-    const note = findVisibleNote(req, id);
-    if (!note) return res.status(404).json(NOTE_NOT_FOUND);
-    if (refuseForeignNote(req, res, note)) return;
+router.patch('/:id/pin', validateRequest(), (req, res) => {
+  const id   = parseInt(req.params.id, 10);
+  const note = findVisibleNote(req, id);
+  if (!note) return res.status(404).json(NOTE_NOT_FOUND);
+  if (refuseForeignNote(req, res, note)) return;
 
-    const newPinned = note.pinned ? 0 : 1;
-    db.get().prepare('UPDATE notes SET pinned = ? WHERE id = ?').run(newPinned, id);
-    res.json({ data: { id, pinned: newPinned } });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  const newPinned = note.pinned ? 0 : 1;
+  db.get().prepare('UPDATE notes SET pinned = ? WHERE id = ?').run(newPinned, id);
+  res.json({ data: { id, pinned: newPinned } });
 });
 
 /**
@@ -469,48 +439,45 @@ router.patch('/:id/pin', (req, res) => {
  * Body: { line: number, checked: boolean, expect?: string }
  * Response: { data: Note } | 409 { code: 409, reason }
  */
-router.patch('/:id/check', (req, res) => {
-  try {
-    const id   = parseInt(req.params.id, 10);
-    const note = findVisibleNote(req, id);
-    if (!note) return res.status(404).json(NOTE_NOT_FOUND);
-    // Abhaken ist Benutzen - ausser die Notiz ist gesperrt (#1602).
-    if (refuseForeignNote(req, res, note, { interaction: true })) return;
+router.patch('/:id/check', validateRequest(), (req, res) => {
+  const id   = parseInt(req.params.id, 10);
+  const note = findVisibleNote(req, id);
+  if (!note) return res.status(404).json(NOTE_NOT_FOUND);
+  // Abhaken ist Benutzen - ausser die Notiz ist gesperrt (#1602).
+  if (refuseForeignNote(req, res, note, { interaction: true })) return;
 
-    const { line, checked, expect } = req.body;
-    if (!Number.isInteger(line) || line < 0)
-      return res.status(400).json({ error: 'Invalid line number.', code: 400 });
-    if (typeof checked !== 'boolean')
-      return res.status(400).json({ error: 'checked must be true or false.', code: 400 });
-    if (expect !== undefined && expect !== null && typeof expect !== 'string')
-      return res.status(400).json({ error: 'expect must be a string.', code: 400 });
+  // Der Rumpf dieser Operation hat kein Feld-Schema: die drei Felder prueft
+  // nur diese Stelle.
+  const { line, checked, expect } = req.body;
+  if (!Number.isInteger(line) || line < 0)
+    return res.status(400).json({ error: 'Invalid line number.', code: 400 });
+  if (typeof checked !== 'boolean')
+    return res.status(400).json({ error: 'checked must be true or false.', code: 400 });
+  if (expect !== undefined && expect !== null && typeof expect !== 'string')
+    return res.status(400).json({ error: 'expect must be a string.', code: 400 });
 
-    const result = toggleChecklistLine(note.content, line, checked, expect);
-    if (!result.ok) {
-      return res.status(409).json({
-        error: 'The note has changed in the meantime. Refresh and try again.',
-        code:  409,
-        reason: result.reason,
-      });
-    }
-
-    // `changed: false` heißt, der Eintrag stand schon so - dann bleibt auch
-    // `updated_at` unangetastet, sonst sortierte ein folgenloser Tap die
-    // Pinnwand um.
-    if (result.changed) {
-      db.get().prepare('UPDATE notes SET content = ? WHERE id = ?').run(result.content, id);
-    }
-
-    const updated = db.get().prepare(`
-      SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
-      FROM notes n LEFT JOIN users u ON u.id = n.created_by WHERE n.id = ?
-    `).get(id);
-
-    res.json({ data: oneWithCategories(updated, req) });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  const result = toggleChecklistLine(note.content, line, checked, expect);
+  if (!result.ok) {
+    return res.status(409).json({
+      error: 'The note has changed in the meantime. Refresh and try again.',
+      code:  409,
+      reason: result.reason,
+    });
   }
+
+  // `changed: false` heißt, der Eintrag stand schon so - dann bleibt auch
+  // `updated_at` unangetastet, sonst sortierte ein folgenloser Tap die
+  // Pinnwand um.
+  if (result.changed) {
+    db.get().prepare('UPDATE notes SET content = ? WHERE id = ?').run(result.content, id);
+  }
+
+  const updated = db.get().prepare(`
+    SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
+    FROM notes n LEFT JOIN users u ON u.id = n.created_by WHERE n.id = ?
+  `).get(id);
+
+  res.json({ data: oneWithCategories(updated, req) });
 });
 
 /**
@@ -518,20 +485,15 @@ router.patch('/:id/check', (req, res) => {
  * Notiz löschen.
  * Response: 204 No Content
  */
-router.delete('/:id', (req, res) => {
-  try {
-    const id     = parseInt(req.params.id, 10);
-    const note   = findVisibleNote(req, id);
-    if (!note) return res.status(404).json(NOTE_NOT_FOUND);
-    if (refuseForeignNote(req, res, note)) return;
-    const result = db.get().prepare('DELETE FROM notes WHERE id = ?').run(id);
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
-    res.status(204).end();
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.delete('/:id', validateRequest(), (req, res) => {
+  const id     = parseInt(req.params.id, 10);
+  const note   = findVisibleNote(req, id);
+  if (!note) return res.status(404).json(NOTE_NOT_FOUND);
+  if (refuseForeignNote(req, res, note)) return;
+  const result = db.get().prepare('DELETE FROM notes WHERE id = ?').run(id);
+  if (result.changes === 0)
+    return res.status(404).json({ error: 'Note not found.', code: 404, reason: 'notes_note_not_found' });
+  res.status(204).end();
 });
 
 export default router;

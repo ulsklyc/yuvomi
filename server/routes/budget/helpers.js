@@ -10,9 +10,15 @@ import { linkTransfer } from '../../services/budget-transfers.js';
 import path from 'path';
 import * as db from '../../db.js';
 import {
-  budgetVisibilityWhere, budgetDetailsVisibleWhere, budgetScopeWhere, budgetDetailsHiddenWhere, canEditEntry,
-  resolveBudgetMode, maskBudgetEntry, BUDGET_MASKED_CATEGORY,
-} from '../../services/budget-visibility.js';
+  budgetDetailsVisibleWhere,
+  budgetScopeWhere,
+  budgetDetailsHiddenWhere,
+  canEditEntry,
+  resolveBudgetMode,
+  maskBudgetEntry,
+  BUDGET_MASKED_CATEGORY,
+  visibleWhere,
+} from '../../authorize/index.ts';
 import { computeLoanSchedule, remainingPrincipalFromPayments, remainingInstallmentsForBalance, rateForInstallment } from '../../services/loan-amortization.js';
 import { todayKey } from '../../utils/timezone.js';
 import { cachedRate, cachedRateInfo } from '../../services/subscription-rates.js';
@@ -20,6 +26,7 @@ import { DEFAULT_LOCALE, resolveHouseholdLocale, supportedLocaleFor } from '../.
 import { newNonMembers } from '../../services/household-members.js';
 import { MAX_INTERVAL_COUNT } from '../../../public/utils/budget-recurrence.js';
 import { SAVINGS_CHART_CATEGORY } from '../../../public/utils/budget-chart-category.js';
+import { ACCOUNT_TYPE_KEYS, LOAN_DIRECTIONS, RECURRENCE_INTERVAL_KEYS, STATS_RANGES as STATS_RANGE_KEYS } from '../../services/budget-fields.js';
 
 // --------------------------------------------------------
 // Persönlich/geteilt (#476/#505): Haushalts-Modus + Sichtbarkeits-Enforcement.
@@ -49,7 +56,7 @@ export function budgetFilter(req, alias, { scoped = true } = {}) {
   const mode = getBudgetMode();
   if (mode !== 'personal') return { clause: '', params: [] };
   const me = viewerId(req);
-  let clause = ` AND ${budgetVisibilityWhere(alias, '?', { mode })}`;
+  let clause = ` AND ${visibleWhere('budget', alias, '?', { mode })}`;
   const params = [me];
   if (scoped) {
     const scope = req.query.scope === 'household' ? 'household' : 'mine';
@@ -75,7 +82,7 @@ export function budgetFilter(req, alias, { scoped = true } = {}) {
  * aufgingen (#659). Eine erwartete Zeile steckt in KEINER Summe - ihr Fehlen
  * verfaelscht nichts. Maskiert waere sie dagegen eine Reihe gleicher Betraege
  * im Rhythmus eines Abos: der Zweck, nur ohne Titel, und gegen die Abo-Liste
- * zu lesen. Das ist die Faustregel aus services/budget-visibility.js: geht es
+ * zu lesen. Das ist die Faustregel aus authorize/rows/budget.ts: geht es
  * um den Zweck und gibt es keinen Saldo, den ein Weglassen verfaelscht, gilt
  * die Zweck-Regel. Eine maskierte erwartete Zeile gibt es deshalb nicht, und
  * damit auch keine Form, an der man sie erkennen koennte.
@@ -90,7 +97,7 @@ export function expectedSubscriptionFilter(req) {
   return {
     clause: `${entry.clause}`
       + ` AND ${budgetDetailsVisibleWhere('b', '?', { mode })}`
-      + ` AND ${budgetVisibilityWhere('sub', '?', { mode })}`,
+      + ` AND ${visibleWhere('budget', 'sub', '?', { mode })}`,
     params: [...entry.params, me, me],
   };
 }
@@ -260,7 +267,8 @@ export function localizedSubcategory(subcategory, lang) {
  * Serie, die am 15. beginnt, kommt am 15. wieder. Ein eigenes Feld dafür (wie es
  * die Vorlage in #636 kennt) wäre eine zweite Wahrheit neben `date`.
  */
-export const RECURRENCE_INTERVAL_KEYS = ['weekly', 'monthly', 'yearly'];
+// One source with the schema (#2810): server/services/budget-fields.js.
+export { RECURRENCE_INTERVAL_KEYS };
 
 // Obergrenze wie im RRULE-Formular der Aufgaben/Termine: dieselbe Zahl im
 // Eingabefeld, damit "alle N" überall dasselbe Höchstmaß hat.
@@ -604,7 +612,7 @@ export function freezeSeriesPast(database, anchorId, cutoffDate) {
 }
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-export const STATS_RANGES = new Set(['week', 'month', 'year']);
+export const STATS_RANGES = new Set(STATS_RANGE_KEYS);
 
 export function ymd(d) { return d.toISOString().slice(0, 10); }        // YYYY-MM-DD (UTC)
 export function ym(d)  { return d.toISOString().slice(0, 7);  }        // YYYY-MM   (UTC)
@@ -965,7 +973,8 @@ export function netWorthSummary(accounts) {
 // Das Modul war ursprünglich nur für verliehenes Geld gedacht - die Rate wurde
 // deshalb immer als Einnahme gebucht. Ein aufgenommener Kredit zahlt aber raus,
 // seine Rate ist eine Ausgabe.
-export const LOAN_DIRECTIONS = ['lent', 'borrowed'];
+// One source with the schema (#2810): server/services/budget-fields.js.
+export { LOAN_DIRECTIONS };
 
 // Wie eine Rate ins Budget gebucht wird. Vorzeichen UND Kategorie hängen an der
 // Richtung: stats.js liest den Typ am Vorzeichen ab (amount > 0 = Einnahme), die
@@ -1328,7 +1337,8 @@ export function entryWithLoanMeta(id) {
 // Konten (#495): getrennte Konten mit Startsaldo + laufendem Saldo
 // --------------------------------------------------------
 
-export const ACCOUNT_TYPE_KEYS = ['checking', 'savings', 'cash', 'credit', 'investment', 'other'];
+// One source with the schema (#2810): server/services/budget-fields.js.
+export { ACCOUNT_TYPE_KEYS };
 
 /**
  * Eine Absage mit ihrem Grund (#1656, #1668).

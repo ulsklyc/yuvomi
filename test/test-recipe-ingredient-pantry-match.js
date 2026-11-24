@@ -38,7 +38,7 @@ const DB_FILE = freshTestDbPath('recipe-ingredient-pantry-match');
 
 const dbmod = await import('../server/db.js');
 const { default: recipesRouter } = await import('../server/routes/recipes.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 const U = db.prepare(`

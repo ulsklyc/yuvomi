@@ -24,6 +24,7 @@ import { createRefusalStop } from './calendar-outbound.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { calendarDisplayName } from '../utils/calendar-meta.js';
 import { readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
+import { REMINDER_LIST_TARGETS } from './calendar-fields.js';
 
 /** Standard-Personen fuer eine Liste, die nicht auf Aufgaben zeigt (#1221): die Route antwortet 400. */
 export class ReminderListAssigneeError extends Error {}
@@ -256,7 +257,7 @@ function updateReminderSelection(accountId, listUrl, { enabled, targetModule, de
   }
 
   const newModule = targetModule || sel.target_module;
-  if (newModule !== 'tasks' && newModule !== 'shopping') {
+  if (!REMINDER_LIST_TARGETS.includes(newModule)) {
     throw new Error('Invalid target module (expected "tasks" or "shopping").');
   }
   const newEnabled = enabled === undefined ? sel.enabled : (enabled ? 1 : 0);

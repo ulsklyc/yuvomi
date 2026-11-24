@@ -24,10 +24,9 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createShoppingDocumentsApp } from './shopping-documents-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const {
   flushOutbound, pendingDeletions, processPendingShoppingCreations, todoUidFor,
 } = await import('../server/services/caldav-todo-outbound.js');
@@ -37,21 +36,22 @@ const db = dbmod.get();
 
 const U = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('u','U','x','member')`).run().lastInsertRowid;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = U;
-  req.authRole = 'member';
-  req.session = { userId: U, role: 'member' };
-  next();
+// At its real prefix with the central error handler (#2810): call() puts the prefix in front.
+const app = await createShoppingDocumentsApp({
+  mount: ['shopping'],
+  auth: (req, _res, next) => {
+    req.authUserId = U;
+    req.authRole = 'member';
+    req.session = { userId: U, role: 'member' };
+    next();
+  },
 });
-app.use('/', shoppingRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}/api/v1/shopping${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,

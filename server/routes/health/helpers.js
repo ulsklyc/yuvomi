@@ -15,32 +15,25 @@
  *   - Verschachtelte Entitäten (Schedules/Logs, Lab-Results) erben Scoping/Visibility
  *     von ihrem Eltern-Datensatz (Medikament bzw. Befund).
  *   - Der Zyklus-Tab ist von der Betreuung ausgenommen (siehe `cycle.js`).
+ *
+ * The rules themselves (visibility, care grants, writable rows) live in
+ * server/authorize/care.ts since phase 2 B4; this file keeps the route helpers.
  */
 
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
 import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
+import { canWriteFor } from '../../authorize/index.ts';
+import { MAX_UNIT } from '../../services/health-fields.js';
 
 export const log = createLogger('Health');
 
-export const VISIBILITIES = ['private', 'family'];
-
-/**
- * Der OFFENE Wert eines Bereichs - das Gegenstueck zu 'private'.
- *
- * Die Gesundheit schreibt seit jeher 'family'. Ein Bereich, der nach
- * docs/DECISIONS.md Abschnitt 5 neu dazukommt, nimmt den kanonischen Satz von
- * Anfang an und schreibt dort 'all'; Abschnitt 5 nennt das Lesen als die
- * Stelle, an der beide Schreibweisen zusammenkommen ("der Lesepfad bildet
- * `family` und `shared` auf `all` ab"), und genau das ist dieser Parameter.
- *
- * Er steht als Vorgabewert auf 'family', damit jede bestehende Aufrufstelle
- * unveraendert dasselbe SQL bekommt wie vorher - ein neuer Bereich muss den
- * Wert nennen, ein alter merkt nichts.
- */
-export const OPEN_FAMILY = 'family';
-export const OPEN_ALL    = 'all';
-export const NUTRITION_VISIBILITIES = ['private', OPEN_ALL];
+// The length of a unit text, for the trimming check of the routes: one source
+// with the OpenAPI document in server/services/health-fields.js (#2810). The
+// value lists (visibility, dose status, ...) are the schema's alone since step
+// (b) of group 6; the open values themselves are rules and come from
+// server/authorize/care.ts.
+export { MAX_UNIT };
 
 /**
  * Wie die Zeitstempel der Gesundheit geprueft werden (`measured_at`,
@@ -67,122 +60,23 @@ export function wallClockNow() {
   return wall ? `${wall.date}T${wall.time.slice(0, 5)}` : nowIso;
 }
 
-export const LOG_STATUS   = ['taken', 'skipped', 'pending'];
-export const FLOW_LEVELS  = ['spotting', 'light', 'medium', 'heavy'];
-export const MAX_UNIT     = 30;
 
 export function viewerId(req) {
   return req.authUserId || req.session.userId;
 }
 
-// Betreute Personen als Subquery statt als aufgelöste ID-Liste: die Zahl der
-// Platzhalter bliebe sonst von den Daten abhängig, und jede aufrufende Route
-// müsste die Liste selbst beschaffen.
-const CARED_FOR_SUBQUERY = 'SELECT subject_id FROM health_care_grants WHERE caregiver_id = ?';
-
 /**
- * Baut eine WHERE-Teilbedingung für Sichtbarkeit/Personen-Filter: Eigentümer
- * oder `visibility = 'family'`. Betreuung spielt hier bewusst KEINE Rolle -
- * dafür gibt es `careAwareClause()`.
- *
- * Warum zwei Funktionen statt eines Flags: so steht an jeder Aufrufstelle
- * lesbar, welches Modell gilt, und wer die Wahl vergisst, landet auf der
- * engeren Variante statt versehentlich fremde Daten zu öffnen.
- *
- * @param {string} alias         - Tabellen-Alias mit user_id + visibility
- * @param {number} viewer        - eingeloggter Nutzer
- * @param {number|null} personId  - optionaler Personen-Filter (?user_id=)
- * @param {string} open          - der offene Wert dieses Bereichs (siehe OPEN_FAMILY)
- * @returns {{ sql: string, params: any[] }}
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). `parseInt`
+ * read `7abc` as 7 until the schema stood in front; it lets nothing but digits
+ * through now, so `Number` reads the same value. `0` and `-0` stay falsy, and
+ * the routes keep answering them with their `Invalid id.`; `-1` finds no row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
  */
-export function visibilityClause(alias, viewer, personId, open = OPEN_FAMILY) {
-  if (personId) {
-    if (personId === viewer) return { sql: `${alias}.user_id = ?`, params: [viewer] };
-    return { sql: `${alias}.user_id = ? AND ${alias}.visibility = ?`, params: [personId, open] };
-  }
-  return { sql: `(${alias}.user_id = ? OR ${alias}.visibility = ?)`, params: [viewer, open] };
-}
-
-/**
- * Wie `visibilityClause()`, zusätzlich mit den Daten betreuter Personen - auch
- * deren privaten (#584). Gilt für Vitalwerte, Medikamente, Laborbefunde,
- * Aktivitäten, Vorsorge und die Naehrwerte (#1326).
- *
- * `open` ist der Wert, den DIESE Tabelle fuer "der Haushalt darf mitlesen"
- * schreibt. Er wandert als Bind-Parameter ins SQL statt als eingebautes
- * 'family', weil die Naehrwert-Tabelle den kanonischen Satz fuehrt und dort
- * 'all' steht - ein fest verdrahtetes 'family' haette dort NIE getroffen, und
- * zwar lautlos: die Abfrage bliebe gueltig und lieferte einfach nichts.
- */
-export function careAwareClause(alias, viewer, personId, open = OPEN_FAMILY) {
-  if (personId) {
-    if (personId === viewer) return { sql: `${alias}.user_id = ?`, params: [viewer] };
-    // Betreute Person: volle Sicht wie der Eigentümer. Für alle anderen bleibt
-    // es beim Familien-Filter.
-    return {
-      sql: `${alias}.user_id = ? AND (${alias}.visibility = ? OR ? IN (${CARED_FOR_SUBQUERY}))`,
-      params: [personId, open, personId, viewer],
-    };
-  }
-  return {
-    sql: `(${alias}.user_id = ? OR ${alias}.visibility = ? OR ${alias}.user_id IN (${CARED_FOR_SUBQUERY}))`,
-    params: [viewer, open, viewer],
-  };
-}
-
-// --------------------------------------------------------
-// Betreuung (#584)
-// --------------------------------------------------------
-
-/** IDs der Personen, für die `viewer` eintragen darf. Ohne Betreuung: []. */
-export function caredForIds(viewer) {
-  if (!viewer) return [];
-  return db.get().prepare(CARED_FOR_SUBQUERY).all(viewer).map((r) => r.subject_id);
-}
-
-/**
- * Darf `viewer` Daten schreiben, die `ownerId` gehören? Wahr für die eigenen
- * Daten und für jede Person, deren Betreuung eingeräumt wurde.
- */
-export function canWriteFor(viewer, ownerId) {
-  if (!viewer || !ownerId) return false;
-  if (viewer === ownerId) return true;
-  return !!db.get().prepare(
-    'SELECT 1 FROM health_care_grants WHERE subject_id = ? AND caregiver_id = ?'
-  ).get(ownerId, viewer);
-}
-
-/**
- * WHERE-Fragment für Zeilen, die `viewer` ändern oder löschen darf: die eigenen
- * plus die jeder betreuten Person. Ersetzt das frühere `user_id = ?`.
- * @param {string} alias - Tabellen-Alias oder '' für unqualifizierte Spalten
- */
-export function writableClause(alias, viewer) {
-  const col = `${alias ? `${alias}.` : ''}user_id`;
-  return {
-    sql: `(${col} = ? OR ${col} IN (${CARED_FOR_SUBQUERY}))`,
-    params: [viewer, viewer],
-  };
-}
-
-/**
- * Lädt einen abhängigen Datensatz, wenn `viewer` dessen Eltern-Zeile ändern
- * darf; sonst null.
- *
- * Zeitpläne und Dosis-Einträge hängen am Medikament, Analyte am Befund: sie
- * haben keine eigene `user_id`, ihr Scoping ist immer das des Elternteils. Wer
- * das von Hand als `m.user_id = ?` schreibt, schneidet die Betreuung (#584)
- * still wieder weg - genau das war #884: anlegen ging, wegräumen nicht. Die
- * Regel steht deshalb hier und nicht in jeder Route erneut.
- *
- * @param {string} sql         - SELECT … JOIN … WHERE <kind>.id = ?  (ohne Scope)
- * @param {string} parentAlias - Alias der Eltern-Tabelle mit `user_id`
- * @param {number} id          - ID des abhängigen Datensatzes
- * @param {number} viewer      - eingeloggter Nutzer
- */
-export function writableChild(sql, parentAlias, id, viewer) {
-  const w = writableClause(parentAlias, viewer);
-  return db.get().prepare(`${sql} AND ${w.sql}`).get(id, ...w.params) ?? null;
+export function pathId(req, name = 'id') {
+  return Number(req.params[name]);
 }
 
 /**
@@ -198,7 +92,7 @@ export function resolveOwner(req, viewer) {
 
   const ownerId = parseInt(raw, 10);
   if (!ownerId) return { error: 'Invalid user_id.', status: 400 };
-  if (!canWriteFor(viewer, ownerId)) {
+  if (!canWriteFor(db.get(), viewer, ownerId)) {
     // Bewusst 403 und nicht 404: dass es die Person gibt, weiß der Aufrufer aus
     // der Mitgliederliste ohnehin - verschleiert würde hier nichts, nur die
     // Ursache unklar gemacht.
@@ -264,7 +158,11 @@ export function sendCsv(res, filename, csv) {
   res.send(`﻿${csv}`);
 }
 
-/** Liest optionale from/to-Query als YYYY-MM-DD (nur wenn plausibel). */
+/**
+ * Liest optionale from/to-Query als YYYY-MM-DD (nur wenn plausibel). Dass es
+ * ein Kalendertag ist, prueft auch das Schema vor der Route (#2810); der Wert
+ * landet hier aber in SQL und im Dateinamen, und die Senke prueft selbst.
+ */
 export function exportRange(req) {
   const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from || '') ? req.query.from : null;
   const to   = /^\d{4}-\d{2}-\d{2}$/.test(req.query.to || '')   ? req.query.to   : null;

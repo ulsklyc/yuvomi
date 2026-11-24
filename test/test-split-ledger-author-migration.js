@@ -91,6 +91,8 @@ const snapshot = () => db.prepare('SELECT id, created_by FROM expense_ledger_ent
 const body = (amount) => ({
   title: 'Einkauf', amount, currency: 'EUR', split_method: 'equal', payer_id: OWN.id,
   participants: [OWN.id, PAY.id], expense_date: '2026-09-02',
+  // Die ganze Ausgabe (#2810): der PUT unten nimmt denselben Rumpf.
+  description: null, converted_amount: null, converted_currency: 'EUR', exchange_snapshot: null,
 });
 const created = await AUT.call('POST', `/split-expenses/groups/${GROUP}/expenses`, body('8.00'));
 assert.equal(created.status, 201);

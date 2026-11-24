@@ -6,7 +6,7 @@
  *        `red;position:fixed;inset:0` legte eine Flaeche ueber fremde Ansichten.
  *        Jeder Schreibweg prueft deshalb auf HEX, und die Anzeige laesst nur
  *        HEX durch.
- * Ausführen: node --experimental-sqlite --test test/test-avatar-color.js
+ * Ausführen: node --test test/test-avatar-color.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -15,11 +15,13 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { safeHexColor, AVATAR_FALLBACK_COLOR } = await import('../public/utils/color.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const INJECTION = 'red;position:fixed;inset:0;z-index:9999';
@@ -29,16 +31,16 @@ const KID = db.prepare("INSERT INTO users (username, display_name, password_hash
 const storedColor = (id) => db.prepare('SELECT avatar_color FROM users WHERE id = ?').get(id).avatar_color;
 
 const actor = { userId: 0, role: 'member' };
-const authApp = express();
-authApp.use(express.json());
-authApp.use(sessionMiddleware);
-authApp.use((req, _res, next) => {
-  if (actor.userId) { req.session.userId = actor.userId; req.session.role = actor.role; }
-  next();
+const authApp = await createAuthApp({
+  session: sessionMiddleware,
+  auth: (req, _res, next) => {
+    if (actor.userId) { req.session.userId = actor.userId; req.session.role = actor.role; }
+    next();
+  },
+  routers: [authRouter],
 });
-authApp.use('/', authRouter);
 const authServer = authApp.listen(0, '127.0.0.1');
-const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}`)));
+const authBase = await new Promise((r) => authServer.on('listening', () => r(`http://127.0.0.1:${authServer.address().port}${AUTH_PREFIX}`)));
 test.after(() => authServer.close());
 
 async function signIn(userId, role) {
@@ -66,13 +68,15 @@ hkApp.use((req, _res, next) => {
   req.sessionModuleAccess = null;
   next();
 });
-hkApp.use('/', housekeepingRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+hkApp.use('/api/v1/housekeeping', housekeepingRouter);
+hkApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const hkServer = hkApp.listen(0, '127.0.0.1');
 const hkBase = await new Promise((r) => hkServer.on('listening', () => r(`http://127.0.0.1:${hkServer.address().port}`)));
 test.after(() => hkServer.close());
 
 async function hkPost(body) {
-  const res = await fetch(`${hkBase}/worker`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(`${hkBase}/api/v1/housekeeping/worker`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return { status: res.status, body: await res.json() };
 }
 
@@ -80,18 +84,24 @@ test('PATCH /me/profile: ein Mitglied setzt sich keine CSS-Deklaration als Farbe
   const session = await signIn(KID, 'member');
   const r = await authCall('PATCH', '/me/profile', session, { avatar_color: INJECTION });
   assert.equal(r.status, 400, JSON.stringify(r.body));
-  assert.match(r.body.error, /avatar_color/);
+  // Seit #2810 (Gruppe 12a) weist das Dokument ab (`COLOR_PATTERN`), vor dem Handler.
+  assert.deepEqual(r.body.fields, [{ path: 'body/avatar_color', rule: 'pattern' }]);
   assert.equal(storedColor(KID), '#34C759', 'Farbe unveraendert');
 });
 
-test('PATCH /me/profile: HEX geht durch, leer faellt auf den Standard', async () => {
+test('PATCH /me/profile: HEX geht durch, leer und null sind keine Farbe', async () => {
   const session = await signIn(KID, 'member');
   const ok = await authCall('PATCH', '/me/profile', session, { avatar_color: '#ff9500' });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(storedColor(KID), '#ff9500');
-  const empty = await authCall('PATCH', '/me/profile', session, { avatar_color: '' });
-  assert.equal(empty.status, 200, JSON.stringify(empty.body));
-  assert.equal(storedColor(KID), '#007AFF');
+  // Bis #2810 (Gruppe 12a) fielen '' und null still auf den Standard #007AFF; die
+  // Seite schickt immer die gewaehlte Farbe. Jetzt 400, die Farbe bleibt.
+  for (const [avatarColor, rule] of /** @type {const} */ ([['', 'pattern'], [null, 'type']])) {
+    const empty = await authCall('PATCH', '/me/profile', session, { avatar_color: avatarColor });
+    assert.equal(empty.status, 400, JSON.stringify(empty.body));
+    assert.deepEqual(empty.body.fields, [{ path: 'body/avatar_color', rule }]);
+    assert.equal(storedColor(KID), '#ff9500');
+  }
 });
 
 test('POST /users und PATCH /users/:id lehnen eine Nicht-HEX-Farbe ab', async () => {
@@ -104,7 +114,7 @@ test('POST /users und PATCH /users/:id lehnen eine Nicht-HEX-Farbe ab', async ()
 
   const patched = await authCall('PATCH', `/users/${KID}`, session, { avatar_color: 'url(x)' });
   assert.equal(patched.status, 400, JSON.stringify(patched.body));
-  assert.equal(storedColor(KID), '#007AFF');
+  assert.equal(storedColor(KID), '#ff9500', 'Farbe unveraendert');
 });
 
 test('POST /worker lehnt eine Nicht-HEX-Farbe ab', async () => {

@@ -1,4 +1,21 @@
-import { op, jsonBody, stringPathParam } from '../helpers.js';
+import { op, jsonBody, stringPathParam, withValidationRefusal } from '../helpers.js';
+
+/**
+ * `?download=1` at both addresses of the OpenAPI document (#2810, group 13):
+ * only `1` sets the download header, so only `1` is accepted. `0`, `true`, an
+ * empty value or the key twice used to fall back silently to the inline
+ * answer; now they are a 400.
+ */
+const DOWNLOAD_PARAM = {
+  name: 'download',
+  in: 'query',
+  required: false,
+  description: '`1` sends the document with `Content-Disposition: attachment` as `openapi.json`. Without the parameter it is answered inline. Any other value is a 400.',
+  schema: { type: 'string', enum: ['1'] },
+};
+
+/** Too many requests to the feeds: one count of 30 per minute and address for all six. */
+const FEED_RATE_LIMITED = { description: 'More than 30 feed requests per minute from this address, counted across all six feeds.' };
 
 export function corePaths() {
   return {
@@ -13,6 +30,40 @@ export function corePaths() {
             content: { 'application/json': { schema: { $ref: '#/components/schemas/HealthResponse' } } },
           },
         },
+      }),
+    },
+    '/readyz': {
+      get: op({
+        summary: 'Readiness check',
+        operationId: 'getReadiness',
+        tag: 'System',
+        auth: false,
+        description: 'Whether this instance can serve right now. Unlike `/health`, which only says that the process answers and stays 200 during a restore, this answers 503 with a `reason` while a restore is running, the database connection is closed, the applied schema is behind this build, or the data directory is not writable. It does not write to the database. Point a load balancer or an uptime monitor here; keep a container healthcheck on `/health`, or the container is restarted in the middle of a restore.',
+        responses: /** @type {any} */ ({
+          200: {
+            description: 'The instance is ready',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ReadinessResponse' } } },
+          },
+          503: {
+            description: 'The instance is not ready; `reason` says why',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/NotReadyResponse' } } },
+          },
+        }),
+      }),
+    },
+    '/api/v1/system/diagnostics': {
+      get: op({
+        summary: 'Get system diagnostics',
+        operationId: 'getSystemDiagnostics',
+        tag: 'System',
+        admin: true,
+        description: 'What this installation runs on, for a bug report or a look at the last backup: version, runtime, schema, sizes, backup status, readiness. Never a key, a path, a hostname, the value of an environment variable or anything about a member. A single value that cannot be read is `null` (`schema_version`: 0) and does not fail the answer. Not cached.',
+        responses: /** @type {any} */ ({
+          200: {
+            description: 'Diagnostics of this installation',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/SystemDiagnosticsResponse' } } },
+          },
+        }),
       }),
     },
     '/api/v1/version': {
@@ -32,12 +83,13 @@ export function corePaths() {
       }),
     },
     '/api/v1/openapi.json': {
-      get: op({
+      get: withValidationRefusal(op({
         summary: 'Get OpenAPI specification',
         tag: 'System',
         admin: true,
-        description: 'Use `?download=1` to receive the OpenAPI document as a downloadable file.',
-      }),
+        description: 'Use `?download=1` to receive the OpenAPI document as a downloadable file; `download` takes no other value.',
+        params: [DOWNLOAD_PARAM],
+      })),
     },
     '/api/v1/changelog': {
       get: op({
@@ -47,12 +99,13 @@ export function corePaths() {
       }),
     },
     '/openapi.json': {
-      get: op({
+      get: withValidationRefusal(op({
         summary: 'Get OpenAPI specification',
         tag: 'System',
         admin: true,
-        description: 'Alias for `/api/v1/openapi.json`. Use `?download=1` to download the JSON file.',
-      }),
+        description: 'Alias for `/api/v1/openapi.json`. Use `?download=1` to download the JSON file; `download` takes no other value.',
+        params: [DOWNLOAD_PARAM],
+      })),
     },
     '/docs': {
       get: op({
@@ -79,6 +132,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -100,6 +154,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -121,6 +176,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -142,6 +198,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -163,6 +220,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -184,6 +242,7 @@ export function corePaths() {
             },
           },
           404: { description: 'Feed token not found' },
+          429: FEED_RATE_LIMITED,
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),

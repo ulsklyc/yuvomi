@@ -5,7 +5,7 @@
  *        inkl. Tages-Doppelbuchungs-Guard und Besuchssumme, Bezahlen/Löschen,
  *        Decay-Tasks-CRUD + Complete, Supply-Requests (koppelt Einkaufsartikel)
  *        und Maintenance-Log. Die Billing-Mathematik liegt in test-housekeeping.js.
- * Ausführen: node --experimental-sqlite --test test/test-housekeeping-routes.js
+ * Ausführen: node --test test/test-housekeeping-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -13,11 +13,10 @@ process.env.DB_PATH = ':memory:';
 
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { computeHourlyAmount } = await import('../server/services/housekeeping-billing.js');
 const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
 const { householdTimeZone, utcToWall } = await import('../server/utils/timezone.js');
@@ -27,27 +26,31 @@ const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_ha
 const MEMBER = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('mem','Mem','x','member')`).run().lastInsertRowid;
 
 let actor = { id: ADMIN, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  req.sessionModuleAccess = actor.moduleAccess ?? null;
-  req.authMethod = actor.authMethod;
-  req.authScopes = actor.authScopes ?? null;
-  next();
-});
 // Die Zahlungsaufgabe ist ein zweiter Weg an den bezahlten Besuch, deshalb
 // haengt der Aufgaben-Router mit im selben Server (GHSA-4p5w-5346-8598).
-app.use('/tasks-api', tasksRouter);
-app.use('/', housekeepingRouter);
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    req.sessionModuleAccess = actor.moduleAccess ?? null;
+    req.authMethod = actor.authMethod;
+    req.authScopes = actor.authScopes ?? null;
+    next();
+  },
+  after: [
+    // At its real prefix: validateRequest() finds its operation by the mount (#2810);
+    // call() keeps the short paths of this suite.
+    ['/api/v1/housekeeping', housekeepingRouter],
+  ],
+});
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, { as, body } = {}) {
   if (as) actor = as;
-  const res = await fetch(`${baseUrl}${path}`, {
+  const url = path.startsWith('/api/v1/tasks') ? `${baseUrl}${path}` : `${baseUrl}/api/v1/housekeeping${path}`;
+  const res = await fetch(url, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -295,7 +298,8 @@ test('DELETE /visits/:id: entfernt Besuch (danach 404)', async () => {
   // Seite sagt den Satz der App, laedt nach, und ein zweites Loeschen ist erledigt.
   assert.equal(get.body.reason, 'housekeeping_visit_not_found');
   for (const [method, path, body] of [
-    ['PUT', `/visits/${SESSION_ID}`, { daily_rate: 50, extras: 0 }],
+    // A valid body (`date` is required): a body outside the schema is a 400 before the lookup (#2810).
+    ['PUT', `/visits/${SESSION_ID}`, { date: '2026-11-01', daily_rate: 50, extras: 0 }],
     ['POST', `/visits/${SESSION_ID}/pay`, {}],
     ['POST', `/visits/${SESSION_ID}/unpay`, {}],
     ['DELETE', `/visits/${SESSION_ID}`, undefined],
@@ -963,7 +967,7 @@ test('bezahlter Besuch: Mitglied oeffnet die Zahlungsaufgabe nicht wieder (PATCH
   const { visitId, taskId } = await paidVisitWithTask('Pia', '2025-07-01');
   const before = visitRow(visitId);
 
-  const r = await call('PATCH', `/tasks-api/${taskId}/status`, { as: MEM, body: { status: 'open' } });
+  const r = await call('PATCH', `/api/v1/tasks/${taskId}/status`, { as: MEM, body: { status: 'open' } });
   assert.equal(r.status, 403, `erwartet 403, bekommen ${r.status} ${JSON.stringify(r.body)}`);
   assert.equal(taskStatus(taskId), 'done', 'die Aufgabe bleibt erledigt');
   assert.deepEqual(visitRow(visitId), before, 'der Besuch bleibt bezahlt und unveraendert');
@@ -980,7 +984,7 @@ test('bezahlter Besuch: Mitglied oeffnet die Zahlungsaufgabe nicht ueber das For
   const { visitId, taskId } = await paidVisitWithTask('Rosa', '2025-07-02');
   const before = visitRow(visitId);
 
-  const r = await call('PUT', `/tasks-api/${taskId}`, { as: MEM, body: { status: 'in_progress' } });
+  const r = await call('PUT', `/api/v1/tasks/${taskId}`, { as: MEM, body: { status: 'in_progress' } });
   assert.equal(r.status, 403, `erwartet 403, bekommen ${r.status} ${JSON.stringify(r.body)}`);
   assert.equal(taskStatus(taskId), 'done');
   assert.deepEqual(visitRow(visitId), before);
@@ -989,7 +993,7 @@ test('bezahlter Besuch: Mitglied oeffnet die Zahlungsaufgabe nicht ueber das For
 test('bezahlter Besuch: ein Admin darf die Zahlungsaufgabe wieder oeffnen', async () => {
   const { visitId, taskId } = await paidVisitWithTask('Sara', '2025-07-03');
 
-  const r = await call('PATCH', `/tasks-api/${taskId}/status`, { as: ADM, body: { status: 'open' } });
+  const r = await call('PATCH', `/api/v1/tasks/${taskId}/status`, { as: ADM, body: { status: 'open' } });
   assert.equal(r.status, 200, `erwartet 200, bekommen ${r.status} ${JSON.stringify(r.body)}`);
   assert.equal(taskStatus(taskId), 'open');
   assert.equal(visitRow(visitId).paid_at, null, 'der Admin nimmt die Zahlung damit zurueck');
@@ -1006,9 +1010,9 @@ test('unbezahlter Besuch: Mitglied bewegt die Zahlungsaufgabe weiter frei', asyn
   const { payment_task_id: taskId } = db.prepare('SELECT payment_task_id FROM housekeeping_work_sessions WHERE id = ?').get(visitId);
   assert.ok(taskId, 'Fixture: der Besuch hat eine Zahlungsaufgabe');
 
-  const progress = await call('PATCH', `/tasks-api/${taskId}/status`, { as: MEM, body: { status: 'in_progress' } });
+  const progress = await call('PATCH', `/api/v1/tasks/${taskId}/status`, { as: MEM, body: { status: 'in_progress' } });
   assert.equal(progress.status, 200, `erwartet 200, bekommen ${progress.status} ${JSON.stringify(progress.body)}`);
-  const done = await call('PATCH', `/tasks-api/${taskId}/status`, { as: MEM, body: { status: 'done' } });
+  const done = await call('PATCH', `/api/v1/tasks/${taskId}/status`, { as: MEM, body: { status: 'done' } });
   assert.equal(done.status, 200, 'abhaken bleibt Mitgliedssache - es ist dasselbe wie Bezahlen');
   assert.ok(visitRow(visitId).paid_at, 'abgehakt heisst bezahlt');
 });

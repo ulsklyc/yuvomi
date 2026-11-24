@@ -9,7 +9,7 @@
  *          - ein privater Beleg bleibt für die Gruppe unsichtbar
  *          - PUT ohne das Feld lässt Belege stehen
  *          - proof_document_id einer Zahlung wird gegen die Sichtbarkeit geprüft
- * Ausführen: node --experimental-sqlite --test test/test-split-expenses-attachments.js
+ * Ausführen: node --test test/test-split-expenses-attachments.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -21,6 +21,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 function mkUser(username, role = 'member') {
@@ -34,6 +36,7 @@ const ADMIN = mkUser('admin', 'admin');
 let actor = { id: OWNER, role: 'member' };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
@@ -43,9 +46,12 @@ app.use((req, _res, next) => {
   req.authScopes = actor.authScopes ?? null;
   next();
 });
-app.use('/', splitRouter);
+// Der echte Praefix aus server/index.js samt zentralem Fehlerhandler: validateRequest()
+// liest die Operation aus `req.baseUrl` (#2810).
+app.use('/api/v1/split-expenses', splitRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/split-expenses`)));
 test.after(() => server.close());
 
 async function call(method, path, { as = { id: OWNER, role: 'member' }, body } = {}) {
@@ -80,6 +86,17 @@ test('setup: Gruppe mit Owner und Mitglied', async () => {
   GROUP = created.body.data.id;
   const added = await call('POST', `/groups/${GROUP}/members`, { body: { user_id: MEM, role: 'admin' } });
   assert.equal(added.status, 201);
+});
+
+/**
+ * PUT /expenses/:id nimmt die ganze Ausgabe (#2810). Ergaenzt, was ein Rumpf
+ * dieser Datei weglaesst, um genau den Wert, fuer den das Weglassen bis v2.93
+ * stand: keine Notiz, kein Kurs, umgerechnet = eingegeben, `equal`.
+ * @param {Record<string, any>} body
+ */
+const whole = (body) => ({
+  description: null, converted_amount: null, converted_currency: body.currency ?? 'EUR', exchange_snapshot: null,
+  split_method: 'equal', ...body,
 });
 
 async function createExpense(body, options = {}) {
@@ -131,7 +148,7 @@ test('PUT /expenses/:id: ersetzt die Beleg-Liste', async () => {
   const expense = await createExpense({ attachment_document_ids: [alt] });
 
   const res = await call('PUT', `/expenses/${expense.id}`, {
-    body: { title: 'Einkauf', amount: '30.00', currency: 'EUR', expense_date: '2030-06-01', attachment_document_ids: [neu] },
+    body: whole({ title: 'Einkauf', amount: '30.00', currency: 'EUR', expense_date: '2030-06-01', attachment_document_ids: [neu] }),
   });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.data.attachments.map((a) => a.document_id), [neu]);
@@ -142,7 +159,7 @@ test('PUT /expenses/:id: ohne das Feld bleiben Belege unangetastet', async () =>
   const expense = await createExpense({ attachment_document_ids: [doc] });
 
   const res = await call('PUT', `/expenses/${expense.id}`, {
-    body: { title: 'Korrigiert', amount: '31.00', currency: 'EUR', expense_date: '2030-06-01' },
+    body: whole({ title: 'Korrigiert', amount: '31.00', currency: 'EUR', expense_date: '2030-06-01' }),
   });
   assert.equal(res.body.data.title, 'Korrigiert');
   assert.deepEqual(res.body.data.attachments.map((a) => a.document_id), [doc]);
@@ -155,7 +172,7 @@ test('PUT /expenses/:id: fremder privater Beleg überlebt das Speichern durch an
 
   const res = await call('PUT', `/expenses/${expense.id}`, {
     as: { id: MEM, role: 'member' },
-    body: { title: 'Einkauf', amount: '30.00', currency: 'EUR', expense_date: '2030-06-01', attachment_document_ids: [gemeinsam] },
+    body: whole({ title: 'Einkauf', amount: '30.00', currency: 'EUR', expense_date: '2030-06-01', attachment_document_ids: [gemeinsam] }),
   });
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.data.attachments.map((a) => a.document_id), [gemeinsam]);
@@ -218,7 +235,7 @@ test('Dokumentenrecht: ohne documents-Lesen kommen keine Belege und keine Anzahl
   assert.deepEqual(await listed(TOKEN), null, 'ein Token ohne documents-Scope ebenso');
   assert.deepEqual(await listed(TOKEN_DOCS), open);
 
-  const put = await call('PUT', `/expenses/${expense.id}`, { as: NONE, body: expenseBody({ title: 'Rechteprobe' }) });
+  const put = await call('PUT', `/expenses/${expense.id}`, { as: NONE, body: whole(expenseBody({ title: 'Rechteprobe' })) });
   assert.equal(put.status, 200);
   assert.deepEqual(docFields(put.body.data.attachments), null, 'PUT-Antwort');
   assert.deepEqual(linkedDocumentIds(expense.id), [doc]);
@@ -239,7 +256,7 @@ test('Dokumentenrecht: ohne documents-Lesen verknuepft POST/PUT nichts, jede ID 
     assert.deepEqual({ status: invalid.status, body: invalid.body }, { status: 403, body: valid.body }, `${label}: POST gleich`);
     assert.equal(count(), before, `${label}: keine Ausgabe angelegt`);
 
-    const put = (ids) => call('PUT', `/expenses/${expense.id}`, { as, body: expenseBody({ title: 'Schreibprobe', attachment_document_ids: ids }) });
+    const put = (ids) => call('PUT', `/expenses/${expense.id}`, { as, body: whole(expenseBody({ title: 'Schreibprobe', attachment_document_ids: ids })) });
     for (const ids of [[other], [doc], [987654]]) {
       const res = await put(ids);
       assert.deepEqual({ status: res.status, body: res.body }, { status: 403, body: valid.body }, `${label}: PUT ${ids}`);
@@ -259,7 +276,7 @@ test('Dokumentenrecht: ohne documents-Lesen verknuepft POST/PUT nichts, jede ID 
       `${label}: gueltiger und ungueltiger Nachweis antworten gleich`);
     assert.equal((await settle(null)).status, 201, `${label}: eine Zahlung ohne Nachweis geht`);
   }
-  const readable = await call('PUT', `/expenses/${expense.id}`, { as: TOKEN_DOCS, body: expenseBody({ title: 'Schreibprobe', attachment_document_ids: [other] }) });
+  const readable = await call('PUT', `/expenses/${expense.id}`, { as: TOKEN_DOCS, body: whole(expenseBody({ title: 'Schreibprobe', attachment_document_ids: [other] })) });
   assert.equal(readable.status, 200);
   assert.deepEqual(linkedDocumentIds(expense.id), [other]);
 });

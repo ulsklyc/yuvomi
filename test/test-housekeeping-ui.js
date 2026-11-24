@@ -681,13 +681,93 @@ test('Uebersicht: das Zahlungsdiagramm zeigt Saeulen mit Legende, leere Monate o
   assert.equal(values.length, 4, 'eine Wertzeile je Monat');
   assert.equal(values[0], '', 'ein leerer Monat traegt keinen Betrag ("0,00 €")');
   assert.doesNotMatch(values[2], /[.,]00/, `ganze Betraege ohne Nachkommastellen (${values[2]})`);
-  assert.match(values[3], /57[.,]5/, 'ein krummer Betrag behaelt seine Stellen');
+  // Die Beschriftung ueber der Saeule ist immer ganz (#2772-Folge): "57,50 €"
+  // stand bei 320px ueber der Nachbarin. Kaufmaennisch gerundet wird 57,5 zu 58.
+  assert.match(values[3], /^58\s?€$/u, `ein krummer Betrag steht im Diagramm gerundet und ganz (${values[3]})`);
+  // Der genaue Betrag bleibt im zugaenglichen Namen der Spalte und im Titel der Spur.
+  const names = [...html.matchAll(/role="listitem" aria-label="([^"]*)"/g)].map((m) => m[1]);
+  assert.match(names[3] ?? '', /57[.,]50/, `der Name der Spalte nennt den genauen Betrag (${names[3]})`);
+  assert.match(html, /title="[^"]*57[.,]50/, 'der Titel der Spur nennt den genauen Betrag');
   const bars = [...html.matchAll(/housekeeping-chart__bar" style="([^"]*)"/g)].map((m) => m[1]);
   assert.equal(bars.length, 3, 'ein leerer Monat hat keine Saeule, nur die Grundlinie');
   assert.match(bars[0], /--paid-share:100\.0%/, 'ganz bezahlt');
   assert.match(bars[1], /--paid-share:26\.3%/, '100 von 380 bezahlt, der Rest ist offen');
   assert.match(html, /housekeeping-chart__legend[\s\S]*housekeeping\.paymentPaid[\s\S]*housekeeping\.paymentPending/, 'die Legende nennt bezahlt und ausstehend');
   assert.match(html, /role="listitem" aria-label="[^"]*housekeeping\.paymentPending/, 'jede Saeule nennt ihren offenen Teil im Namen');
+});
+
+// Sechs Monate passen in die schmalste Karte. Mit 44px Mindestbreite und 12px
+// Luecke brauchten sechs Spalten 324px; die Karte bietet bei 320px Fenster
+// innen 254px (bei 375px 309px), das Diagramm scrollte seitlich und der
+// laufende Monat ganz rechts war abgeschnitten. Gerechnet wird mit den
+// Deklarationen aus housekeeping.css und den Token aus tokens.css; die beiden
+// Breiten unten sind Messwerte und stehen hier als Eingabe: die Innenbreite
+// der Karte (Browser, 320px Fenster) und "9.999 €" in der Systemschrift bei
+// 11px mit tabellarischen Ziffern (AppKit, 41.5px). Ob der Browser die Regeln
+// so anwendet, misst dieser Test nicht. Seit der Folge zu #2772 rundet
+// chartMoney() auch krumme Summen auf ganze Betraege (vorher "999,50 €" 48.5px,
+// "1.234,50 €" 58.8px - breiter als die 44px zwischen zwei Spaltenmitten bei
+// 254px); damit gilt die Rechnung fuer jede Monatssumme bis vier Stellen.
+// Fuenfstellige Monatssummen ("10.000 €") liegen ausserhalb der Rechnung.
+test('Uebersicht: sechs Monatsspalten passen ab 320px Fenster ohne Scrollen in die Karte', () => {
+  const CARD_INNER = 254;
+  const VALUE_4_DIGITS = 41.5;
+  const tokensCss = readFileSync(new URL('../public/styles/tokens.css', import.meta.url), 'utf8');
+  const tokenPx = (/** @type {string} */ name) => {
+    const value = tokensCss.match(new RegExp(`${name}:\\s*(\\d+(?:\\.\\d+)?)px`))?.[1];
+    assert.ok(value, `${name} ist in tokens.css kein Pixelwert`);
+    return Number(value);
+  };
+  /**
+   * Wertet eine Laengenangabe aus; Prozent gelten gegen `basis`.
+   * @param {string} decl
+   * @param {number} basis
+   * @returns {number}
+   */
+  const px = (decl, basis) => {
+    const js = decl
+      .replace(/var\((--space-[\w]+)\)/g, (_m, name) => String(tokenPx(name)))
+      .replace(/(\d+(?:\.\d+)?)%/g, (_m, n) => String((Number(n) / 100) * basis))
+      .replace(/(\d)px/g, '$1')
+      .replace(/calc\(/g, '(')
+      .replace(/min\(/g, 'Math.min(')
+      .replace(/max\(/g, 'Math.max(');
+    assert.match(js, /^[\d\s.+\-*/(),Mathminax]+$/, `die Angabe enthaelt etwas, das der Test nicht rechnet: ${decl} -> ${js}`);
+    return Function(`"use strict"; return (${js});`)();
+  };
+  /** @typedef {{ selector: string, body: string, at: string[] }} CssRule */
+  const base = (/** @type {string} */ selector) => [...eachRule(HK_STYLES)]
+    .filter((/** @type {CssRule} */ r) => !r.at.length && r.selector.split(',').map((s) => s.trim()).includes(selector))
+    .map((/** @type {CssRule} */ r) => r.body).join('\n');
+  const prop = (/** @type {string} */ body, /** @type {string} */ name) => [...body.matchAll(new RegExp(`(?:^|[\\s;{])${name}:\\s*([^;]+);`, 'g'))].at(-1)?.[1].trim() ?? null;
+
+  const chart = base('.housekeeping-chart');
+  const column = base('.housekeeping-chart__bar-wrap');
+  const gapDecl = prop(chart, 'column-gap') ?? prop(chart, 'gap');
+  assert.ok(gapDecl, '.housekeeping-chart setzt eine Luecke');
+  const gap = px(gapDecl.split(/\s+(?![^(]*\))/).at(-1) ?? gapDecl, CARD_INNER);
+  const minWidth = px(prop(column, 'min-width') ?? '0', CARD_INNER);
+  const needed = 6 * minWidth + 5 * gap;
+  const reserve = tokenPx('--space-2');
+  assert.ok(needed <= CARD_INNER - reserve,
+    `sechs Spalten brauchen ${needed}px, die Karte bietet bei 320px Fenster ${CARD_INNER}px (Reserve ${reserve}px)`);
+
+  // Die Wertbeschriftung "9.999 €" ist breiter als die Spalte. Sie darf nicht
+  // in die Nachbarin laufen und am Rand nicht vom Scrollport beschnitten werden.
+  const columnWidth = (CARD_INNER - 5 * gap) / 6;
+  assert.ok(columnWidth + gap >= VALUE_4_DIGITS,
+    `zwei vierstellige Betraege stehen ${columnWidth + gap}px auseinander, brauchen ${VALUE_4_DIGITS}px`);
+  const overhang = Math.max(0, (VALUE_4_DIGITS - columnWidth) / 2);
+  const bleed = px(prop(chart, 'padding-inline') ?? '0', CARD_INNER);
+  assert.ok(overhang <= bleed,
+    `am Rand steht der Betrag ${overhang.toFixed(1)}px ueber, der Scrollport reicht ${bleed}px weiter`);
+  assert.equal(px(prop(chart, 'margin-inline') ?? '0', CARD_INNER), -bleed,
+    'der Bleed nimmt sich zurueck, was das Polster gibt - der Inhaltsrand bleibt');
+  assert.equal(prop(column, 'grid-template-columns'), 'minmax(0, 1fr)',
+    'die Spur der Spalte waechst nicht mit der Beschriftung und schiebt die Saeule nicht aus der Mitte');
+
+  // Breite Fenster sehen aus wie vorher: ab 300px Innenbreite bleibt die Luecke bei --space-3.
+  assert.equal(px(gapDecl, 324), tokenPx('--space-3'), 'bei 390px Fenster (324px) bleibt die Luecke 12px');
 });
 
 // R24 (E2, Ulas 28.10.): die Besuche fuehrten am Desktop vier Kacheln (Besuche,

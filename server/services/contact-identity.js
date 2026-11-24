@@ -26,6 +26,12 @@
  * Token-Inhabers vorbei. Alle anderen Felder bleiben fuer jeden mit
  * Schreibrecht auf Kontakte editierbar. Ein Schreibweg ohne handelnde Person
  * (der CardDAV-Sync) erfuellt nichts davon und laesst die Adressen stehen.
+ *
+ * Ein angemeldetes Geraet hat keinen vollen Zugriff, auch wenn sein Credential
+ * keine Scopes traegt: SECURITY.md sagt zu, dass es weder Passwort noch E-Mail
+ * noch den zweiten Faktor aendert. Die Allowlist in server/auth.js haelt das
+ * fuer die Routen unter /auth; diese Adressen liegen ausserhalb davon und
+ * fuehren zum selben Konto.
  */
 
 import { isAdminRequest } from '../middleware/require-admin.js';
@@ -37,7 +43,8 @@ import { accountIdsByEmail, emailMatchKey } from '../utils/email-match.js';
  * `fullAccess` folgt `req.authScopes`, das `requireAuth` setzt: `null` fuer
  * eine Sitzung und ein ungescoptes Token, eine Liste fuer ein gescoptes Token
  * und ein Wandtablett. Dieselbe Unterscheidung trifft das Scope-Gate in
- * server/index.js.
+ * server/index.js. Ein angemeldetes Geraet (`req.authDeviceId`) traegt keine
+ * Scopes und hat trotzdem keinen vollen Zugriff.
  * @param {import('express').Request} req
  * @returns {{ userId: number|null, isAdmin: boolean, fullAccess: boolean }}
  */
@@ -45,7 +52,7 @@ export function contactActorFromRequest(req) {
   return {
     userId: req.authUserId ?? null,
     isAdmin: isAdminRequest(req),
-    fullAccess: req.authScopes == null,
+    fullAccess: req.authScopes == null && req.authDeviceId == null,
   };
 }
 
@@ -59,7 +66,8 @@ export function contactActorFromRequest(req) {
 export function mayChangeContactEmails(contact, actor) {
   if (!contact?.family_user_id) return true;
   if (!actor) return false;
-  // Ein gescoptes Token nie - auch nicht das des Admins oder der Person selbst.
+  // Ein gescoptes Token und ein angemeldetes Geraet nie - auch nicht das des
+  // Admins oder der Person selbst.
   if (actor.fullAccess !== true) return false;
   if (actor.isAdmin === true) return true;
   return actor.userId != null && Number(actor.userId) === Number(contact.family_user_id);

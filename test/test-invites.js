@@ -4,7 +4,7 @@
  *        list/cleanup) gegen das echte Migrations-SQL aus v121, dazu die fünf
  *        Einladungs-Routen: Admin-Gate, CSRF, und dass Rolle und Familienrolle
  *        aus der Einladung stammen statt aus dem Body des Eingeladenen.
- * Ausführen: node --experimental-sqlite test/test-invites.js
+ * Ausführen: node test/test-invites.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 // Muss vor dem ersten db.js-Import stehen, sonst legt der Import eine echte
@@ -15,6 +15,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 
@@ -113,7 +114,7 @@ test('markAccepted greift nach Ablauf nicht mehr, auch mit gültig geprüftem To
   const db = makeDb();
   const { token } = svcAt(db, T0).createInvite({ createdBy: 1 });
   // Der Ablauf faellt zwischen verifyToken und markAccepted: beim Einloesen liegt
-  // dazwischen ein bcrypt-Hash von rund 300 ms.
+  // dazwischen ein Passwort-Hash (Argon2id, rund 20 ms).
   assert.notEqual(svcAt(db, T0).verifyToken(token), null);
   assert.equal(svcAt(db, AFTER_TTL).markAccepted(token, 2), 0);
   assert.equal(db.prepare('SELECT accepted_at FROM invites').get().accepted_at, null);
@@ -227,12 +228,6 @@ const sentMails = [];
 let actor = ADM;
 let mailConfigured = true;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.session = { csrfToken: CSRF, ...(actor ? { userId: actor.id, role: actor.role } : {}) };
-  next();
-});
 const inviteRouter = express.Router();
 buildInviteRoutes(inviteRouter, {
   database: routeDb,
@@ -244,10 +239,18 @@ buildInviteRoutes(inviteRouter, {
   baseUrl: 'https://yuvomi.test',
   limiter: (_req, _res, next) => next(), // Rate-Limit im Test überbrücken
 });
-app.use('/auth', inviteRouter);
+// At the real prefix (test/auth-app.js); the paths below say `/auth/...`, the
+// base carries `/api/v1`.
+const app = await createAuthApp({
+  auth: (req, _res, next) => {
+    req.session = { csrfToken: CSRF, ...(actor ? { userId: actor.id, role: actor.role } : {}) };
+    next();
+  },
+  routers: [inviteRouter],
+});
 const server = app.listen(0, '127.0.0.1');
 const routeBase = await new Promise((r) =>
-  server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+  server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1`)));
 
 async function call(method, path, { actor: a, body, csrf = CSRF } = {}) {
   if (a !== undefined) actor = a;
@@ -369,8 +372,14 @@ test('GET /invites liefert nie token oder token_hash', async () => {
 });
 
 test('GET /invites/preview: Unsinn-Token liefert valid false statt 500', async () => {
+  // Ohne `token` weist seit #2810 (Gruppe 12a) das Dokument ab (der Parameter ist Pflicht).
   for (const query of ['?token=quatsch', '?token=', '']) {
     const res = await call('GET', `/auth/invites/preview${query}`, { actor: null });
+    if (query === '') {
+      assert.equal(res.status, 400);
+      assert.deepEqual(res.body.fields, [{ path: 'query/token', rule: 'required' }]);
+      continue;
+    }
     assert.equal(res.status, 200);
     assert.equal(res.body.data.valid, false);
   }
@@ -550,7 +559,7 @@ test('createInvite speichert das Startrechte-Set als Text, oder null', () => {
 });
 
 test('die enge Vorlage sperrt genau die drei persönlichen Module', async () => {
-  const { invitePresetPermissions, INVITE_RESTRICTED_MODULES } = await import('../server/permissions.js');
+  const { invitePresetPermissions, INVITE_RESTRICTED_MODULES } = await import('../server/authorize/index.ts');
   const restricted = invitePresetPermissions('restricted');
   assert.deepEqual(Object.keys(restricted.modules).sort(), [...INVITE_RESTRICTED_MODULES].sort());
   for (const access of Object.values(restricted.modules)) assert.equal(access, 'none');
@@ -599,7 +608,7 @@ test('accept schreibt die Startrechte, bevor das Konto benutzbar ist', async () 
   ]);
   // Und die Auflösung sagt dasselbe - die Zeilen allein wären nur die halbe
   // Zusicherung, wenn resolvePermissions() sie nicht anwendete.
-  const { resolvePermissions } = await import('../server/permissions.js');
+  const { resolvePermissions } = await import('../server/authorize/index.ts');
   const resolved = resolvePermissions(routeDb, { id: userId, role: 'member', family_role: 'other' });
   assert.equal(resolved.modules.health, 'none');
   assert.equal(resolved.widgets.cycle, 'none', 'ein Widget erbt die Sperre seines Moduls');

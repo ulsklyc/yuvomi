@@ -39,6 +39,7 @@ delete process.env.OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM;
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
 
 import { startTestServer, cookieHeader } from './server-ready.js';
 
@@ -326,7 +327,7 @@ test('ein deaktivierter Gast kommt nicht NEU in eine Gruppe, seine alte Mitglied
   assert.equal(r.status, 200);
   assert.equal(r.body.outcome, 'deactivated');
 
-  const second = await OWN.call('POST', '/split-expenses/groups', { name: 'Urlaub', type: 'trip', default_currency: 'EUR' });
+  const second = await OWN.call('POST', '/split-expenses/groups', { name: 'Urlaub', type: 'travel', default_currency: 'EUR' });
   assert.equal(second.status, 201);
   const add = await OWN.call('POST', `/split-expenses/groups/${second.body.data.id}/members`, { user_id: gid, role: 'guest' });
   assert.equal(add.status, 400, 'nicht neu in eine andere Gruppe');
@@ -816,8 +817,6 @@ test('ein Wandtablett laesst sich hier nicht entfernen, und seine Kopplung bleib
 // Datenbank wie der Server. Der echte Server haengt am echten Mailversand,
 // und der ist in einer Suite nicht eingerichtet.
 const mails = [];
-const resetApp = express();
-resetApp.use(express.json());
 const resetRouter = express.Router();
 buildResetRoutes(resetRouter, {
   database: db,
@@ -826,11 +825,11 @@ buildResetRoutes(resetRouter, {
   baseUrl: 'https://yuvomi.example',
   limiter: (_req, _res, next) => next(),
 });
-resetApp.use(resetRouter);
+const resetApp = await createAuthApp({ routers: [resetRouter] });
 const resetServer = resetApp.listen(0, '127.0.0.1');
 await new Promise((resolve) => resetServer.on('listening', resolve));
 test.after(() => resetServer.close());
-const RESET = `http://127.0.0.1:${resetServer.address().port}`;
+const RESET = `http://127.0.0.1:${resetServer.address().port}${AUTH_PREFIX}`;
 
 async function forgot(identifier) {
   const before = mails.length;

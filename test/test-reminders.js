@@ -1,7 +1,7 @@
 /**
  * Modul: Reminders-Test
  * Zweck: Validiert DB-Schema und Abfragen für Erinnerungen
- * Ausführen: node --experimental-sqlite test-reminders.js
+ * Ausführen: node test-reminders.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

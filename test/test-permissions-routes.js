@@ -5,7 +5,7 @@
  *        test-permissions.js abgedeckt; hier geht es um die Route-Schicht:
  *        das requireAdmin-Gate (Privilege-Escalation-Schutz), Payload-Validierung,
  *        Round-Trip-Persistenz und die Admin-Ziel-Sonderregel.
- * Ausführen: node --experimental-sqlite --test test/test-permissions-routes.js
+ * Ausführen: node --test test/test-permissions-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -14,10 +14,15 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
+import {
+  recordingLog, withTableGone, requestLogged, assertFixed500, FIXED_500,
+} from './helpers/forced-db-error.js';
 
 const dbmod = await import('../server/db.js');
 const { default: permissionsRouter } = await import('../server/routes/permissions.js');
 const db = dbmod.get();
+const { resolveRequestModuleAccess } = await import('../server/authorize/index.ts');
 
 function mkUser(username, role = 'member', familyRole = 'child') {
   return db.prepare(
@@ -35,11 +40,20 @@ app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
+  // As requireAuth does (server/auth.js): the module rights, and the request
+  // registered for its actor. Since C1 the admin gate asks authorize() with the
+  // request's actor, which logs an error when built for a request that never
+  // passed requireAuth.
+  req.sessionModuleAccess = resolveRequestModuleAccess(db, req);
   next();
 });
-app.use('/', permissionsRouter);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/permissions', permissionsRouter);
+// Wie server/index.js: der zentrale Fehlerhandler steht hinter dem Router.
+const handlerLog = recordingLog();
+app.use(createErrorHandler(handlerLog));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/permissions`)));
 
 async function call(method, path, { actor: a, body } = {}) {
   if (a) actor = a;
@@ -240,6 +254,7 @@ test('PUT /user rolls permission revocation back when fasting cleanup fails', as
       body: { capabilities: { health_use_fasting: 'none' } },
     });
     assert.equal(response.status, 500);
+    assert.deepEqual(response.body, FIXED_500, 'fester Satz, kein Text des Triggers');
     assert.equal(db.prepare(`SELECT access FROM access_permissions
       WHERE subject_type = 'user' AND subject_id = ?
         AND resource_type = 'capability' AND resource_key = 'health_use_fasting'`).get(String(userId)).access, 'allow');
@@ -266,6 +281,7 @@ test('PUT /role rolls permission revocation back when fasting cleanup fails', as
       body: { capabilities: { health_use_fasting: 'none' } },
     });
     assert.equal(response.status, 500);
+    assert.deepEqual(response.body, FIXED_500, 'fester Satz, kein Text des Triggers');
     assert.equal(db.prepare(`SELECT access FROM access_permissions
       WHERE subject_type = 'role' AND subject_id = ?
         AND resource_type = 'capability' AND resource_key = 'health_use_fasting'`).get(familyRole).access, 'allow');
@@ -277,6 +293,58 @@ test('PUT /role rolls permission revocation back when fasting cleanup fails', as
     db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'role' AND subject_id = ?`).run(familyRole);
   }
 });
+
+// --------------------------------------------------------------------------
+// Datenbankfehler (Phase 1b Abschnitt E, Pilot des zentralen Fehlerhandlers).
+// Jede Route antwortet auf einen SQLite-Fehler mit 500 und dem festen Satz,
+// ohne SQLite-Text im Rumpf, und der Fehler steht genau einmal im Log - gleich,
+// ob die Route selbst antwortet oder ihn dem Handler überlässt. Die Übersetzung
+// der Validator-Fehler in 400 bleibt daneben, was sie war.
+// --------------------------------------------------------------------------
+test('GET /catalog: Datenbankfehler -> 500 mit festem Satz, kein SQLite-Text im Rumpf', async () => {
+  actor = ADM;
+  const answer = await withTableGone(db, 'users', () => requestLogged(baseUrl, handlerLog, 'GET', '/catalog'));
+  assertFixed500(answer, 'no such table: users', 'GET /catalog');
+});
+
+// 'child' ist die Familienrolle von MEMBER; ein leeres Profil ist gültige Eingabe.
+const BROKEN_ROUTES = [
+  { method: 'GET', name: '/role/:familyRole', path: '/role/child' },
+  { method: 'PUT', name: '/role/:familyRole', path: '/role/child', body: { modules: {} } },
+  { method: 'GET', name: '/user/:userId', path: `/user/${MEMBER}` },
+  { method: 'PUT', name: '/user/:userId', path: `/user/${MEMBER}`, body: { modules: {} } },
+];
+for (const { method, name, path, body } of BROKEN_ROUTES) {
+  test(`${method} ${name}: Datenbankfehler -> 500 mit festem Satz, kein SQLite-Text im Rumpf`, async () => {
+    actor = ADM;
+    const answer = await withTableGone(db, 'access_permissions', () => requestLogged(baseUrl, handlerLog, method, path, body));
+    assertFixed500(answer, 'no such table: access_permissions', `${method} ${name}`);
+  });
+}
+
+for (const [name, path] of [['/role/:familyRole', '/role/child'], ['/user/:userId', `/user/${MEMBER}`]]) {
+  test(`PUT ${name}: ein Validator-Fehler bleibt 400 mit seinem Satz und ohne Fehlerzeile im Log`, async () => {
+    actor = ADM;
+    const catalog = await requestLogged(baseUrl, handlerLog, 'GET', '/catalog');
+    const moduleKey = String(catalog.body.data.modules[0].key);
+
+    const unknown = await requestLogged(baseUrl, handlerLog, 'PUT', String(path), { modules: { __no_such_module__: 'read' } });
+    assert.equal(unknown.status, 400);
+    assert.deepEqual(unknown.body, { error: 'Unknown module: __no_such_module__', code: 400 });
+    // Since #2810 the access level is a rule of the schema (`none|read|write`):
+    // the schema check answers before the handler, with the field instead of
+    // the sentence. The key stays the handler's rule (the module list is dynamic).
+    const invalid = await requestLogged(baseUrl, handlerLog, 'PUT', String(path), { modules: { [moduleKey]: 'bogus-access' } });
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(invalid.body, {
+      error: 'The request does not match the documented schema.',
+      code: 400,
+      reason: 'validation',
+      fields: [{ path: `body/modules/${moduleKey}`, rule: 'enum' }],
+    });
+    assert.deepEqual([...unknown.errorLines, ...invalid.errorLines], []);
+  });
+}
 
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));

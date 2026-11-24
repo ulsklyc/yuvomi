@@ -52,7 +52,9 @@ const { default: recipesRouter } = await import('../server/routes/recipes.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { default: pantryRouter } = await import('../server/routes/pantry.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 const U = db.prepare(`
@@ -67,6 +69,7 @@ const LIST = db.prepare(`INSERT INTO shopping_lists (name, created_by) VALUES ('
 let actor = { id: U, scopes: null };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor.id);
   req.authUserId = user.id;
@@ -83,6 +86,8 @@ app.use('/api/v1/recipes', recipesRouter);
 app.use('/api/v1/shopping', shoppingRouter);
 app.use('/api/v1/housekeeping', housekeepingRouter);
 app.use('/api/v1/pantry', pantryRouter);
+// The central error handler answers the 400 of validateRequest() as JSON (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => { server.close(); });

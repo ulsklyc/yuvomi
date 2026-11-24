@@ -85,8 +85,30 @@ test('OpenAPI: `lang` nennt genau die App-Sprachen', async () => {
   }
   assert.ok(langParams.length >= 2, `nur ${langParams.length} lang-Parameter gefunden - liest der Test die Spec noch?`);
 
+  // The weather routes read `lang` leniently (a region tag such as `de-AT`, an
+  // OpenWeatherMap code, anything else falls back), and validateRequest() checks
+  // the document since #2810: there it is plain text, an enum would refuse what
+  // the routes take. The geocode search still names the app languages.
+  // The budget categories read it the same way (#1859: an unknown code falls
+  // back to the household language, group 9 of #2810) and name the languages
+  // in the description. The holiday regions read it through
+  // supportedLocaleFor() (#1723: an unknown code answers in English, group 11b
+  // of #2810).
+  const LENIENT = new Map([
+    ['GET /api/v1/preferences/holidays/subdivisions/{countryCode}', { namesLocales: true }],
+    ['GET /api/v1/weather', { namesLocales: false }],
+    ['GET /api/v1/weather/geocode', { namesLocales: true }],
+    ['GET /api/v1/budget/categories', { namesLocales: true }],
+    ['GET /api/v1/budget/categories/{categoryKey}/subcategories', { namesLocales: true }],
+  ]);
   for (const { where, param } of langParams) {
-    assert.deepEqual(sorted(param.schema.enum), sorted(APP_LOCALES), `${where}: lang-Enum weicht von SUPPORTED_LOCALES ab`);
+    const lenient = LENIENT.get(where);
+    if (lenient) {
+      assert.deepEqual(param.schema, { type: 'string' }, `${where}: lang is plain text`);
+      if (!lenient.namesLocales) continue;
+    } else {
+      assert.deepEqual(sorted(param.schema.enum), sorted(APP_LOCALES), `${where}: lang-Enum weicht von SUPPORTED_LOCALES ab`);
+    }
     const genannt = param.description.match(/Supported values: ([^.]+)\./)?.[1].split(', ') ?? [];
     assert.deepEqual(sorted(genannt), sorted(APP_LOCALES), `${where}: die Beschreibung nennt andere Sprachen als das Enum`);
     // Ein Default ist nur dort genannt, wo er fest ist; nennt ihn die Spec, muss
@@ -104,7 +126,7 @@ test('OpenAPI: `lang` nennt genau die App-Sprachen', async () => {
     assert.ok(!('default' in param.schema), `${where}: kein fester Default, der Rueckfall ist die Haushaltssprache`);
     assert.match(param.description, /household language/, `${where}: die Beschreibung nennt den Rueckfall`);
   }
-  const andere = langParams.filter(({ where }) => !where.includes('/budget/categories'));
+  const andere = langParams.filter(({ where }) => !where.includes('/budget/categories') && !LENIENT.has(where));
   for (const { where, param } of andere) {
     assert.equal(param.schema.default, 'en', `${where}: faellt weiter auf Englisch`);
   }
@@ -161,7 +183,8 @@ function* jsFiles(dir) {
     const full = path.join(dir, name);
     if (name === 'node_modules' || name === 'vendor' || name === 'locales') continue;
     if (statSync(full).isDirectory()) yield* jsFiles(full);
-    else if (/\.(m?js)$/.test(name)) yield full;
+    // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
+    else if (/\.(m?js|ts)$/.test(name)) yield full;
   }
 }
 

@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatMoney, formatSignedAmount, formatMoneyAxis, currencySymbol, setFallbackCurrency } from '../public/utils/money.js';
-import { toDecimalString, toAmountDecimalString, amountInputToCents, centsToAmountInput, amountToInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, currencyFractionDigits, parseAmountInput, smallestUnitLabel } from '../public/utils/money.js';
+import { toDecimalString, toAmountDecimalString, amountInputToCents, centsToAmountInput, amountToInput, breaksOffAtSeparator, toStoredNumber, amountInputProblem, amountExample, amountPlaceholder, currencyFractionDigits, parseAmountInput, smallestUnitLabel } from '../public/utils/money.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
 
 /**
@@ -354,6 +354,34 @@ test('amountInputProblem: der Grund, warum ein Betrag nicht speicherbar ist (#16
   // umstellt, hat das Raster gewechselt (wie bei amountIsSavable).
   assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'JPY' }), null);
   assert.equal(grund('en-US', '12.50', 'JPY', { original: '12.50', originalCurrency: 'EUR' }), 'precision');
+
+  // `digits`: die Stellen, die der Server fuehrt, ersetzen die der Waehrung
+  // (exakte Anteile einer Umrechnung nach HUF, #2810). Ohne Option bleibt HUF
+  // beim CLDR (0 Stellen).
+  assert.equal(grund('de', '1790,74', 'HUF'), 'precision');
+  assert.equal(grund('de', '1790,74', 'HUF', { digits: 2 }), null);
+  assert.equal(grund('de', '1790,745', 'HUF', { digits: 2 }), 'precision');
+  assert.equal(grund('de', '12,50', 'EUR', { digits: 0 }), 'precision');
+  assert.equal(grund('de', '1790,74', 'HUF', { digits: null }), 'precision');
+});
+
+test('amountPlaceholder: `digits` ersetzt die Stellen der Waehrung', () => {
+  withFormatLocale('de', () => {
+    assert.equal(amountPlaceholder('HUF'), '0');
+    assert.equal(amountPlaceholder('HUF', { digits: 2 }), '0,00');
+    assert.equal(amountPlaceholder('EUR', { digits: null }), '0,00');
+  });
+});
+
+test('formatMoney: `digits` ersetzt die Stellen der Waehrung, ohne Option bleibt der CLDR', () => {
+  withFormatLocale('de', () => {
+    const plain = (/** @type {string} */ text) => text.replace(/\s/g, ' ');
+    assert.equal(plain(formatMoney(3581.47, 'HUF')), '3.581 HUF');
+    assert.equal(plain(formatMoney(3581.47, 'HUF', { digits: 2 })), '3.581,47 HUF');
+    assert.equal(plain(formatMoney(3581.47, 'HUF', { digits: null })), '3.581 HUF');
+    assert.equal(plain(formatMoney(12.5, 'EUR')), '12,50 €');
+    assert.equal(plain(formatMoney(12.5, 'EUR', { digits: 2 })), '12,50 €');
+  });
 });
 
 test('jeder Speicherweg der Aufteilung verlangt einen Betrag', async () => {

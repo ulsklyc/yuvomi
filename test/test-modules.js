@@ -17,7 +17,7 @@
  *        Abweichung vom :memory:-DB-Standard nur beim Dateisystem: MODULES_DIR zeigt
  *        auf einen isolierten Temp-Ordner (der Service liest echte Ordner/Manifeste),
  *        die DB bleibt In-Memory (sync_config genügt). Kein Netz, keine Mocks.
- * Ausführen: node --experimental-sqlite --test test/test-modules.js
+ * Ausführen: node --test test/test-modules.js
  */
 
 import os from 'node:os';
@@ -149,6 +149,7 @@ const svc = await import('../server/services/modules.js');
 const { SUPPORTED_MANIFEST_VERSION } = svc;
 const { normalizeCapabilities, fullWidgetId, isWidgetId, isNamespacedWidgetId, MODULE_ID_RE, WIDGET_SHORT_ID_RE } = await import('../server/services/module-capabilities.js');
 const { default: modulesRouter } = await import('../server/routes/modules.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 // ── App mit injizierter Auth (actor zur Request-Zeit gelesen) ────────────────────
@@ -164,9 +165,12 @@ app.use((req, _res, next) => {
   next();
 });
 app.use(express.json());
-app.use('/', modulesRouter);
+// At its real prefix, with the central error handler: validateRequest() finds
+// its operation by the mount and hands its 400 on (#2810).
+app.use('/api/v1/modules', modulesRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/modules`)));
 
 const ADM = { id: 1, role: 'admin' };
 const MEM = { id: 2, role: 'member' };
@@ -785,7 +789,7 @@ test('Freigabe nicht schreibbar → 503 not_writable ohne Serverpfad; anderer Fe
   try {
     const r = await call('PATCH', '/ro-record-mod', { actor: ADM, body: { enabled: true } });
     assert.equal(r.status, 500, JSON.stringify(r.body));
-    assert.deepEqual(r.body, { error: 'Module update failed.', code: 500 });
+    assert.deepEqual(r.body, { error: 'Internal server error.', code: 500 });
   } finally {
     restore();
   }

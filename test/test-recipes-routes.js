@@ -8,7 +8,7 @@
  *        'Sonstiges', quantity leer→null, Längen-Slicing), meal_types-Normalisierung
  *        (Default alle-4, Dedup, Invalides verworfen), Replace-Set der Zutaten bei
  *        PUT und CASCADE-Löschung. Persistenz jeweils per DB-Assertion belegt.
- * Ausführen: node --experimental-sqlite --test test/test-recipes-routes.js
+ * Ausführen: node --test test/test-recipes-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -28,6 +28,8 @@ const { default: shoppingRouter } = await import('../server/routes/shopping.js')
 // Meals-Router, nicht an seinem SQL-Text.
 const { default: mealsRouter } = await import('../server/routes/meals.js');
 const recipeProviders = await import('../server/services/recipe-providers/index.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const OWNER = db.prepare(`INSERT INTO users (username, display_name, avatar_color, password_hash, role) VALUES ('owner','Owner','#112233','x','member')`).run().lastInsertRowid;
@@ -38,19 +40,30 @@ const MEMBER2 = db.prepare(`INSERT INTO users (username, display_name, password_
 let actor = { id: OWNER, role: 'member' };
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
   next();
 });
-app.use('/shopping', shoppingRouter);
-app.use('/meals', mealsRouter);
 // Derselbe Router noch einmal unter seinem echten Pfad: die MCP-Bruecke ruft
 // `/api/v1/recipes` per Loopback auf (#2197), und genau diesen Weg nimmt der
 // Test am Ende dieser Datei.
 app.use('/api/v1/recipes', recipesRouter);
-app.use('/', recipesRouter);
+// The short paths of this suite (`/`, `/:id/...`) reach the router at its real
+// prefix: validateRequest() reads the operation from the mount (#2810).
+// The meal plan and the shopping list the same way: `/meals...` reaches it at
+// `/api/v1/meals`, `/shopping...` at `/api/v1/shopping`.
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => {
+  if (/^\/(meals|shopping)(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`;
+  else if (!/^\/(shopping|api\/v1)(\/|\?|$)/.test(req.url)) req.url = `/api/v1/recipes${req.url}`;
+  next();
+});
+app.use('/api/v1/recipes', recipesRouter);
+app.use('/api/v1/meals', mealsRouter);
+app.use('/api/v1/shopping', shoppingRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -152,6 +165,23 @@ test('GET /: Creator-Join, Zutaten aggregiert, NOCASE-Sortierung, meal_types nor
   assert.equal(probe.creator_color, '#112233');
   assert.equal(probe.ingredients.length, 2);
   assert.ok(Array.isArray(probe.meal_types));
+});
+
+test('GET /: gleich betitelte Rezepte stehen aufsteigend nach id (#2804)', async () => {
+  // Eingefuegt als 9002, 9003, 9001: nur der id-Schluessel bringt sie in id-Reihenfolge.
+  const tieIds = [9002, 9003, 9001];
+  for (const id of tieIds) {
+    db.prepare('INSERT INTO recipes (id, title, created_by) VALUES (?, ?, ?)').run(id, 'Gleichstand', OWNER);
+  }
+  try {
+    const r = await call('GET', '/');
+    assert.equal(r.status, 200);
+    const rows = /** @type {Array<{ id: number, title: string }>} */ (r.body.data);
+    const ids = rows.filter((x) => x.title === 'Gleichstand').map((x) => x.id);
+    assert.deepEqual(ids, [9001, 9002, 9003]);
+  } finally {
+    db.prepare(`DELETE FROM recipes WHERE id IN (${tieIds.join(', ')})`).run();
+  }
 });
 
 // --------------------------------------------------------------------------
@@ -704,9 +734,14 @@ test('PUT /:id: ein Teil-Update ohne meal_types lässt die Auswahl stehen (#750)
 
 const PNG_1X1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
+// Die gespiegelten Rezepte oben heissen auch "Mit Bild": der Listenfall sucht
+// das eigene ueber seine id, nicht ueber den Titel.
+let mitBildId = 0;
+
 test('POST /recipes: ein eigenes Bild wird gespeichert, aber nie mitgeliefert', async () => {
   const r = await call('POST', '/', { title: 'Mit Bild', image_data: PNG_1X1 });
   assert.equal(r.status, 201);
+  mitBildId = r.body.data.id;
   // DIE DATEN SELBST GEHEN NIE MIT: eine Data-URL von bis zu 5 MB in jeder
   // Listenzeile waere ein Vielfaches der Antwort, fuer eine 32px-Vorschau.
   assert.equal(r.body.data.image_data, undefined, 'image_data darf nicht in der Antwort stehen');
@@ -715,7 +750,7 @@ test('POST /recipes: ein eigenes Bild wird gespeichert, aber nie mitgeliefert', 
 
 test('GET /recipes: die Liste traegt das Flag, nicht das Bild', async () => {
   const r = await call('GET', '/');
-  const mitBild = r.body.data.find((x) => x.title === 'Mit Bild');
+  const mitBild = r.body.data.find((x) => x.id === mitBildId);
   assert.ok(mitBild, 'das Rezept muss in der Liste stehen');
   assert.equal(mitBild.image_data, undefined);
   assert.equal(mitBild.has_own_image, true);
@@ -772,7 +807,8 @@ test('POST /: ohne Body → 400 mit der Titel-Meldung, nicht 500 (#2197)', async
   const before = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
   const r = await call('POST', '/');
   assert.equal(r.status, 400, JSON.stringify(r.body));
-  assert.match(r.body.error, /title is required/);
+  // The request check names the missing body since #2810 (was: "title is required.").
+  assert.deepEqual(r.body.fields, [{ path: 'body', rule: 'required' }]);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n, before);
 });
 
@@ -781,7 +817,7 @@ test('PUT /:id: ohne Body → 400, das Rezept bleibt unveraendert (#2197)', asyn
   const id = created.body.data.id;
   const r = await call('PUT', `/${id}`);
   assert.equal(r.status, 400, JSON.stringify(r.body));
-  assert.match(r.body.error, /title is required/);
+  assert.deepEqual(r.body.fields, [{ path: 'body', rule: 'required' }]);
   assert.deepEqual(ingredientRows(id).map((x) => x.name), ['Bleibt']);
 });
 
@@ -806,9 +842,11 @@ test('POST / und PUT /:id: Zutaten, die keine Liste sind → 400, nichts geschri
   assert.equal(put.status, 400, JSON.stringify(put.body));
   assert.deepEqual(ingredientRows(id).map((x) => x.name), ['Salz']);
 
+  // An entry that is not an object was skipped silently; since #2810 it is a 400.
   const nullItem = await call('POST', '/', { title: 'NullZutat', ingredients: [null, { name: 'Zucker' }] });
-  assert.equal(nullItem.status, 201, JSON.stringify(nullItem.body));
-  assert.deepEqual(ingredientRows(nullItem.body.data.id).map((x) => x.name), ['Zucker']);
+  assert.equal(nullItem.status, 400, JSON.stringify(nullItem.body));
+  assert.deepEqual(nullItem.body.fields, [{ path: 'body/ingredients/0', rule: 'type' }]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM recipes WHERE title = 'NullZutat'").get().n, 0);
 });
 
 // --------------------------------------------------------------------------
@@ -824,7 +862,7 @@ test('MCP call_api_operation post_recipes: Felder neben payload → klare Meldun
   const previous = process.env.MCP_INTERNAL_BASE_URL;
   process.env.MCP_INTERNAL_BASE_URL = baseUrl;
   actor = { id: ADMIN, role: 'admin' };
-  const ctx = { actor: { id: ADMIN, role: 'admin' }, requestHeaders: {} };
+  const ctx = { actor: { kind: 'session', userId: ADMIN, role: 'admin' }, requestHeaders: {} };
   try {
     const before = db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n;
     await assert.rejects(
@@ -838,12 +876,12 @@ test('MCP call_api_operation post_recipes: Felder neben payload → klare Meldun
     );
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM recipes').get().n, before, 'kein Rezept ohne payload');
 
-    // Ganz ohne payload: die Route antwortet mit ihrer eigenen Validierung.
+    // Ganz ohne payload: die Anfragepruefung der Route antwortet (#2810).
     await assert.rejects(
       callTool(ctx, 'call_api_operation', { operation_key: 'post_recipes' }),
       (err) => {
         assert.doesNotMatch(err.message, /Internal error/);
-        assert.match(err.message, /title is required/);
+        assert.match(err.message, /does not match the documented schema/);
         return true;
       },
     );
@@ -923,7 +961,8 @@ test('POST/PUT /: servings ausserhalb 1-99 oder keine ganze Zahl -> 400, nichts 
   for (const servings of [0, 100, 2.5, 'vier', -1]) {
     const r = await call('POST', '/', { title: `Falsch ${servings}`, servings });
     assert.equal(r.status, 400, `servings ${servings}`);
-    assert.match(r.body.error, /Servings/);
+    // The request check answers since #2810 (was: "Servings must be a whole number from 1 to 99.").
+    assert.equal(r.body.fields[0].path, 'body/servings', JSON.stringify(r.body));
   }
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM recipes WHERE title LIKE 'Falsch %'").get().n, 0);
 });

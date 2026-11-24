@@ -13,6 +13,9 @@
  *
  * Usage: node scripts/build-screenshot-webp.mjs [muster ...]
  *
+ * Playwright ist keine Abhaengigkeit: YUVOMI_PLAYWRIGHT_PATH zeigt auf ein global
+ * installiertes playwright/index.mjs (Default: Homebrew), scripts/lib/playwright-module.js.
+ *
  * Ohne Argument wird alles gebaut. Ein Argument beschränkt den Lauf auf
  * Dateinamen, die es enthalten (`… dashboard-light-mobile`) - gedacht für den
  * Fall, dass sich eine einzelne Aufnahme oder ihr Profil geändert hat und ein
@@ -27,7 +30,7 @@
  * installiert und ffmpeg ist ohne libwebp gebaut.
  */
 
-import { chromium } from '/opt/homebrew/lib/node_modules/playwright/index.mjs';
+import { loadChromium } from './lib/playwright-module.js';
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -161,7 +164,7 @@ async function convert(page, pngPath, outPath, width) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await (await loadChromium()).launch({ headless: true });
   const page = await browser.newPage();
   await page.setContent('<!doctype html><meta charset="utf-8"><title>webp</title>');
 

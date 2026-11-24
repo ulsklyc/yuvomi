@@ -4,7 +4,7 @@
  *        Aenderungswegen, Suche und Uebersicht - auch fuer Admins. Eine
  *        gesperrte Notiz aendern nur Ersteller:in und Admins, und zwar GANZ:
  *        Bearbeiten, Anpinnen, Loeschen, Kategorien UND Abhaken.
- * Ausführen: node --experimental-sqlite --test test/test-notes-access.js
+ * Ausführen: node --test test/test-notes-access.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -16,6 +16,9 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: notesRouter } = await import('../server/routes/notes.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { runSearch } = await import('../server/services/search.js');
 const { noteLockedFor, mayChangeNoteLock, mayChangeNoteVisibility } = await import('../public/utils/note-access.js');
@@ -30,16 +33,20 @@ let actor = { id: PARENT, role: 'member' };
 const as = (id, role = 'member') => { actor = { id, role }; };
 const app = express();
 app.use(express.json());
+// As server/index.js: a missing body is `{}` (#2810).
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
   req.session = { userId: actor.id, role: actor.role };
   next();
 });
-app.use('/notes', notesRouter);
-app.use('/dashboard', dashboardRouter);
+app.use('/api/v1/notes', notesRouter);
+app.use('/api/v1/dashboard', dashboardRouter);
+// The central error handler of the app: validateRequest() hands its 400 on to it (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
@@ -75,7 +82,9 @@ test('POST: visibility and locked are stored, invalid values are refused in Engl
   assert.equal(note.locked, 1);
   const bad = await call('POST', '/notes', { content: 'x', visibility: 'assignees' });
   assert.equal(bad.status, 400);
-  assert.match(bad.body.error, /visibility/);
+  // Seit #2810 weist das Schema der Operation ab, mit dem Feld statt eines Satzes.
+  assert.equal(bad.body.reason, 'validation');
+  assert.ok(bad.body.fields.some((/** @type {{ path: string }} */ f) => f.path === 'body/visibility'), JSON.stringify(bad.body.fields));
   assert.equal((await call('POST', '/notes', { content: 'x', locked: 'yes' })).status, 400);
   // Die offene Stufe anderer Module (DECISIONS 5) heisst hier `all`.
   const family = await call('POST', '/notes', { content: 'x', visibility: 'family' });

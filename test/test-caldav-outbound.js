@@ -16,7 +16,7 @@
  *            Ziel und Löschen in der Quelle, in genau dieser Reihenfolge.
  *
  *        Netz-frei: der tsdav-Client ist eine Attrappe.
- * Ausführen: node --experimental-sqlite --test test/test-caldav-outbound.js
+ * Ausführen: node --test test/test-caldav-outbound.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

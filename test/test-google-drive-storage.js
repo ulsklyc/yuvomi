@@ -3,7 +3,7 @@ import http from 'node:http';
 import { Readable } from 'node:stream';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
+import { createShoppingDocumentsApp } from './shopping-documents-app.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'google-drive-storage-test-secret';
@@ -13,7 +13,6 @@ process.env.GOOGLE_DRIVE_REDIRECT_URI = 'https://example.test/api/v1/documents/s
 
 const databaseModule = await import('../server/db.js');
 const driveStorage = await import('../server/services/google-drive-storage.js');
-const { default: driveStorageRouter } = await import('../server/routes/document-storage-google-drive.js');
 const originalDatabase = databaseModule.get();
 const database = new Database(':memory:');
 database.exec(`
@@ -195,17 +194,19 @@ test('partial Drive-specific credentials fail closed in status and routes', asyn
   setCfg('document_storage_google_drive_refresh_token', 'drive-refresh');
   setCfg('document_storage_google_drive_account_id', 'account-a');
   setCfg('document_storage_google_drive_folder_id', 'folder-a');
-  const app = express();
-  app.use((req, _res, next) => {
-    req.authRole = 'admin';
-    req.session = {};
-    next();
+  // At its real prefix with the central error handler (#2810).
+  const app = await createShoppingDocumentsApp({
+    mount: ['google-drive'],
+    auth: (req, _res, next) => {
+      req.authRole = 'admin';
+      req.session = {};
+      next();
+    },
   });
-  app.use('/', driveStorageRouter);
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
-  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const baseUrl = `http://127.0.0.1:${server.address().port}/api/v1/documents/storage/google-drive`;
   const message = 'GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET must both be set or both be empty.';
 
   for (const [clientId, clientSecret] of [

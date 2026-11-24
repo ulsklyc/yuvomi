@@ -20,7 +20,7 @@
  * beide Seiten per Bauart gleich. Hier stehen die Faelle, in denen sie es nicht
  * sind.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-oidc-redirect-uri.js
+ * Ausfuehren: node --test test/test-oidc-redirect-uri.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'oidc-redirect-uri-test-secret';
 process.env.DB_PATH = ':memory:';
@@ -36,7 +36,7 @@ process.env.OIDC_REDIRECT_URI = NORMAL;
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
 
 const realFetch = globalThis.fetch;
 
@@ -83,27 +83,34 @@ const MEMBER = Number(database.prepare(`
 `).run().lastInsertRowid);
 const CSRF = 'ab'.repeat(32);
 
-const app = express();
-app.use(express.json());
-app.use(sessionMiddleware);
-// Meldet das Mitglied an, wie es `setupAuthSession` tut - der Verknuepfungs-Lauf
-// beginnt angemeldet und mit CSRF-Token.
-app.post('/__test/sign-in', (req, res) => {
-  req.session.userId = MEMBER;
-  req.session.role = 'member';
-  req.session.csrfToken = CSRF;
-  req.session.save(() => res.json({ ok: true }));
+const app = await createAuthApp({
+  session: sessionMiddleware,
+  before: [
+    // Meldet das Mitglied an, wie es `setupAuthSession` tut - der Verknuepfungs-Lauf
+    // beginnt angemeldet und mit CSRF-Token.
+    ['/__test/sign-in', (/** @type {any} */ req, /** @type {any} */ res) => {
+      req.session.userId = MEMBER;
+      req.session.role = 'member';
+      req.session.csrfToken = CSRF;
+      req.session.save(() => res.json({ ok: true }));
+    }],
+    // Stellt einen Lauf nach, der VOR dem Update begonnen hat: sein Session-State
+    // kennt die redirect_uri der Authorize-Anfrage noch nicht.
+    ['/__test/forget-redirect-uri', (/** @type {any} */ req, /** @type {any} */ res) => {
+      delete req.session.oidc.redirectUri;
+      req.session.save(() => res.json({ ok: true }));
+    }],
+    // Ein zweiter Pfad, den der Reverse Proxy umschreibt oder mit einem Praefix
+    // versieht: die Anfrage kommt unter /hinter-dem-proxy/auth an, `req.originalUrl`
+    // behaelt diesen Pfad, und Express routet sie zum Router unter seinem echten
+    // Praefix (validateRequest() findet die Operation am Mount, #2810).
+    [(/** @type {any} */ req, /** @type {unknown} */ _res, /** @type {() => void} */ next) => {
+      if (req.url.startsWith('/hinter-dem-proxy/auth/')) req.url = `${AUTH_PREFIX}${req.url.slice('/hinter-dem-proxy/auth'.length)}`;
+      next();
+    }],
+  ],
+  routers: [authRouter],
 });
-// Stellt einen Lauf nach, der VOR dem Update begonnen hat: sein Session-State
-// kennt die redirect_uri der Authorize-Anfrage noch nicht.
-app.post('/__test/forget-redirect-uri', (req, res) => {
-  delete req.session.oidc.redirectUri;
-  req.session.save(() => res.json({ ok: true }));
-});
-app.use('/api/v1/auth', authRouter);
-// Derselbe Router unter einem zweiten Pfad: so sieht Express die Anfrage, wenn
-// der Reverse Proxy den Pfad umschreibt oder ein Praefix davorsetzt.
-app.use('/hinter-dem-proxy/auth', authRouter);
 const server = app.listen(0, '127.0.0.1');
 const base = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => { server.close(); globalThis.fetch = realFetch; });

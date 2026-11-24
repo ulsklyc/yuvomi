@@ -7,6 +7,1415 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The calendar subscription feeds and the API description download are checked like every
+  other route.** This is about your own scripts; the app sends nothing that is refused now.
+  `?download=` at `/openapi.json` and `/api/v1/openapi.json` takes only `1`: `download=0`,
+  `download=true`, an empty `download=` and the parameter given twice (`download=1&download=1`,
+  `download=1&download=0`) answered the document inline and are now a 400 with
+  `reason: validation`; without the parameter the document is still answered inline, and an
+  account that is not an administrator still gets its 401 or 403 first. The six subscription
+  feeds (`/feed/calendar`, `/birthdays`, `/inventory-deadlines`, `/cycle`, `/schedule`,
+  `/waste`) keep their addresses, their tokens and their answers; only an internal error is now
+  answered as JSON (`{"error":"Internal server error.","code":500}`) instead of the text
+  `Internal error`, and it is logged without the token.
+- **The calendar and the overview check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that is refused now (from this
+  release on the subscription settings send `shared` as `true`/`false`, they sent `1`/`0`).
+  Under `/api/v1/calendar` (events, occurrences, local calendars, the personal feed, holidays,
+  sync targets, ICS subscriptions and the import; the Google, Apple, CalDAV and Outlook routes
+  follow) input that used to be quietly accepted, replaced or answered with a 500 is now refused
+  with a 400:
+  - a path id that is not plain digits: `1abc`, `1.0` and `1e0` reached event or subscription 1,
+    `0x1` and `1.0` local calendar 1 - also to delete it;
+  - a switch that is not `true`/`false`: `all_day` as `1`, `"false"` or `{}` made an all-day
+    event, `countdown` as `1` or text, `shared` of a subscription as `1`, `"x"` or `null` (stored
+    as 1 or 0);
+  - an id that is not a whole number: `local_calendar_id: "1"` or `true`, `assigned_to: "2"`,
+    and assignees `[1.5]` or `[-1]` (a 500) or `[0]`, `[{}]` (dropped silently); a subscription's
+    default assignees or the people of an import as text;
+  - an unknown `visibility` (silently `all`), an `icon` that is not text (`5` became `calendar`),
+    `color: ""` (no colour), `end_datetime: ""`, a start or end `2026-02-30` as a plain date, a
+    `target_*` or attachment field of the wrong type (`attachment_data: 5` was ignored);
+  - a local calendar `color: null` (became the default blue), `sort_order` as text, `null` or
+    `true`, and `PUT /calendar/calendars/{id}` with `{}` (did nothing);
+  - `POST /calendar/import` with both `ics` and `url` (the file won);
+  - query garbage: `/calendar/upcoming?limit=` `abc`, `0`, `-1`, `1.5` or given twice (5, or -1
+    unchecked; a limit above 20 is still cut to 20), `assigned_to=abc` and a `from`/`to` that is
+    no calendar day on `GET /calendar` (an empty list), `from`/`to` of `/calendar/holidays`
+    (month 13 answered an empty list; a missing day was a 400 already), `q` of the search given
+    twice.
+
+  A PUT or PATCH without a body is a 400 (it answered 200 and changed nothing). The check runs
+  before the event, series or subscription is looked up, so a bad request is a 400, not a 404 or
+  the 403 of a child without the right to change others' events; a valid one meets those as
+  before. Two refusals stay in front of it: without write access to the calendar, managing local
+  calendars answers 403 also with a malformed request, and so does an attachment without write
+  access to documents. Lengths, the calendar run of a date-time, the recurrence rule and every
+  refusal with a `reason` the app shows stay with the routes (`calendar_name_invalid`,
+  `calendar_subscription_name_invalid`, `calendar_ics_url_invalid`, `malformed_recurrence_id`,
+  `invalid_recurrence_id` and the others); a body of the wrong type now answers
+  `reason: validation` with the field. `GET /dashboard` keeps its lenient query: every value its
+  description tolerates still answers 200.
+- **The Google, Apple, CalDAV and Outlook settings routes check every request against the
+  published API description, and an unknown account answers 404.** This is about your own API
+  clients; the settings pages send nothing that is refused now. Under
+  `/api/v1/calendar/google`, `/apple`, `/caldav`, `/outlook` and `/external-calendars` input
+  that used to be quietly accepted or answered with a 500 is now refused with a 400:
+  - a switch that is not `true`/`false`: `enabled: "false"` or `{}` switched a CalDAV calendar
+    or reminder list ON, `0` or `null` off (the Google and Outlook switches and `readonly` were
+    refused already, now with `reason: validation`);
+  - a path id that is not plain digits: `PUT /caldav/accounts/1abc` changed account 1,
+    `DELETE /caldav/accounts/1abc` and `DELETE /outlook/accounts/1.0` deleted it;
+  - a value of the wrong type: `name: 5` was stored as the name of a CalDAV account,
+    `targetModule: "x"` of a reminder list and `calendarUrl: 5` answered 500, `ownerUserId` of
+    an Outlook account as text or `""` (use `null` to clear it), people as text or `0`, an
+    `expected_token` that is not 64 hex digits, a `source` other than `google`, `apple` or
+    `caldav`;
+  - `deleteEvents` and `refresh` in the query other than `true` or `false` (only `true` counted,
+    anything else meant false);
+  - `PUT /caldav/accounts/{id}` and `PUT /outlook/accounts/{id}` without a body.
+
+  A CalDAV or Outlook account in the path that does not exist now answers 404 with
+  `reason: caldav_account_not_found` or `outlook_account_not_found`. It answered 500
+  (`"Failed to delete CalDAV account."` and the like) or, for CalDAV, 502 with
+  `remote_failed` and `"The CalDAV server refused the request or could not be reached."` -
+  although no server was asked. Admin rights are checked first (a member gets 403 also with a
+  malformed request), then the request, then the account (a malformed request to an unknown
+  account is a 400). The OAuth callbacks take whatever query Google or Microsoft send and still
+  lead back to the settings. The refusals with a `reason` the app shows (`apple_url_invalid`,
+  `password_required`, the default assignees) and the checks of length and blank values stay
+  with the routes; a body of the wrong type now answers `reason: validation` with the field.
+- **The tasks check every request against the published API description.** This is about
+  your own API clients; the app sends nothing that is refused now. The description itself is
+  corrected where it refused what the app sends: the switches `is_recurring`,
+  `recurrence_from_completion`, `countdown` and `locked` take `true`/`false` and `1`/`0`,
+  `points` takes any number and is still cut to 0-10000, `priority` and `category` take `""`
+  (not given), and the filters `status`, `priority`, `assigned_to` and `category` of
+  `GET /tasks` may be repeated (`?status=open&status=done`), as the app sends them; an unknown
+  status or priority there is still a filter without a hit. Under `/api/v1/tasks` input that used
+  to be quietly accepted or replaced is now refused with a 400:
+  - a path id that is not plain digits: `DELETE /tasks/1.0`, `1e0` or ` 1` deleted task 1, and
+    the same reached it on every other task route, the comment id included;
+  - a switch that is neither `true`/`false` nor `1`/`0`: `"false"`, `5` or `{}` counted as on,
+    `null` on an update as off;
+  - `points` as text, `true` or `""` (read as 5, 1 or 0), an unknown `visibility` (silently
+    `all` or the stored one), `""` as `start_date`, `due_date`, `due_time` (stored as no date)
+    or as `status` of a new task (became `open`);
+  - an id that is not a whole number of at least 1: `assigned_to` as `"2"`, `true`, `"abc"`,
+    `[0]` or twice the same person, `done_by_user_id: true` (named user 1), `ids` of the bulk
+    actions and `rotation_pool` as text, `parent_task_id: "1"` or `-1` (a 404);
+  - a text field that is not text: `comment: 5` and a category `name: 5` were stored as "5", a
+    tag `name: 5` or `["x"]` became a tag, a tag `[5]` in `tags`;
+  - `PATCH /tasks/categories/reorder` without a list of keys (answered 200 and did nothing),
+    `PATCH /tasks/{id}/archive` with `archived: 0` or `null`, `POST /tasks/points/rebase` with
+    `to: null`, `""` or `true` (set every task on the old default to 0 points);
+  - query garbage: `limit` of `/tasks/completions` outside 1-200 or `/tasks/{id}/completions`
+    outside 1-100 (cut silently), `user_id=abc`, `before_id=x`, `assigned_to=abc` (ignored), a
+    query value given twice where it is not repeatable;
+  - a PUT or POST without a body (`PUT /tasks/{id}` answered 200 and changed nothing; only
+    `PATCH /tasks/{id}/archive` still archives without one).
+
+  These answered 500 and are now a 400: `parent_task_id: 0` or `true`, `sync_target: 5`,
+  `status: null` or `""` on `PUT /tasks/{id}`, `/tasks/completions?limit=1.5` and
+  `order: [5, {}]` on the category order. An assignee id without an account (`assigned_to: [999]`)
+  also answered 500; it is now the 400 of a non-member ("Only household members can be chosen
+  here - user 999 is not a household member."). The check runs before the task, the comment, the
+  category or the tag is looked up, so a bad request is a 400, not a 404 or the 403 of a locked
+  task or of someone else's comment; a valid one meets those as before. Two refusals stay in
+  front of it: the default-points preview and rebase answer a member 403 `admin_required`, and
+  the hand order answers 403 `reorder_not_allowed` without the right to change it, also with a
+  malformed request. Leaving out `document_ids` on `PUT /tasks/{id}/documents` still removes
+  every visible link, as the description now says. The refusals with a `reason` and the checks of
+  length, blank values, categories and the recurrence rule stay with the routes; a body of the
+  wrong type now answers `reason: validation` with the field.
+- **The preferences and the push routes check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now.
+  The description itself is corrected where it refused what it promised: `lang` of
+  `/preferences/holidays/subdivisions/{countryCode}` takes any text again, an unsupported code
+  answers in English. Under `/api/v1/preferences` and `/api/v1/push` input that used to be
+  quietly accepted or replaced is now refused with a 400:
+  - `PUT /preferences` without a body or with a list instead of an object (answered 200 and
+    changed nothing);
+  - a push subscription whose `keys.p256dh` or `keys.auth` is not text or empty (`p256dh: 5` was
+    stored), or whose `endpoint` is longer than 2048 characters;
+  - `POST /push/unsubscribe` with an `endpoint` that is not text (`5` answered 204 and did
+    nothing), `POST /push/test` with a `title`, `body` or `endpoint` that is not text (sent the
+    default text instead);
+  - `lang` of the holiday regions given twice (answered in English).
+
+  `POST /push/unsubscribe` with an object as `endpoint` answered 500 and is now a 400.
+  Malformed input that was refused already (a push subscription without keys, `endpoint: 5`, a
+  wall pause without a boolean `active`, a country code `de` or a region code `x` on the holiday
+  lists) is still a 400, now with `reason: validation` and the field instead of the route's own
+  sentence. The settings registry keeps checking `PUT /preferences` field by field: the
+  description checks only that the body is an object, so a member sending an admin field still
+  gets 403 `admin_required`, also for an invalid value, every field keeps its own 400 sentence,
+  and unknown keys are still ignored. The check that a push endpoint is a public https address
+  stays with the route. `POST /push/test` still takes no body.
+- **Sign-in, setup, the session and your own account check every request against the published
+  API description.** This is about your own API clients; the app, the iOS app and the YunoHost
+  package send nothing that is refused now. The description itself is corrected where it
+  refused the app: the password change (`PATCH /auth/me/password`) is documented with the
+  `current_password` and `new_password` the settings page sends (it said `currentPassword`),
+  the profile with the phone, email and birthday fields the page sends, and accepting an
+  invitation no longer requires a password where password sign-in is turned off. Under
+  `/api/v1/auth` (sign-in, setup, password reset, invitation preview and accept, second factor,
+  signed-in devices and pairing, profile, own password, Gravatar, the changelog mark) input that
+  used to be quietly accepted or read as something else is now refused with a 400:
+  - a sign-in whose `username` or `password` is a list, a number or an object (a list with one
+    known username signed in);
+  - a password that is not text or longer than 1024 characters at setup, reset, accepting an
+    invitation and changing your own password (a number was stored as the password; a password
+    over 1024 characters could be set but never typed at the sign-in);
+  - a username longer than 64 characters at the sign-in;
+  - a reset or invitation token or a second-factor code that is not text (a number was checked
+    as text);
+  - `GET /auth/invites/preview` without `token` or with it twice (answered `valid: false`),
+    `POST /auth/forgot-password` and `/auth/reset-password/check` with an `identifier` or
+    `token` that is not text (answered 200);
+  - a profile `display_name`, `phone` or `email` that is not text (`5` was stored as `"5"`), an
+    `avatar_color` that is empty, `null` or not `#RRGGBB` (fell back to blue), an empty
+    `avatar_data`, a `birth_date` that is empty or no calendar date, a `birth_year_unknown` that
+    is not `true` or `false`;
+  - a changelog mark whose `latest` is not text (`5` was stored as `"5"`);
+  - a signed-in device id with decimals such as `1.0` in the path.
+
+  A token that is not text at `POST /auth/reset-password` and `/auth/invites/accept`, and a
+  sign-in or setup whose username is a list or an object, answered 500 and are now a 400.
+  Malformed input that was refused already (a sign-in over 64 or 1024 characters, a
+  second-factor code over 64 characters, a device field or a pairing `server` that is not text,
+  a request without a body) is still a 400, now with `reason: validation` and the field instead
+  of the route's own sentence. The answer depends on the shape of the request only, never on whether an account exists; a 400
+  counts against the sign-in, reset, second-factor and pairing rate limits like any other failed
+  attempt. Two things still come before the shape of the body: once an account exists,
+  `POST /auth/setup` answers 403 (404 in production) whatever is sent, and an API token gets 403
+  at `POST /auth/devices`, `/auth/devices/pair` and `/auth/logout-others` whatever is sent. A
+  missing second-factor code, or one that is not text, is now a 400 before the route says that
+  no sign-in is waiting or that two-factor authentication is off; the shape is public, the 400
+  says nothing about the account. The checks of length after trimming, the username format,
+  the shortest password (counted after Unicode normalization), the time zone, the language, the
+  pairing code and every second factor stay with the routes, with their own sentences and
+  reasons. Unknown fields are still ignored everywhere, at the setup above all.
+- **Account administration checks every request against the published API description.** This
+  is about your own API clients; the settings pages send nothing that is refused now. With this,
+  every route under `/api/v1/auth` does. The description itself is corrected where it fell
+  short of the app: an invitation documents the `permission_preset` the invitation dialog sends,
+  an invitation and a member change may be sent without a body (they answered 201 and 200 that
+  way, the description required one), and `PUT /auth/2fa/require` documents its body. Under
+  `/api/v1/auth` (invitations, the household two-factor requirement and overview, signing a
+  member out of every device, API tokens, member accounts) input that used to be quietly
+  accepted or read as something else is now refused with a 400:
+  - a switch that is not `true`/`false`: `system_admin: "true"` made an administrator at
+    `POST /auth/users` and `POST /auth/invites`, `system_admin` as `null`, `1` or `"x"` at
+    `PATCH /auth/users/{id}` demoted an administrator to member, `sso_only`, `send_email` and
+    `birth_year_unknown` as `1`, `"true"` or `null`; `PUT /auth/2fa/require` with
+    `required: "1"` turned the requirement on, `"true"`, `1`, `null` or `[true]` turned it off;
+  - a text field that is not text: a `display_name`, `name` of an API token, `phone` or `email`
+    of `5` was stored as `"5"`, an object as `"[object Object]"`, a `username` or password as a
+    list or a number was taken as text;
+  - a password longer than 1024 characters at `POST /auth/users` and `PATCH /auth/users/{id}`
+    (it could be set but never typed at the sign-in);
+  - `subject_user_id` of an API token as text, `true` or a list (`"2"` and `[2]` picked account
+    2, `true` account 1), or below 1;
+  - `expires_at` of an API token as a plain date such as `2999-01-01` (the description has
+    always said date and time, as the settings page sends it);
+  - a member's `avatar_color` that is empty, `null` or not `#RRGGBB` (fell back to blue, and
+    `null` answered 500 when creating a member), an empty `avatar_data`, a `birth_date` that is
+    empty or no calendar date, an unknown `permission_preset` or `family_role` (refused already,
+    now with `reason: validation`);
+  - a path id that is not plain digits: `DELETE /auth/users/5abc` deleted account 5,
+    `PATCH /auth/users/1.5` changed account 1, `DELETE /auth/invites/1.0` revoked invitation 1,
+    `DELETE /auth/api-tokens/1.0` revoked token 1; `DELETE /auth/users/abc` answered 404.
+
+  The check runs after the administrator check: anyone else still gets 401 or 403 whatever is
+  sent, and an API token still gets 403 `browser_session_required` at
+  `POST /auth/users/{id}/devices/sign-out` whatever the id. It runs before the account,
+  invitation or token is looked up, so a malformed request is a 400, not the 404 of an unknown
+  member or the 409 of a taken username; a valid one meets those as before. Leaving out
+  `required` at `PUT /auth/2fa/require` still switches the requirement off, as the description now
+  says. The shortest password (counted after Unicode normalization), the username format, the
+  length of names after trimming, the email checks for accounts without a password, the expiry in
+  the future and the known scopes stay with the routes, with their own sentences and reasons.
+  Unknown fields are still ignored.
+- **The budget and the subscriptions answer an unexpected failure with the same sentence as the
+  rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
+  and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,
+  `"Subscription could not be created."` and the like); they now answer
+  `{ "error": "Internal server error.", "code": 500 }`. The status stays 500, and the app shows
+  its own message for it as before. Every other answer is unchanged.
+- **The calendar and the overview answer an unexpected failure with the same sentence as the
+  rest of the API.** The event routes under `/api/v1/calendar` said `"Internal error."` on such a
+  500 (for example with an assignee id that is no user, or an attachment that is no valid file),
+  `GET /calendar/sync-targets` said `"Failed to list sync targets."` and `GET /dashboard`
+  `"Dashboard could not be loaded."`; they now answer
+  `{ "error": "Internal server error.", "code": 500 }`, as the other calendar routes already did.
+  The status stays 500, and the app shows its own message for it as before. Every other answer
+  is unchanged.
+- **The Google, Apple, CalDAV and Outlook settings routes answer an unexpected failure with the
+  same sentence as the rest of the API.** On a server-side failure they said a sentence of their
+  own (`"Failed to update calendar selection."`, `"Failed to update reminder selection."`,
+  `"Failed to update Outlook account."`, `"Failed to fetch calendars."`, `"CalDAV sync failed."`,
+  `"Connecting the Apple calendar failed."`, `"The read-only mode could not be saved."` and the
+  like); they now answer `{ "error": "Internal server error.", "code": 500 }`. Today this is
+  reachable with a CalDAV calendar or reminder list, or an Outlook calendar, that the account does
+  not have, and with an Outlook account change the account refuses (an empty name, an owner who is
+  no user, nothing to change); the settings page shows its own message there as before. The
+  status stays 500. Where a server-side failure hit connecting a CalDAV or Apple account, an Apple
+  sync or refreshing the CalDAV calendars or reminder lists, the page framed the server's sentence
+  ("Connection failed: Failed to fetch calendars."); it now shows its general error message, as
+  for every other 500. A refusal of the foreign server keeps its class ("Connection failed: HTTP
+  401"). Every other answer is unchanged.
+- **The tasks answer an unexpected failure with the same sentence as the rest of the API.**
+  `GET /tasks/sync-targets` said `"Failed to list sync targets."` on a server-side failure; it
+  now answers `{ "error": "Internal server error.", "code": 500 }`, as every other task route
+  already did. The status stays 500. The task dialog still falls back to "local only" and the
+  task settings show their own message there, as before. Every other answer is unchanged.
+- **Push notifications answer an unexpected failure with the same sentence as the rest of the
+  API.** The routes under `/api/v1/push` (public key, subscribe, unsubscribe, wall pause, test
+  push) said `"Internal error."` on a server-side failure; they now answer
+  `{ "error": "Internal server error.", "code": 500 }`. The status stays 500. The notification
+  settings still show their own message when switching push on or off or sending a test push
+  fails, as before. Every other answer of the push and preferences routes is unchanged.
+- **Signing out and starting the SSO sign-in answer an unexpected failure with the same sentence
+  as the rest of the API.** `POST /auth/logout` said `"Logout failed."` when the session could not
+  be ended, `GET /auth/oidc/start` and `POST /auth/oidc/link/start` said
+  `"OIDC initialization failed."` when the identity provider could not be reached or the start
+  failed otherwise; they now answer `{ "error": "Internal server error.", "code": 500 }`. The
+  status stays 500, and the server log still names the provider's error at the SSO start. The app
+  signs out locally and goes to the sign-in page as before, and the account settings show their
+  own message when linking SSO fails; the SSO button of the sign-in page opens the start address
+  directly, so a browser shows the new sentence there. Every other answer of the sign-in, session
+  and own-account routes is unchanged.
+- **Setting the default assignees of a synced calendar takes the people.** This is about your
+  own API clients; the app sends them already. `PATCH /calendar/external-calendars` without
+  `default_assignee_user_ids` and without `default_assignee_user_id` emptied the calendar's default
+  assignees, so every event the sync brought in afterwards arrived unassigned. One of the two is
+  required now (a 400 with `reason: "validation"`, before the 404 of an unknown calendar);
+  `default_assignee_user_ids: []` or `default_assignee_user_id: null` still clears the set.
+- **Setting the documents of a task takes the list.** This is about your own API clients; the app
+  sends it already. `PUT /tasks/{id}/documents` without `document_ids` removed every document
+  link of the task the caller could see, with a 200 and no message. `document_ids` is required
+  now (a 400 with `reason: "validation"`, before the 404 of an unknown task and the 403 of a
+  locked one); `document_ids: []` still removes the links.
+- **Signing out a device by a negative id answers 404.** This is about your own API clients; the
+  app signs out only devices from its list. `DELETE /auth/devices/-1` and `/auth/devices/-0`
+  answered 400 `"Invalid device ID."`; like `0` and an id that is no device of yours they now
+  answer 404 `"Device not found."`. A path id that is not plain digits stays a 400.
+- **Setting the household two-factor requirement takes the switch.** This is about your own API
+  clients; the settings page always sends it. `PUT /auth/2fa/require` requires `required`: a
+  request without it used to switch the household's two-factor requirement off, now it is a 400
+  with `reason: "validation"` and nothing changes. The check still runs after the administrator
+  and CSRF checks.
+- **The MCP tool `call_api_operation` names the refused fields.** When the API refuses a request
+  for its content, the tool's error now ends with the path and rule of each refused field, for
+  example `[fields: type at body/title]` - at most ten, then "and N more". Values are never
+  named. Errors without such fields read as before.
+
+### Removed
+- **`role: "admin"` no longer makes an administrator at `POST /auth/users`.** This is about your
+  own API clients; the settings page sends `system_admin`. Next to `system_admin: true` an
+  undocumented `role: "admin"` created an administrator too. `role` is now an unknown field like
+  any other and is ignored: without `system_admin: true` the new account is a member.
+
+### Fixed
+- **A member whose stored colour is not `#RRGGBB` can change their profile again.** A colour
+  stored before the colour rule (an older installation, an import, a hand edit of the database)
+  such as `red` turned every change of the profile (`PATCH /auth/me/profile`) and every change an
+  administrator made to that member (`PATCH /auth/users/{id}`), the name included, into a 400
+  `"avatar_color must be a valid HEX color (#RRGGBB)."`, whatever the request said. Only a colour
+  that is sent is checked now, and it still has to be `#RRGGBB`; the stored one stays until it is
+  replaced.
+- **Refreshing the calendars of an Outlook account answers an expired sign-in with 409
+  `outlook_reauth_required` and a refusal of Microsoft with 502 and its class, instead of a 500.**
+
+### Security
+- **Passwords are hashed with Argon2id, and a password over 72 bytes counts in full.** New and
+  changed passwords are stored as Argon2id (RFC 9106) with the parameters of the OWASP Password
+  Storage Cheat Sheet: 19 MiB of memory (m=19456 KiB), 2 passes, parallelism 1, a 16-byte salt
+  and a 32-byte hash. It comes with Node itself (`node:crypto`), no new dependency. bcrypt read
+  only the first 72 bytes of a password: two passwords that differed only after that (after 18
+  emoji, or 72 Latin letters) were the same password. Existing bcrypt hashes stay valid and are
+  replaced by an Argon2id hash on the next successful sign-in; nobody has to reset a password.
+  A failed sign-in takes as long for an unknown account as for one with an old or a new hash, so
+  the response time does not tell which accounts exist.
+  **After this version you cannot go back to an older one without every account that has signed
+  in, been created or set a password since having to reset its password**: older versions do not
+  know Argon2id and refuse those sign-ins.
+
+## [2.94.0] - 2026-11-22
+
+### Changed
+- **The budget and the subscriptions check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now.
+  Under `/api/v1/budget` (accounts, categories, entries, series, loans, plans, statistics,
+  transfers) and `/api/v1/budget/subscriptions`, input that used to be quietly accepted,
+  replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `1abc`, `1.0` and `1e0` reached account, entry or loan 1,
+    `0x1` and `1.0` reached transfer or subscription 1 - also to delete it, and `POST
+    /subscriptions/0x1/renew` booked a payment;
+  - a month outside 01 to 12: `GET /budget?month=2026-13` with a running series wrote an entry
+    dated `2026-13-05`, a loan stored `start_month: "2026-13"`, and the summary, the plan and
+    the export answered for month 13; a day that is not `YYYY-MM-DD` (`anchor=2026-13-45` of the
+    statistics answered 500);
+  - a number, list, object or truth value in a text field: an account, category, entry,
+    transfer, loan or subscription category named `{}` was stored as `"[object Object]"`, a
+    number as text; on editing an entry, a series, a loan or a subscription a number answered
+    500;
+  - `null`, an empty string, text, a truth value or a list as an amount: `null` and `""` set an
+    entry, a series, an account's starting balance or the subscription budget to 0, `true`
+    counted as 1, `[5]` as 5, `"0x10"` as 16; `credit_limit: ""` is now `null` to clear it;
+  - an unknown `interest_mode` of a new loan became a loan without interest, an unknown
+    `visibility` of an entry, transfer, loan or subscription the default; an unknown loan
+    `direction` or account `type` (`""` was stored as the type), category `type`,
+    `recurrence_interval` (`null` answered 500), `billing_cycle` (missing or `""` answered
+    500) or `end_type`;
+  - switches that are not `true`/`false` (`0`/`1` on entries): `is_recurring: "false"` started
+    a series, `archived: "false"` archived an account;
+  - ids in a body that are not whole numbers: `account_id: ""` or `"1"`, a subscription's
+    `category_id: true` (a 500), `responsible_user_ids` and `attachment_document_ids` with
+    non-numbers (dropped silently), the order lists (`order: [{}]` of the categories answered
+    500, missing or empty changed nothing; the subscription order took any list);
+  - a `query` of the logo search that is not text (`5` was looked up as the website `5`);
+  - a query value outside its type, or given twice: `scope=x`, `account_id=abc`, `loan_id=abc`,
+    a month of the export or plan that is not `YYYY-MM` (the current month), `range=day`,
+    `include_archived=yes`, a subscription `status`, `enabled`, `category_id` or
+    `payment_method_id` outside its values (no filter, or an empty list).
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404 or 403 (the
+  write rule of the personal budget mode); a valid one meets those as before. Lengths, ranges,
+  the calendar day and every refusal with a `reason` the budget page shows stay with the routes;
+  a body of the wrong type now answers `reason: validation` with the field (for example
+  `entry_date_invalid` for `date: "nope"`, `loan_direction_invalid` for an unknown direction).
+  The loan preview answers an unknown `interest_mode` with 400 instead of `{ ok: false }`. A
+  PUT without a body is a 400; `PATCH /budget/{id}/confirm` still takes none. An unexpected
+  error of a subscription route now answers `Internal server error.` like every other route
+  (it was `Internal error.`).
+- **The shopping list, documents, the document storage settings and the DMS connection check
+  every request against the published API description.** This is about your own API clients;
+  the app sends nothing that is refused now (from this release on it sends the folder of a
+  document, the DMS account and the order of the shopping categories as numbers). Under
+  `/api/v1/shopping` and `/api/v1/documents` (with `storage/google-drive` and `dms`), input that
+  used to be quietly accepted, replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `0x1`, `1.0` and `1e0` reached document 1, and on the
+    shopping list `1.0` reached list or item 1;
+  - a number, list, object or truth value in a text field: a shopping list, shop, category,
+    folder or document named `{}` was stored as `"[object Object]"`, a number as text;
+  - an unknown `visibility` of a new or linked document became `family`, visible to the whole
+    household; an unknown `category` became `other`, and on editing a document an unknown
+    `visibility`, `category` or `status` was ignored;
+  - an unknown DMS `provider` became `paperless`; a `dms_document_id` that is neither text nor a
+    number was stored as its text (`true`, `"[object Object]"`);
+  - an unknown `folder_key` of an upload was dropped; an unknown `selected_upload_backend`, an
+    `enabled` of the WebDAV settings that is not `true` or `false`;
+  - a number field sent as a truth value, text or list: `expiry_reminder_days: true` was stored
+    as 1, `price_cents: true`, `[]` and `"0x10"` as 1, 0 and 16; ids in a body that are not
+    whole numbers or digit text (`folder_id`, `parent_id`, `subject_user_id`, `account_id`,
+    `document_id`; `parent_id: true` and `"0x1"` were read as folder 1);
+  - `archived: "false"` and `0` archived a document; `preview: "true"` of the meal-plan import
+    ran the real import; `is_checked` other than `true`, `false`, `0` or `1`;
+  - `order` of the shopping categories that is not a list of ids (`[{}]` and `[true]` answered
+    500, `[1.5]` and `["x"]` changed nothing), `items` of the pantry import that is not a list
+    of entries (taken as empty), `ids` of the kitchen undo that are not whole numbers (dropped);
+  - a query value outside its type, or given twice: a doubled `q` of the shopping suggestions
+    answered 500; `status`, `category`, `folder_id` and `expiring` of the document list and an
+    empty `documents` of a folder deletion fell back silently to no filter or `unfile`;
+    `limit` of the price history outside 1 to 50 was clamped.
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of the storage settings, Google Drive and
+  every DMS route, and the meal-plan and pantry rights of the two kitchen imports come first:
+  403 stays 403, also for a bad request. Lengths stay with the routes. Sharing a document with
+  an id that has no account answers the 400 of a non-member instead of 500. A DMS account stored
+  with a built-in property name as its provider no longer reaches a broken adapter.
+- **Contacts, contact sync and the meal plan check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now
+  (from this release on the meal dialog sends the chosen recipe as a number). Under
+  `/api/v1/contacts`, `/api/v1/contacts/cardav` and `/api/v1/meals`, input that used to be
+  quietly accepted, replaced or answered with a 500 is now refused with a 400:
+  - a path id that is not plain digits: `0x10` and `abc` found nothing (404), `1e2` reached row 1;
+  - a number, list, object or truth value in a text field: a contact named `{}` was stored as
+    `"[object Object]"`, a number as text; on editing a contact or a meal, and on the
+    ingredients of a meal, a number answered 500;
+  - `recipe_id` and `cook_user_id` that are neither whole numbers nor digit text (`"0x10"` was
+    read as recipe 16, `true` as 1 or a 500), a `listId` of a transfer that is not a whole
+    number, a meal type that is empty or `null`, a series end that is not a day;
+  - `ingredients` and `assignments` that are not lists of objects (500);
+  - an unknown `scope` on `PUT` and `DELETE /meals/{id}`: on `DELETE` it deleted the meal;
+  - `week` of the meal plan that is not a day: `abc` and an empty value fell back to the current
+    week, `2026-13-45` answered 500, `2026-02-30` rolled over into March;
+  - `order` of the contact categories that is not a list of text (taken as empty, or 500 for an
+    object entry), a category edit with neither `name` nor `color`;
+  - CardDAV: account fields that are not text (a password that was not text counted as empty),
+    `enabled` of an address book that is not `true` or `false`; the refusal carries
+    `reason: "validation"` and no `errorCode`, and the contact sync page says its sentence for
+    it;
+  - queries given twice (a doubled `q` of the meal suggestions answered 500).
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of contact sync and the shopping write
+  right of the two transfers to the shopping list come first: 403 stays 403, also for a bad
+  request. Lengths stay with the routes, with their `reason` and `params.limit`. Deleting a
+  contact sync account that does not exist answers 404 (`account_not_found`) instead of 500. A
+  week start stored as a built-in property name (`constructor`) no longer breaks the meal plan.
+- **The shops and the price history of the shopping list answer an unexpected failure with the
+  same sentence as the rest of the API.** `GET`, `POST`, `PUT` and `DELETE` under
+  `/api/v1/shopping/stores` and `GET /api/v1/shopping/price-history` said `"Internal error"` on
+  a server-side failure; they now say `"Internal server error."` like every other module. Status
+  500 and `code` are unchanged, and so is every answer that names a known cause.
+- **Health answers an unexpected failure with the same sentence as the rest of the API.**
+  Vitals, medications and the dose log, lab reports, activities, the CSV exports, the cycle
+  tab, caregivers, preventive care and nutrition under `/api/v1/health` said
+  `"Internal error."` on a server-side failure; they now say `"Internal server error."` like
+  every other module. Status 500 and `code` are unchanged. Every answer that names a known
+  cause stays as it was: the fasting refusals with their `reason` (and the `current` record of
+  a conflict), an undo of a dose that is not recorded (`health_dose_pending`), the reasons of
+  the cycle import, the vital limits and units, and the refusals of care. The cycle feed,
+  fasting and the visibility defaults answered this way already.
+- **Health checks every request against the published API description.** This is about your
+  own API clients; the app sends nothing that is refused now (from this release on it sends the
+  type of a preventive-care record as a number). Under `/api/v1/health`, input that used to be
+  quietly accepted, replaced or answered later is now refused with a 400:
+  - a path id that is not plain digits: `7abc`, `1e2`, `1.5` and `" 5"` reached row 7, 1, 1 and
+    5, and on fasting records `0x10` reached record 16;
+  - a number sent as text, a truth value or a list in a number field: `"0x10"`, `" "`, `[]` and
+    `true` were stored as 16, 0, 0 and 1 (vital values, stock and doses, lab values, activity
+    numbers, nutrients, cycle settings);
+  - an unknown value where the module has a list: visibility, dose status, lab flag, cycle flow
+    and the day log choices, basal temperature unit, contraception, preventive-care kind, meal
+    type, the areas of the visibility defaults; `active` and `prn` of a new medication or
+    schedule that are not `true`/`false`/`1`/`0` became the default;
+  - a number, list or object in a text field (stored as text, `{}` as `"[object Object]"`), ids
+    in a body that are neither whole numbers nor digit text (`user_id`, `schedule_id`,
+    `type_id`, `notify_partner_user_id`), `symptoms` that is neither a list nor text (it cleared
+    the day's symptoms) and `results` of a lab report that is not a list (dropped);
+  - `caregiver_ids` with an entry that is not an id: `["abc"]` WITHDREW ALL CARE for the person;
+  - `PATCH /health/fasting/{id}` with `visibility: null`, which made a shared fast private;
+    fasting `goal_minutes`, `rating` and `expected_revision` sent as text;
+  - queries: `user_id` that is not plain digits or `0` (read as "everybody visible"), `active`
+    other than `1`, `0`, `true`, `false`, export dates that are not a day (ignored), an unknown
+    `meal_type`, and any parameter given twice;
+  - a missing body on the routes that read one; `{}` sent on purpose still passes where the
+    route took it before. `POST /health/logs/{id}/skip` reads no body.
+
+  The check runs before the row is looked up, so a bad request is a 400, not a 404 or 409; a
+  valid one meets those as before. The fasting capability and the admin check of caregivers and
+  preventive-care types come first: 403 stays 403, also for a bad request. Rules the
+  description cannot carry stay with the routes: vital limits and units, the order of start and
+  end, the CSV import rows, revisions and overlaps of fasts. A basal temperature unit named like
+  a built-in property (`constructor`) no longer passes the range check.
+- **Editing a shared expense takes the whole expense.** This is about your own API clients; the
+  app sends every field now. `PUT /split-expenses/expenses/{id}` without `description`,
+  `currency`, `converted_amount`, `converted_currency`, `exchange_snapshot`, `split_method` or
+  `expense_date` cleared the stored note and exchange snapshot, read the amount in the converted
+  currency, set the converted amount and currency back to the amount and currency, split the
+  amount equally and moved the expense to today. All seven are required now besides `title` and
+  `amount`; `null` still clears the note and the snapshot and stands for the amount, and
+  `expense_date: ""` is still today. `payer_id`, `participants`, `category`, `budget_category`
+  and `attachment_document_ids` stay optional and keep the stored value when left out. The edit
+  dialog no longer drops the stored conversion and exchange snapshot of an expense whose amount
+  and currency it leaves unchanged, and the exact shares of such a converted expense are entered
+  and checked in the converted currency, as the server adds them up.
+- **Saving the cycle settings takes all of them.** This is about your own API clients; the app
+  sends every field already. `PUT /health/cycle/settings` without one of its fields reset it to
+  its default: the cycle and period lengths, the due date, contraception, the period reminder
+  and the partner notification were cleared, the luteal phase went back to 14 days, fertility
+  tracking and the PMS window were switched on, pregnancy and perimenopause mode and the daily
+  log nudge were switched off and the default visibility became `private` (`{}` reset them all).
+  All 14 fields are required now; `null` still clears a value where the field takes it, and
+  `luteal_length: null` is still 14.
+- **Saving a cycle day again takes the whole day.** This is about your own API clients; the app
+  sends the whole day already. `POST /health/cycle/logs` on a day that has a log without `flow`,
+  `note`, `visibility`, `symptoms`, `basal_temp`, `basal_temp_unit`, `cervix_mucus`, `lh_test`,
+  `pregnancy_test` or `intimacy` cleared the stored value, emptied the symptoms and made the day
+  `private`. These ten are required now besides `log_date`; `null` and `""` still mean "not
+  given". `feelings` and `mood` stay optional and keep the stored feelings when both are left
+  out.
+- **Setting a nutrition target takes all eight nutrients.** This is about your own API clients;
+  the app sends all eight already. `PUT /health/nutrition/targets` without a nutrient unset it,
+  and `{}` deleted the whole target. All eight are required now; `null` unsets one, and eight
+  `null` still delete the target. `user_id` stays optional and means the caller when left out.
+- **Recording a dose takes its status.** This is about your own API clients; the app sends it
+  already. `POST /health/medications/{id}/logs` without `status` stored `pending`, and repeating
+  a planned dose that was taken (same `schedule_id` and `scheduled_at`) reset it to `pending`
+  and dropped its time. `status` is required now; `null` still means `pending`. `taken_at`,
+  `dose_qty`, `note` and `stock_deduct` stay optional: left out, a repeat keeps the stored time,
+  dose and note and deducts nothing.
+- **Renaming a contact takes all five name parts.** This is about your own API clients.
+  `PUT /contacts/{id}` with some of `firstName`, `lastName`, `middleName`, `namePrefix` and
+  `nameSuffix` cleared the ones left out, so a middle name, title or suffix from a vCard or
+  CardDAV was lost. Sent together they are required together now: one without the others is a
+  400 naming a missing part; `null` still clears a part, and leaving out all five keeps them.
+- **Editing a document takes its access list.** This is about your own API clients; the app
+  sends it already. `PUT /documents/{id}` without `allowed_member_ids` emptied the list, so a
+  `restricted` document silently lost every member it was shared with. `allowed_member_ids` is
+  required now (`[]` shares it with nobody); for `family` and `private` it is ignored as before.
+  Every other field stays optional and keeps the stored value when left out.
+- **An exchange snapshot is an object or `null`.** This is about your own API clients: on
+  `POST /split-expenses/groups/{id}/expenses` and `PUT /split-expenses/expenses/{id}`,
+  `exchange_snapshot` sent as `false`, `0`, `""` or any other value that is not an object is now
+  refused with a 400, where `false`, `0` and `""` were stored as no snapshot and other values as
+  sent.
+- **Backup answers an unexpected failure with the same sentence as the rest of the API.**
+  `GET /api/v1/backup/database` said `"Database backup failed."`, `POST /api/v1/backup/trigger`
+  `"Backup trigger failed."` and `PUT /api/v1/backup/webdav/config` `"Failed to save WebDAV
+  config."` on a server-side failure; they now say `"Internal server error."` like every other
+  module. Status 500 and `code` are unchanged. Every answer that names a known cause stays as it
+  was: a download whose backup failed its integrity check (`backup_verify_failed`), a local
+  failure of the WebDAV upload (`backup_local_failed`), the 502 of the WebDAV server, the
+  `errorCode` of the WebDAV settings and the reasons of a restore. Shared expenses answered
+  this way already.
+- **Shared expenses, backup and the system diagnostics check every request against the
+  published API description.** This is about your own API clients; the app sends nothing that
+  is refused now (from this release on it sends the payer and payee as numbers). Under
+  `/api/v1/split-expenses`, `/api/v1/backup`, `/api/v1/system` and `/api/v1/changelog`, input
+  that used to be quietly accepted, replaced or answered later is now refused with a 400:
+  - a path id that is not plain digits: `0x10`, `1e1` and `" 5"` read group, expense or
+    recurring expense 16, 10 and 5, and `7abc` or `1.5` were a 404;
+  - an unknown value where the module has a list: group `type`, `default_currency`,
+    `default_split_method`, an expense or settlement `currency` and `converted_currency`,
+    `split_method`, `category`, a recurring `frequency`, a member `role`, a guest
+    `family_role`, and the filters `status` (groups) and `category` (expenses). They were
+    replaced with a default (`general`, `equal`, the group currency, `guest`, `other`) or
+    ignored;
+  - a number, truth value, list or object in a text field (a guest `password: {}` was stored as
+    `"[object Object]"`), an amount sent as a number, and ids in a body that are neither whole
+    numbers nor digit text (`payer_id`, `payee_id`, `participants`, `splits[].user_id`,
+    `user_id`, `contact_id`, `proof_document_id`, `attachment_document_ids`);
+  - `attachment_document_ids` that is not a list on `PUT /split-expenses/expenses/{id}`:
+    `null`, a single id or text REMOVED EVERY RECEIPT of the expense. Leave the field out to
+    keep them, send `[]` to remove them;
+  - `PUT /backup/webdav/config` with a `username`, `password` or `remotePath` that is not text
+    (`username: 5` was a 500) or a `keep` that is not a whole number (`7.5` was stored as 7);
+  - queries: `limit`, `offset` and `before_id` that are not plain digits, `recurring` other than
+    `1`, and any parameter given twice. `limit` above 100 and a negative `offset` are still
+    capped, as described;
+  - a missing body on the routes that read one; `{}` sent on purpose still passes where the
+    route took it before (`PATCH /split-expenses/groups/{id}`).
+
+  What stays allowed is in the description now too: `null` or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), unknown fields, no body at the pause
+  toggle. Rules the description cannot carry stay with the routes and their sentences: an empty
+  name after trimming, amounts and their decimal places, the sums of a split, membership,
+  budget categories (`unknown_budget_category`), the WebDAV address pattern and password rule
+  (`errorCode`). `missed` keeps its reason `invalid_missed`. The check runs before the group,
+  expense or recurring expense is looked up, so a bad request is a 400, not a 404, 403 or 409;
+  a valid one meets those as before. The admin check of backup and diagnostics and the refusal
+  of a shared-expense guest creating a group come first: 403 stays 403, also for a bad request.
+  Text lengths count the value as sent.
+- **Replacing a moved or skipped waste pickup or a day of the shift schedule takes the whole
+  entry.** This is about your own API clients; the app sends every field already. A `PUT`
+  replaces what is stored, so a field left out no longer stands for a value:
+  - `PUT /waste/schedules/{id}/overrides/{originalDate}` without `replacement_date` and `note`:
+    an empty body skipped the pickup, and a missing note wiped the stored one. Both are required
+    now; `replacement_date: null` skips the pickup;
+  - `PUT /schedule/overrides/{dateKey}` without `shift_type_id`, `note` and `field_values`: a
+    missing shift type made the day free, a missing note wiped the stored one, and missing field
+    values kept the stored ones while everything else was replaced. All three are required now;
+    `shift_type_id: null` is the free day, and `field_values: {}` clears the values. `user_id`
+    stays optional and defaults to you.
+- **Waste collection and the shift schedule answer an unexpected failure with the same sentence
+  as the rest of the API.** The routes under `/api/v1/waste` (types, schedules and their
+  overrides, one-off pickups, occurrences, import sources, file import, reminder settings) said
+  `"Internal error"` on a server-side failure, `DELETE /api/v1/schedule/shift-types/{id}` said
+  `"Internal error."` and `GET /api/v1/schedule/entries` said `"Schedule entries could not be
+  resolved."`; they now say `"Internal server error."` like every other module. Status 500 and
+  `code` are unchanged. Every answer that names a known cause stays as it was: a refused input,
+  a missing record or a conflict of waste collection, the 502 of a subscribed address without
+  calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
+  and the own schedule settings answered this way already.
+
+### Fixed
+- **Saving a contact in the app keeps its middle name, title and suffix.** A contact imported
+  from a vCard or synced over CardDAV lost them the first time its form was saved, because the
+  form sent only the first and last name; it now sends the stored ones along.
+- **A shared expense converted into a currency with other decimal places reports the converted
+  amount correctly.** `converted_amount` in the expense answers was written with the decimal
+  places of `currency` instead of `converted_currency`: 1500 JPY converted from USD read
+  `"15.00"`, and sending it back was refused. `converted_amount_minor` was always right.
+- **Exact shares of an expense converted into COP, HUF, IDR or IRR can be saved again.** The
+  converted amount keeps two decimal places (for example 3581.47 HUF), but the share fields
+  allowed none for these currencies, so the shares could never add up to it. They now accept
+  the decimal places the converted amount is stored with.
+- **The running total under exact shares of such an expense shows the stored decimal places.**
+  It showed 3,581 HUF while the shares had to add up to 3,581.47 HUF; it now shows 3,581.47 HUF.
+- **A shared expense saved without an exchange rate answers `exchange_snapshot: null`.** Creating
+  or replacing an expense without a rate stored the text `"null"`, and the expense answers
+  returned `"exchange_snapshot": "null"` for it. New and replaced expenses now store no value and
+  answer `null`; expenses saved before keep `"null"` until they are saved again.
+
+## [2.93.0] - 2026-11-18
+
+### Changed
+- **The inventory checks every request against the published API description.** This is about
+  your own API clients; the app sends nothing that is refused now (it sends location ids as
+  numbers from this release on, also in the order of locations and child locations). Under
+  `/api/v1/inventory`, input that used to be quietly accepted, reinterpreted or answered later
+  is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`DELETE /inventory/items/12abc` deleted item 12), a number, truth value, list or object in
+    a text field (it was stored as text), and a number written as text, a truth value or a
+    list in a number field (`"12.5"`, `true` and `[5]` were read as numbers);
+  - items: a `condition`, `status` or `odometer_unit` outside its list, and `false` or `0` for
+    them (they meant the default; null, `""` or leaving it out still do), a day that is not
+    `YYYY-MM-DD` or is a list, a location id that is neither a whole number nor digit text,
+    `warranty_months` outside 0 to 600, an odometer reading that is not a whole number - also
+    for a category without one, where it was dropped silently - and a price that is not a
+    number, also from an account without the price right (it was ignored);
+  - `tracked_dates` and `attachment_document_ids` that are not a list: on a replace, null,
+    text or an object REMOVED all tracked dates with their reminders, or all document links.
+    Leaving the field out still leaves them as they are, and `[]` still clears them. Tracked
+    date rows that are not objects, without label or day, or with numbers outside their range;
+  - linking a booking: `entry_id` as text or left out, a `role` outside its list,
+    `amount_share` as text or below zero; completing a tracked date and the service log: a day
+    that is not `YYYY-MM-DD`, an odometer reading as text or below zero;
+  - the list: `status` outside its list, `location_id` that is not plain digits, and a filter
+    given twice (they were ignored or read as the first);
+  - the order of locations, child locations and categories with entries that are not ids or
+    keys (`[{}]` and `[true]` were a 500, other entries were skipped or stored), and an order
+    of child locations without `order` (it was a silent no-op; `[]` still is).
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for a location id (older app versions send it), a currency in
+  any case, unknown fields. A `PUT` replaces the whole item, as before: left-out fields are
+  cleared or take their default, only the name is required, and `tracked_dates` and
+  `attachment_document_ids` stay untouched when left out. Rules the description cannot carry
+  stay with the routes and their sentences: an empty name after trimming, a day that does not
+  exist, a category or location that does not exist (`inventory_selected_location_not_found`
+  as before, for a number and for digit text), the photo content, the odometer that must not
+  fall below the current reading. The check runs before the entry is looked up, so a bad
+  request for a missing entry is a 400, not a 404 or 409, and an account that may change only
+  its own items gets 400 for a bad request on someone else's item and, as before, 403
+  `not_owner` for a valid one. Text lengths count the value as sent.
+- **Housekeeping and rewards check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that is refused now (it sends the
+  housekeeper id as a number from this release on). Under `/api/v1/housekeeping` and
+  `/api/v1/rewards`, input that used to be quietly accepted, reinterpreted or answered later
+  is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `1.9`, `0x10` or ` 1`
+    (they were read as numbers), a number, truth value, list or object in a text field (it was
+    stored as text), and a number written as text, a truth value or a list in a number field
+    (`"60"`, `true` and `[5]` were read as numbers) - for amounts also from an account without
+    the amounts right, where they were ignored;
+  - `PUT /rewards/participants/{userId}` without `enabled`, or with anything but `true` or
+    `false` (`"true"`, `1`, `null`): it SWITCHED THE PARTICIPATION OFF. `enabled` is required
+    now. `PATCH /rewards/catalog/{id}` with `is_active` that is not `true` or `false`: it
+    switched the reward off;
+  - lists: `payment_schedule` and `rate_type` of a housekeeper, `action` of a redemption
+    decision (missing or unknown, it was 400 only after the request was looked up), `kind` of a
+    request, `frequency` of a pocket money plan and `direction` of a money entry outside their
+    values; `birth_year_unknown` as `0`, `1` or null;
+  - ids in a body (housekeeper, receipt, person, reward) that are neither whole numbers nor
+    digit text, and `null` for a person or reward in rewards; whole numbers outside the
+    route's own bounds (a reward's cost and quantity, a bonus, a plan's anchor day, a task
+    frequency below 1);
+  - queries: `?month=` outside 01 to 12 or before the year 1001 (`2026-13` was a 500),
+    `worker_id`, `user_id`, `limit` and `timezone_offset_minutes` that are not plain digits
+    (`?user_id=abc` listed everybody), `local_date` that is not `YYYY-MM-DD`, `status`, `kind`
+    and `all` outside their values, and any filter given twice.
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), unknown fields, a body on the routes
+  that read none. Rules the description cannot carry stay with the routes and their sentences:
+  an empty name after trimming, the username rule (`housekeeping_username_invalid`), a day that
+  does not exist, amounts below zero, the money amount and currency of an account. Texts the
+  rewards routes cut (`icon`, `note`, `reason`) are still cut, not refused. The check runs
+  before the entry is looked up, so a bad request is a 400, not a 404, 403 or 409; a valid one
+  meets those as before. The admin check of `POST /housekeeping/worker` and of the rewards
+  admin routes, and the shopping right of `POST /housekeeping/supply-requests`, come first:
+  403 stays 403, also for a bad request. Text lengths count the value as sent.
+- **Waste collection and the shift schedule check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused
+  now. Under `/api/v1/waste` and `/api/v1/schedule`, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `1.5` or `1e3` (they were
+    read as 12, 1 and 1), a number, truth value, list or object in a text field, and a number
+    written as text, a truth value or a list in a number field (`"7"` for a cycle length, `""`
+    or `false` for `reminderOffsetMinutes`, which meant 0 minutes);
+  - `PUT /waste/reminder-settings/{typeId}` without `enabled`, `offset_days` and
+    `delivery_time`: a body without `enabled` SWITCHED THE REMINDER OFF, and a missing lead
+    time or time was reset to 1 day and 08:00. All three are required now;
+  - switches that are not `true` or `false` (`active`, `archived`, `ignored`, `enabled`,
+    `is_active`, `overtimeEnabled`): `active: "false"` kept a waste schedule running;
+  - garbage that was a 500: `type_id: true` or `{}` for a waste schedule or pickup, a `note`
+    that is not text on a moved or skipped pickup, `mappings: [null]` on an import commit, and
+    `color: ""` for a waste type;
+  - lists: a `recurrence_kind` or weekday code outside its values, weekdays as comma text
+    (`"MO,TH"`; send a list), a mapping profile `version`
+    other than 1, `include_archived` and `include_inactive` other than `1`, `true`, `0` or
+    `false`;
+  - ids in a body that are neither whole numbers nor digit text (`user_id`, `shift_type_id`,
+    `custom_field_id`, the type of a schedule or pickup); bounds the routes have on every
+    value (cycle length 1-366, at most 500 cycle days, reminder minutes 0-1440, weekly hours
+    1-168, waste reminder lead time 0-14 days);
+  - queries: `type_id`, `user_id`, `from` and `to` that are not plain digits or `YYYY-MM-DD`
+    (`?type_id=abc` listed every schedule, `?user_id=3abc` read 3), and any filter given twice;
+  - missing fields that were answered later: `profile_digest` of a mapping profile commit and
+    `expected_version` of a re-import commit (a 409 before), and a day in the path of a waste
+    override that is not `YYYY-MM-DD` (a 404 before).
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, digit text for ids (the legacy form), weekdays as a list or one code,
+  unknown fields, an empty body where every field is optional (skipping a pickup
+  date), a URL source without `ics`. Rules the description cannot carry stay with the routes
+  and their reasons: an empty name after trimming, a day that does not exist, the anchor day of
+  a schedule, the interval bound per kind, a type, shift type or member that does not exist,
+  the refresh interval of a URL source (with its bounds as `params`). The check runs before the
+  entry is looked up, so a bad request is a 400, not a 404, 403 or 409; a valid one meets those
+  as before. A member who names someone else in `user_id` of a pattern, override, extra shift
+  or their range variants gets 403 first, also for a bad request, now with the plain sentence
+  `Forbidden.`. Text lengths count the value as sent.
+- **A path id beyond the safe integer range is refused with a 400.** This is about your own
+  API clients; the app never sends such an id. On the routes that check requests against the
+  API description (notes, birthdays, quick links, reminders, notification channels,
+  permissions, displays, profile pictures, recipes, recipe providers, pantry, inventory,
+  housekeeping, rewards, waste collection, shift schedule), a
+  path id above 9007199254740991 is now a 400 with the rule `maximum`, and a run of digits too
+  long to be a number at all (hundreds of digits) a 400 with the rule `type`. Before, such an id
+  answered 404 or 400 depending on the route. 9007199254740991 itself, `0` and a negative id
+  are answered by the route as before. The API description gives every numeric path id this
+  upper bound.
+
+## [2.92.0] - 2026-11-18
+
+### Changed
+- **Notes, birthdays and quick links check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that changes. Under
+  `/api/v1/notes`, `/api/v1/birthdays` and `/api/v1/quick-links`, input that used to be
+  quietly accepted or reinterpreted is now refused with a 400:
+  - a path id that is not plain digits, such as `12abc` (it was read as 12);
+  - `pinned` as `"false"`, `5` or `"x"`, and `pinned: null` on a note update;
+  - a number in a text field, such as `"title": 5` (it was stored as text);
+  - an id written as text in `category_ids` and `contact_id`, and anything but whole numbers
+    in `contact_ids` (birthday import) and `ids` (quick link order). Note category reordering
+    still takes digit strings, because the app sends them;
+  - a list instead of an object as the body;
+  - a quick link `visibility` other than `all`, `private` or null (it became `all` or was
+    ignored);
+  - an empty `name` when updating a birthday or a quick link.
+
+  Such a refusal reads `{ "error": "The request does not match the documented schema.",
+  "code": 400, "reason": "validation", "fields": [{ "path": "body/title", "rule": "type" }] }`.
+  `fields` names the place and the JSON Schema rule, never the value you sent. Input that was
+  already refused before can now get this form instead of the old sentence. The check runs
+  before the entry is looked up, so a bad request for a missing or locked entry is now a 400,
+  not a 404 or 403, and a missing body where one is required is a 400. Text lengths count the
+  value as sent, before surrounding spaces are trimmed. Unknown fields are still ignored, and
+  what stays allowed is in the description too: null or `""` for "no value", the note
+  visibilities `family` and `shared`, `year_unknown: null`, a pin toggle without a body, and
+  reminder fields as text or number.
+- **Birthdays answer an unexpected failure with the same sentence as the rest of the API.** The
+  seven routes under `/api/v1/birthdays` (list, upcoming, create, import candidates, import,
+  update, delete) said `"Internal error."` on a server-side failure; they now say
+  `"Internal server error."` like every other module. Status 500 and `code` are unchanged.
+- **Reminders, notification channels, modules, permissions, e-mail and weather check every
+  request against the published API description.** This is about your own API clients; the app
+  sends nothing that is refused now (a task reminder now goes out with its id as a number).
+  Under these six prefixes, input that used to be quietly accepted or reinterpreted is now
+  refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (it was read as another number or looked up as 12), and a query value given twice where
+    one is expected (`audience`, `admin`, `city`, `lang`, `entity_id`);
+  - `/api/v1/reminders`: `entity_id` as `1abc` or `1.9` (it was read as 1), an unknown
+    `entity_type`, `remind_at` as a list, and a time the route never read - a lowercase `t`
+    or `z`, a space instead of `T`, an offset of hours only (`+02`). A body that is not an
+    object or a `remind_ats` that is not a list is refused before the entry is looked up;
+  - `/api/v1/notifications`: a provider that is not exactly `gotify`, `ntfy`, `webhook` or
+    `email` (`" NTFY "` was accepted), a number as `name`, `enabled` as `"false"` (it switched
+    the channel ON), `config` or `secrets` as null, and `clearSecrets` that is not a list of
+    names (a number was a 500). A `provider` sent with an update must be a known one, too;
+  - `/api/v1/modules`: `overwrite` as `true` or `yes` on a ZIP install (`true` replaced, `yes`
+    was ignored), `overwrite: "1"` on a GitHub install, a `path` over 500 characters as sent,
+    `ref` or `path` that is not text, and an asset address without a file path (it was a 404);
+  - `/api/v1/permissions`: no body, a list as the body and `capabilities: null` (all three
+    answered 200 and REMOVED the stored rights), a map that is not an object, an access level
+    other than `none`, `read`, `write` (modules) or `none`, `allow` (widgets, capabilities),
+    and a member id such as `12abc` or `1.5`;
+  - `/api/v1/email`: a missing body on `PUT /config` (it was a 200 that saved nothing), `port`
+    as text, a truth value, a list or `""` (`"587"` was stored as text), a number or truth
+    value as `host`, `user`, `fromName`, `fromAddress` or `pass`, `clearPassword: "true"`, a
+    `secure` that is not one of its three values, and `to: null` or a number on `POST /test`;
+  - `/api/v1/weather`: a place name given twice, and an icon code other than 2 to 4 letters or
+    digits.
+
+  What stays allowed is in the description now too: `entity_id` as digit text on
+  `POST /reminders`, every time form the reminder routes read (a date alone, no seconds, a
+  fraction, `Z`, `+02:00` or `+0200`), up to five reminders counted after conversion, a
+  partial channel update, null to clear an e-mail field, any `lang` on the weather routes
+  (`de-AT`, an unknown code falls back), `admin` and `audience` as any text. A refusal's
+  `reason` can now be the route's own documented reason instead of `validation`, and an entry
+  in `fields` can carry it as `reason`: `bad_url` (GitHub URL missing, not text or too long),
+  `email_port_invalid`, `email_from_invalid` (a sender that is neither text nor null) and
+  `name_too_short` (a place name that is missing, empty or given twice) keep the reason they
+  had. The check runs after the admin, session and rate-limit checks, so a member still gets
+  403, and before the entry is looked up, so a bad request for a missing channel, member or
+  reminder target is now a 400, not a 404.
+- **Family, profile pictures, search, kitchen, screensaver and wall displays check every request
+  against the published API description.** This is about your own API clients; the app sends
+  nothing that is refused now. Under these prefixes, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`5.0` and `1e2` were read as 5 and 100), and a query value given twice where one is
+    expected (`q` on `/api/v1/search` searched for `a,b`, `today` on `/api/v1/kitchen/summary`);
+  - `/api/v1/family/members/reorder`: the order is checked before the members are looked up.
+    It keeps its reasons `invalid_order` and `duplicate_member`, now with `fields`. A member who
+    is not an administrator gets 403 for any body, as before;
+  - `/api/v1/people/{id}/avatar`: a missing `v`, one that is not 32 lowercase hex characters,
+    or one given twice (it was a 404). A well-formed key that does not match is still a 404;
+  - `/api/v1/kitchen/summary`: `today` that is neither `YYYY-MM-DD` nor empty (it fell back
+    to the household day). An empty or missing `today` still means the household day;
+  - `/api/v1/screensaver`: no body or a list on `PUT /config` (it was a 200 that saved
+    nothing), `url` or `albumId` that is not text (they were read through `String()`, so a
+    list with one URL was stored), a `url` over 2048 or an `apiKey` over 1000 characters as
+    sent, an `apiKey` that is not text (it was ignored), `clearApiKey: "true"`, and a photo id
+    that is not a UUID - also when Immich is not set up (that was a 404). `url`, `albumId` and
+    the key length keep `immich_url_invalid`, `immich_album_id_invalid` and
+    `immich_api_key_invalid`, and a refused body stores no field at all;
+  - `/api/v1/displays`: a `display_name` that is a number, a truth value, a list (they were
+    stored as text) or empty, or longer than 128 characters as sent; `show_screensaver` as
+    text; on `POST /displays/pair` a missing `code`, a `code` or `label` that is not text and a
+    `label` over 120 characters (it was cut). A refused pairing counts against the rate limit
+    like any attempt and leaves a signed-in session in place.
+
+  What stays allowed is in the description now too: `q` of any length, an empty `today`, a
+  day of the right shape that does not exist (compared as text, as before), `""` to clear the
+  Immich URL and album, a photo id in either letter case, `label: null` or `""`. Rules the
+  description cannot carry stay with the routes and their sentences: a member order that is
+  incomplete or names someone outside the household, the Immich URL scheme and album UUID
+  after trimming, a display name of spaces only, equal night hours. The check runs after the
+  admin check and the pairing rate limit, so a member still gets 403.
+- **Recipes, recipe providers and the pantry check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now
+  (it sends storage location ids as numbers from this release on). Under `/api/v1/recipes`,
+  `/api/v1/recipe-providers` and `/api/v1/pantry`, input that used to be quietly accepted,
+  reinterpreted or answered later is now refused with a 400:
+  - everywhere: a path id that is not plain digits, such as `12abc`, `5.0`, `1e2` or `0x10`
+    (`DELETE /recipes/42abc` deleted recipe 42, and `0x1e` or `31.0` deleted provider account
+    30 or 31), a query value given twice, a number, truth value, list or object in a text
+    field (it was stored as text), and a number written as text (`"5"`, `true` and `[5]` were
+    read as numbers);
+  - `/api/v1/recipes`: `ingredients` that is null, not a list, or holds entries that are not
+    objects (null emptied the list, odd entries were skipped), `servings` outside 1 to 99 or as
+    text or `""`, `meal_types` that is neither a list of texts, a text nor null, `listId` and
+    `ingredientIds` of the transfer to a shopping list as text, and `pantryItemId: ""` on an
+    ingredient match (it cleared the match; `null` or leaving it out still does);
+  - `/api/v1/recipe-providers` (admin only): a `provider` other than `mealie` or `tandoor`
+    (an unknown one was stored as `mealie`; left out it still is), `enabled` that is not a
+    real truth value (`"false"` switched an account ON, `null` and `0` OFF), and a `PATCH`
+    without a body. A base or external address that does not start with `http://` or
+    `https://` keeps its reason `recipe_providers_url_invalid` or
+    `recipe_providers_external_url_invalid`, now with `fields`;
+  - `/api/v1/pantry`: a `unit` outside the unit list (it became `pcs`, and on `PATCH` it
+    overwrote the stored unit), a quantity or minimum as text or below zero, `min_quantity: ""`
+    (use null to clear), `expires_on` that is not `YYYY-MM-DD`, empty or null, a storage
+    location id that is neither a whole number nor digit text, a `PATCH` without a body,
+    `items` or `changes` that is not a list (null or text took over or undid nothing), an
+    `order` of storage locations with entries that are not ids (`[{}]` and `[true]` were a
+    500, other entries were skipped), and undo entries that are not the shape the take-over
+    answered with.
+
+  What stays allowed is in the description now too: null or `""` for "no value" where the
+  routes read it so, `meal_types` as comma text, unknown recipe meal types (dropped), an
+  address in upper case or with leading spaces, `""` for no external address, digit text for a
+  storage location id (older app versions send it), null to keep a pantry item's unit or
+  category on a change, `{}` on a partial update and on the provider test and sync. A `PUT`
+  replaces the whole recipe or pantry item, as before: left-out fields are cleared, and only
+  the name is required. Rules the description cannot carry stay with the routes and their
+  sentences: an empty name after trimming, a day that does not exist, a category or storage
+  location that does not exist, the image content, a provider address in a private network.
+  The admin check of the providers and the second module right of the recipe transfer, the
+  ingredient match and the shopping-list take-over run first, so a caller without them still
+  gets 403 for any body; the check then runs before the entry is looked up, so a bad request
+  for a missing entry is a 400, not a 404 or 409. Text lengths count the value as sent.
+- **Reminders, notification channels, modules and e-mail answer an unexpected failure with the
+  same sentence as the rest of the API.** Their routes said `"Internal error."` (reminders,
+  notification channels including a failed channel test, e-mail) or `"Module install failed."`,
+  `"Module delete failed."`, `"Module install info failed."`, `"Module list failed."`,
+  `"Module update failed."` and `"Module asset failed."` (modules) on a server-side failure;
+  they now say `"Internal server error."` like every other module. Status 500 and `code` are
+  unchanged, a failed channel test still stores its error on the channel, and every answer
+  that names a known cause (a refused input, `busy`, `not_writable`, an install refusal with
+  its `reason`) stays as it was. Permissions and weather answered this way already.
+- **Recipes answer an unexpected failure with the same sentence as the rest of the API.** The
+  recipe routes (list, create, update, delete, own image, transfer to the shopping list,
+  ingredient match) said `"Internal error"` on a server-side failure; they now say
+  `"Internal server error."` like every other module. Status 500 and `code` are unchanged. The
+  image proxy of imported recipes keeps its own answers (`404`, `502`). Recipe providers and the
+  pantry answered this way already.
+
+### Fixed
+- **The calendar search no longer loses upcoming events behind old ones.** With more than 100
+  matching events it kept the oldest, so an old series or a year of past events pushed the
+  upcoming ones out of the result. It now keeps upcoming events and series first, then past
+  events from the newest - like the global search. The order of the result is unchanged.
+- **Search and the overview show rows that tie in the same order on every load.** Lists that
+  sort by date or title had no unique last sort key, so entries with the same date or the same
+  title could swap places between two loads, and the global search could drop exactly the newest
+  of several past events with the same start when it cut its candidates. Ties now follow the
+  direction of the list: newest first breaks them with the newer entry, all others with the
+  older; two recipes with the same title stand in the order they were created.
+- **Confirming which pantry row a recipe ingredient means names the ingredient in English.**
+  `PUT /api/v1/recipes/{id}/ingredient-match` with an empty, blank or too long `name` answered
+  `"Zutat is required."`, `"Zutat must not be empty."` or `"Zutat may be at most 200 characters
+  long."` - a German word in an English message. It now says `"Ingredient ..."`. Status and
+  `code` are unchanged.
+- **Taking checked shopping items into the pantry no longer fails with a server error when a
+  storage location was deleted meanwhile.** If one of the chosen locations no longer exists -
+  for example removed in another session while the dialog was open - the take-over now answers
+  400 `Location not found.` like adding a pantry item does, and nothing is taken over. Before,
+  the whole take-over ended as a 500.
+- **The API description marks every value that may be null in the OpenAPI 3.1 way.** 36 places - the
+  fasting and nutrition bodies, the household setup, the waste calendar feed - said so with the
+  OpenAPI 3.0 keyword `nullable`, which a 3.1 client generator ignores, so a generated client treated
+  them as never null. They now carry `null` in their type. Four sample values moved from `example` to
+  `examples`, and two "one of these fields" rules are spelled so that a strict JSON Schema validator
+  accepts them. The API itself did not change.
+
+## [2.91.1] - 2026-11-17
+
+### Fixed
+- **The "session cannot be checked" screen is readable on the light field.** When the server
+  did not answer the sign-in check at startup (offline, a server error, too many requests), the
+  title, the sentence and "Technical details" stood directly on the violet light field behind
+  them, and in the light theme the sentence and the details link fell below the WCAG AA
+  contrast of 4.5:1. The screen now sits on the same glass panel as the sign-in page.
+- **The retry countdown keeps number and unit together in Traditional Chinese.** On the same
+  screen, the hint "Trying again in 2 s" could break between the number and 秒 on a narrow
+  panel. Every other language already joined them with a non-breaking space; zh-Hant now does
+  too.
+- **Numbers stay on one line with their unit in every language.** Texts such as "up to 25 MB",
+  "1 h 30 min", "45 %", the wind speed on the weather card or the Russian and Ukrainian "5 дн."
+  could break between the number and its abbreviated unit, leaving the unit alone at the start
+  of the next line. All 27 languages now join them with a non-breaking space, and a test keeps
+  new texts to the same rule.
+- **The housekeeping payments chart shows all six months on a phone.** On screens narrower
+  than about 390px the chart scrolled sideways and started at the oldest month, so the current
+  month on the right was cut off or hidden. The six columns now fit the card from a 320px wide
+  screen, and amounts up to four digits stay readable above their column. The number above
+  a column is now always a whole amount, so a month total like €1,234.50 no longer runs into
+  its neighbour; the exact amount is still shown in the visits and the report.
+
+## [2.91.0] - 2026-11-15
+
+### Changed
+- **Every "administrators only" refusal of the API has the same answer.** Routes that only an
+  administrator may use refused everyone else with one of four texts ("Permission denied.",
+  "Admin access required.", "Not authorized.", and one of its own for the member order), most
+  of them without a `reason`. They now all answer `403` with
+  `{ "error": "Admin access required.", "code": 403, "reason": "admin_required" }`. A signed-in
+  device gets `reason: "device_credential"` at every one of these routes, where some of them
+  used to send the plain text. API clients that compared the text should read the `reason`
+  instead. Who may use a route has not changed, and the web app shows the same sentence as
+  before.
+- **Four household settings are for administrators only.** The currency, the app name, the
+  housekeeping payment tasks and the default length of new events count for the whole
+  household, but every member could change them through the API. A member who sends
+  `currency`, `app_name`, `housekeeping_payment_tasks` or `calendar_default_duration` to
+  `PUT /api/v1/preferences` now gets `403` with `reason: "admin_required"`, also for an invalid
+  value, which used to answer `400`, and nothing of that request is saved. Every member still
+  reads all four. In the web app members never saw these controls; on the Appearance page they
+  now see the household currency as a read-only row.
+
+### Fixed
+- **The backup schedule shows the same time as the next backup.** On a server running in
+  another time zone than the household, the backup card said "Daily at 02:00" above "Next
+  backup 03:00" for the same run. The server now names the zone its schedule runs in, and the
+  schedule reads its time, weekday and day from the next run in the household's time zone;
+  where that would not hold for every run, for example shortly before only one of the two
+  zones changes to summer time, it shows the configured value (`BACKUP_SCHEDULE=0 2 * * *`)
+  instead.
+- **A wall display reads only the tasks the whole household sees.** The task list, a single
+  task with its subtasks, its comments, its linked documents, its history, the household's
+  completion feed, the tag lists, the task parts of the overview and the task named by a
+  points entry (`GET /api/v1/tasks`, `/tasks/:id`, `/tasks/:id/comments`,
+  `/tasks/:id/documents`, `/tasks/:id/completions`, `/tasks/completions`, `/tasks/tags`,
+  `/tasks/meta/options`, `/dashboard` without `audience=household`, `/rewards/ledger`) asked a
+  paired display the same question as a person, so a task or subtask shared only with its
+  assignees would show on the wall if the display itself was assigned, while ticking it off
+  there answered "not found". Every one of these reads now follows the same wall rule: such a
+  task answers "not found" like an unknown one, also where a household task answers "no
+  access to documents", and the list, its subtask counts, the feeds, the tags, the overview
+  with its counts and countdowns leave it out, also for every earlier instance of a repeating
+  task; a points entry keeps its row and its points, only without the task's name. Nothing
+  changes for people. In the app this state could not be reached: a display is never offered
+  as an assignee, and the server refuses it as one.
+- **A wall display reads only the events the whole household sees.** The calendar, the next
+  events, the event search, a single event, the event count and the synced calendars of the
+  calendar list, and the event parts of the overview without `audience=household` showed a
+  display an event shared only with its assignees if the display itself was assigned. They
+  now follow the same wall rule as the tasks: such an event answers "not found" like an
+  unknown one and stays off every list, count and countdown. Nothing changes for people, and
+  as with the tasks the state could not be reached in the app.
+
+## [2.90.0] - 2026-11-14
+
+### Foundation
+- **Every access rule is answered in one place.** Who may see a row, who may use an area and
+  who cares for whom was decided in many files: as SQL in the routes, as comparisons on loaded
+  rows, in the scheduler, the feeds, the push sender and the MCP tools. All of it now lives in
+  `server/authorize/` and is asked through one function, and lint rules refuse a new rule
+  written anywhere else. Nothing changes for a household: the rules are the same, apart from
+  the corrections listed under "Fixed" and "Security" below, which this move brought to light.
+- **A matrix test holds what each role sees on every read path.** For every kind of account
+  (admin, member, child, caregiver, wall display, split-expense guest) and every path that
+  reads data (lists, detail views, search, overview, feeds, reminders, MCP) the expected answer
+  is written down and checked on every change, so a rule that drifts on one path turns a test
+  red before it reaches a release.
+- **No change to the database, and the way back is open.** This release brings no migration.
+  Before the tag the previous image and this build ran in turn on the same database, and a
+  backup made on this build restored on the previous one; pinning the previous version works
+  as described in the installation guide ("Pinning a version").
+
+### Added
+- **The admin sheet "System" shows diagnostics and copies them for a bug report.** Below the
+  system information there is a section with what the installation runs on: version and build,
+  whether it is ready, since when it has been running, Node.js, platform and SQLite, the schema
+  version and the last migration, the size of the database and the free disk space, whether the
+  database is encrypted and where its key comes from, and the state of the last backup. One
+  button copies all of it as plain text with the field names of the API and the raw values, the
+  same in every language, so that whoever reads the report does not have to know yours. The
+  text contains no password, key or path and nothing about members. Copying also works over
+  plain http in the home network; where a browser refuses it, the text stands selected in a
+  field instead of claiming a copy that did not happen.
+- **The backup page now shows why the last scheduled run failed** (#2525). Settings > Household >
+  Backup and restore gains a "Last error" row next to the backup card's status, naming the reason
+  in your language - a full disk, an unwritable backup folder, a failed integrity check, or an
+  unrecognised cause - from `scheduler.lastError.reason`. A successful run clears the row.
+- **The backup card keeps telling you when a backup last succeeded, and warns when that is too
+  long ago.** After a failed run, "Last backup" showed only the date of the failure, and the date
+  of the last backup you can actually restore from was gone. "Last backup" is now always the
+  last one that succeeded; a failed run adds its own "Last attempt" row above the reason and
+  leaves again with the next success. If the last success is older than two intervals of the
+  schedule (daily, weekly, monthly or every N hours), or no run has succeeded yet although one
+  was tried, the row turns amber and says that at least two scheduled backups have been missed -
+  also when nothing failed and the schedule simply stood still. A schedule the page cannot read
+  as one of those patterns never warns about age. The card also names the next scheduled run
+  ("Next backup") below those rows, because after a failure the next question is when it will
+  try again. And "Active" is green only while nothing on the card asks for attention: after a
+  failed run or with an overdue backup the word stays, since the schedule is still running, but
+  without the green that would say all is well next to a red line.
+
+### Fixed
+- **A wall display or a split-expense guest account no longer receives medication reminders or
+  calendar feeds.** Reminders, pushes and the subscription feeds are sent without a request, and
+  there the account was looked up like an ordinary member: a display or a guest whose medication
+  schedule or feed token had been set directly in the database heard about its own doses, and its
+  calendar feed carried every household event, while the app itself refuses both accounts these
+  areas. Now a guest receives nothing from any area, a display receives only from the areas its
+  wall shows (tasks, calendar, rewards), and every feed of a display or a guest - calendar,
+  birthdays, inventory deadlines, cycle, shift plan and waste - answers with an empty calendar,
+  as for a member without the area. The app offers neither account a way to get there, so only
+  an installation edited by hand was affected. Members and admins are not affected.
+- **An AI assistant now creates tasks, shopping items and events exactly as the app does**
+  (#2616). The MCP tools `create_task`, `add_shopping_item` and `create_event` wrote with their
+  own queries beside the app's own path, and the result differed: a new task got no points,
+  although the household had set a default value for them; your own task category was refused
+  while a default category you had deleted was still accepted; a shopping item took any
+  category name, even one that no longer exists, and without one it fell back on "Sonstiges"
+  even after you had renamed that category; and with an iCloud calendar connected, which uploads
+  every local event, a new calendar event waited for the next sync run instead of going up right
+  away. All three now take the same route as the app, so there is nothing left to keep in step.
+  They also accept an optional `idempotency_key`: repeat a call with the same key after a lost
+  answer and you get the first result back instead of a duplicate. Writing over MCP now needs an
+  API token or a sent-along CSRF token - a client that authenticates with a browser session
+  cookie alone is refused. When the API refuses a call with a machine-readable reason, the error
+  text of these tools and of `call_api_operation` now ends in it, for example
+  `[reason: csrf_invalid]`.
+- **Creating or editing a task with an empty category or priority no longer breaks it.** An
+  API client that sent `category: ""` got a task with an empty category that none of your
+  categories matches, and `priority: ""` failed with "Internal server error.". An empty value
+  now counts as not given, exactly as leaving the field out: a new task gets "Miscellaneous"
+  and no priority, an edited one keeps what it had. The app itself sent an empty category when
+  its category list had not loaded. The description is now stored without leading and trailing spaces, and one
+  that is empty or only spaces is stored as no description - also when you clear it on edit.
+  When an AI assistant cannot reach the API from the server itself, the server log now says so
+  with the cause and the address it tried, not only the assistant.
+- **"Create backup now" no longer reports success when the backup failed.** The server answers
+  a failed manual run with `200` and `success: false`, and the page showed "Backup created
+  successfully." without reading the answer. It now shows the reason in your language, the
+  same sentence as the "Last error" row, and the card reloads either way.
+- **A backup schedule over several weekdays is no longer shown as "Every Monday".** With
+  `BACKUP_SCHEDULE` set to a range or a list of weekday names, such as `0 2 * * mon-fri` or
+  `0 2 * * mon,wed,fri`, the backup card read only the first name: it said "Every Monday at
+  02:00" for a schedule that runs on five days. The backups themselves always ran as
+  configured - only the description was wrong. Such a schedule now stands there as the
+  expression itself, like every other list or range; a single weekday is still spelled out,
+  as a number or as a short or full name (`mon`, `Monday`).
+- **The global search finds the tasks your task list shows.** It only found tasks you had
+  created yourself or that named you in the old single-assignee field. A task someone else
+  shared with everyone, or one you were assigned to together with others, stood in your list
+  and was missing from the search. The search now applies the rule of the list.
+- **The global search finds the notes your notes page shows.** It only found notes you had
+  written yourself. A note someone else shared with everyone stood on your notes page and was
+  missing from the search. The search now applies the rule of the page: notes visible to
+  everyone, and your own. A note set to "only me" is still found by nobody but its author.
+- **The global search finds the medications and activities of a person you care for.** If an
+  admin has entered you as someone's caregiver, the Health pages show you that person's
+  entries, including the ones marked private. The search left those out: it only knew your
+  own entries and the ones shared with the family. It now applies the rule of the Health
+  pages. Nothing else changes - without a care grant nobody finds another person's private
+  entry, an admin included.
+- **An archived task says so in the search results.** The global search finds archived tasks,
+  so that a task you put away can be found again - but the hit looked like any open task. It
+  now reads "Archived" before the due date and stands at the end of the task hits, after the
+  done ones. With many hits an archived task can drop off the end of the list; a more exact
+  search term brings it back. `GET /api/v1/search` returns `archived_at` on a task hit.
+- **Changing or deleting a quick link that your list does not show answers "not found".**
+  `PUT` and `DELETE /api/v1/quick-links/:id` now apply the same visibility rule as the list. A
+  quick link with a visibility other than "all" or "private", which only a restored backup or
+  direct database access can produce, was hidden from everyone but its creator in the list,
+  yet changing or deleting it answered `403` and so gave away that it exists. It now answers
+  `404` with `quick_links_link_not_found`, like a private quick link of someone else. Nothing
+  changes for the two levels the app writes.
+- **Recurring events decide "is this series mine" the way the calendar list does.** If the
+  creator stored with a series is not an account number - possible only after restoring a
+  backup or editing the database directly, for example `0x2` - the calendar never counted the
+  series as anyone's own, but a single occurrence of it that is shared with everyone could
+  still offer "change this occurrence" to the account that text resembles. It no longer does.
+  Events the app wrote itself are not affected.
+
+### Security
+- **The global search no longer finds a private task of someone else.** A task set to "only
+  me" was found by a second person if the old single-assignee field still named them - a
+  field the task list ignores for a private task. Title, status, priority and due date of that
+  task appeared in the search results, with a matching word from its description or tags as an
+  excerpt. The task list, the detail view and the overview never showed it. The search now
+  asks the same rule as the list: visible to everyone, created by you, or shared with the
+  assigned people and you are one of them.
+
+## [2.89.1] - 2026-11-12
+
+### Security
+- **A signed-in device can no longer change the email addresses of a household member.**
+  SECURITY.md says that a device credential changes neither password, email nor second factor.
+  The addresses of the contact that belongs to an account were outside that rule, and they are
+  where a password reset is sent. A device is now refused there like a module-scoped token
+  (`403`, `contact_email_protected`), for the person's own contact too. The other fields of the
+  contact stay editable from a device, and a browser session or a full-access token changes
+  the addresses as before.
+- **The Umbrel catalog workflow no longer runs foreign code next to its token.** On every
+  release it ran the catalog repository's linter and installed its npm dependencies in the step
+  that held the token for the catalog fork. It now has three jobs: one edits the catalog files
+  as text, one runs the linter with no secret and no rights and installs with
+  `npm ci --ignore-scripts`, and only the last one holds the token and pushes. Nothing changes
+  for an installation.
+
+## [2.89.0] - 2026-11-12
+
+### Foundation
+- **A readiness endpoint `/readyz` next to `/health`.** `/health` only says that the process
+  answers, and it stays `200` during a restore so that Docker does not restart the container in
+  the middle of one. `/readyz` says whether the instance can serve right now: `200` with
+  `{"status":"ready"}`, or `503` with `{"status":"not_ready","reason":"..."}` while a restore is
+  running, the database connection is closed, the database is older than this version expects or
+  the data folder refuses writes. It needs no login, tells nothing else about the instance and
+  does not write to the database. `/health` and every shipped healthcheck stay as they are; the
+  new path is for a load balancer or an uptime monitor.
+- **Unexpected errors are answered and logged in one place.** The central error handler now
+  keeps the status of a client error that is marked as safe to show; until now every error
+  that reached it was a 500. Its sentence and `reason` reach the client only from a
+  `HttpError` (`server/utils/http-error.js`), whose text we write ourselves; a 4xx of the HTTP
+  libraries gets a fixed sentence such as "The request was refused (Bad Request).", because
+  body-parser wraps foreign text (zlib) that way. Requests the HTTP layer refuses now get their
+  4xx instead of a 500: a corrupt compressed body, an aborted upload or a body shorter than its
+  `Content-Length` 400, a form nested too deep 400, too many form fields 413, an unsupported
+  `Content-Encoding` or charset 415. A path parameter that does not decode (`%ZZ`) is a 400.
+  Everything else stays a 500 with the fixed sentence, and the raw text stays in the log. The
+  log line names the method, the route pattern and the status instead of the path, and the
+  raw segment of an undecodable parameter is no longer written, so a calendar feed token in the
+  URL no longer lands in the log. The cause of an error is logged with it.
+- **The status of the last backup survives a restart.** After a restart the backup page said
+  "never" until the next scheduled run, because the last attempt lived in memory only. The time of
+  the last attempt, the time of the last success and the reason of a failed attempt are now kept
+  in the database, without a schema change, and a restore keeps the values of the installation it
+  runs on rather than those inside the restored file. `GET /api/v1/backup/status` gains
+  `scheduler.lastSuccess`.
+- **A restore drill checks that a release database restores and migrates on this version.**
+  `scripts/restore-drill.mjs` restores a database through the same restore command an operator
+  uses, migrates it to the current schema and checks its integrity, foreign keys, schema and row
+  counts before it starts the server on it and reads every module. The rollback probe that
+  tries the way back before a foundation release moved into the repository as
+  `scripts/rollback-probe/`. Nothing changes for an installation.
+- **Releases that change the database schema carry a frozen demo database.** A new workflow
+  attaches `yuvomi-<version>-corpus.db` and its `.sha256` to every release whose schema differs
+  from the last one with such a file, and to every foundation release. It is the demo seed of
+  that release, encrypted with a public test key, and the restore drill migrates each of them
+  to the current version. Nothing changes for an installation.
+- **Every day and in every pull request, all of those databases are restored and migrated.**
+  A new workflow downloads each release's frozen database, restores it the way an operator
+  would, migrates it to the code under test and starts the server on it. A migration that
+  breaks an older database now fails in CI, and the run is also red when the newest release
+  changed the schema but has no frozen database. Nothing changes for an installation.
+- **Lint, layer and dead-code checks run on every pull request.** A new `lint` job runs
+  oxlint, dependency-cruiser, knip and zizmor and compares their findings with
+  `lint-baseline.json`, one count per file and rule that only sinks: a new finding or a rising
+  count fails, as with the type baseline. An assignment to `innerHTML` and an `await` inside a
+  database transaction have no baseline and fail at the first finding. Contributors run
+  `npm run lint` before a push; CONTRIBUTING.md lists the rules. Nothing changes for an
+  installation.
+- **Tests that read source code as text are listed and counted.**
+  `test/text-reader-inventory.json` names every suite that reads a file under `public/` or
+  `server/` as text, with the files it reads and what becomes of it. A new suite of that kind
+  without an entry fails `npm run test:text-reader-inventory`, and the number of checks that
+  hold a spelling instead of a behaviour only sinks. docs/test-suites.md has the rules. Nothing
+  changes for an installation.
+- **CI runs the test suites side by side and takes about ten minutes instead of thirty.**
+  The `Tests` job now runs `npm run test-parallel` with four jobs instead of `npm test`. A red
+  suite no longer hides the ones after it: the job log ends with every red suite and its log,
+  and when one is red, the logs are attached to the run. Contributors run `npm run test-parallel` before a push.
+  A new push to a pull request cancels the run it replaces.
+- **The way back to 2.88.1 was tried before the tag.** Image 2.88.1 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.88.1 to 2.89.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.89.0 restored on
+  2.88.1 through the admin restore, and 2.88.1 started on a database that carries the new
+  backup status without a word about it. To go back, pin the image tag `2.88.1`.
+
+### Added
+- **Admins can ask the server what it runs on.** `GET /api/v1/system/diagnostics` answers with
+  the version and build revision, the Node.js and SQLite versions, platform, schema version and
+  the time of the last migration, the size of the database and its write-ahead log, free space on
+  the data volume, uptime, the status of the last backup with the next scheduled run, where the
+  database key comes from, readiness and the number of installed modules. It never carries a key,
+  a path, a hostname, the value of an environment variable or anything about a member, and it is
+  refused for members and for signed-in devices. `GET /api/v1/backup/status` gains
+  `scheduler.nextRun`. The settings page does not show any of this yet.
+
+### Changed
+- **The container image of a release is now built from its tag alone.** Until now a release
+  build reused layers from the build cache that builds of `main` fill, the dependency install
+  and the app build included. A tagged build now ignores that cache and writes none; only the
+  rolling `main` image keeps it. Nothing changes for an installation.
+- **A failed backup says why, with a reason instead of the text of the error** (from #2525,
+  the `reason` on the last error proposed by @nomi25home in #2540). `scheduler.lastError` in
+  `GET /api/v1/backup/status` now always carries `reason`, one of `backup_dir_not_writable`,
+  `disk_full`, `backup_verify_failed` and `unknown`, and its `message` is the fixed sentence of
+  that reason. Until now `message` was the raw text of the error, with the absolute path of the
+  backup folder in it; that text is in the server log only now, where it still names the folder
+  and what to check. `POST /api/v1/backup/trigger` answers a failed run as before with `200` and
+  `success: false`, and carries the same `reason`. The backup page does not show the reason yet.
+
+### Fixed
+- **The demo seed finds the database key the server stored itself.** `scripts/seed-demo.js
+  --db <path>` now reads `DB_ENCRYPTION_KEY_FILE` and the key a first start keeps under
+  `.secrets/` next to the database, in the same order as the server. Until now it stopped on an
+  encrypted database unless the key was in the environment or in `.env`.
+
+## [2.88.1] - 2026-11-11
+
+### Security
+- **Medication reminders to a person's own notification channel now go through the same SSRF
+  guard as every other channel delivery.** Until now they were sent with an unguarded request.
+  The deployment switch `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` applies to them as it does to
+  the other channels: a person whose own Gotify, ntfy or webhook channel lives in the local
+  network needs that switch for medication reminders too, as it was already needed for every
+  other reminder.
+
+### Upcoming: foundation release 2.89.0 (quality and operations)
+- **The next release changes how Yuvomi is tested and operated, not what it does.** It is
+  planned for Friday, 13 November 2026, at the earliest, and carries no new feature; pages,
+  data and the database stay as they are. This note is the advance notice for it.
+- **A readiness endpoint `/readyz` next to `/health`.** It answers `503` with a reason while
+  the instance cannot serve, for a load balancer or an uptime monitor. The existing `/health`
+  does not change, and neither does any shipped healthcheck.
+- **The status of the last backup survives a restart.** Today the backup page says "never"
+  after a restart until the next scheduled run.
+- **The way back stays open.** The release does not change the database, so pinning the image
+  tag `2.88.1` returns to this version with your data untouched (installation guide, "Pinning a
+  version"). That way is tried once before the release is tagged.
+
+## [2.88.0] - 2026-11-10
+
+### Foundation
+- **The web app now ships built**, bundled and minified by Vite 8 with source maps, and the
+  service worker takes its offline list from the build instead of a hand-kept one; pages,
+  offline reach and the module API for third-party modules (`/api.js`, `/i18n.js`,
+  `/utils/html.js`) stay the same, so nothing changes on screen.
+- **The release tarball carries the built app** in `dist/` next to the source, together with
+  `THIRD-PARTY-NOTICES.txt`; the server starts only from a build and says so when `dist/` is
+  missing.
+- **For module authors: only `/api.js`, `/i18n.js` and `/utils/html.js` stay importable.**
+  Until now a third-party module could import any app file, for example
+  `/utils/page-layout.js`; with this release every other file ships inside the bundle under a
+  hashed name, and such an import stops the module from loading. Import only these three paths
+  and build the page markup yourself (the example in MODULES.md shows how).
+- **Yuvomi now needs Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4 on iPhone and
+  iPad).** Until now it still started down to Chrome 87, Firefox 79 and Safari 14.1 (iOS 14.5);
+  on Chrome 87 to 98 and Safari or iOS 14.1 to 15.3 it no longer does. Update the browser or
+  the device's system, or use another browser. Those browsers, and Firefox before 97, now get
+  a short page in German or English that names the versions and the way out, instead of an
+  empty app; Chrome 99 to 104 and Firefox 97 to 114 still start, with single screens that can
+  stay empty. The offline page now speaks English as well as German, and the supported
+  browsers are documented as one list instead of two.
+- **Menus behind a button now open on Firefox ESR 115 and Safari 15.4 to 16** (and Chrome
+  105 to 113): every "more" menu, the account menu, filters and the date field's calendar
+  stayed closed there. Those browsers now load a small polyfill for the Popover API; newer
+  browsers load nothing extra.
+- **`npm run dev` now starts Vite on port 5173** in front of the Express server, which keeps
+  serving the API on 3000; `npm run build` makes the production build.
+- **The contributor rules now state what the project guarantees instead of which tools it
+  avoids.** CONTRIBUTING.md replaces "no frameworks, no build tools" with five guarantees (no
+  runtime CDN, no telemetry, third-party code pinned and listed, markup built as DOM, a
+  reproducible build with two attested release artifacts), describes the build and the type
+  check, and docs/DECISIONS.md records the build step, the Node floor and the position on
+  hosting as entries 20 to 22.
+- **The way back to 2.87.0 was tried before the tag.** Image 2.87.0 and this build ran in turn
+  on the same demo database, in production mode with a generated encryption key. Neither start
+  applied a migration, every module answered the same through the API before and after, and
+  the service worker switched from 2.87.0 to 2.88.0 and back without an error screen or a
+  failed request, with the session staying signed in. A backup made on 2.88.0 restored on
+  2.87.0 through the admin restore. To go back, pin the image tag `2.87.0`.
+
+### Changed
+- **Running Yuvomi outside a container now needs Node.js 24.12 or newer.** `package.json`
+  accepts Node 24.12 and later (24.x and 26 and up) instead of 22.14 and 23.6; the tests run
+  on 24 and 26 and no longer need the SQLite flag. Anyone who still runs a bare-metal
+  install on Node 22 sees a one-line message at start that names the supported range; update
+  Node, then start again. The container image is unchanged and already runs on Node 24.
+
+### Fixed
+- **The in-app changelog shows a summary whole when it runs over two lines.** An entry whose
+  bold first sentence wrapped in the source lost the end of that sentence to the text below
+  it, so the short form read "... on iPhone and" with "iPad)." opening the reason. This hit
+  154 entries since 2.45.0; summary and reason are now split where the sentence ends.
+- **Birthdays no longer rewrite their calendar entries every minute.** The check that keeps a
+  birthday's calendar entry and reminder in step runs once a minute for every account, and on
+  every visit to the birthday list. It wrote each entry again even when nothing had changed,
+  which also rebuilt the entry in the search index: constant small writes to the database, on
+  a NAS or a Raspberry Pi to its disk or SD card. It now writes only what differs.
+- **Pages open from the app's cache without a round trip to the server.** The service worker
+  asked the network first for every page and module before handing out the copy it already
+  held, although the built files under `/assets/` carry a hash of their content in the name and
+  never change under it; it now serves them straight from its cache and fetches only a file
+  that is missing. Files without a hash, such as `index.html` and `/api.js`, still come from the
+  network first. The PDF viewer (pdf.js) also no longer lands in the worker's cache after the
+  first opened document: documents are not available offline, so it is left to the browser.
+- **On a phone, the tool row of Recipes, Pantry, Meals and Shopping folds away on scroll in
+  browsers that need the menu polyfill too.** The rule that folds it keeps the row while one
+  of its menus is open, and it asked for that with a selector those browsers do not know, so
+  they dropped the whole rule and the row kept its space above the list. It now has a second
+  rule that asks the way the polyfill marks an open menu.
+- **An up-to-date browser that lands on the "browser too old" page now returns to the app on
+  its own.** Opened from a bookmark, or reloaded after a browser update, the page kept saying
+  the browser was too old until you pressed "Try again"; it now runs the same check as the app
+  and sends a browser that passes it back to the start page. A browser that is too old stays
+  on the page. The page and the offline page also no longer request a language file they
+  never use.
+
+## [2.87.0] - 2026-11-08
+
+### Added
+- **Every release carries a signed tarball of the app.** Next to the container image, each
+  GitHub release now has `yuvomi-<version>-dist.tar.gz`, a `SHA256SUMS` file and a build
+  provenance attestation that proves GitHub built both from the release tag of this repository
+  (`gh attestation verify yuvomi-<version>-dist.tar.gz -R ulsklyc/yuvomi`; steps in the
+  installation guide). For now the tarball holds the same files as GitHub's source download.
+  The YunoHost package and the Proxmox script will install from it next, so that later
+  releases can ship a built web app there without changing how those installations update. A
+  release only becomes visible once the tarball is on it, so no channel picks up a release
+  without its file.
+
 ### Fixed
 - **Tasks: `updated_at` moves again when a task is actually changed.** Every database from
   migration v4 on had silently lost the trigger that keeps `tasks.updated_at` current: the table
@@ -80,6 +1489,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filesystem, with hosts, ports and server paths. They now carry a fixed sentence or the class of
   the failure (`HTTP 507`, `ECONNREFUSED`); the app's own sentences, such as a provider's refused
   status or a manifest check, stay.
+
+### Upcoming: foundation release 2.88.0 (toolchain)
+- **The next release changes how Yuvomi is built and what it runs on, not what it does.** It
+  is planned for Wednesday, 11 November 2026, and carries no new feature; pages, data and the
+  database stay as they are. This note is the advance notice for it.
+- **Outside a container, Node.js 24.12 or newer becomes the minimum.** The container image
+  already runs on Node 24 and needs nothing, and so do the YunoHost package and the Proxmox
+  script. A bare-metal install on Node 22 has to update Node before it updates Yuvomi.
+- **The web app ships built.** Vite bundles and minifies it and ships source maps; nothing
+  changes on screen. For authors of third-party modules: `/api.js`, `/i18n.js` and
+  `/utils/html.js` stay importable, every other app file moves into the bundle under a hashed
+  name, and a module that imports one of those stops loading.
+- **Yuvomi will need Chrome and Edge 105, Firefox 115 or Safari 15.4 (iOS 15.4).** Today it
+  still starts down to Chrome 87, Firefox 79 and Safari 14.1. Chrome before 99, Firefox before
+  97 and Safari before 15.4 then get a short page that names the versions instead of the app;
+  Chrome 99 to 104 and Firefox 97 to 114 still start, with single screens that can stay empty.
+  Update the browser or the device's system beforehand.
+- **The release tarball carries the built app.** `yuvomi-<version>-dist.tar.gz` gets a `dist/`
+  folder next to the source; the YunoHost package and the Proxmox script already install from
+  the tarball and pick it up with their normal update.
+- **The way back stays open.** The release does not change the database, so pinning the
+  previous image tag `2.87.0` returns to this version with your data untouched (installation
+  guide, "Pinning a version"). That way is tried once before the release is tagged.
 
 ## [2.86.0] - 2026-11-07
 

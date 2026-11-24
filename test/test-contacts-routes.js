@@ -5,13 +5,13 @@
  *        Felder (phones/emails/addresses) bei POST/PUT inkl. Replacement-Semantik,
  *        GET /-Filter (category + q), vCard-Export mit Escaping, validateAddresses-
  *        Feldzweige, sowie die 404/403-Pfade (GET/:id, DELETE/:id family, Kategorie-404).
- * Ausführen: node --experimental-sqlite test/test-contacts-routes.js
+ * Ausführen: node test/test-contacts-routes.js
  */
 
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import express from 'express';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 let passed = 0, failed = 0;
 async function asyncTest(name, fn) {
@@ -27,7 +27,7 @@ freshTestDbPath('contacts-routes');
 process.env.SESSION_SECRET = 'contacts-routes-test-secret-32bytes-long';
 
 const db = await import('../server/db.js');
-const { default: contactsRouter, validateAddresses } = await import('../server/routes/contacts.js');
+const { validateAddresses } = await import('../server/routes/contacts.js');
 db.init();
 const database = db.get();
 
@@ -36,13 +36,15 @@ const famUserId = database.prepare(
   "INSERT INTO users (username, display_name, password_hash, avatar_color, role) VALUES ('contacts-fam', 'Fam Mitglied', 'x', '#007AFF', 'member')"
 ).run().lastInsertRowid;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); });
-app.use('/contacts', contactsRouter);
+// Am echten Praefix samt Fehlerhandler (#2810): validateRequest() findet die
+// Operation ueber `req.baseUrl`.
+const app = await createContactsMealsApp({
+  mount: ['contacts'],
+  auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise((r) => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}/contacts`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1/contacts`;
 
 const jget = async (u) => { const r = await fetch(u); return { status: r.status, body: await r.json().catch(() => null) }; };
 const jsend = async (u, method, body) => {
@@ -250,7 +252,10 @@ try {
   await asyncTest('POST / mit ungültigem birthday-Format → 400', async () => {
     const { status, body } = await jsend(`${base}`, 'POST', { name: 'Bad BDay', birthday: '18.07.1990' });
     assert(status === 400, `Status ${status}`);
-    assert(/geburtstag|birthday|YYYY-MM-DD/i.test(body.error), 'Fehlermeldung nennt Datum/Format');
+    // Seit #2810 weist das Schema die Form vor der Route ab, mit dem Grund der
+    // Route (`contacts_birthday_invalid`) und dem Feld.
+    assert(body.reason === 'contacts_birthday_invalid', `reason ${body.reason}`);
+    assert(body.fields?.some((/** @type {any} */ f) => f.path === 'body/birthday'), 'das Feld ist benannt');
   });
 
   // PUT: birthday setzen/ändern (Audit R2: Feld ist jetzt im Kontakt-Formular),
@@ -428,34 +433,39 @@ try {
   // Absage traegt jetzt `reason`, eine Grenze als `params.limit`; der englische
   // `error` bleibt wortgleich fuer API-Clients.
   // ------------------------------------------------------------------
+  // Was die Gestalt verletzt (keine Liste, kein Objekt, ohne Bezeichnung oder
+  // Wert, kein Text, `isPrimary` kein Boolean), weist seit #2810 das Schema vor
+  // der Route ab: mit seinem festen Satz, `fields` und - fuer "keine Liste" -
+  // dem Grund des Feldes, sonst `validation`. Der Rest bleibt Fall der Route.
+  const SCHEMA = 'The request does not match the documented schema.';
   const MV_CASES = [
     // [Feld, Wert, Grund, Grenze, error]
-    ['phones', 'keine Liste', 'contacts_phone_entry_invalid', undefined, 'Phones must be an array'],
+    ['phones', 'keine Liste', 'contacts_phone_entry_invalid', undefined, SCHEMA],
     ['phones', Array.from({ length: 21 }, (_, i) => ({ label: 'm', value: `0${i}` })), 'contacts_phones_too_many', 20, 'Too many phone entries (max 20)'],
-    ['phones', [null], 'contacts_phone_entry_invalid', undefined, 'Phone entry must be an object'],
-    ['phones', [{ label: 'Mobil' }], 'contacts_phone_entry_invalid', undefined, 'Phone requires label and value'],
+    ['phones', [null], 'validation', undefined, SCHEMA],
+    ['phones', [{ label: 'Mobil' }], 'validation', undefined, SCHEMA],
     ['phones', [{ label: '   ', value: '0800' }], 'contacts_phone_entry_invalid', undefined, 'Phone label invalid or too long'],
     ['phones', [{ label: 'L'.repeat(51), value: '0800' }], 'contacts_phone_label_too_long', 50, 'Phone label invalid or too long'],
-    ['phones', [{ label: 'Mobil', value: 12345 }], 'contacts_phone_entry_invalid', undefined, 'Phone value invalid or too long'],
+    ['phones', [{ label: 'Mobil', value: 12345 }], 'validation', undefined, SCHEMA],
     ['phones', [{ label: 'Mobil', value: '1'.repeat(101) }], 'contacts_phone_too_long', 100, 'Phone value invalid or too long'],
-    ['phones', [{ label: 'Mobil', value: '0800', isPrimary: 'ja' }], 'contacts_phone_entry_invalid', undefined, 'Phone isPrimary must be boolean'],
-    ['emails', {}, 'contacts_email_entry_invalid', undefined, 'Emails must be an array'],
+    ['phones', [{ label: 'Mobil', value: '0800', isPrimary: 'ja' }], 'validation', undefined, SCHEMA],
+    ['emails', {}, 'contacts_email_entry_invalid', undefined, SCHEMA],
     ['emails', Array.from({ length: 21 }, (_, i) => ({ label: 'p', value: `a${i}@x.de` })), 'contacts_emails_too_many', 20, 'Too many email entries (max 20)'],
-    ['emails', ['a@x.de'], 'contacts_email_entry_invalid', undefined, 'Email entry must be an object'],
-    ['emails', [{ value: 'a@x.de' }], 'contacts_email_entry_invalid', undefined, 'Email requires label and value'],
+    ['emails', ['a@x.de'], 'validation', undefined, SCHEMA],
+    ['emails', [{ value: 'a@x.de' }], 'validation', undefined, SCHEMA],
     ['emails', [{ label: 'L'.repeat(51), value: 'a@x.de' }], 'contacts_email_label_too_long', 50, 'Email label invalid or too long'],
     ['emails', [{ label: 'Privat', value: `${'e'.repeat(251)}@x.de` }], 'contacts_email_too_long', 255, 'Email value invalid or too long'],
     ['emails', [{ label: 'Privat', value: 'kein-at-zeichen' }], 'contacts_email_invalid', undefined, 'Email value must be a valid email address'],
-    ['emails', [{ label: 'Privat', value: 'a@x.de', isPrimary: 1 }], 'contacts_email_entry_invalid', undefined, 'Email isPrimary must be boolean'],
-    ['addresses', 'keine Liste', 'contacts_address_entry_invalid', undefined, 'Addresses must be an array'],
+    ['emails', [{ label: 'Privat', value: 'a@x.de', isPrimary: 1 }], 'validation', undefined, SCHEMA],
+    ['addresses', 'keine Liste', 'contacts_address_entry_invalid', undefined, SCHEMA],
     ['addresses', Array.from({ length: 21 }, () => ({ label: 'h' })), 'contacts_addresses_too_many', 20, 'Too many address entries (max 20)'],
-    ['addresses', [42], 'contacts_address_entry_invalid', undefined, 'Address entry must be an object'],
-    ['addresses', [{ city: 'Berlin' }], 'contacts_address_entry_invalid', undefined, 'Address requires label'],
+    ['addresses', [42], 'validation', undefined, SCHEMA],
+    ['addresses', [{ city: 'Berlin' }], 'validation', undefined, SCHEMA],
     ['addresses', [{ label: 'L'.repeat(51) }], 'contacts_address_label_too_long', 50, 'Address label invalid or too long'],
     ['addresses', [{ label: 'Zuhause', street: 'S'.repeat(256) }], 'contacts_address_part_too_long', 255, 'Address street invalid or too long'],
-    ['addresses', [{ label: 'Zuhause', postalCode: 12345 }], 'contacts_address_entry_invalid', undefined, 'Address postalCode invalid or too long'],
+    ['addresses', [{ label: 'Zuhause', postalCode: 12345 }], 'validation', undefined, SCHEMA],
     ['addresses', [{ label: 'Zuhause', country: 'C'.repeat(256) }], 'contacts_address_part_too_long', 255, 'Address country invalid or too long'],
-    ['addresses', [{ label: 'Zuhause', isPrimary: 'ja' }], 'contacts_address_entry_invalid', undefined, 'Address isPrimary must be boolean'],
+    ['addresses', [{ label: 'Zuhause', isPrimary: 'ja' }], 'validation', undefined, SCHEMA],
   ];
   const expectMvCase = (where, res, [field, , reason, limit, error]) => {
     assert(res.status === 400, `${where} ${field} ${reason}: Status ${res.status}`);

@@ -5,24 +5,26 @@
 
 import { localCalendarColorSql, localCalendarIdSql } from '../../services/local-calendars.js';
 
-import { createLogger } from '../../logger.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
-import { DATE_RE } from '../../middleware/validate.js';
+import { DATE_RE } from '../../api/formats.ts';
 import {
   expandAndResolveEventRows, getUpcomingEvents, hydrateEventAttachmentBodies,
 } from '../../services/calendar-event-reader.js';
 import { SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN } from '../../services/calendar-events.js';
-import { buildMatchQuery, eventSearchWindow, resolveEventSearchRows } from '../../services/search.js';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from '../../services/visibility.js';
+import {
+  PAST_SINGLE_EVENT_SQL, buildMatchQuery, eventSearchWindow, resolveEventSearchRows,
+} from '../../services/search.js';
+import { readerBinds, readerVisibleWhere, rowReader } from '../../authorize/index.ts';
+import { isAdminRequest } from '../../middleware/require-admin.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
-  VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, isAdminUser, serializeEvents,
+  VALID_SOURCES, ASSIGNED_USERS_SQL, getUserId, serializeEvents,
 } from './helpers.js';
 import { todayKey } from '../../utils/timezone.js';
 import { birthdaysSwitchedOff, notBirthdayEventSql } from '../../services/household-modules.js';
 
-const log = createLogger('Calendar');
 const router = express.Router();
 
 // --------------------------------------------------------
@@ -33,105 +35,102 @@ const router = express.Router();
 //        &source=local|google|apple  (optional Filter)
 // Response: { data: Event[], from, to }
 // --------------------------------------------------------
-router.get('/', (req, res) => {
-  try {
-    const today = todayKey(db.get());
-    const year  = today.slice(0, 4);
-    const month = today.slice(5, 7);
+router.get('/', validateRequest(), (req, res) => {
+  const today = todayKey(db.get());
+  const year  = today.slice(0, 4);
+  const month = today.slice(5, 7);
 
-    const from = req.query.from || `${year}-${month}-01`;
-    const to   = req.query.to   || `${year}-${month}-31`;
+  const reader = rowReader(req);
+  const from = req.query.from || `${year}-${month}-01`;
+  const to   = req.query.to   || `${year}-${month}-31`;
 
-    if (!DATE_RE.test(from) || !DATE_RE.test(to))
-      return res.status(400).json({ error: 'from and to must be in YYYY-MM-DD format.', code: 400 });
+  if (!DATE_RE.test(from) || !DATE_RE.test(to))
+    return res.status(400).json({ error: 'from and to must be in YYYY-MM-DD format.', code: 400 });
 
-    let sql = `
-      SELECT e.*,
-             u_assigned.display_name AS assigned_name,
-             u_assigned.avatar_color AS assigned_color,
-             u_created.display_name  AS creator_name,
-             -- Name UND geerbte Farbe kommen aus zwei Toepfen: CalDAV/Google
-             -- ueber calendar_ref_id, ICS-Abos ueber subscription_id (sie haben
-             -- keinen external_calendars-Eintrag). Beide sind dasselbe - eine
-             -- Eigenschaft, die fuer JEDEN Termin der Quelle gilt (#891).
-             --
-             -- DER NAME FOLGTE DER FARBE ERST NICHT (#1064): er las allein
-             -- ec.name und blieb damit bei jedem Abo-Termin NULL, waehrend die
-             -- Zeile darunter dessen Farbe laengst auslieferte. Der Termin trug
-             -- sichtbar die Farbe seiner Quelle und konnte sie nirgends nennen.
-             COALESCE(ec.name, isub.name)   AS cal_name,
-             COALESCE(ec.color, isub.color) AS cal_color,
-             lc.id AS local_calendar_id,
-             lc.name  AS local_calendar_name,
-             ${localCalendarColorSql()} AS local_calendar_color,
-             ${SOURCE_CALENDAR_COLUMNS},
-             COALESCE(bd.name, nd.name) AS birthday_name,
-             CASE WHEN bd.year_unknown = 1 THEN NULL ELSE bd.birth_date END AS birthday_date,
-             nd.name_day   AS name_day,
-             CASE WHEN nd.id IS NOT NULL THEN 'name_day'
-                  WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
-             ${ASSIGNED_USERS_SQL}
-      FROM calendar_events e
-      LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
-      LEFT JOIN users u_created  ON u_created.id  = e.created_by
-      LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
-      LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
-      ${SOURCE_CALENDAR_JOIN}
-      LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
-      LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
-      LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
-      WHERE (
-        (e.recurrence_rule IS NULL AND
-          DATE(e.start_datetime) <= ? AND
-          (e.end_datetime IS NULL OR DATE(e.end_datetime) >= ?))
-        OR
-        (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
-      )
-      AND ${icsSubscriptionVisibleWhere('e')}
-    `;
-    const params = [to, from, to, getUserId(req)];
+  let sql = `
+    SELECT e.*,
+           u_assigned.display_name AS assigned_name,
+           u_assigned.avatar_color AS assigned_color,
+           u_created.display_name  AS creator_name,
+           -- Name UND geerbte Farbe kommen aus zwei Toepfen: CalDAV/Google
+           -- ueber calendar_ref_id, ICS-Abos ueber subscription_id (sie haben
+           -- keinen external_calendars-Eintrag). Beide sind dasselbe - eine
+           -- Eigenschaft, die fuer JEDEN Termin der Quelle gilt (#891).
+           --
+           -- DER NAME FOLGTE DER FARBE ERST NICHT (#1064): er las allein
+           -- ec.name und blieb damit bei jedem Abo-Termin NULL, waehrend die
+           -- Zeile darunter dessen Farbe laengst auslieferte. Der Termin trug
+           -- sichtbar die Farbe seiner Quelle und konnte sie nirgends nennen.
+           COALESCE(ec.name, isub.name)   AS cal_name,
+           COALESCE(ec.color, isub.color) AS cal_color,
+           lc.id AS local_calendar_id,
+           lc.name  AS local_calendar_name,
+           ${localCalendarColorSql()} AS local_calendar_color,
+           ${SOURCE_CALENDAR_COLUMNS},
+           COALESCE(bd.name, nd.name) AS birthday_name,
+           CASE WHEN bd.year_unknown = 1 THEN NULL ELSE bd.birth_date END AS birthday_date,
+           nd.name_day   AS name_day,
+           CASE WHEN nd.id IS NOT NULL THEN 'name_day'
+                WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
+           ${ASSIGNED_USERS_SQL}
+    FROM calendar_events e
+    LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
+    LEFT JOIN users u_created  ON u_created.id  = e.created_by
+    LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+    LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
+    ${SOURCE_CALENDAR_JOIN}
+    LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
+    LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
+    LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
+    WHERE (
+      (e.recurrence_rule IS NULL AND
+        DATE(e.start_datetime) <= ? AND
+        (e.end_datetime IS NULL OR DATE(e.end_datetime) >= ?))
+      OR
+      (e.recurrence_rule IS NOT NULL AND DATE(e.start_datetime) <= ?)
+    )
+    AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '?')}
+  `;
+  const params = [to, from, to, ...readerBinds(reader, 'ics_subscriptions')];
 
-    // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare.
-    sql += ` AND ${visibilityWhere('e', 'event_assignments', 'event_id')}`;
-    params.push(getUserId(req), getUserId(req));
+  // Sichtbarkeit (#474): eigene + für alle sichtbare + zugewiesene-sichtbare.
+  // A paired display reads under the wall rule (rowReader).
+  sql += ` AND ${readerVisibleWhere(reader, 'events', 'e', '?')}`;
+  params.push(...readerBinds(reader, 'events'));
 
-    // GEBURTSTAGE HAUSHALTSWEIT ABGESCHALTET (#1660): ihre Termine sind eine
-    // Einblendung aus einem anderen Modul und laufen dann nicht mehr mit. Der
-    // Kalender selbst bleibt, wie er ist - abschalten ist keine Sperre, aber
-    // was eine Antwort ungefragt aus einem abgeschalteten Modul mitbringt,
-    // folgt dem Schalter (docs/DECISIONS.md 11). Der einzelne Termin bleibt
-    // ueber GET /:id erreichbar, und die Geburtstage ueber ihre eigenen Routen.
-    if (birthdaysSwitchedOff(db.get())) sql += ` AND ${notBirthdayEventSql('e')}`;
+  // GEBURTSTAGE HAUSHALTSWEIT ABGESCHALTET (#1660): ihre Termine sind eine
+  // Einblendung aus einem anderen Modul und laufen dann nicht mehr mit. Der
+  // Kalender selbst bleibt, wie er ist - abschalten ist keine Sperre, aber
+  // was eine Antwort ungefragt aus einem abgeschalteten Modul mitbringt,
+  // folgt dem Schalter (docs/DECISIONS.md 11). Der einzelne Termin bleibt
+  // ueber GET /:id erreichbar, und die Geburtstage ueber ihre eigenen Routen.
+  if (birthdaysSwitchedOff(db.get())) sql += ` AND ${notBirthdayEventSql('e')}`;
 
-    if (req.query.assigned_to) {
-      sql += ' AND EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id AND ea.user_id = ?)';
-      params.push(parseInt(req.query.assigned_to, 10));
-    }
-
-    if (req.query.source && VALID_SOURCES.includes(req.query.source)) {
-      sql += ' AND e.external_source = ?';
-      params.push(req.query.source);
-    }
-
-    sql += ' ORDER BY e.start_datetime ASC, e.all_day DESC';
-
-    const database = db.get();
-    const rawEvents = database.prepare(sql).all(...params);
-    const serialization = {
-      database,
-      viewer: documentViewer(req),
-      actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
-    };
-    const events = serializeEvents(
-      expandAndResolveEventRows(database, rawEvents, from, to),
-      serialization,
-    );
-    res.json({ data: events, from, to });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  if (req.query.assigned_to) {
+    sql += ' AND EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id AND ea.user_id = ?)';
+    params.push(parseInt(req.query.assigned_to, 10));
   }
+
+  if (req.query.source && VALID_SOURCES.includes(req.query.source)) {
+    sql += ' AND e.external_source = ?';
+    params.push(req.query.source);
+  }
+
+  sql += ' ORDER BY e.start_datetime ASC, e.all_day DESC';
+
+  const database = db.get();
+  const rawEvents = database.prepare(sql).all(...params);
+  const serialization = {
+    database,
+    viewer: documentViewer(req),
+    actorId: getUserId(req),
+    isAdmin: isAdminRequest(req),
+  };
+  const events = serializeEvents(
+    expandAndResolveEventRows(database, rawEvents, from, to),
+    serialization,
+  );
+  res.json({ data: events, from, to });
 });
 
 // --------------------------------------------------------
@@ -140,26 +139,22 @@ router.get('/', (req, res) => {
 // Query: ?limit=5
 // Response: { data: Event[] }
 // --------------------------------------------------------
-router.get('/upcoming', (req, res) => {
-  try {
-    const limit    = Math.min(parseInt(req.query.limit, 10) || 5, 20);
-    const database = db.get();
-    const expanded = serializeEvents(hydrateEventAttachmentBodies(
-      database,
-      // Geburtstage abgeschaltet: der geteilte Leser laesst sie aus (#1660).
-      getUpcomingEvents(database, { userId: getUserId(req), limit }),
-    ), {
-      database,
-      viewer: documentViewer(req),
-      actorId: getUserId(req),
-      isAdmin: isAdminUser(req),
-    });
+router.get('/upcoming', validateRequest(), (req, res) => {
+  const limit    = Math.min(parseInt(req.query.limit, 10) || 5, 20);
+  const database = db.get();
+  const expanded = serializeEvents(hydrateEventAttachmentBodies(
+    database,
+    // Geburtstage abgeschaltet: der geteilte Leser laesst sie aus (#1660).
+    // A paired display reads under the wall rule (rowReader).
+    getUpcomingEvents(database, { userId: getUserId(req), limit, reader: rowReader(req) }),
+  ), {
+    database,
+    viewer: documentViewer(req),
+    actorId: getUserId(req),
+    isAdmin: isAdminRequest(req),
+  });
 
-    res.json({ data: expanded });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: expanded });
 });
 
 // --------------------------------------------------------
@@ -171,94 +166,100 @@ router.get('/upcoming', (req, res) => {
 // alle Familientermine, ICS nur aus geteilten/eigenen Abos. Vor /:id registriert.
 // Response: { data: Event[] }
 // --------------------------------------------------------
-router.get('/search', (req, res) => {
-  try {
-    // Mit der Verbindung, damit Wortteile tragen wie in der globalen Suche
-    // ("zahn" findet die "Kinderzahnarzt"-Kontrolle) - beide Suchen sollen fuers
-    // gleiche Stichwort dieselben Termine liefern (#471).
-    const match = buildMatchQuery(req.query.q ?? '', { database: db.get() });
-    if (!match) return res.json({ data: [], total: 0 });
+router.get('/search', validateRequest(), (req, res) => {
+  // Mit der Verbindung, damit Wortteile tragen wie in der globalen Suche
+  // ("zahn" findet die "Kinderzahnarzt"-Kontrolle) - beide Suchen sollen fuers
+  // gleiche Stichwort dieselben Termine liefern (#471).
+  const match = buildMatchQuery(req.query.q ?? '', { database: db.get() });
+  if (!match) return res.json({ data: [], total: 0 });
 
-    const userId = getUserId(req);
-    const LIMIT  = 100;
-    // Sichtbarkeit deckt sich mit GET / (alle Familientermine; ICS nur aus
-    // geteilten/eigenen Abos). Als Fragment wiederverwendet für Count + Liste.
-    const whereSql = `
-      s.entity = 'event' AND s.search_index MATCH @match
-      AND ${icsSubscriptionVisibleWhere('e', '@userId')}
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id', '@userId')}${
-        // Wie GET /: ohne Geburtstage, wenn der Haushalt sie abgeschaltet hat (#1660).
-        birthdaysSwitchedOff(db.get()) ? ` AND ${notBirthdayEventSql('e')}` : ''}`;
+  const userId = getUserId(req);
+  const reader = rowReader(req);
+  const LIMIT  = 100;
+  // Sichtbarkeit deckt sich mit GET / (alle Familientermine; ICS nur aus
+  // geteilten/eigenen Abos). Als Fragment wiederverwendet für Count + Liste.
+  const whereSql = `
+    s.entity = 'event' AND s.search_index MATCH @match
+    AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '@userId')}
+    AND ${readerVisibleWhere(reader, 'events', 'e', '@userId')}${
+      // Wie GET /: ohne Geburtstage, wenn der Haushalt sie abgeschaltet hat (#1660).
+      birthdaysSwitchedOff(db.get()) ? ` AND ${notBirthdayEventSql('e')}` : ''}`;
 
-    const total = db.get().prepare(`
-      SELECT COUNT(*) AS n
-      FROM search_index s
-      JOIN calendar_events e ON e.id = s.entity_id
-      WHERE ${whereSql}
-    `).get({ match, userId }).n;
+  const total = db.get().prepare(`
+    SELECT COUNT(*) AS n
+    FROM search_index s
+    JOIN calendar_events e ON e.id = s.entity_id
+    WHERE ${whereSql}
+  `).get({ match, userId }).n;
 
-    const rows = db.get().prepare(`
-      SELECT e.*,
-             u_assigned.display_name AS assigned_name,
-             u_assigned.avatar_color AS assigned_color,
-             u_created.display_name  AS creator_name,
-             -- Name UND geerbte Farbe kommen aus zwei Toepfen: CalDAV/Google
-             -- ueber calendar_ref_id, ICS-Abos ueber subscription_id (sie haben
-             -- keinen external_calendars-Eintrag). Beide sind dasselbe - eine
-             -- Eigenschaft, die fuer JEDEN Termin der Quelle gilt (#891).
-             --
-             -- DER NAME FOLGTE DER FARBE ERST NICHT (#1064): er las allein
-             -- ec.name und blieb damit bei jedem Abo-Termin NULL, waehrend die
-             -- Zeile darunter dessen Farbe laengst auslieferte. Der Termin trug
-             -- sichtbar die Farbe seiner Quelle und konnte sie nirgends nennen.
-             COALESCE(ec.name, isub.name)   AS cal_name,
-             COALESCE(ec.color, isub.color) AS cal_color,
-             lc.id AS local_calendar_id,
-             lc.name  AS local_calendar_name,
-             ${localCalendarColorSql()} AS local_calendar_color,
-             ${SOURCE_CALENDAR_COLUMNS},
-             COALESCE(bd.name, nd.name) AS birthday_name,
-             CASE WHEN bd.year_unknown = 1 THEN NULL ELSE bd.birth_date END AS birthday_date,
-             nd.name_day   AS name_day,
-             CASE WHEN nd.id IS NOT NULL THEN 'name_day'
-                  WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
-             ${ASSIGNED_USERS_SQL}
-      FROM search_index s
-      JOIN calendar_events e ON e.id = s.entity_id
-      LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
-      LEFT JOIN users u_created  ON u_created.id  = e.created_by
-      LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
-      LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
-      ${SOURCE_CALENDAR_JOIN}
-      LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
-      LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
-      LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
-      WHERE ${whereSql}
-      ORDER BY e.start_datetime ASC
-      LIMIT @limit
-    `).all({ match, userId, limit: LIMIT });
+  // Wiederkehrende Treffer stehen an ihrer nächsten Instanz ab heute (statt des
+  // Serienstarts, der Jahre zurückliegen kann). Findet die Serie im Fenster
+  // keine kommende Instanz, bleibt der Master-Termin unverändert (#471). Das
+  // Fenster teilt sich diese Route mit der globalen Suche (#1607).
+  const database = db.get();
+  const window = eventSearchWindow(database);
 
-    // Wiederkehrende Treffer auf die nächste Instanz ab heute auflösen (statt des
-    // Serienstarts, der Jahre zurückliegen kann). Findet die Serie im Fenster
-    // keine kommende Instanz, bleibt der Master-Termin unverändert (#471). Das
-    // Fenster teilt sich diese Route mit der globalen Suche (#1607).
-    const database = db.get();
-    const window = eventSearchWindow(database);
-    const resolved = resolveEventSearchRows(database, rows, window.from, window.to);
+  const rows = database.prepare(`
+    SELECT e.*,
+           u_assigned.display_name AS assigned_name,
+           u_assigned.avatar_color AS assigned_color,
+           u_created.display_name  AS creator_name,
+           -- Name UND geerbte Farbe kommen aus zwei Toepfen: CalDAV/Google
+           -- ueber calendar_ref_id, ICS-Abos ueber subscription_id (sie haben
+           -- keinen external_calendars-Eintrag). Beide sind dasselbe - eine
+           -- Eigenschaft, die fuer JEDEN Termin der Quelle gilt (#891).
+           --
+           -- DER NAME FOLGTE DER FARBE ERST NICHT (#1064): er las allein
+           -- ec.name und blieb damit bei jedem Abo-Termin NULL, waehrend die
+           -- Zeile darunter dessen Farbe laengst auslieferte. Der Termin trug
+           -- sichtbar die Farbe seiner Quelle und konnte sie nirgends nennen.
+           COALESCE(ec.name, isub.name)   AS cal_name,
+           COALESCE(ec.color, isub.color) AS cal_color,
+           lc.id AS local_calendar_id,
+           lc.name  AS local_calendar_name,
+           ${localCalendarColorSql()} AS local_calendar_color,
+           ${SOURCE_CALENDAR_COLUMNS},
+           COALESCE(bd.name, nd.name) AS birthday_name,
+           CASE WHEN bd.year_unknown = 1 THEN NULL ELSE bd.birth_date END AS birthday_date,
+           nd.name_day   AS name_day,
+           CASE WHEN nd.id IS NOT NULL THEN 'name_day'
+                WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
+           ${ASSIGNED_USERS_SQL}
+    FROM search_index s
+    JOIN calendar_events e ON e.id = s.entity_id
+    LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
+    LEFT JOIN users u_created  ON u_created.id  = e.created_by
+    LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+    LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
+    ${SOURCE_CALENDAR_JOIN}
+    LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
+    LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
+    LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
+    WHERE ${whereSql}
+    -- Der Schnitt bei @limit folgt der globalen Suche (calendarSearchSlice):
+    -- Kommendes und Serien zuerst, dann vergangene Einzeltermine ab dem
+    -- juengsten. Nach dem gespeicherten Start aufsteigend verdraengte eine
+    -- alte Serienstammzeile oder ein Jahr Vergangenes die kommenden Termine.
+    ORDER BY ${PAST_SINGLE_EVENT_SQL} ASC,
+             CASE WHEN ${PAST_SINGLE_EVENT_SQL} THEN NULL ELSE e.start_datetime END ASC,
+             e.start_datetime DESC,
+             CASE WHEN ${PAST_SINGLE_EVENT_SQL} THEN e.id END DESC,
+             e.id ASC
+    LIMIT @limit
+  `).all({ match, userId, from: window.from, limit: LIMIT });
 
-    res.json({
-      data: serializeEvents(resolved, {
-        viewer: documentViewer(req),
-        database,
-        actorId: userId,
-        isAdmin: isAdminUser(req),
-      }),
-      total,
-    });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  // Angezeigt wird aufsteigend nach dem aufgeloesten Start (resolveEventSearchRows).
+  const resolved = resolveEventSearchRows(database, rows, window.from, window.to);
+
+  res.json({
+    data: serializeEvents(resolved, {
+      viewer: documentViewer(req),
+      database,
+      actorId: userId,
+      isAdmin: isAdminRequest(req),
+    }),
+    total,
+  });
 });
 
 export default router;

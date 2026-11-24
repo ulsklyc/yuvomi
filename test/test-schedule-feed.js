@@ -6,7 +6,7 @@
  *        (2) Token-Lebenszyklus (get/regenerate/clear) gegen die per-Nutzer-
  *        Spalte users.schedule_feed_token (Migration 183).
  *        (3) Der Verwaltungs-Router (/schedule/feed) end-to-end.
- * Ausführen: node --experimental-sqlite --test test/test-schedule-feed.js
+ * Ausführen: node --test test/test-schedule-feed.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -19,6 +19,8 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const scheduleIcs = await import('../server/services/schedule-ics.js');
 const { default: scheduleFeedRouter } = await import('../server/routes/schedule-feed.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 function insertUser(username, role = 'member') {
@@ -308,7 +310,10 @@ let actorId = alice;
 const app = express();
 app.use(express.json());
 app.use((req, _res, next) => { req.authUserId = actorId; next(); });
-app.use('/schedule/feed', scheduleFeedRouter);
+app.use(defaultEmptyBody);
+// At its real prefix: validateRequest() finds its operation by the mount (#2810).
+app.use('/api/v1/schedule/feed', scheduleFeedRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -323,42 +328,42 @@ async function call(method, path, { as = alice } = {}) {
 
 test('GET /schedule/feed liefert null ohne aktiven Feed', async () => {
   scheduleIcs.clearFeedToken(db, alice);
-  const r = await call('GET', '/schedule/feed');
+  const r = await call('GET', '/api/v1/schedule/feed');
   assert.equal(r.status, 200);
   assert.equal(r.body.data, null);
 });
 
 test('POST /schedule/feed/regenerate aktiviert den Feed, GET liefert ihn danach', async () => {
-  const r = await call('POST', '/schedule/feed/regenerate');
+  const r = await call('POST', '/api/v1/schedule/feed/regenerate');
   assert.equal(r.status, 200);
   assert.ok(r.body.data.token);
   assert.match(r.body.data.url, /\/feed\/schedule\/.+\.ics$/);
 
-  const get = await call('GET', '/schedule/feed');
+  const get = await call('GET', '/api/v1/schedule/feed');
   assert.equal(get.body.data.token, r.body.data.token);
 });
 
 test('DELETE /schedule/feed deaktiviert den Feed', async () => {
-  await call('POST', '/schedule/feed/regenerate');
-  const del = await call('DELETE', '/schedule/feed');
+  await call('POST', '/api/v1/schedule/feed/regenerate');
+  const del = await call('DELETE', '/api/v1/schedule/feed');
   assert.equal(del.status, 200);
   assert.equal(del.body.data.token, null);
 
-  const get = await call('GET', '/schedule/feed');
+  const get = await call('GET', '/api/v1/schedule/feed');
   assert.equal(get.body.data, null);
 });
 
 test('Jeder Angemeldete verwaltet sein eigenes Token - auch Nicht-Admins', async () => {
-  const bobRes = await call('POST', '/schedule/feed/regenerate', { as: bob });
+  const bobRes = await call('POST', '/api/v1/schedule/feed/regenerate', { as: bob });
   assert.equal(bobRes.status, 200);
   assert.ok(bobRes.body.data.token);
 
-  const aliceRes = await call('POST', '/schedule/feed/regenerate', { as: alice });
+  const aliceRes = await call('POST', '/api/v1/schedule/feed/regenerate', { as: alice });
   assert.notEqual(aliceRes.body.data.token, bobRes.body.data.token);
 
-  await call('DELETE', '/schedule/feed', { as: alice });
-  const bobStill = await call('GET', '/schedule/feed', { as: bob });
+  await call('DELETE', '/api/v1/schedule/feed', { as: alice });
+  const bobStill = await call('GET', '/api/v1/schedule/feed', { as: bob });
   assert.equal(bobStill.body.data.token, bobRes.body.data.token, 'Bobs Abo muss Alices DELETE überleben');
 
-  await call('DELETE', '/schedule/feed', { as: bob });
+  await call('DELETE', '/api/v1/schedule/feed', { as: bob });
 });

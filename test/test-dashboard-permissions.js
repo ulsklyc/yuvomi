@@ -22,16 +22,15 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'dashboard-permissions-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess, PERMISSION_MODULES } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess, PERMISSION_MODULES } = await import('../server/authorize/index.ts');
 const { moduleForPath } = await import('../server/scopes.js');
 const { DISPLAY_SCOPES } = await import('../server/display-scopes.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
@@ -193,22 +192,24 @@ db.prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id,
 // Mitglied die aufgelöste Modul→Access-Map. Genau dieses Feld liest die Route.
 // --------------------------------------------------------------------------
 let actor = PARENT;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = user.role === 'admin'
-    ? null
-    : buildSessionModuleAccess(resolvePermissions(db, user));
-  // Token-Scopes wie in `requireAuth`: null für Sessions und ungescopte Tokens.
-  req.authScopes = tokenScopes;
-  next();
-});
 let tokenScopes = null;
-app.use('/api/v1/dashboard', dashboardRouter);
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(actor);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = user.role === 'admin'
+      ? null
+      : buildSessionModuleAccess(resolvePermissions(db, user));
+    // Token-Scopes wie in `requireAuth`: null für Sessions und ungescopte Tokens.
+    req.authScopes = tokenScopes;
+    next();
+  },
+});
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/dashboard`;

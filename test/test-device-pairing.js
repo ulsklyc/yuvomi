@@ -12,7 +12,7 @@
  *   4. Personen-Codes und Display-Codes taugen nie fuer den anderen Weg.
  *   5. Was ein Konto beendet oder seine Sitzungen abraeumt, entwertet offene Codes.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-device-pairing.js
+ * Ausfuehren: node --test test/test-device-pairing.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -182,7 +182,8 @@ test('ein ungueltiger Rumpf verbraucht den Code nicht', async () => {
   for (const overrides of [{ name: '' }, { platform: 'iOS!' }, { device_id: 'x' }]) {
     const res = await redeem(code, overrides);
     assert.equal(res.status, 400, JSON.stringify(overrides));
-    assert.equal((await res.json()).reason, undefined, 'das ist kein Urteil ueber den Code');
+    // Seit #2810 (Gruppe 12a) die Absage des Dokuments, `validation` statt keines Grundes.
+    assert.equal((await res.json()).reason, 'validation', 'das ist kein Urteil ueber den Code');
   }
   assert.equal((await redeem(code)).status, 201, 'der Code gilt noch');
 });
@@ -275,10 +276,22 @@ test('ein gueltiges Credential loest keinen Code ein', async () => {
   assert.equal((await redeem(code)).status, 201, 'der Code gilt weiter');
 });
 
-test('ein Code, der keine Zeichenkette ist, bekommt dieselbe Absage', async () => {
-  for (const code of [undefined, null, 42, { toString: null }, ['AAAAACCCCC']]) {
-    await assertInvalidCode(await redeem(code), JSON.stringify(code));
+test('ein Code, der keine Zeichenkette ist, weist das Dokument ab, ohne einen Code zu verbrauchen', async () => {
+  // Bis #2810 (Gruppe 12a) dieselbe Absage wie ein falscher Code
+  // (`invalid_pairing_code`). Jetzt die Absage des Dokuments: die App schickt den
+  // Code immer als Text, ein anderer Typ ist ein Fehler der App, kein Urteil ueber
+  // einen Code (YuvomiPairingRedeemer.swift liest nur `invalid_pairing_code`).
+  const { session } = await member();
+  const { code: real } = await issue(session);
+  for (const [code, rule] of [[undefined, 'required'], [null, 'type'], [42, 'type'], [{ toString: null }, 'type'], [['AAAAACCCCC'], 'type']]) {
+    const res = await redeem(code);
+    assert.equal(res.status, 400, JSON.stringify(code));
+    const body = await res.json();
+    assert.equal(body.reason, 'validation', JSON.stringify(code));
+    assert.deepEqual(body.fields, [{ path: 'body/code', rule }], JSON.stringify(code));
+    assert.equal(body.credential, undefined);
   }
+  assert.equal((await redeem(real)).status, 201, 'der Code gilt noch');
 });
 
 test('die OpenAPI fuehrt das Einloesen als oeffentlich', async () => {

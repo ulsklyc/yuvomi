@@ -3,7 +3,7 @@
  * Zweck: Validiert generateRecurringInstances für Einheit + Anzahl (#636:
  *        weekly/monthly/yearly, "alle N"), virtuelles (geglättetes) Budget,
  *        Idempotenz und übersprungene Fälligkeitstage.
- * Ausführen: node --experimental-sqlite test/test-budget-recurrence.js
+ * Ausführen: node test/test-budget-recurrence.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

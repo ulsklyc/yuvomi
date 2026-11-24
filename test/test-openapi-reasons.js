@@ -16,6 +16,13 @@
  * er als ganzes Wort irgendwo an seiner Operation steht (Beschreibung oder
  * Antworten).
  *
+ * SCHEMA-GRUENDE (#2810): ein `x-reason` im Anfrage-Schema einer Operation
+ * (Pfad- und Query-Parameter, Body, `$ref` aufgeloest) sendet validateRequest(),
+ * sobald die Regel daneben verletzt ist. Er zaehlt wie ein Grund im Handler und
+ * muss ebenso in Beschreibung oder Antworten stehen; die Annotation selbst
+ * zaehlt nicht als Doku. Haelt ein synthetischer Fall (das Dokument traegt beim
+ * Bau noch keine Annotation).
+ *
  * BLINDSTELLEN, bewusst: ein Grund, den ein Helfer ausserhalb des Handlers oder
  * ein Dienst baut (`reason: err.reason`, `WEATHER_REASON.X`), und ein Grund, den
  * eine Middleware vor dem Handler sendet, liegen nicht im gelesenen Text. Der
@@ -60,16 +67,69 @@ function sentReasons(body) {
   return [...new Set([...body.replace(LOG_CALL, '').matchAll(SENT)].map((m) => m[1]))].sort();
 }
 
+// Die Annotation selbst ist keine Doku: ein Integrator liest den Grund in der
+// Beschreibung oder den Antworten, nicht in einem Schema-Knoten.
 function documents(operation, reason) {
-  return new RegExp(`(?<![a-z0-9_])${reason}(?![a-z0-9_])`).test(JSON.stringify(operation ?? {}));
+  const prose = JSON.stringify(operation ?? {}, (key, value) => (key === 'x-reason' ? undefined : value));
+  return new RegExp(`(?<![a-z0-9_])${reason}(?![a-z0-9_])`).test(prose);
 }
 
-/** `METHOD /pfad` -> die gesendeten Gruende, die an der Operation fehlen. */
-function undocumented() {
+/**
+ * Die Gruende, die das Anfrage-Schema einer Operation als `x-reason` traegt
+ * (Pfad- und Query-Parameter, Body; `$ref` aufgeloest): validateRequest()
+ * sendet sie, sobald die Regel daneben verletzt ist
+ * (server/api/validate-request.ts). Sie zaehlen wie ein Grund im Handler.
+ * @param {any} document
+ * @param {any} pathItem
+ * @param {any} operation
+ * @returns {string[]}
+ */
+function schemaReasons(document, pathItem, operation) {
+  /** @type {Set<string>} */
+  const found = new Set();
+  const seen = new Set();
+  /** @param {any} node */
+  const walk = (node) => {
+    if (!node || typeof node !== 'object' || seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) { node.forEach(walk); return; }
+    for (const [key, child] of Object.entries(node)) {
+      // Unter `properties` sind Schluessel Feldnamen, kein Schluesselwort.
+      if (key === 'properties' && child && typeof child === 'object') {
+        Object.values(child).forEach(walk);
+        continue;
+      }
+      if (key === 'x-reason') {
+        for (const reason of typeof child === 'string' ? [child] : Object.values(child ?? {})) {
+          if (typeof reason === 'string') found.add(reason);
+        }
+      } else if (key === '$ref' && typeof child === 'string' && child.startsWith('#/')) {
+        walk(child.slice(2).split('/').map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'))
+          .reduce((at, part) => at?.[part], document));
+      } else {
+        walk(child);
+      }
+    }
+  };
+  for (const param of [...(pathItem?.parameters ?? []), ...(operation?.parameters ?? [])]) {
+    if (param.in === 'path' || param.in === 'query') walk(param.schema);
+  }
+  for (const media of Object.values(operation?.requestBody?.content ?? {})) walk(media.schema);
+  return [...found];
+}
+
+/**
+ * `METHOD /pfad` -> die gesendeten Gruende, die an der Operation fehlen.
+ * @param {{ routes?: { verb: string, path: string, body: string }[], document?: any }} [options]
+ *   ein synthetischer Fall gibt eigene Routen und ein eigenes Dokument
+ */
+function undocumented({ routes = allRoutes(), document = spec } = {}) {
   const out = new Map();
-  for (const route of allRoutes()) {
-    const operation = spec.paths[route.path]?.[route.verb];
-    const missing = sentReasons(route.body).filter((reason) => !documents(operation, reason));
+  for (const route of routes) {
+    const pathItem = document.paths[route.path];
+    const operation = pathItem?.[route.verb];
+    const sent = [...new Set([...sentReasons(route.body), ...schemaReasons(document, pathItem, operation)])].sort();
+    const missing = sent.filter((reason) => !documents(operation, reason));
     if (!missing.length) continue;
     const label = `${route.verb.toUpperCase()} ${route.path}`;
     out.set(label, [...new Set([...(out.get(label) ?? []), ...missing])].sort());
@@ -134,11 +194,52 @@ test('der Leser findet die Gruende und ordnet sie der richtigen Route zu', () =>
     'ein Grund aus einer Log-Zeile zaehlt als gesendet');
 });
 
+test('ein x-reason im Anfrage-Schema zaehlt als gesendet und braucht Doku an der Operation', () => {
+  // Synthetisch: das echte Dokument traegt noch keine Annotation (#2810 baut
+  // nur den Mechanismus), ohne diesen Fall waere der Leser ungeprueft.
+  /** @type {any} */
+  const document = {
+    paths: {
+      '/api/v1/x/{id}': {
+        parameters: [{ in: 'path', name: 'id', schema: { type: 'integer', 'x-reason': 'x_id_invalid' } }],
+        post: {
+          parameters: [{ in: 'query', name: 'q', schema: { type: 'string', 'x-reason': { maxLength: 'x_query_too_long' } } }],
+          requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/XInput' } } } },
+          responses: { 400: { description: 'Refused' } },
+        },
+      },
+    },
+    components: {
+      schemas: {
+        XInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', 'x-reason': { minLength: 'name_too_short', default: 'x_name_invalid' } },
+            'x-reason': { type: 'string' },
+            tags: { type: 'array', items: { $ref: '#/components/schemas/XTag' } },
+          },
+        },
+        XTag: { type: 'string', 'x-reason': 'x_tag_invalid' },
+      },
+    },
+  };
+  const routes = [{ verb: 'post', path: '/api/v1/x/{id}', body: "res.status(404).json({ reason: 'x_not_found' })" }];
+  assert.deepEqual(Object.fromEntries(undocumented({ routes, document })), {
+    'POST /api/v1/x/{id}': ['name_too_short', 'x_id_invalid', 'x_name_invalid', 'x_not_found', 'x_query_too_long', 'x_tag_invalid'],
+  }, 'die Gruende aus Parametern, Body und $ref zaehlen als gesendet, die Annotation allein dokumentiert nicht');
+
+  const operation = document.paths['/api/v1/x/{id}'].post;
+  operation.responses[400].description = 'Refused: x_id_invalid, x_query_too_long, name_too_short, x_name_invalid, x_tag_invalid.';
+  operation.responses[404] = { description: 'x_not_found' };
+  assert.deepEqual(Object.fromEntries(undocumented({ routes, document })), {}, 'in der Prosa genannt, ist jeder Grund dokumentiert');
+});
+
 test('withCaseReasons gibt es genau einmal, in server/openapi/helpers.js', () => {
   const dir = new URL('../server/openapi/paths/', import.meta.url);
   const copies = [];
   const unshared = [];
-  for (const name of readdirSync(dir).filter((file) => file.endsWith('.js'))) {
+  // .ts too: a path module written in TypeScript (phase 2 onward) is a path module.
+  for (const name of readdirSync(dir).filter((file) => /\.(js|ts)$/.test(file))) {
     const src = withoutCommentsKeepingLines(readFileSync(new URL(name, dir), 'utf8'));
     if (/\bfunction\s+withCaseReasons\b|\bwithCaseReasons\s*=/.test(src)) copies.push(name);
     if (/\bwithCaseReasons\s*\(/.test(src) && !/import\s*\{[^}]*\bwithCaseReasons\b[^}]*\}\s*from\s*'\.\.\/helpers\.js'/.test(src)) {

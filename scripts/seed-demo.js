@@ -5,8 +5,9 @@
  * Usage: node scripts/seed-demo.js [--db /path/to/yuvomi.db] [--locale en|de]
  *
  * Opens the database through server/db.js, exactly like the server: it reads
- * `.env` from the working directory, applies DB_ENCRYPTION_KEY (an encrypted
- * installation works the same as an unencrypted one) and migrates the schema,
+ * `.env` from the working directory, finds DB_ENCRYPTION_KEY in the environment,
+ * through DB_ENCRYPTION_KEY_FILE or in `.secrets/` next to the database (an
+ * encrypted installation works the same as an unencrypted one) and migrates the schema,
  * so a database the server has not opened yet works too. `--db` wins over
  * DB_PATH from the environment or `.env`. Populates EVERY module:
  *   - Users: alex (admin/dad), linda (admin/mom), emma & leo (children, with the
@@ -54,7 +55,7 @@ import { fileURLToPath } from 'node:url';
 import { computeLoanSchedule } from '../server/services/loan-amortization.js';
 import { buildDemoPdf } from './seed-demo-pdf.js';
 import { assignPantryProduct, writeMinimumThrough } from '../server/services/pantry-products.js';
-import { applyChildStartPermissions } from '../server/permissions.js';
+import { applyChildStartPermissions } from '../server/authorize/index.ts';
 import { recordCompletion } from '../server/services/task-completions.js';
 
 const args = process.argv.slice(2);
@@ -85,6 +86,13 @@ if (!['en', 'de'].includes(LOCALE)) {
 const L = (en, de) => (LOCALE === 'de' ? de : en);
 
 console.log(`Locale: ${LOCALE}`);
+
+// Der Secret-Handschlag des Servers (env > `_FILE` > `.secrets/` neben der
+// Datenbank), dynamisch und erst hier: er leitet den Ablageort aus DB_PATH ab,
+// und das setzt `--db` oben erst nach den statischen Imports. Ohne ihn fand der
+// Seed weder `DB_ENCRYPTION_KEY_FILE` noch den Schluessel, den der Server beim
+// ersten Start unter `.secrets/` gespeichert hat.
+await import('../server/utils/load-file-secrets.js');
 
 // Ueber server/db.js statt `new Database()`: Schluessel, Platzhalter-Guard,
 // Cipher-Pruefung, WAL und Migrationen kommen aus derselben Quelle wie beim
@@ -414,7 +422,7 @@ const emmaId  = insertUser.run('emma',  'Emma Johnson',  pw, 'member', 'child', 
 const leoId   = insertUser.run('leo',   'Leo Johnson',   pw, 'member', 'child', '#F97316').lastInsertRowid;
 const mariaId = insertUser.run('maria', 'Maria Silva',   pw, 'member', 'other', '#7C3AED').lastInsertRowid;
 // Die Kinder entstehen wie in der App (POST /auth/users, Einladung): direkt
-// nach dem Konto die Kinder-Startrechte (server/permissions.js) - kein Budget,
+// nach dem Konto die Kinder-Startrechte (server/authorize/catalog.ts) - kein Budget,
 // Haushaltshilfe nur lesend und ohne Betraege, kein Fasten, Zyklus aus. Ohne
 // diesen Schritt zeigte die Demo ein Kinderkonto, das es so nie gaebe: Emma
 // sah Kontostaende, Loehne und den Zyklus (Critique 2026-10-21, D14).

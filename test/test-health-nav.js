@@ -22,6 +22,9 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
+// Die Modul-Listen des Servers stehen seit Phase 2, C3 im Einstellungs-Register
+// und werden importiert statt aus dem Routentext geschnitten.
+const { TOGGLEABLE_MODULES, MODULE_ORDER_RE, normalizeMobileNavOrder } = await import('../server/settings/values.ts');
 
 const {
   HEALTH_ROUTES, HEALTH_STORAGE_KEY, HEALTH_AREAS, getLastHealthRoute, isHealthRoute,
@@ -233,9 +236,8 @@ test('router.js: Nav-Eintrag Gesundheit (Sektion home, Icon heart-pulse)', () =>
 // Modul abschaltbar (sensible Daten → muss deaktivierbar sein)
 // --------------------------------------------------------
 test('Server-Allowlist: health ist ein toggelbares Modul', () => {
-  const src = read('server/routes/preferences.js');
-  assert.match(src, /TOGGLEABLE_MODULES = \[[\s\S]*'health'[\s\S]*\]/);
-  assert.match(src, /MODULE_ORDER_RE =[^\n]*\|health\|/);
+  assert.ok(TOGGLEABLE_MODULES.includes('health'));
+  assert.ok(MODULE_ORDER_RE.test('health'));
 });
 
 test('Settings-Toggle: health in BUILT_IN_MODULES', () => {
@@ -248,10 +250,10 @@ test('Settings-Toggle: health in BUILT_IN_MODULES', () => {
 });
 
 test('Server-Allowlist: rewards ist toggelbar/sortierbar (Backend-Parität zur Nav)', () => {
-  const src = read('server/routes/preferences.js');
-  assert.match(src, /TOGGLEABLE_MODULES = \[[\s\S]*'rewards'[\s\S]*\]/);
-  assert.match(src, /MODULE_ORDER_RE =[^\n]*\|rewards\|/);
-  assert.match(src, /MOBILE_NAV_ORDER_RE =[^\n]*\|rewards\|/);
+  assert.ok(TOGGLEABLE_MODULES.includes('rewards'));
+  assert.ok(MODULE_ORDER_RE.test('rewards'));
+  // MOBILE_NAV_ORDER_RE ist nicht exportiert: gefragt wird die Funktion, die es anwendet.
+  assert.deepEqual(normalizeMobileNavOrder(['rewards']), ['rewards']);
 });
 
 // --------------------------------------------------------

@@ -64,8 +64,13 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { germanIn, outboundLiterals } from './error-language.js';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
+import { createContactsMealsApp } from './contacts-meals-app.js';
 
 const ROUTES = new URL('../server/routes/', import.meta.url);
+// The settings registry (phase 2, C3) holds the refusal texts of
+// PUT /api/v1/preferences since they moved out of the route: leg 1 reads it too.
+const SETTINGS = new URL('../server/settings/', import.meta.url);
 
 /**
  * Deutsche Stellen je Routen-Datei, Stand 26.10.2026. NUR SENKEN: wer ein
@@ -78,14 +83,17 @@ function routeFiles(dir = ROUTES, prefix = '') {
   return readdirSync(dir).flatMap((name) => {
     const url = new URL(name, dir);
     if (statSync(url).isDirectory()) return routeFiles(new URL(`${name}/`, dir), `${prefix}${name}/`);
-    return name.endsWith('.js') ? [{ rel: `${prefix}${name}`, url }] : [];
+    // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+    return /\.(js|ts)$/.test(name) ? [{ rel: `${prefix}${name}`, url }] : [];
   });
 }
 
 /** Datei -> ihre deutschen Stellen. */
 function germanByFile() {
   const out = new Map();
-  for (const { rel, url } of routeFiles()) {
+  const files = routeFiles();
+  for (const { rel, url } of routeFiles(SETTINGS)) files.push({ rel: `../settings/${rel}`, url });
+  for (const { rel, url } of files) {
     const hits = outboundLiterals(readFileSync(url, 'utf8'))
       .map((lit) => ({ ...lit, word: germanIn(lit.text) }))
       .filter((lit) => lit.word);
@@ -164,23 +172,25 @@ test('der Leser findet die Saetze ueberhaupt', () => {
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const holidays = await import('../server/services/holidays.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
+const { createPreferencesApp } = await import('./preferences-app.js');
 
 const ADMIN = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run().lastInsertRowid;
 const MEMBER = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('member','Member','x','member')").run().lastInsertRowid;
 
 const actor = { userId: ADMIN, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.userId;
-  req.authRole = actor.role;
-  req.session = { userId: actor.userId };
-  next();
+// The preferences at their real prefix (#2810, test/preferences-app.js): call()
+// reads `/preferences...` under `/api/v1`.
+const app = await createPreferencesApp({
+  mount: ['preferences'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.userId;
+    req.authRole = actor.role;
+    req.session = { userId: actor.userId };
+    next();
+  },
 });
-app.use('/preferences', preferencesRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1`)));
 test.after(() => { server.close(); holidays.__setFetchImpl(null); });
 
 async function call(method, route, body, { userId = ADMIN, role = 'admin' } = {}) {
@@ -288,19 +298,22 @@ test('keine Absage der Preferences-Routen traegt deutschen Wortlaut', async () =
 });
 
 test('keine Absage der Kalender-Konten (Google, Outlook) traegt deutschen Wortlaut', async () => {
-  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const { movedCandidatesLimit } = await import('../server/services/sync-assignment.js');
-  const calApp = express();
-  calApp.use(express.json({ limit: '10mb' }));
-  calApp.use((req, _res, next) => {
-    req.authUserId = ADMIN;
-    req.authRole = 'admin';
-    req.session = { userId: ADMIN, role: 'admin' };
-    next();
+  // createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody
+  // und der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+  const calApp = await createCalendarApp({
+    mount: ['calendar'],
+    jsonLimit: '10mb',
+    auth: (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    },
   });
-  calApp.use('/calendar', calendarRouter);
   const calServer = calApp.listen(0, '127.0.0.1');
-  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body) => {
@@ -320,8 +333,8 @@ test('keine Absage der Kalender-Konten (Google, Outlook) traegt deutschen Wortla
     await run('google-calendar-id', 'PATCH', '/calendar/google/calendars', {});
     await run('google-enabled', 'PATCH', '/calendar/google/calendars', { calendarId: 'c', enabled: 'yes' });
     await run('google-readonly', 'PUT', '/calendar/google/readonly', { readonly: 'yes' });
-    await run('ext-source', 'PATCH', ext, { ...ok, source: 'nope' });
-    await run('ext-id', 'PATCH', ext, { ...ok, external_id: ' ' });
+    await run('ext-source', 'PATCH', ext, { ...ok, source: 'nope', default_assignee_user_ids: [] });
+    await run('ext-id', 'PATCH', ext, { ...ok, external_id: ' ', default_assignee_user_ids: [] });
     await run('ext-assignee', 'PATCH', ext, { ...ok, default_assignee_user_id: 'abc' });
     await run('ext-assignee-unknown', 'PATCH', ext, { ...ok, default_assignee_user_id: 987654 });
     await run('ext-not-synced', 'PATCH', ext, { ...ok, default_assignee_user_id: null });
@@ -357,9 +370,12 @@ test('keine Absage der Erinnerungs-Routen traegt deutschen Wortlaut', async () =
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  remApp.use('/reminders', remindersRouter);
+  // At its real prefix, with the central error handler: validateRequest() finds
+  // its operation by the mount and hands its 400 on (#2810).
+  remApp.use('/api/v1/reminders', remindersRouter);
+  remApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const remServer = remApp.listen(0, '127.0.0.1');
-  const remUrl = await new Promise((r) => remServer.on('listening', () => r(`http://127.0.0.1:${remServer.address().port}`)));
+  const remUrl = await new Promise((r) => remServer.on('listening', () => r(`http://127.0.0.1:${remServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body, tokenScopes = null) => {
@@ -414,9 +430,10 @@ test('keine Absage der Notizen traegt deutschen Wortlaut', async () => {
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  notesApp.use('/notes', notesRouter);
+  notesApp.use('/api/v1/notes', notesRouter);
+  notesApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const notesServer = notesApp.listen(0, '127.0.0.1');
-  const notesUrl = await new Promise((r) => notesServer.on('listening', () => r(`http://127.0.0.1:${notesServer.address().port}`)));
+  const notesUrl = await new Promise((r) => notesServer.on('listening', () => r(`http://127.0.0.1:${notesServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body) => {
@@ -462,9 +479,10 @@ test('keine Absage der Schnellzugriffe traegt deutschen Wortlaut', async () => {
     req.session = { userId: who.userId, role: who.role };
     next();
   });
-  qlApp.use('/quick-links', quickLinksRouter);
+  qlApp.use('/api/v1/quick-links', quickLinksRouter);
+  qlApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const qlServer = qlApp.listen(0, '127.0.0.1');
-  const qlUrl = await new Promise((r) => qlServer.on('listening', () => r(`http://127.0.0.1:${qlServer.address().port}`)));
+  const qlUrl = await new Promise((r) => qlServer.on('listening', () => r(`http://127.0.0.1:${qlServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body, as = { userId: ADMIN, role: 'admin' }) => {
@@ -498,15 +516,24 @@ test('keine Absage der Schnellzugriffe traegt deutschen Wortlaut', async () => {
 
 test('keine Absage des Inventars traegt deutschen Wortlaut', async () => {
   const { default: inventoryRouter } = await import('../server/routes/inventory/index.js');
+  const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
   const invApp = express();
   invApp.use(express.json({ limit: '10mb' }));
+  invApp.use(defaultEmptyBody);
   invApp.use((req, _res, next) => {
     req.authUserId = ADMIN;
     req.authRole = 'admin';
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  invApp.use('/inventory', inventoryRouter);
+  // At its real prefix: validateRequest() reads the operation from the mount
+  // and hands its 400 to the error handler (#2810).
+  invApp.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => {
+    if (/^\/inventory(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`;
+    next();
+  });
+  invApp.use('/api/v1/inventory', inventoryRouter);
+  invApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const invServer = invApp.listen(0, '127.0.0.1');
   const invUrl = await new Promise((r) => invServer.on('listening', () => r(`http://127.0.0.1:${invServer.address().port}`)));
   try {
@@ -534,37 +561,37 @@ test('keine Absage des Inventars traegt deutschen Wortlaut', async () => {
 
     await run('name', 'POST', '/inventory/items', {});
     await run('category', 'POST', '/inventory/items', item({ category: 'nope' }));
-    await run('location', 'POST', '/inventory/items', item({ location_id: 'abc' }));
-    await run('purchase-date', 'POST', '/inventory/items', item({ purchase_date: 'nope' }));
+    await run('location', 'POST', '/inventory/items', item({ location_id: 0 }));
+    await run('purchase-date', 'POST', '/inventory/items', item({ purchase_date: '2026-02-30' }));
     await run('price', 'POST', '/inventory/items', item({ purchase_price: -1 }));
     await run('price-type', 'POST', '/inventory/items', item({ purchase_price: 'abc' }));
     await run('warranty', 'POST', '/inventory/items', item({ warranty_months: 601 }));
     await run('odometer', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: -5 }));
     await run('odometer-unit', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: 5, odometer_unit: 'nope' }));
-    await run('odometer-on', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: 5, odometer_on: 'nope' }));
+    await run('odometer-on', 'POST', '/inventory/items', item({ category: 'vehicles', odometer: 5, odometer_on: '2026-02-30' }));
     await run('condition', 'POST', '/inventory/items', item({ condition: 'nope' }));
     await run('status', 'POST', '/inventory/items', item({ status: 'nope' }));
-    await run('entry-id', 'POST', '/inventory/items', item({ entry_id: 'abc' }));
+    await run('entry-id', 'POST', '/inventory/items', item({ entry_id: 0 }));
     await run('date-label', 'POST', '/inventory/items', date({ label: '' }));
-    await run('date-date', 'POST', '/inventory/items', date({ date: 'nope' }));
+    await run('date-date', 'POST', '/inventory/items', date({ date: '2026-02-30' }));
     await run('date-offset', 'POST', '/inventory/items', date({ reminder_offset_days: 400 }));
     await run('date-interval', 'POST', '/inventory/items', date({ interval_months: 0 }));
     await run('date-distance', 'POST', '/inventory/items', date({ interval_distance: -1 }));
     await run('dates-many', 'POST', '/inventory/items', {
       name: 'Ding', tracked_dates: Array.from({ length: 11 }, (_, i) => ({ label: `F${i}`, date: '2027-01-01' })),
     });
-    await run('item-id', 'GET', '/inventory/items/abc');
-    await run('link-entry', 'POST', `/inventory/items/${id}/entries`, { entry_id: 'abc' });
+    await run('item-id', 'GET', '/inventory/items/0');
+    await run('link-entry', 'POST', `/inventory/items/${id}/entries`, { entry_id: 0 });
     await run('link-role', 'POST', `/inventory/items/${id}/entries`, { entry_id: 1, role: 'nope' });
     await run('link-share', 'POST', `/inventory/items/${id}/entries`, { entry_id: 1, amount_share: -1 });
-    await run('unlink-entry', 'DELETE', `/inventory/items/${id}/entries/abc`);
-    await run('complete-date', 'POST', `/inventory/items/${id}/dates/abc/complete`, {});
+    await run('unlink-entry', 'DELETE', `/inventory/items/${id}/entries/0`);
+    await run('complete-date', 'POST', `/inventory/items/${id}/dates/0/complete`, { performed_on: '2026-10-01' });
     await run('log-label', 'POST', `/inventory/items/${id}/service-log`, { performed_on: '2026-10-01' });
     await run('log-date', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel' });
     await run('log-odometer', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel', performed_on: '2026-10-01', odometer: -1 });
     await run('log-regression', 'POST', `/inventory/items/${id}/service-log`, { label: 'Ölwechsel', performed_on: '2026-10-01', odometer: 40000 });
-    await run('log-id', 'PUT', `/inventory/items/${id}/service-log/abc`, { label: 'X', performed_on: '2026-10-01' });
-    await run('entry-items-id', 'GET', '/inventory/entries/abc/items');
+    await run('log-id', 'PUT', `/inventory/items/${id}/service-log/0`, { label: 'X', performed_on: '2026-10-01' });
+    await run('entry-items-id', 'GET', '/inventory/entries/0/items');
 
     assertRefusedInEnglish(seen);
   } finally {
@@ -573,16 +600,17 @@ test('keine Absage des Inventars traegt deutschen Wortlaut', async () => {
 });
 
 test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
-  const { default: contactsRouter } = await import('../server/routes/contacts.js');
-  const cApp = express();
-  cApp.use(express.json());
-  cApp.use((req, _res, next) => {
-    req.authUserId = ADMIN;
-    req.authRole = 'admin';
-    req.session = { userId: ADMIN, role: 'admin' };
-    next();
+  // At the real prefix with the error handler: validateRequest() reads the
+  // operation from the mount (#2810); `run()` puts `/api/v1` in front.
+  const cApp = await createContactsMealsApp({
+    mount: ['contacts'],
+    auth: (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    },
   });
-  cApp.use('/contacts', contactsRouter);
   const cServer = cApp.listen(0, '127.0.0.1');
   const cUrl = await new Promise((r) => cServer.on('listening', () => r(`http://127.0.0.1:${cServer.address().port}`)));
   try {
@@ -591,7 +619,7 @@ test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const res = await fetch(`${cUrl}${route}`, { method, headers, body: payload });
+      const res = await fetch(`${cUrl}/api/v1${route}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
       seen.push({ label, status: res.status, error: json?.error ?? null });
@@ -626,17 +654,18 @@ test('keine Absage der Kontakte traegt deutschen Wortlaut', async () => {
 });
 
 test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
-  const { default: healthRouter } = await import('../server/routes/health.js');
   const who = { userId: ADMIN, role: 'admin' };
-  const hApp = express();
-  hApp.use(express.json());
-  hApp.use((req, _res, next) => {
-    req.authUserId = who.userId;
-    req.authRole = who.role;
-    req.session = { userId: who.userId, role: who.role };
-    next();
+  // At its real prefix with the central error handler (#2810): validateRequest()
+  // finds its operation by the mount and refuses through next(err).
+  const { createHealthApp } = await import('./health-app.js');
+  const hApp = await createHealthApp({
+    auth: (req, _res, next) => {
+      req.authUserId = who.userId;
+      req.authRole = who.role;
+      req.session = { userId: who.userId, role: who.role };
+      next();
+    },
   });
-  hApp.use('/health', healthRouter);
   const hServer = hApp.listen(0, '127.0.0.1');
   const hUrl = await new Promise((r) => hServer.on('listening', () => r(`http://127.0.0.1:${hServer.address().port}`)));
   try {
@@ -646,7 +675,7 @@ test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const res = await fetch(`${hUrl}${route}`, { method, headers, body: payload });
+      const res = await fetch(`${hUrl}/api/v1${route}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
       return { status: res.status, body: json };
@@ -685,19 +714,21 @@ test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
 });
 
 test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt deutschen Wortlaut', async () => {
-  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const who = { userId: ADMIN, role: 'admin' };
-  const calApp = express();
-  calApp.use(express.json());
-  calApp.use((req, _res, next) => {
-    req.authUserId = who.userId;
-    req.authRole = who.role;
-    req.session = { userId: who.userId, role: who.role };
-    next();
+  // createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody
+  // und der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+  const calApp = await createCalendarApp({
+    mount: ['calendar'],
+    auth: (req, _res, next) => {
+      req.authUserId = who.userId;
+      req.authRole = who.role;
+      req.session = { userId: who.userId, role: who.role };
+      next();
+    },
   });
-  calApp.use('/calendar', calendarRouter);
   const calServer = calApp.listen(0, '127.0.0.1');
-  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body, as = { userId: ADMIN, role: 'admin' }) => {
@@ -750,21 +781,25 @@ test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt d
 
 test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortlaut', async () => {
   const { default: shoppingRouter } = await import('../server/routes/shopping.js');
-  const { default: tasksRouter } = await import('../server/routes/tasks.js');
+  const { createTasksApp } = await import('./tasks-app.js');
   const { default: pushRouter } = await import('../server/routes/push.js');
   const { buildRouter: buildWeatherRouter } = await import('../server/routes/weather.js');
-  const gApp = express();
-  gApp.use(express.json());
-  gApp.use((req, _res, next) => {
-    req.authUserId = ADMIN;
-    req.authRole = 'admin';
-    req.session = { userId: ADMIN, role: 'admin' };
-    next();
+  // The tasks, the shopping list and push at their real prefixes (#2810,
+  // test/tasks-app.js): call() maps `/tasks...`, `/shopping...` and `/push...` there.
+  const gApp = await createTasksApp({
+    auth: (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    },
+    after: [
+      ['/api/v1/shopping', shoppingRouter],
+      ['/api/v1/push', pushRouter],
+      // The weather router at its real prefix, with the central error handler (#2810).
+      ['/api/v1/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) })],
+    ],
   });
-  gApp.use('/shopping', shoppingRouter);
-  gApp.use('/tasks', tasksRouter);
-  gApp.use('/push', pushRouter);
-  gApp.use('/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) }));
   const gServer = gApp.listen(0, '127.0.0.1');
   const gUrl = await new Promise((r) => gServer.on('listening', () => r(`http://127.0.0.1:${gServer.address().port}`)));
   try {
@@ -773,7 +808,8 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const res = await fetch(`${gUrl}${route}`, { method, headers, body: payload });
+      const url = /^\/(shopping|tasks|push)(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
+      const res = await fetch(`${gUrl}${url}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }
       return { status: res.status, body: json };
@@ -818,8 +854,8 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
     await run('push-subscribe', 'POST', '/push/subscribe', {});
     await run('push-unsubscribe', 'POST', '/push/unsubscribe', {});
     await run('push-wall-mode', 'PUT', '/push/wall-mode', {});
-    await run('weather-icon-code', 'GET', '/weather/icon/!!');
-    await run('weather-icon-upstream', 'GET', '/weather/icon/01d');
+    await run('weather-icon-code', 'GET', '/api/v1/weather/icon/!!');
+    await run('weather-icon-upstream', 'GET', '/api/v1/weather/icon/01d');
 
     assertRefusedInEnglish(seen);
   } finally {
@@ -831,17 +867,27 @@ test('keine Absage von Essensplan, Vorrat und Rezepten traegt deutschen Wortlaut
   const { default: mealsRouter } = await import('../server/routes/meals.js');
   const { default: pantryRouter } = await import('../server/routes/pantry.js');
   const { default: recipesRouter } = await import('../server/routes/recipes.js');
+  const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+  const { createErrorHandler } = await import('../server/middleware/error-handler.js');
   const kApp = express();
   kApp.use(express.json({ limit: '10mb' }));
+  kApp.use(defaultEmptyBody);
   kApp.use((req, _res, next) => {
     req.authUserId = ADMIN;
     req.authRole = 'admin';
     req.session = { userId: ADMIN, role: 'admin' };
     next();
   });
-  kApp.use('/meals', mealsRouter);
-  kApp.use('/pantry', pantryRouter);
-  kApp.use('/recipes', recipesRouter);
+  // Meal plan, pantry and recipes at their real prefix: validateRequest() reads
+  // the operation from the mount and hands its 400 to the error handler (#2810).
+  kApp.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => {
+    if (/^\/(meals|pantry|recipes)(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`;
+    next();
+  });
+  kApp.use('/api/v1/meals', mealsRouter);
+  kApp.use('/api/v1/pantry', pantryRouter);
+  kApp.use('/api/v1/recipes', recipesRouter);
+  kApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const kServer = kApp.listen(0, '127.0.0.1');
   const kUrl = await new Promise((r) => kServer.on('listening', () => r(`http://127.0.0.1:${kServer.address().port}`)));
   try {
@@ -894,9 +940,9 @@ test('keine Absage von Essensplan, Vorrat und Rezepten traegt deutschen Wortlaut
     await run('pantry-expires', 'POST', '/pantry', { name: 'Reis', expires_on: 'x' });
     await run('pantry-min', 'POST', '/pantry', { name: 'Reis', min_quantity: -1 });
     await run('pantry-notes', 'POST', '/pantry', { name: 'Reis', notes: longText });
-    await run('pantry-item-id', 'PUT', '/pantry/x', { name: 'Reis' });
+    await run('pantry-item-id', 'PUT', '/pantry/0', { name: 'Reis' });
     await run('location-name', 'POST', '/pantry/locations', {});
-    await run('location-id', 'PUT', '/pantry/locations/x', { name: 'X' });
+    await run('location-id', 'PUT', '/pantry/locations/0', { name: 'X' });
     await run('recipe-title', 'POST', '/recipes', {});
     await run('recipe-notes', 'POST', '/recipes', { title: 'A', notes: longText });
 

@@ -38,6 +38,8 @@ const dbmod = await import('../server/db.js');
 const { default: pantryRouter } = await import('../server/routes/pantry.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const { default: kitchenRouter } = await import('../server/routes/kitchen.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { productKey, assignPantryProduct } = await import('../server/services/pantry-products.js');
 const db = dbmod.get();
 
@@ -53,15 +55,20 @@ const USER = db.prepare(`
 
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = USER;
   req.authRole = 'member';
   req.session = { userId: USER, role: 'member' };
   next();
 });
-app.use('/pantry', pantryRouter);
-app.use('/shopping', shoppingRouter);
-app.use('/kitchen', kitchenRouter);
+// At their real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/(pantry|shopping)(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`; next(); });
+app.use('/api/v1/pantry', pantryRouter);
+app.use('/api/v1/shopping', shoppingRouter);
+// At its real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use('/api/v1/kitchen', kitchenRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 // No idle timeout on the keep-alive sockets: the demo seed (spawnSync) and the
 // synchronous migration tests block this process, server and fetch alike, for
@@ -701,7 +708,7 @@ test('adoption at start: a product it creates takes the highest minimum of its b
 
 const TODAY = '2026-10-20';
 async function kitchen() {
-  const r = await call('GET', `/kitchen/summary?today=${TODAY}`);
+  const r = await call('GET', `/api/v1/kitchen/summary?today=${TODAY}`);
   assert.equal(r.status, 200);
   return r.body.data.pantry;
 }

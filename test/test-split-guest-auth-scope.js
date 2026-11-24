@@ -21,7 +21,7 @@
  *   5. Mitglieder merken nichts davon.
  *   6. Die Verankerung: die Liste ist `/api/v1`-relativ und exakt.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-split-guest-auth-scope.js
+ * Ausfuehren: node --test test/test-split-guest-auth-scope.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

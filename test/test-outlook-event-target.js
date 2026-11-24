@@ -4,7 +4,7 @@
  *        target_outlook_account_id + target_outlook_calendar_id speichern,
  *        leeren können und ungültige Werte mit 400 ablehnen
  *        (Klon von test-caldav-event-target.js für den Outlook-Provider).
- * Ausführen: node --experimental-sqlite test/test-outlook-event-target.js
+ * Ausführen: node test/test-outlook-event-target.js
  */
 
 // Env vor dem Import der Route setzen (auth.js erwartet SESSION_SECRET,
@@ -14,10 +14,9 @@ process.env.DB_PATH = ':memory:';
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const db = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 describe('Outlook-Push-Ziel an Events', () => {
   let server;
@@ -37,14 +36,15 @@ describe('Outlook-Push-Ziel an Events', () => {
        VALUES ('Papa', 'ms-user-t', 'papa@example.com', 'tok', 'ref')`
     ).run().lastInsertRowid;
 
-    const app = express();
-    app.use(express.json({ limit: '10mb' }));
-    app.use((req, _res, next) => { req.authUserId = userId; req.authRole = 'admin'; next(); });
-    app.use('/calendar', calendarRouter);
+    const app = await createCalendarApp({
+      mount: ['calendar'],
+      jsonLimit: '10mb',
+      auth: (req, _res, next) => { req.authUserId = userId; req.authRole = 'admin'; next(); },
+    });
 
     await new Promise((resolve) => {
       server = app.listen(0, '127.0.0.1', () => {
-        baseUrl = `http://127.0.0.1:${server.address().port}`;
+        baseUrl = `http://127.0.0.1:${server.address().port}/api/v1`;
         resolve();
       });
     });

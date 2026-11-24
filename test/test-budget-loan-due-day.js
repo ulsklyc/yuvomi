@@ -31,7 +31,7 @@
  * ein Datum oder null erwartet, stellt deshalb Uhr und Zone, und zwei tun es
  * am Monatswechsel, einmal mit dem Haushalt vor UTC, einmal dahinter.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-budget-loan-due-day.js
+ * Ausfuehren: node --test test/test-budget-loan-due-day.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -40,12 +40,11 @@ process.env.DB_PATH = ':memory:';
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { tempDir } from './tmp-dir.js';
 
 const dbmod = await import('../server/db.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { dueDateInMonth } = await import('../server/routes/budget/helpers.js');
 const { todayKey, utcDateKey } = await import('../server/utils/timezone.js');
 const { MIGRATIONS, migrate } = dbmod;
@@ -55,15 +54,17 @@ const USER = db.prepare(
   "INSERT INTO users (username, display_name, password_hash, role) VALUES ('a', 'A', 'x', 'admin')"
 ).run().lastInsertRowid;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = USER;
-  req.authRole = 'admin';
-  req.session = { userId: USER, role: 'admin' };
-  next();
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['budget'],
+  auth: (req, _res, next) => {
+    req.authUserId = USER;
+    req.authRole = 'admin';
+    req.session = { userId: USER, role: 'admin' };
+    next();
+  },
 });
-app.use('/', budgetRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => {
   server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`));
@@ -71,7 +72,7 @@ const baseUrl = await new Promise((resolve) => {
 test.after(() => server.close());
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}/api/v1/budget${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,

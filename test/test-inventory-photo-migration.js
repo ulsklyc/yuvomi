@@ -2,7 +2,7 @@
  * Test: Inventory photo migration (v139)
  * Purpose: Verify that the photo_data column is properly added as a nullable TEXT column
  * to inventory_items, and that existing rows inserted without photo_data default to NULL.
- * Run: node --experimental-sqlite --test test/test-inventory-photo-migration.js
+ * Run: node --test test/test-inventory-photo-migration.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';

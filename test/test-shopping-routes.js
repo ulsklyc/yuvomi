@@ -8,7 +8,7 @@
  *        Listen-/Artikel-CRUD inkl. Gang-Sortierung, sowie der Essensplan-Import
  *        (Aggregation, on_shopping_list-Markierung, Datumsbereich).
  *        Shopping ist haushaltsweit (kein owner/visibility) → kein Auth-Gate-Teil.
- * Ausführen: node --experimental-sqlite --test test/test-shopping-routes.js
+ * Ausführen: node --test test/test-shopping-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -16,29 +16,29 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createShoppingDocumentsApp } from './shopping-documents-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: shoppingRouter } = await import('../server/routes/shopping.js');
 const db = dbmod.get();
 
 const U = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('u','U','x','member')`).run().lastInsertRowid;
 
 let actor = { id: U, role: 'member' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// At its real prefix with the central error handler (#2810): call() puts the prefix in front.
+const app = await createShoppingDocumentsApp({
+  mount: ['shopping'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use('/', shoppingRouter);
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}/api/v1/shopping${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -197,7 +197,8 @@ test('POST /:listId/duplicate: Nicht-Boolean-Flags → 400 (#1165)', async () =>
   for (const flag of ['resetChecked', 'keepQuantities', 'keepNotes']) {
     const r = await call('POST', `/${list}/duplicate`, { name: 'Kopie', [flag]: 'false' });
     assert.equal(r.status, 400, `${flag}: 'false' (String) muss abgelehnt werden`);
-    assert.match(r.body.error, /boolean/i);
+    // Seit #2810 die Absage des Schemas, die das Feld nennt.
+    assert.deepEqual(r.body.fields, [{ path: `body/${flag}`, rule: 'type' }]);
   }
   // Echte Booleans bleiben natürlich erlaubt.
   const ok = await call('POST', `/${list}/duplicate`, {
@@ -981,7 +982,7 @@ test('#1909 inzwischen geloeschte Liste: jede Route, die an ihr arbeitet, nennt 
     ['POST', `/${GONE}/items`, { name: 'Milch' }],
     ['POST', `/${GONE}/send`, { userId: U }],
     ['POST', `/${GONE}/import-meal-plan`, { from: today, to: today }],
-    ['POST', `/${GONE}/import-pantry`, {}],
+    ['POST', `/${GONE}/import-pantry`, { items: [] }],
   ]) {
     const r = await call(method, path, body);
     assert.deepEqual([r.status, r.body?.reason, r.body?.error], [404, 'shopping_list_not_found', 'List not found.'], `${method} ${path}`);
@@ -991,15 +992,17 @@ test('#1909 inzwischen geloeschte Liste: jede Route, die an ihr arbeitet, nennt 
 test('#1909 eine Validierung, die nur ein Aufrufer der API ausloest, nennt keinen Fall', async () => {
   const list = await newList('Reason-Ohne');
   const item = await newItem(list);
-  for (const [method, path, body] of [
-    ['PATCH', '/categories/reorder', { order: [] }],
-    ['PATCH', `/items/${item}`, { list_id: 'x' }],
-    ['PATCH', `/items/${item}`, { store_id: 'x' }],
-    ['PUT', '/stores/0', { name: 'x' }],
+  // Seit #2810 weist das Schema die Form ab: sein Grund ist `validation`, kein
+  // Fall des Moduls. Was der Handler behaelt, bleibt ohne Grund.
+  for (const [method, path, body, reason] of [
+    ['PATCH', '/categories/reorder', { order: [] }, 'validation'],
+    ['PATCH', `/items/${item}`, { list_id: 'x' }, 'validation'],
+    ['PATCH', `/items/${item}`, { store_id: 'x' }, 'validation'],
+    ['PUT', '/stores/0', { name: 'x' }, undefined],
   ]) {
     const r = await call(method, path, body);
     assert.equal(r.status, 400, `${method} ${path}`);
-    assert.equal(r.body.reason, undefined, `${method} ${path}`);
+    assert.equal(r.body.reason, reason, `${method} ${path}`);
   }
 });
 

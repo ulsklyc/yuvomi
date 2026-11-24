@@ -11,6 +11,7 @@ import { SETTINGS_DOMAINS, SETTINGS_LEAVES } from '../public/settings/registry.j
 import { eachRule } from './css-rules.js';
 import { keySetDiff } from './i18n-plural-keys.js';
 import { withoutHtmlComments, withoutBlockComments, withoutCommentsKeepingLines } from './source-text.js';
+import { distPrecache, isPrecachedSource, readDist } from './dist-build.js';
 import {
   dialogSegments, submitOutsideFooter, footerWithoutCancel, saveBranchPartners,
   fixedSaveOnTwoCaseDialog, foreignCreateVerbs, aliasFieldClasses,
@@ -203,54 +204,11 @@ function assertRuleUsesToken(css, selector, property, token, file) {
   assert.match(body, new RegExp(`${property}:\\s*var\\(${token}\\)`), `${file} ${selector} ${property} should use ${token}`);
 }
 
-// `innerHTML` ist eine der harten Invarianten, und der Guard dafuer war eine
-// Liste von sieben Dateien: jede NEUE Seite kam ungeprueft durch, und genau die
-// neue ist die, in der es passiert. Der Bestand haelt die Regel ohnehin schon
-// ueberall - die Liste war also nie eine Ausnahmegenehmigung, nur ein zu enger
-// Suchbereich. Vendor-Code ist ausgenommen: der wird von Hand kopiert und nicht
-// nach unseren Regeln geschrieben.
-//
-// `outerHTML =` gehoert dazu: es parst denselben String als Markup, nur ersetzt
-// es das Element selbst statt seines Inhalts. Die zwei Stellen, die es gab
-// (schedule.js), laufen seitdem ueber insertAdjacentHTML('afterend') + remove().
-//
-// Verbundzuweisungen (`+=`, `||=`, `??=` ...) und die Klammerschreibweise
-// (`el['outerHTML'] =`) rufen denselben Setter auf und zaehlen deshalb mit.
-// Die Grenze eines Text-Guards: einen Namen aus einer Variablen,
-// `Object.assign(el, { innerHTML })` oder `Reflect.set` sieht er nicht - das
-// bleibt beim Review. Lucide ist Vendor-Code, liegt aber aus historischen
-// Gruenden als public/lucide.min.js ausserhalb von vendor/ (siehe
-// public/vendor/lucide/README.md) und ist deshalb einzeln ausgenommen.
+// innerHTML/outerHTML writes are a lint rule since phase 1b (section D): the selectors
+// HTML-STRING-WRITE in .oxlintrc.json, the forms this text guard tested are the fixture
+// test/fixtures/lint/a.js (npm run test:lint-baseline), the gate is npm run lint.
+// Vendor code is copied by hand and not written to our rules; later scans skip it.
 const VENDOR_PREFIX = '../public/vendor/';
-const VENDOR_FILES = new Set(['../public/lucide.min.js']);
-const HTML_STRING_WRITE = /(?:\.(?:innerHTML|outerHTML)|\[\s*(['"`])(?:innerHTML|outerHTML)\1\s*\])\s*(?:[-+*/%&|^]|\*\*|<<|>>>?|&&|\|\||\?\?)?=(?!=)/;
-
-test('kein innerHTML- oder outerHTML-Schreibzugriff irgendwo unter public/ (ausser vendor/)', () => {
-  const files = walkJsFiles('../public/').filter((f) => !f.startsWith(VENDOR_PREFIX) && !VENDOR_FILES.has(f));
-  const offenders = files.filter((file) => HTML_STRING_WRITE.test(read(file)));
-  assert.deepEqual(offenders, [],
-    'anhaengen mit insertAdjacentHTML oder ueber die DOM-API, User-Daten durch esc()');
-
-  // Ohne diese Schranke waere der Guard auch dann gruen, wenn walkJsFiles nach
-  // einem Umbau eine leere Liste liefert - gruen ueber nichts.
-  assert.ok(files.length >= 100, `nur ${files.length} Frontend-Dateien gefunden - der Scan greift nicht mehr`);
-});
-
-test('der innerHTML-Guard erkennt das Muster, das er verbietet', () => {
-  const pattern = HTML_STRING_WRITE;
-  assert.ok(pattern.test('root.innerHTML = `<div>`;'), 'Zuweisung wird nicht erkannt');
-  assert.ok(pattern.test('el.innerHTML=""'), 'Zuweisung ohne Leerzeichen wird nicht erkannt');
-  assert.ok(pattern.test('existing.outerHTML = html;'), 'outerHTML-Zuweisung wird nicht erkannt');
-  assert.ok(pattern.test('list.innerHTML += row;'), 'Verbundzuweisung += wird nicht erkannt');
-  assert.ok(pattern.test('el.outerHTML ||= html;'), 'logische Zuweisung ||= wird nicht erkannt');
-  assert.ok(pattern.test('el.innerHTML ??= html;'), 'logische Zuweisung ??= wird nicht erkannt');
-  assert.ok(pattern.test("el['outerHTML'] = html;"), 'Klammerschreibweise wird nicht erkannt');
-  assert.ok(pattern.test('el["innerHTML"] += row;'), 'Klammerschreibweise mit += wird nicht erkannt');
-  assert.ok(!pattern.test("const html = el['outerHTML'];"), 'ein Lesezugriff in Klammern wird faelschlich beanstandet');
-  assert.ok(!pattern.test('if (el.innerHTML === x)'), 'ein Vergleich wird faelschlich beanstandet');
-  assert.ok(!pattern.test('if (el.innerHTML !== x)'), 'eine Ungleichheit wird faelschlich beanstandet');
-  assert.ok(!pattern.test('return emptyStateEl(opts).outerHTML;'), 'ein Lesezugriff wird faelschlich beanstandet');
-});
 
 /**
  * Ein Backtick in einem HTML-Kommentar sprengt das Template-Literal, in dem er
@@ -736,34 +694,39 @@ test('service worker knows every supported locale file', () => {
   // die Precache-Liste: vorab gecacht wird nur die Rueckfallsprache
   // (PRECACHED_LOCALES), jede andere beim ersten Abruf oder auf Zuruf der Seite
   // (CACHE_LOCALE) - und der Worker nimmt nur an, was in APP_LOCALES steht.
-  // Gelesen wird deshalb der Block dieser einen Liste, nicht jedes Literal der Datei.
+  // Seit dem Build (Phase 1a, Abschnitt D) schreibt Vite beide Listen in
+  // dist/sw.js (`self.__LOCALES__`, `self.__PRECACHE__`); gelesen wird das Artefakt.
   const i18n = read('../public/i18n.js');
-  const sw = read('../public/sw.js');
+  const sw = readDist('sw.js');
   const supportedLocales = [...i18n.match(/SUPPORTED_LOCALES\s*=\s*\[([^\]]+)\]/)?.[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
   const localeFiles = readdirSync(new URL('../public/locales/', import.meta.url))
     .filter((file) => file.endsWith('.json'))
     .map((file) => file.replace(/\.json$/, ''))
     .sort();
-  const appLocalesBlock = sw.match(/const APP_LOCALES = \[([\s\S]*?)\];/)?.[1] ?? '';
-  const knownLocales = [...appLocalesBlock.matchAll(/'\/locales\/([^']+)\.json'/g)].map((match) => match[1]).sort();
+  const appLocalesBlock = sw.match(/^self\.__LOCALES__ = (\[.*\]);$/m)?.[1] ?? '[]';
+  const knownLocales = /** @type {string[]} */ (JSON.parse(appLocalesBlock)).map((p) => p.replace(/^\/locales\/(.+)\.json$/, '$1')).sort();
 
   assert.deepEqual(supportedLocales.sort(), localeFiles, 'SUPPORTED_LOCALES must match public/locales/*.json');
   assert.deepEqual(knownLocales, supportedLocales.sort(), 'Service worker APP_LOCALES must list every supported locale');
-  assert.match(sw, /const PRECACHED_LOCALES = \['\/locales\/de\.json'\];/, 'the fallback locale is precached');
+  assert.deepEqual(distPrecache().filter((p) => p.startsWith('/locales/')), ['/locales/de.json'], 'the fallback locale is precached, no other');
 });
 
 test('service worker release caches track package and deployment revisions and include the early locale bootstrap', () => {
+  // Quelle: beide Werte sind Tokens, die der Build einsetzt (scripts/build/service-worker.ts).
+  // Artefakt: dist/sw.js traegt die Version aus package.json.
   const pkg = JSON.parse(read('../package.json'));
   const sw = read('../public/sw.js');
-  const release = sw.match(/const APP_RELEASE\s*=\s*['"]([^'"]+)['"]/)?.[1];
+  const built = readDist('sw.js');
+  const release = built.match(/const APP_RELEASE\s*=\s*['"]([^'"]+)['"]/)?.[1];
 
   assert.equal(release, pkg.version, 'Service worker APP_RELEASE must match package.json');
+  assert.match(sw, /const APP_RELEASE\s*=\s*['"]__YUVOMI_APP_RELEASE__['"]/);
   assert.match(sw, /const APP_BUILD_REVISION\s*=\s*['"]__YUVOMI_BUILD_REVISION__['"]/);
   assert.match(sw, /const CACHE_RELEASE\s*=\s*`\$\{APP_RELEASE\}-\$\{APP_BUILD_REVISION\}`/);
-  for (const cache of ['shell', 'pages', 'locales', 'assets', 'api']) {
+  for (const cache of ['shell', 'locales', 'assets', 'api']) {
     assert.match(sw, new RegExp(`yuvomi-${cache}-\\$\\{CACHE_RELEASE\\}`));
   }
-  assert.match(sw, /['"]\/lang-init\.js['"]/, 'early lang/dir bootstrap must be available offline');
+  assert.ok(distPrecache().includes('/lang-init.js'), 'early lang/dir bootstrap must be available offline');
 });
 
 test('an announced update stops the router from loading further page modules (#616)', () => {
@@ -5185,7 +5148,8 @@ test('jede Übergabe in den Einkauf geht über die eine Dublettenregel', () => {
   const routesDir = new URL('../server/routes/', import.meta.url);
   let checked = 0;
   for (const entry of readdirSync(routesDir)) {
-    if (!entry.endsWith('.js')) continue;
+    // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+    if (!/\.(js|ts)$/.test(entry)) continue;
     for (const route of transferRoutes(read(`../server/routes/${entry}`))) {
       if (route.path.endsWith('import-shopping')) continue;
       checked += 1;
@@ -5316,7 +5280,8 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
   const routesDir = new URL('../server/routes/', import.meta.url);
   let routesChecked = 0;
   for (const entry of readdirSync(routesDir)) {
-    if (!entry.endsWith('.js')) continue;
+    // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+    if (!/\.(js|ts)$/.test(entry)) continue;
     for (const route of transferRoutes(read(`../server/routes/${entry}`))) {
       // Der Weg in den VORRAT nimmt ueber seine eigene Route zurueck (R23, D3);
       // dafuer steht unten eine eigene Zusicherung.
@@ -6254,8 +6219,10 @@ test('die Küchen-Tab-Leiste trägt den Zustand des Kreislaufs', () => {
     'der Kitchen-Router muss gemountet sein');
   assert.match(read('../server/openapi/paths/kitchen.js'), /'\/api\/v1\/kitchen\/summary'/,
     'die Route muss in der OpenAPI-Spec stehen');
-  assert.match(route, /router\.get\('\/summary'[\s\S]*?try \{[\s\S]*?\} catch \(err\)/,
-    'jeder Route-Handler in try/catch (Hard Constraint)');
+  // Seit #2810 (Phase 2 E) beantwortet der zentrale Fehlerhandler einen
+  // unerwarteten Fehler; ein eigener catch mit 500 waere eine zweite Stelle.
+  assert.doesNotMatch(route, /status\(500\)/,
+    'ein unerwarteter Fehler geht an den zentralen Fehlerhandler (server/middleware/error-handler.js)');
 
   // `today` kommt vom Client: „abgelaufen" hängt am lokalen Kalendertag, der Server
   // rechnet in UTC. Dieselbe Entscheidung wie im Kopf von pantry-status.js.
@@ -17355,9 +17322,8 @@ test('die Nacht hat EINE Rechnung: theme-init.js und isWallNight fragen /night-h
     assert.ok(at !== -1 && at < html.indexOf('<script src="/theme-init.js"></script>'),
       `${doc} laedt /night-hours.js vor /theme-init.js`);
   }
-  const sw = read('../public/sw.js');
-  assert.ok(sw.includes("'/night-hours.js',"), 'im Precache des Service Workers');
-  assert.ok(sw.includes("'/utils/night-hours.js',"));
+  assert.ok(distPrecache().includes('/night-hours.js'), 'im Precache des gebauten Service Workers');
+  assert.ok(isPrecachedSource('/utils/night-hours.js'), 'utils/night-hours.js liegt in keinem precachten Chunk');
 });
 
 test('the early screensaver delay in theme-init.js does not drift from utils/screensaver-idle.js (#885)', async () => {
@@ -17979,7 +17945,7 @@ test('das Mehr-Blatt zeichnet erst aus dem Speicher, dann nach (#868)', () => {
  * DIE DREI-TAGE-GRENZE STEHT AN ZWEI ENDEN UND MUSS DIESELBE SEIN (#868).
  *
  * Der Server zaehlt sie fuer den Startwert (`birthdaySoonCount` in
- * routes/dashboard.js), der Browser fuer die laufende Aktualisierung
+ * services/birthdays-slices.ts), der Browser fuer die laufende Aktualisierung
  * (`BIRTHDAY_BADGE_DAYS` in utils/nav-badges.js). Laufen sie auseinander,
  * springt die Zahl beim ersten Besuch der Geburtstagsseite - dieselbe Frage,
  * zwei Antworten, und keine davon sichtbar falsch.
@@ -17988,7 +17954,7 @@ test('das Mehr-Blatt zeichnet erst aus dem Speicher, dann nach (#868)', () => {
  */
 test('Server und Browser ziehen den Geburtstags-Schnitt beim selben Tag (#868)', () => {
   const client = read('../public/utils/nav-badges.js');
-  const server = read('../server/routes/dashboard.js');
+  const server = read('../server/services/birthdays-slices.ts');
 
   const c = /BIRTHDAY_BADGE_DAYS\s*=\s*(\d+)/.exec(client);
   assert.ok(c, 'BIRTHDAY_BADGE_DAYS ist nicht mehr auffindbar');
@@ -18794,7 +18760,8 @@ test('PAGE-013: a narrow header follows the measure of ITS page, and full/split 
 });
 
 test('PAGE-014: page-layout helpers escape every attribute they emit', async () => {
-  // Die Helfer sind die zugesagte Oberflaeche fuer Erweiterungen (MODULES.md);
+  // Die Helfer bauen die Kernseiten (Drittmodulen waren sie bis Phase 1a in
+  // MODULES.md zugesagt, seit dem Build nur noch die drei Fassaden);
   // eine id aus einem Datensatz ist der erwartete Gebrauch der Option. Die
   // erste Fassung ersetzte nur `"` in Attribut-WERTEN - id, className und
   // Attribut-SCHLUESSEL gingen roh in den String (claude-review, dritte Runde
@@ -23128,8 +23095,8 @@ test('R20: sichtbare Etiketten stehen im Namen, und es gibt genau einen Hauptber
 });
 
 // DIE !important-SPERRKLINKE (R20, Entscheidung Ulas 2026-10-18). `@layer`
-// ist vertagt, bis das Mindestziel Chrome 99 / Firefox 97 / Safari 15.4 traegt
-// (docs/DECISIONS.md); bis dahin darf die Zahl der echten `!important` nur
+// traegt die Untergrenze seit Phase 1a E; ob ein Blatt es nutzt, entscheidet
+// docs/DECISIONS.md 14. Bis dahin darf die Zahl der echten `!important` nur
 // sinken. Zaehlregel: jede Deklaration mit `!important` in einer Regel, die
 // `eachRule()` in public/styles/*.css liefert - Kommentare zaehlen nicht,
 // `@media`/`@supports`/`@container` zaehlen mit, `@keyframes` nicht (dort
@@ -23595,6 +23562,8 @@ test('router: idle warm-up preloads at low priority, intent and the start route 
     document: { createElement: () => ({}), head: { appendChild: (l) => links.push(l) } },
     allRoutes: () => [{ path: '/tasks', page: '/pages/tasks.js', module: 'tasks' }, { path: '/notes', page: '/pages/notes.js', module: 'notes' }],
     moduleCache: new Map(),
+    // Im Build die gehashte Datei aus #yuvomi-page-urls (router.js).
+    pageModuleUrl: (/** @type {string} */ page) => `/assets${page}`,
     shellStale: false,
     navItems: () => [{ path: '/tasks' }, { path: '/notes' }],
     routerState: { currentPath: '/' },
@@ -23613,6 +23582,7 @@ test('router: idle warm-up preloads at low priority, intent and the start route 
   warmPrimaryRoutes();
   const warm = links.filter((l) => l.rel === 'modulepreload');
   assert.equal(warm.length, 2, 'beide Hauptziele vorgewaermt');
+  assert.deepEqual(warm.map((l) => l.href), ['/assets/pages/tasks.js', '/assets/pages/notes.js'], 'vorgewaermt wird die gebaute Datei, nicht der Quellpfad (der liefert im Build index.html)');
   assert.deepEqual(warm.map((l) => l.fetchPriority), ['low', 'low'], 'das Vorwaermen im Leerlauf laedt mit niedriger Prioritaet');
   links.length = 0;
   env.allRoutes = undefined;
@@ -23669,7 +23639,7 @@ test('long contact and recipe lists skip rendering rows out of view', () => {
     assert.match(rule.body, /content-visibility:\s*auto/);
     const size = rule.body.match(/contain-intrinsic-size:\s*(auto none auto \d+px)/)?.[1];
     assert.ok(size, `${selector}: ohne gemerkte Hoehe springt der Bildlaufbalken`);
-    // `auto none` versteht Chrome erst ab 117; Chrome 87-116 kennt
+    // `auto none` versteht Chrome erst ab 117; Chrome 105-116 kennt
     // content-visibility schon und verwuerfe nur die Hoehe - Zeilen ohne
     // Platzhalter. Die Weiche fragt deshalb den ganzen Wert ab.
     assert.ok(rule.at.some((at) => at.includes('(contain-intrinsic-size: auto none auto 1px)')),

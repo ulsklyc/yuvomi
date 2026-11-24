@@ -13,13 +13,12 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'tasks-reorder-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
@@ -59,15 +58,14 @@ const alice = { id: ALICE, role: 'admin' };
 const bob = { id: BOB, role: 'member' };
 
 let actor = alice;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;
@@ -235,7 +233,8 @@ test('PATCH /reorder: mehr als 500 IDs -> 400', async () => {
   const order = Array.from({ length: 501 }, (_, i) => i + 1);
   const r = await call('PATCH', '/reorder', { as: alice, body: { order } });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /500/);
+  // Since #2810 the schema's 400 (maxItems 500), naming the field.
+  assert.deepEqual(r.body.fields, [{ path: 'body/order', rule: 'maxItems' }]);
 });
 
 test('PATCH /reorder: doppelte ID -> 400, nichts geaendert', async () => {
@@ -274,7 +273,8 @@ test('PATCH /reorder: eine fuer die Person unsichtbare Aufgabe -> 404', async ()
 test('PATCH /reorder: wird nicht als /:id gelesen (Routenreihenfolge)', async () => {
   const r = await call('PATCH', '/reorder', { as: alice, body: { order: [] } });
   assert.equal(r.status, 400, 'die Reorder-Route antwortet, nicht /:id/status oder ein 404');
-  assert.match(r.body.error, /task IDs/);
+  // Since #2810 the schema of PATCH /reorder answers (minItems), not that of /:id.
+  assert.deepEqual(r.body.fields, [{ path: 'body/order', rule: 'minItems' }]);
 });
 
 // --------------------------------------------------------

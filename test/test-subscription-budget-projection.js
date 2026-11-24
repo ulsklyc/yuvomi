@@ -20,7 +20,7 @@
  * Ein Fall verschiebt die Zone, damit "heute" nachweislich der Haushaltszone
  * folgt und nicht dem UTC-Tag.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-subscription-budget-projection.js
+ * Ausfuehren: node --test test/test-subscription-budget-projection.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -29,11 +29,9 @@ delete process.env.FIXER_API_KEY;
 
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
-const { default: subscriptionsRouter } = await import('../server/routes/subscriptions.js');
 const { addBillingCycle } = await import('../server/services/subscriptions.js');
 const db = dbmod.get();
 
@@ -53,13 +51,14 @@ setConfig('currency', 'EUR');
 setConfig('budget_mode', 'shared');
 
 let actor = { id: A, role: 'member' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id }; next(); });
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
 // Dieselbe Reihenfolge wie in server/index.js: die Abos haengen unter dem
 // Budget-Praefix und muessen VOR dem Budget-Router stehen.
-app.use('/budget/subscriptions', subscriptionsRouter);
-app.use('/budget', budgetRouter);
+const app = await createBudgetApp({
+  mount: ['subscriptions', 'budget'],
+  auth: (req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -78,7 +77,7 @@ async function call(method, route, { as = A, body } = {}) {
   const headers = {};
   let payload;
   if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-  const res = await fetch(`${baseUrl}${route}`, { method, headers, body: payload });
+  const res = await fetch(`${baseUrl}/api/v1${route}`, { method, headers, body: payload });
   const text = await res.text();
   let json = null;
   try { json = JSON.parse(text); } catch { /* CSV */ }
@@ -484,7 +483,7 @@ test('Gesamtgrenze: zu viele erwartete Zeilen brechen das Zaehlen ab, und die An
 
 test('Export ueber Jahre: erwartete Zeilen hoechstens fuer das Fenster, und der Kopf nennt das Ende', async () => {
   await createSub();
-  const res = await fetch(`${baseUrl}/budget/export?from=2026-01-01&to=2099-12-31`);
+  const res = await fetch(`${baseUrl}/api/v1/budget/export?from=2026-01-01&to=2099-12-31`);
   const text = await res.text();
   const expectedLines = text.split('\n').filter((l) => l.includes(',Expected,'));
   // Fenster: ab dem laufenden Monat (01.10.2026), PROJECTION_WINDOW_DAYS weit.
@@ -495,7 +494,7 @@ test('Export ueber Jahre: erwartete Zeilen hoechstens fuer das Fenster, und der 
   ]);
   assert.equal(res.headers.get('x-budget-expected-until'), '2027-10-01');
 
-  const monthly = await fetch(`${baseUrl}/budget/export?month=2026-11`);
+  const monthly = await fetch(`${baseUrl}/api/v1/budget/export?month=2026-11`);
   assert.equal(monthly.headers.get('x-budget-expected-until'), null, 'ein Monat passt ins Fenster: kein Hinweis');
   await monthly.text();
 });

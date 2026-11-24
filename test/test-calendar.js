@@ -2,7 +2,7 @@
  * Modul: Kalender-Test
  * Zweck: Validiert alle Calendar-API-Abfragen, Datumsbereichs-Filter,
  *        Constraints, CRUD-Logik
- * Ausführen: node --experimental-sqlite test-calendar.js
+ * Ausführen: node test-calendar.js
  */
 
 import { DatabaseSync } from 'node:sqlite';
@@ -1403,7 +1403,7 @@ test('der Farbwaehler zeigt eine Farbe, die nicht aus seiner Palette stammt', ()
 test('der Farbwaehler nimmt nur an, was wie eine Farbe aussieht', () => {
   // Der Wert landet in einem style-Attribut. esc() verhindert das Ausbrechen,
   // nicht aber eine zweite CSS-Deklaration dahinter - und die Sync-Dienste
-  // schreiben direkt in die Tabelle, an COLOR_RE aus validate.js vorbei.
+  // schreiben direkt in die Tabelle, an COLOR_RE aus api/formats.ts vorbei.
   const { pickerColors, EVENT_COLORS } = calendarHelpers;
   for (const bad of ['red; background-image:url(x)', 'rgb(1,2,3)', '#FFF', '#12345', '#GGGGGG', '', 'javascript:x']) {
     assert(pickerColors({ color: bad }).length === EVENT_COLORS.length,
@@ -1797,7 +1797,7 @@ test('R22 D5: Woche/Tag nennen "F · LJ" vor der Uhrzeit, der Monat zeigt Strich
     assert((cell.match(/class="month-day__shift"/g) || []).length === 3, 'hoechstens drei Striche');
     assert(/class="month-day__shifts-more">\+1</.test(cell), 'der Rest als +N');
     // Der Bezugsrahmen der Striche haengt an einer Klasse, nicht an `:has()`
-    // (S10): die Mindestversion Chrome 87 verwirft jede `:has()`-Regel, und
+    // (S10): Firefox 115 an der Untergrenze verwirft jede `:has()`-Regel, und
     // die absoluten Striche aller Zellen stuenden an derselben Ecke.
     assert(/class="month-day[^"]*\bmonth-day--shifts\b/.test(cell), 'die Zelle mit Schichten traegt month-day--shifts');
     const shiftsBox = [...eachRule(calendarCss)].find((r) => /\.month-day__shifts\b/.test(r.selector) && /position:\s*absolute/.test(r.body));

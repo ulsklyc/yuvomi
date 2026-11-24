@@ -22,7 +22,7 @@
  * (UTC+14) ist es dann bereits der 01.09., also September gegen August. Beide
  * Werte kommen im Test vor, damit ein Rot zeigt, welcher gewonnen hat.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-budget-month-zone.js
+ * Ausfuehren: node --test test/test-budget-month-zone.js
  */
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';

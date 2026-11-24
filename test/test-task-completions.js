@@ -4,7 +4,7 @@
  *        Zurücknehmen räumt es ab, die Serie einer wiederkehrenden Aufgabe
  *        bleibt als eine Historie lesbar - und keiner der Lesepfade zeigt eine
  *        Aufgabe, die die fragende Person nicht sehen darf.
- * Ausführen: node --experimental-sqlite test/test-task-completions.js
+ * Ausführen: node test/test-task-completions.js
  */
 
 import assert from 'node:assert/strict';
@@ -385,19 +385,17 @@ test('revokeCompletion raeumt auch ohne Statuswechsel ab', () => {
 // die Reihenfolge der Pfade (sonst matcht "completions" als :id), das Lesen der
 // Query, den Cursor in der Antwort und die 404-Regel der Serienansicht.
 // --------------------------------------------------------
-const express = (await import('express')).default;
 const http = await import('node:http');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 
 let actor = mom;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor;
-  req.session = { userId: actor };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actor;
+    req.session = { userId: actor };
+    next();
+  },
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;

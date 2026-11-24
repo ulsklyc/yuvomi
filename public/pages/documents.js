@@ -2588,7 +2588,8 @@ async function runDocumentAction(action, doc) {
     }
     const owner = _container;
     try {
-      await api.post('/documents/dms/push', { account_id: accountId, document_id: doc.id });
+      // Als Zahl (#2810): das Auswahl-Modal liefert den Wert als Text.
+      await api.post('/documents/dms/push', { account_id: Number(accountId), document_id: doc.id });
       window.yuvomi?.showToast(t('documents.pushToDmsQueued'), 'success');
     } catch (err) {
       reportError(err, { owner });
@@ -2780,7 +2781,8 @@ async function moveSelected() {
       name: doc.name,
       description: doc.description || null,
       category: doc.category,
-      folder_id: target || null,
+      // Als Zahl (#2810): der Wert des Auswahl-Modals ist Text.
+      folder_id: target ? Number(target) : null,
       visibility: doc.visibility,
       status: doc.status,
       allowed_member_ids: doc.allowed_member_ids || [],
@@ -3720,7 +3722,8 @@ async function saveDocument(event, doc, panel) {
       name: form.querySelector('#document-name').value.trim(),
       description: form.querySelector('#document-description').value.trim() || null,
       category: form.querySelector('#document-category').value,
-      folder_id: form.querySelector('#document-folder').value || null,
+      // Als Zahl (#2810): der Wert eines <select> ist Text.
+      folder_id: form.querySelector('#document-folder').value ? Number(form.querySelector('#document-folder').value) : null,
       visibility,
       status: form.querySelector('#document-status').value,
       expires_at: expiresAt,
@@ -3944,7 +3947,8 @@ function openDmsLinkModal() {
         }
 
         accountSelect.addEventListener('change', () => {
-          selectedAccountId = accountSelect.value;
+          // Als Zahl (#2810): der Wert eines <select> ist Text.
+          selectedAccountId = Number(accountSelect.value);
           syncHint();
           // Re-run listing for the new account (empty query lists all documents).
           runDmsSearch(input.value.trim());
@@ -4156,7 +4160,7 @@ async function linkDmsDocument(item, accountId) {
     // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
     // Anpassen geht danach über „Bearbeiten".
     await api.post('/documents/dms/link', {
-      account_id: accountId,
+      account_id: Number(accountId),
       dms_document_id: item.id,
       category: 'other',
       visibility: 'family',

@@ -34,7 +34,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'subscriptions-errors-test-secret';
@@ -79,15 +79,18 @@ const setMode = (mode) => db.prepare(`INSERT INTO sync_config (key, value) VALUE
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(mode);
 
 let actor = { id: ADA, role: 'admin' };
-const app = express();
-app.use(express.json({ limit: '2mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['subscriptions'],
+  jsonLimit: '2mb',
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use('/api/v1/budget/subscriptions', routes.default);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));

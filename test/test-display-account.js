@@ -19,7 +19,7 @@
  * selbst einhaengt, sieht sie nie; er waere eine Kopie der Kette, und eine
  * Kopie kann nicht belegen, dass das Original sperrt.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-display-account.js
+ * Ausfuehren: node --test test/test-display-account.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -525,7 +525,7 @@ test('das Display liest keine Abo-URLs, ein Mensch schon', async () => {
   // diesem Ticket schon fuer ein gescoptes Token mit `calendar:read`; gemessen
   // wird deshalb an den Scopes, nicht an der Anmeldeart.
   const created = await admin('POST', '/calendar/subscriptions', {
-    name: 'Schulferien', url: 'https://example.invalid/feed.ics?token=geheim', color: '#6366f1', shared: 1,
+    name: 'Schulferien', url: 'https://example.invalid/feed.ics?token=geheim', color: '#6366f1', shared: true,
   });
   assert.ok([200, 201].includes(created.status), `Abo anlegen: ${created.status}`);
 
@@ -626,7 +626,7 @@ test('das Display kann nicht als erledigende Person benannt werden (#1205)', asy
 test('das Display meldet sich nicht mit Passwort an - auch nicht mit einem echten', async () => {
   // DER PLATZHALTER ALLEIN IST KEIN BELEG, und der erste Anlauf dieses Tests
   // war genau das: er warf den Platzhalter als Passwort gegen den Login und sah
-  // ihn scheitern - aber das taete jeder Nicht-bcrypt-Wert, auch ohne jede
+  // ihn scheitern - aber das taete jeder Nicht-Hash-Wert, auch ohne jede
   // Sperre (per Mutation gemessen: der Test blieb gruen, nachdem die Regel
   // ausgebaut war). Die Sperre ist erst gezeigt, wenn ein Konto mit einem
   // ECHTEN, passenden Hash trotzdem abgewiesen wird.
@@ -1272,7 +1272,7 @@ test('der Hinweis in den Einstellungen nennt genau die Bereiche, die ein Display
   );
   assert.ok(DISPLAY_SCOPES.includes('dashboard:read'), 'Vorbedingung: die Uebersicht ist ein Scope - und wird trotzdem nicht aufgezaehlt');
 
-  // UND GEGEN DIE RECHTEAUFLOESUNG (server/permissions.js, Display-Zweig): was
+  // UND GEGEN DIE RECHTEAUFLOESUNG (server/authorize/catalog.ts, Display-Zweig): was
   // ein gekoppeltes Geraet dort als lesbares Modul bekommt, steht im Hinweis.
   const created = await admin('POST', '/displays', { display_name: 'Bereichsprobe' });
   const issued = await admin('POST', `/displays/${created.body.data.id}/pairing-code`, {});
@@ -1382,6 +1382,13 @@ test('das Display-Dashboard liefert Einkauf, Haushaltshilfe, Abfuhr und Vorrat f
   assert.ok('pantryExpiring' in res.body, 'pantryExpiring muss vorhanden sein');
 });
 
+/**
+ * Whether a 400 names a field: in `fields` (validateRequest(), #2810) or in the handler's sentence.
+ * @param {any} body @param {string} field
+ */
+const names = (body, field) => (body?.fields ?? []).some((/** @type {any} */ f) => f.path === `body/${field}` || f.path.startsWith(`body/${field}/`))
+  || new RegExp(field).test(body?.error ?? '');
+
 test('an admin manages this display’s night hours and screensaver without changing household preferences (#2436)', async () => {
   const created = await admin('POST', '/displays', { display_name: 'Remote settings probe' });
   const id = created.body.data.id;
@@ -1397,11 +1404,12 @@ test('an admin manages this display’s night hours and screensaver without chan
   for (const invalid of [{...settings, night_from:7}, {...settings, night_until:24}, {...settings, idle_seconds:61}, {...settings, show_clock:'false'}, {...settings, cover_photo:1}, {night_from:21}, {...settings, unknown:true}, null]) {
     const rejected = await admin('PATCH', `/displays/${id}`, {device_settings:invalid, show_screensaver:true});
     assert.equal(rejected.status, 400, JSON.stringify(invalid));
-    assert.match(rejected.body.error, /device_settings/, 'the error names the invalid field');
+    // The schema names the field in `fields` (#2810); a rule across fields stays the handler's sentence.
+    assert.ok(names(rejected.body, 'device_settings'), `the refusal names the invalid field: ${JSON.stringify(rejected.body)}`);
   }
   const rejectedSwitch = await admin('PATCH', `/displays/${id}`, {device_settings:{...settings, idle_seconds:300}, show_screensaver:'false'});
   assert.equal(rejectedSwitch.status, 400);
-  assert.match(rejectedSwitch.body.error, /show_screensaver/);
+  assert.ok(names(rejectedSwitch.body, 'show_screensaver'), JSON.stringify(rejectedSwitch.body));
   const listed = (await admin('GET', '/displays')).body.data.find(d => d.id === id);
   assert.deepEqual(listed.device_settings, settings); assert.equal(listed.show_screensaver, false, 'invalid changes are atomic');
   const other = (await admin('POST', '/displays', { display_name:'Other display' })).body.data;

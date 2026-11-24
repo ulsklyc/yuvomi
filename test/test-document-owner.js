@@ -20,6 +20,8 @@ process.env.SESSION_SECRET = 'document-owner-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -79,6 +81,7 @@ function documentRow(id) {
 function createHarness(userId, role, cookieSession) {
   const app = express();
   app.use(express.json());
+  app.use(defaultEmptyBody);
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
@@ -86,6 +89,8 @@ function createHarness(userId, role, cookieSession) {
     next();
   });
   app.use('/api/v1/documents', documentsRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {
@@ -110,7 +115,7 @@ function createHarness(userId, role, cookieSession) {
 const WRITES = [
   {
     route: 'PUT /:id',
-    send: (h, id) => h.call('PUT', `/${id}`, { name: 'Umbenannt' }),
+    send: (h, id) => h.call('PUT', `/${id}`, { name: 'Umbenannt', allowed_member_ids: [] }),
     status: 200,
     applied: (row) => row?.name === 'Umbenannt',
   },
@@ -168,7 +173,7 @@ test('PUT /:id: ein Mitglieds-Token neben einer Admin-Sitzung bekommt 403, die A
   const before = documentRow(id);
   const withToken = createHarness(MEMBER, 'member', { userId: ADMIN, role: 'admin' });
   try {
-    const res = await withToken.call('PUT', `/${id}`, { name: 'Umbenannt' });
+    const res = await withToken.call('PUT', `/${id}`, { name: 'Umbenannt', allowed_member_ids: [] });
     assert.equal(res.status, 403, 'das Gate urteilt nach der Rolle des Token-Subjekts');
     assert.deepEqual(documentRow(id), before, 'die Zeile bleibt unberuehrt');
   } finally {
@@ -176,7 +181,7 @@ test('PUT /:id: ein Mitglieds-Token neben einer Admin-Sitzung bekommt 403, die A
   }
   const adminOnly = createHarness(ADMIN, 'admin');
   try {
-    const res = await adminOnly.call('PUT', `/${id}`, { name: 'Umbenannt' });
+    const res = await adminOnly.call('PUT', `/${id}`, { name: 'Umbenannt', allowed_member_ids: [] });
     assert.equal(res.status, 200, JSON.stringify(res.body));
   } finally {
     await adminOnly.close();

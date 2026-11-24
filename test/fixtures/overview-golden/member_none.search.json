@@ -1,0 +1,192 @@
+{
+  "private": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxtaskmember": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxevtchild": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxnoteadmin": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxdocchild": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxbudgetmember": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxmedmember": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "quokka": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "goldkiwi": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "zzqxnohitzz": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  }
+}

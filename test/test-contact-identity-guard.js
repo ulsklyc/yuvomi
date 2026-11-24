@@ -17,6 +17,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import { createServer } from 'node:http';
 import { startTestServer, cookieHeader } from './server-ready.js';
 
@@ -111,8 +112,6 @@ async function tokenFor(subjectUserId, scopes) {
 async function withResetRoutes(fn) {
   const sent = [];
   const pending = [];
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   buildResetRoutes(router, {
     database: db,
@@ -124,10 +123,10 @@ async function withResetRoutes(fn) {
     // danach verlaesslich zaehlt statt vom Zufall der Ereignisschleife.
     defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const base = `http://127.0.0.1:${server.address().port}/auth`;
+  const base = `http://127.0.0.1:${server.address().port}/api/v1/auth`;
   const post = (path, body) => fetch(`${base}${path}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(async (r) => {
@@ -208,6 +207,55 @@ test('unscoped tokens keep working: the admin\'s on a member, the member\'s on t
   const kidFull = await call(await tokenFor(kidId, null), 'PUT', `/contacts/${kidContactId}`, { email: 'kid.b@home.test' });
   assert.equal(kidFull.status, 200);
   assert.equal(emailsOf(kidContactId).email, 'kid.b@home.test');
+});
+
+// Ein angemeldetes Geraet traegt keine Scopes und las sich deshalb wie ein
+// ungescoptes Token. SECURITY.md sagt fuer das Credential zu, dass es die
+// E-Mail-Adresse nicht aendert; die Adresse des verknuepften Kontakts ist
+// die, an die der Passwort-Reset geht.
+let deviceCounter = 0;
+/** @param {{ cookie?: string, csrfToken?: string }} session */
+async function deviceFor(session) {
+  deviceCounter += 1;
+  const created = await call(session, 'POST', '/auth/devices', {
+    name: `Phone ${deviceCounter}`, platform: 'ios', device_id: `guard-device-${deviceCounter}`,
+  });
+  assert.equal(created.status, 201);
+  return { token: created.body.credential };
+}
+
+test('a signed-in device cannot change the addresses of its own member, primary or secondary', async () => {
+  const phone = await deviceFor(kid);
+  const primary = await call(phone, 'PUT', `/contacts/${kidContactId}`, { email: ATTACKER });
+  assert.equal(primary.status, 403);
+  assert.equal(primary.body.reason, 'contact_email_protected');
+  const secondary = await call(phone, 'PUT', `/contacts/${kidContactId}`, { emails: [{ label: 'work', value: ATTACKER }] });
+  assert.equal(secondary.status, 403);
+  assert.deepEqual(emailsOf(kidContactId), { email: 'kid@home.test', emails: [] });
+});
+
+test('an admin\'s signed-in device cannot change the admin\'s own addresses either', async () => {
+  const phone = await deviceFor(admin);
+  const r = await call(phone, 'PUT', `/contacts/${adminContactId}`, { email: ATTACKER });
+  assert.equal(r.status, 403);
+  assert.deepEqual(emailsOf(adminContactId), ADMIN_UNTOUCHED);
+});
+
+test('a signed-in device can still change the other fields of its own contact', async () => {
+  const phone = await deviceFor(kid);
+  const r = await call(phone, 'PUT', `/contacts/${kidContactId}`, { notes: 'From the phone', email: 'kid@home.test' });
+  assert.equal(r.status, 200);
+  assert.equal(db.prepare('SELECT notes FROM contacts WHERE id = ?').get(kidContactId).notes, 'From the phone');
+  assert.deepEqual(emailsOf(kidContactId), { email: 'kid@home.test', emails: [] });
+});
+
+test('after a refused attempt from a device, forgot-password sends the link to the member\'s own address only', async () => {
+  const phone = await deviceFor(kid);
+  assert.equal((await call(phone, 'PUT', `/contacts/${kidContactId}`, { email: ATTACKER })).status, 403);
+  await withResetRoutes(async (/** @type {{ post: Function, sent: Array<{ to: string }> }} */ { post, sent }) => {
+    assert.equal((await post('/forgot-password', { identifier: 'kid' })).status, 200);
+    assert.deepEqual(sent.map((m) => m.to), ['kid@home.test']);
+  });
 });
 
 test('a member can still edit the other fields of a linked contact, with the unchanged form around them', async () => {
@@ -375,12 +423,31 @@ test('a group deleted while the account is being prepared leaves no account behi
   assert.equal(c.status, 201);
   const g = await call(kid, 'POST', '/split-expenses/groups', { name: 'Race trip' });
   assert.equal(g.status, 201);
-  const add = call(kid, 'POST', `/split-expenses/groups/${g.body.data.id}/members`, { contact_id: c.body.data.id });
-  // Die Loeschung soll WAEHREND des Hashs ankommen, nicht davor.
-  await new Promise((r) => setTimeout(r, 30));
-  const del = await call(kid, 'DELETE', `/split-expenses/groups/${g.body.data.id}`);
+  // Die Loeschung soll WAEHREND des Hashs ankommen, nicht davor. Das Fenster
+  // stellt der Test selbst her, statt auf die Dauer des Hashes zu wetten (ein
+  // Timer von 30 ms hielt nur, solange bcrypt rund 280 ms rechnete; Argon2id
+  // ist nach rund 20 ms fertig): der erste `crypto.argon2`-Aufruf - den
+  // server/utils/password.js erst beim Aufruf vom geteilten Modulobjekt liest -
+  // startet die Loeschung und rechnet erst, wenn sie beantwortet ist.
+  const crypto = (await import('node:crypto')).default;
+  const original = crypto.argon2;
+  /** @type {{ deletion: Promise<{ status: number, body: any }> | null }} */
+  const held = { deletion: null };
+  crypto.argon2 = /** @type {any} */ (/** @this {any} */ function heldForDeletion(/** @type {any[]} */ ...args) {
+    crypto.argon2 = original;
+    held.deletion = call(kid, 'DELETE', `/split-expenses/groups/${g.body.data.id}`);
+    const resume = () => /** @type {any} */ (original).apply(this, args);
+    held.deletion.then(resume, resume);
+  });
+  let added;
+  try {
+    added = await call(kid, 'POST', `/split-expenses/groups/${g.body.data.id}/members`, { contact_id: c.body.data.id });
+  } finally {
+    crypto.argon2 = original;
+  }
+  assert.ok(held.deletion, 'the deletion ran while the account was being prepared');
+  const del = await held.deletion;
   assert.equal(del.status, 200);
-  const added = await add;
   assert.equal(added.status, 404, `adding answered ${added.status}`);
   assert.equal(db.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(c.body.data.id).family_user_id, null);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE display_name = 'Racer'").get().n, 0);

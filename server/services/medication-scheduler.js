@@ -10,17 +10,17 @@
  *          #584, D#1041) - each of them only while Health is not denied to
  *          them (#2602), and never through a channel the household shares
  *          (#2598).
- * Dependencies: server/db.js, push.js, notification-channels.js, notifications.js,
- *               household-modules.js, reminder-origins.js, utils/timezone.js.
+ * Dependencies: server/db.js, push.js, notification-channels.js, channel-delivery.js,
+ *               household-modules.js, server/authorize/, utils/timezone.js.
  */
 import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as dbModule from '../db.js';
 import { pushService as defaultPushService } from './push.js';
 import { createNotificationChannelStore } from './notification-channels.js';
-import { defaultProviders } from './notifications.js';
+import { defaultProviders, sendToChannel } from './channel-delivery.js';
 import { householdDisabledModules } from './household-modules.js';
-import { recipientDeniedModules } from './reminder-origins.js';
+import { actorForUser, authorize, caregiversOf } from '../authorize/index.ts';
 import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 
@@ -28,7 +28,6 @@ const log = createLogger('MedicationScheduler');
 const APP_NAME = 'Yuvomi';
 // Fallback body when the medication has no name: never repeat the app name (#581).
 const FALLBACK_BODY = 'Medication reminder';
-const PROVIDER_TIMEOUT_MS = 8_000;
 
 /**
  * Day (YYYY-MM-DD) and time ('HH:MM') of `now` on the HOUSEHOLD's clock.
@@ -60,16 +59,6 @@ function scheduleDueOnDate(schedule, dateKey) {
   return (schedule.days_mask & (1 << weekdayIndex(dateKey))) !== 0;
 }
 
-async function withTimeout(fn, timeoutMs = PROVIDER_TIMEOUT_MS) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fn(controller.signal);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 /**
  * May this recipient hear about a medication dose at all?
  *
@@ -82,8 +71,9 @@ async function withTimeout(fn, timeoutMs = PROVIDER_TIMEOUT_MS) {
  * a tap target (`/health/meds`) the route guard refuses.
  *
  * Only `none` counts, not `read`: whoever may read Health may hear from it.
- * An admin resolves to the empty set and is never filtered. An unknown
- * recipient (`null`) is dropped - there is nobody the reminder belongs to.
+ * An admin is never filtered. An unknown recipient (no actor) is dropped -
+ * there is nobody the reminder belongs to. The verdict is `receive` of
+ * server/authorize/.
  *
  * SKIP, DO NOT DELETE: the dose log is written before this question is asked
  * and stays, like a reminder row under #1289. A revoked right is an
@@ -91,8 +81,7 @@ async function withTimeout(fn, timeoutMs = PROVIDER_TIMEOUT_MS) {
  * part of it.
  */
 function mayHearAboutHealth(database, userId) {
-  const denied = recipientDeniedModules(database, userId);
-  return denied !== null && !denied.has('health');
+  return authorize(actorForUser(database, userId), 'receive', { module: 'health' }).allowed;
 }
 
 /**
@@ -106,7 +95,8 @@ function mayHearAboutHealth(database, userId) {
  * @param {Object} [opts.channelStore] - { listEnabledChannelsForUser }
  * @param {Object} [opts.providers]    - { [provider]: { send } }
  * @param {Date}   [opts.now]
- * @param {Function} [opts.fetchImpl]
+ * @param {Function} [opts.fetchImpl] - tests inject one; without it the delivery takes
+ *   the SSRF-guarded fetch that channel-delivery.js sets as the default for every sender
  * @returns {Promise<{ due:number, created:number, notified:number, sent:number, failed:number }>}
  */
 /**
@@ -118,13 +108,21 @@ export function processDueMedications(options) {
   return runExternalJob(() => processDueMedicationsUntracked(options));
 }
 
+/**
+ * @param {{
+ *   database?: any, pushService?: typeof defaultPushService, channelStore?: any,
+ *   providers?: typeof defaultProviders, now?: Date, fetchImpl?: Function,
+ * }} [opts] - described at processDueMedications()
+ */
 async function processDueMedicationsUntracked({
   database,
   pushService = defaultPushService,
   channelStore,
   providers = defaultProviders,
   now = new Date(),
-  fetchImpl = fetch,
+  // No default of its own: `undefined` falls through to the guarded fetch of
+  // sendToChannel(), the one default for every sender.
+  fetchImpl,
 } = {}) {
   const activeDb = database || dbModule.get();
 
@@ -155,15 +153,6 @@ async function processDueMedicationsUntracked({
     JOIN users u ON u.id = m.user_id
     WHERE s.active = 1 AND m.active = 1
   `).all();
-
-  // Caregivers of the affected person (#584). The grant is given per person by
-  // an admin and is never derived from a role - so it is looked up here
-  // exactly as when it is entered, not guessed from "is a parent". Until
-  // D#1041 the scheduler did not query the table at all: a child without a
-  // device got the reminder, the parents did not.
-  const caregiversOf = activeDb.prepare(
-    'SELECT caregiver_id FROM health_care_grants WHERE subject_id = ? ORDER BY caregiver_id'
-  );
 
   const findLog = activeDb.prepare(
     'SELECT id FROM medication_logs WHERE medication_id = ? AND schedule_id = ? AND scheduled_at = ?'
@@ -217,7 +206,12 @@ async function processDueMedicationsUntracked({
   const deliveries = newlyDue.map((dose) => {
     const medBody = dose.medName || FALLBACK_BODY;
     const recipients = [{ userId: dose.ownerId, body: medBody }];
-    for (const { caregiver_id: caregiverId } of caregiversOf.all(dose.ownerId)) {
+    // Caregivers of the affected person (#584), by id (caregiversOf() in
+    // server/authorize/). The grant is given per person by an admin and is never
+    // derived from a role - so it is looked up exactly as when it is entered, not
+    // guessed from "is a parent". Until D#1041 the scheduler did not query the
+    // table at all: a child without a device got the reminder, the parents did not.
+    for (const caregiverId of caregiversOf(activeDb, dose.ownerId)) {
       if (caregiverId === dose.ownerId) continue;
       recipients.push({ userId: caregiverId, body: `${dose.ownerName}: ${medBody}` });
     }
@@ -249,7 +243,7 @@ async function processDueMedicationsUntracked({
 
       // ONLY THE RECIPIENT'S OWN CHANNELS, NEVER ONE THE HOUSEHOLD SHARES (#2598).
       // Every Health origin is `'personal'` for household channels
-      // (HOUSEHOLD_CHANNEL_POLICY in reminder-targets.js), and SECURITY.md
+      // (HOUSEHOLD_CHANNEL_POLICY in authorize/rows/reminders.ts), and SECURITY.md
       // promises that a channel shared by the household never receives a
       // health reminder. A medication's row visibility does not change that:
       // a family-visible one still goes out by push and to the person's own
@@ -261,10 +255,9 @@ async function processDueMedicationsUntracked({
       const channels = store.listEnabledChannelsForUser(recipient.userId)
         .filter((channel) => channel.scope === 'user');
       for (const channel of channels) {
-        const provider = providers[channel.provider];
-        if (!provider) continue;
+        if (!providers[channel.provider]) continue;
         try {
-          await withTimeout((signal) => provider.send({ channel, payload, fetchImpl, signal }));
+          await sendToChannel({ channel, payload, fetchImpl, providers });
           counters.sent += 1;
         } catch (err) {
           counters.failed += 1;

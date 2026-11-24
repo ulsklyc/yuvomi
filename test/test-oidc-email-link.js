@@ -18,7 +18,7 @@
  * ganzen Server; ersetzt ist nur `openid-client`, also das, was der Callback
  * nach der kryptografischen Pruefung sieht (wie test/test-oidc-contact.js).
  *
- * Ausfuehren: node --experimental-sqlite --experimental-test-module-mocks --test test/test-oidc-email-link.js
+ * Ausfuehren: node --experimental-test-module-mocks --test test/test-oidc-email-link.js
  */
 delete process.env.AUTH_ALLOW_PASSWORD_LOGIN;
 delete process.env.OIDC_ALLOW_SIGNUP;

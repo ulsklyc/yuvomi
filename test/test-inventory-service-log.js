@@ -16,7 +16,7 @@
  *          - ein Distanz-Intervall erzeugt keine zusaetzliche Erinnerung
  *          - ein rueckdatierter Kilometerstand auf einer Log-Zeile rollt
  *            inventory_items.odometer nicht zurueck
- * Ausfuehren: node --experimental-sqlite --test test/test-inventory-service-log.js
+ * Ausfuehren: node --test test/test-inventory-service-log.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -28,6 +28,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: itemsRouter } = await import('../server/routes/inventory/items.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const deadlinesIcs = await import('../server/services/inventory-deadlines-ics.js');
 const db = dbmod.get();
 
@@ -44,8 +46,12 @@ setBudgetMode('shared');
 let actor = { id: A };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => { req.authUserId = actor.id; req.session = { userId: actor.id }; next(); });
-app.use('/items', itemsRouter);
+// At its real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/(items|entries)(\/|\?|$)/.test(req.url)) req.url = `/api/v1/inventory${req.url}`; next(); });
+app.use('/api/v1/inventory/items', itemsRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

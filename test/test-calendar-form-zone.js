@@ -30,7 +30,6 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const SERVER_ZONE = 'UTC';
 const BROWSER_ZONES = ['America/New_York', 'Europe/Berlin'];
@@ -39,7 +38,7 @@ globalThis.window = globalThis.window ?? {};
 globalThis.window.yuvomi = { showToast() {} };
 
 const dbmod = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { householdTimeZone, configuredHouseholdTimeZone, storedToInstantMs } = await import('../server/utils/timezone.js');
 const { __test: calendar } = await import('../public/pages/calendar.js');
 const { displayTimeZone } = await import('../public/utils/timezone.js');
@@ -47,17 +46,20 @@ const db = dbmod.get();
 
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
-const app = express();
-app.use(express.json({ limit: '5mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = 1; req.authRole = 'admin';
-  req.session = { userId: 1, role: 'admin' };
-  req.user = { id: 1, role: 'admin' };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '5mb',
+  auth: (req, _res, next) => {
+    req.authUserId = 1; req.authRole = 'admin';
+    req.session = { userId: 1, role: 'admin' };
+    req.user = { id: 1, role: 'admin' };
+    next();
+  },
 });
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
 test.after(() => server.close());
 
 /** Fuehrt `fn` unter der Prozesszone `zone` aus und stellt sie danach zurueck. */

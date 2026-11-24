@@ -24,7 +24,7 @@ process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'kitchen-permissions-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { moduleForPath } = await import('../server/scopes.js');
 const { default: kitchenRouter } = await import('../server/routes/kitchen.js');
 

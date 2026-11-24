@@ -468,7 +468,9 @@
    * KEIN TEXT STEHT DIREKT DARAUF. Schon bei 10 % Staerke faellt
    * Sekundaertext auf der getoenten Buehne unter AA (3,99:1 im Kern); deshalb
    * steht auf den Zugangsseiten ALLES auf der Tafel (auth.css), auch Marke,
-   * Name und Versionszeile. Gerechnet ist der schlechteste denkbare Grund
+   * Name und Versionszeile, und der Zustand "Sitzung nicht pruefbar" auf
+   * derselben Tafel (layout.css, `.app-shell > .session-unreachable`). Die
+   * einzige Ausnahme ist der Schriftzug des Ladebilds in Tinte. Gerechnet ist der schlechteste denkbare Grund
    * unter der Tafel - alle drei Kreise mit vollem Kern uebereinander, ohne den
    * Blur der Tafel - und darauf jede Tinte, die sie traegt:
    *   hell  (0,20): Label/Sekundaertext 5,43:1, Tertiaer 4,93, Akzent-Link
@@ -1923,6 +1925,11 @@
   --z-drag:    250;   /* Drag-Ghost (z.B. Kanban) — über Modal, unter Toast */
   --z-toast:   300;
   --z-skip-link: 400; /* Skip-Link im Keyboard-Fokus — bewusst über allem */
+  /* Steht fuer die Top Layer, wo es sie nicht gibt: ein offenes Popover unter
+   * dem Popover-Polyfill (reset.css) liegt in der Seite und muss trotzdem ueber
+   * Dialogen, Meldungen und dem Skip-Link stehen wie ein echtes. Der groesste
+   * 32-Bit-Wert, den ein Browser fuer z-index annimmt (#2650). */
+  --z-top-layer: 2147483647;
 
   /* --------------------------------------------------------
    * 16. Glass-Design-System (Liquid Glass Layer)

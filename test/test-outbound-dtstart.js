@@ -5,7 +5,7 @@
  *        DTSTART tragen - RFC 5545 3.8.5.3 nennt die Wiederholungsmenge dann
  *        ausdruecklich "undefined", und ein fremder Client darf daraus ein
  *        Vorkommen MEHR machen, als Yuvomi zeigt.
- * Ausfuehren: node --experimental-sqlite --test test/test-outbound-dtstart.js
+ * Ausfuehren: node --test test/test-outbound-dtstart.js
  *
  * Geprueft werden die reine Umformung UND der Feed, weil beides schiefgehen
  * kann: der Helfer koennte richtig rechnen und trotzdem nirgends angewendet

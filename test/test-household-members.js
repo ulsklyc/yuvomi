@@ -33,14 +33,14 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
+import rateLimit from 'express-rate-limit';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware, requireAuth } = await import('../server/auth.js');
 const { default: familyRouter } = await import('../server/routes/family.js');
 const { default: scheduleRouter } = await import('../server/routes/schedule.js');
 const { default: scheduleExtrasRouter } = await import('../server/routes/schedule-extras.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
@@ -131,28 +131,45 @@ assert.deepEqual(byId(EVERYONE), [...EVERYONE].reverse(), 'Vorbedingung: ids lau
 // --------------------------------------------------------------------------
 
 let actor = ANNA;
-const app = express();
-app.use(express.json());
-app.use(sessionMiddleware);
-app.use((req, _res, next) => {
-  if (actor) {
-    req.session.userId = actor;
-    req.session.role = ROLE[actor];
-  }
-  next();
+// At their real prefixes, in the mount order of server/index.js (#2810). In
+// server/index.js the general API limiter stands in front of the routers,
+// here a generous one does, far above what this suite sends.
+const tasksLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+const calendarLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+const budgetLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+const dashboardLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+// The documents router reads and writes files.
+const documentsLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+// The tasks at their real prefix through test/tasks-app.js: validateRequest()
+// finds its operation by the mount.
+const app = await createTasksApp({
+  auth: [
+    sessionMiddleware,
+    (req, _res, next) => {
+      if (actor) {
+        req.session.userId = actor;
+        req.session.role = ROLE[actor];
+      }
+      next();
+    },
+  ],
+  before: [
+    ['/api/v1/auth', authRouter],
+    ['/api/v1/family', requireAuth, familyRouter],
+    ['/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter],
+    ['/api/v1/schedule', requireAuth, scheduleRouter],
+    ['/api/v1/tasks', tasksLimiter, requireAuth],
+  ],
+  after: [
+    ['/api/v1/calendar', calendarLimiter, requireAuth, calendarRouter],
+    ['/api/v1/budget', budgetLimiter, requireAuth, budgetRouter],
+    ['/api/v1/dashboard', dashboardLimiter, requireAuth, dashboardRouter],
+    ['/api/v1/rewards', requireAuth, rewardsRouter],
+    ['/api/v1/split-expenses', requireAuth, splitRouter],
+    ['/api/v1/permissions', requireAuth, permissionsRouter],
+    ['/api/v1/documents', documentsLimiter, requireAuth, documentsRouter],
+  ],
 });
-app.use('/auth', authRouter);
-app.use('/family', requireAuth, familyRouter);
-app.use('/schedule/extras', requireAuth, scheduleExtrasRouter);
-app.use('/schedule', requireAuth, scheduleRouter);
-app.use('/tasks', requireAuth, tasksRouter);
-app.use('/calendar', requireAuth, calendarRouter);
-app.use('/budget', requireAuth, budgetRouter);
-app.use('/dashboard', requireAuth, dashboardRouter);
-app.use('/rewards', requireAuth, rewardsRouter);
-app.use('/split-expenses', requireAuth, splitRouter);
-app.use('/permissions', requireAuth, permissionsRouter);
-app.use('/documents', requireAuth, documentsRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -204,13 +221,13 @@ test('members only: the shopping list recipient picker', () => {
 });
 
 test('members only: GET /schedule/household-members', async () => {
-  const r = await call('GET', '/schedule/household-members');
+  const r = await call('GET', '/api/v1/schedule/household-members');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data), MEMBERS);
 });
 
 test('members only: GET /family/members (the source of the pickers)', async () => {
-  const r = await call('GET', '/family/members');
+  const r = await call('GET', '/api/v1/family/members');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data), MEMBERS);
 });
@@ -219,26 +236,26 @@ test('accounts: the 2FA overview lists every account', async () => {
   // Der zweite Faktor schuetzt Konten, nicht Mitgliedschaft (Entscheidung
   // vom 15.09.2026, #1207): die Admin-Uebersicht listet deshalb jedes Konto.
   assert.deepEqual(idsOf(householdOverview(db, memberOrderSql('u')), 'user_id'), EVERYONE);
-  const r = await call('GET', '/auth/2fa/overview');
+  const r = await call('GET', '/api/v1/auth/2fa/overview');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data, 'user_id'), EVERYONE);
 });
 
 test('members only: GET /tasks/meta/options', async () => {
-  const r = await call('GET', '/tasks/meta/options');
+  const r = await call('GET', '/api/v1/tasks/meta/options');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.users), MEMBERS);
 });
 
 test('members only: a task comment mention notifies neither staff nor guests', async () => {
-  const task = await call('POST', '/tasks', { body: { title: 'Wer hilft?', visibility: 'all' } });
+  const task = await call('POST', '/api/v1/tasks', { body: { title: 'Wer hilft?', visibility: 'all' } });
   assert.equal(task.status, 201);
 
   const pushed = [];
   const original = pushService.sendPushToUser;
   pushService.sendPushToUser = async (userId) => { pushed.push(userId); };
   try {
-    const r = await call('POST', `/tasks/${task.body.data.id}/comments`, {
+    const r = await call('POST', `/api/v1/tasks/${task.body.data.id}/comments`, {
       body: { comment: '@Ben @Clara @Dora wer uebernimmt das?' },
     });
     assert.equal(r.status, 201);
@@ -251,7 +268,7 @@ test('members only: a task comment mention notifies neither staff nor guests', a
 });
 
 test('members only: the dashboard user list, reward standings and participant count', async () => {
-  const r = await call('GET', '/dashboard');
+  const r = await call('GET', '/api/v1/dashboard');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.users), MEMBERS);
   assert.deepEqual(idsOf(r.body.rewards.standings), MEMBERS);
@@ -259,17 +276,17 @@ test('members only: the dashboard user list, reward standings and participant co
 });
 
 test('members only: reward balances, participant count and the participant list', async () => {
-  const overview = await call('GET', '/rewards/overview');
+  const overview = await call('GET', '/api/v1/rewards/overview');
   assert.equal(overview.status, 200);
   assert.deepEqual(idsOf(overview.body.data.balances), MEMBERS);
   assert.equal(overview.body.data.setup.participantCount, MEMBERS.length);
-  const participants = await call('GET', '/rewards/participants');
+  const participants = await call('GET', '/api/v1/rewards/participants');
   assert.equal(participants.status, 200);
   assert.deepEqual(idsOf(participants.body.data), MEMBERS);
 });
 
 test('members only: householdSize at /auth/me counts neither staff nor guests', async () => {
-  const r = await call('GET', '/auth/me');
+  const r = await call('GET', '/api/v1/auth/me');
   assert.equal(r.status, 200);
   assert.equal(r.body.householdSize, MEMBERS.length);
 });
@@ -279,10 +296,10 @@ test('members only: householdSize at /auth/me counts neither staff nor guests', 
 // --------------------------------------------------------------------------
 
 test('split member candidates: members plus the guests of this group, not of another', async () => {
-  const here = await call('GET', `/split-expenses/groups/${GROUP}/member-candidates`);
+  const here = await call('GET', `/api/v1/split-expenses/groups/${GROUP}/member-candidates`);
   assert.equal(here.status, 200);
   assert.deepEqual(idsOf(here.body.data.filter((row) => row.source === 'user'), 'user_id'), [ANNA, BEN, DORA]);
-  const other = await call('GET', `/split-expenses/groups/${OTHER}/member-candidates`);
+  const other = await call('GET', `/api/v1/split-expenses/groups/${OTHER}/member-candidates`);
   assert.equal(other.status, 200);
   assert.deepEqual(idsOf(other.body.data.filter((row) => row.source === 'user'), 'user_id'), [ANNA, BEN, EMIL]);
 });
@@ -292,7 +309,7 @@ test('split member candidates: members plus the guests of this group, not of ano
 // --------------------------------------------------------------------------
 
 test('accounts: API token subjects are every account except guests, as before', async () => {
-  const r = await call('GET', '/auth/api-tokens');
+  const r = await call('GET', '/api/v1/auth/api-tokens');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.subjects), ACCOUNTS_WITHOUT_GUESTS);
 });
@@ -301,18 +318,18 @@ const SCOPES = { [ANNA]: 'family', [BEN]: 'family', [CLARA]: 'family', [DORA]: '
 const scopesOf = (rows) => Object.fromEntries(rows.map((row) => [row.id, row.access_scope]));
 
 test('accounts: GET /auth/users lists everyone and marks staff and guests', async () => {
-  const r = await call('GET', '/auth/users');
+  const r = await call('GET', '/api/v1/auth/users');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data), EVERYONE);
   assert.deepEqual(scopesOf(r.body.data), SCOPES);
-  const asMember = await call('GET', '/auth/users', { as: BEN });
+  const asMember = await call('GET', '/api/v1/auth/users', { as: BEN });
   assert.equal(asMember.status, 200);
   assert.deepEqual(idsOf(asMember.body.data), EVERYONE);
   assert.deepEqual(scopesOf(asMember.body.data), SCOPES);
 });
 
 test('accounts: GET /permissions/catalog lists everyone with access_scope', async () => {
-  const r = await call('GET', '/permissions/catalog');
+  const r = await call('GET', '/api/v1/permissions/catalog');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data.members), EVERYONE);
   assert.deepEqual(scopesOf(r.body.data.members), SCOPES);
@@ -320,7 +337,7 @@ test('accounts: GET /permissions/catalog lists everyone with access_scope', asyn
 
 test('access_scope: /auth/me and the login answer name a guest a split_guest', async () => {
   for (const id of [BEN, DORA]) {
-    const me = await call('GET', '/auth/me', { as: id });
+    const me = await call('GET', '/api/v1/auth/me', { as: id });
     assert.equal(me.status, 200);
     assert.equal(me.body.user.access_scope, SCOPES[id]);
   }
@@ -329,7 +346,7 @@ test('access_scope: /auth/me and the login answer name a guest a split_guest', a
   const anonymous = await fetch(`${base}/auth/me`);
   const cookies = anonymous.headers.getSetCookie().map((raw) => raw.split(';')[0]).join('; ');
   for (const [id, username] of [[BEN, 'ben'], [DORA, 'dora']]) {
-    const res = await fetch(`${base}/auth/login`, {
+    const res = await fetch(`${base}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookies },
       body: JSON.stringify({ username, password: PASSWORD }),
@@ -350,14 +367,14 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   const ALL_NAMES = ['Anna', 'Ben', 'Clara', 'Dora', 'Emil'];
   const sorted = (names) => [...names].sort();
 
-  const me = await call('GET', '/auth/me', { as: ANNA });
+  const me = await call('GET', '/api/v1/auth/me', { as: ANNA });
   assert.equal(me.status, 200);
   assert.deepEqual(sorted(me.body.initialsRoster), ALL_NAMES, 'members, staff and guests - every account /auth/users lists');
-  const staff = await call('GET', '/auth/me', { as: CLARA });
+  const staff = await call('GET', '/api/v1/auth/me', { as: CLARA });
   assert.deepEqual(sorted(staff.body.initialsRoster), ALL_NAMES, 'staff sees the same discs as a member');
   // Ein Gast erreicht nur die geteilten Ausgaben; die Namen des Haushalts
   // gehen ihn nichts an.
-  const guest = await call('GET', '/auth/me', { as: DORA });
+  const guest = await call('GET', '/api/v1/auth/me', { as: DORA });
   assert.equal(guest.status, 200);
   assert.deepEqual(guest.body.initialsRoster, [], 'a split guest gets no names');
 
@@ -367,10 +384,10 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   const display = addUser('wall', 'Wand', 'member', 'other');
   db.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').run(display, ANNA);
   try {
-    const after = await call('GET', '/auth/me', { as: ANNA });
+    const after = await call('GET', '/api/v1/auth/me', { as: ANNA });
     assert.equal(after.status, 200);
     assert.deepEqual(sorted(after.body.initialsRoster), ALL_NAMES, 'Ben is deactivated and still listed; the display is not');
-    const listed = await call('GET', '/auth/users', { as: ANNA });
+    const listed = await call('GET', '/api/v1/auth/users', { as: ANNA });
     assert.deepEqual(sorted(listed.body.data.map((row) => row.display_name)), ALL_NAMES, 'the same accounts as /auth/users');
     assert.ok(listed.body.data.find((row) => row.id === BEN).deactivated_at, 'control: Ben really is deactivated');
   } finally {
@@ -381,7 +398,7 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   actor = null;
   const anonymous = await fetch(`${base}/auth/me`);
   const cookies = anonymous.headers.getSetCookie().map((raw) => raw.split(';')[0]).join('; ');
-  const res = await fetch(`${base}/auth/login`, {
+  const res = await fetch(`${base}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookies },
     body: JSON.stringify({ username: 'ben', password: PASSWORD }),
@@ -397,28 +414,28 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
 const assignedIds = (table, key, id) => byId(db.prepare(`SELECT user_id FROM ${table} WHERE ${key} = ?`).all(id).map((r) => r.user_id));
 
 test('tasks: a new assignee must be a household member', async () => {
-  const ok = await call('POST', '/tasks', { body: { title: 'Mitglied', assigned_to: [BEN] } });
+  const ok = await call('POST', '/api/v1/tasks', { body: { title: 'Mitglied', assigned_to: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('POST', '/tasks', { body: { title: 'Personal', assigned_to: [CLARA] } }), 'staff assignee');
-  assertRejectsNonMember(await call('POST', '/tasks', { body: { title: 'Gast', assigned_to: [BEN, DORA] } }), 'guest assignee');
+  assertRejectsNonMember(await call('POST', '/api/v1/tasks', { body: { title: 'Personal', assigned_to: [CLARA] } }), 'staff assignee');
+  assertRejectsNonMember(await call('POST', '/api/v1/tasks', { body: { title: 'Gast', assigned_to: [BEN, DORA] } }), 'guest assignee');
 });
 
 test('tasks: a stored staff assignee stays saveable, a newly added guest does not', async () => {
   const taskId = Number(db.prepare("INSERT INTO tasks (title, visibility, created_by) VALUES ('Fenster', 'all', ?)").run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(taskId, CLARA);
 
-  const kept = await call('PUT', `/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('task_assignments', 'task_id', taskId), byId([BEN, CLARA]));
 
-  assertRejectsNonMember(await call('PUT', `/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
+  assertRejectsNonMember(await call('PUT', `/api/v1/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
   assert.deepEqual(assignedIds('task_assignments', 'task_id', taskId), byId([BEN, CLARA]), 'a rejected PUT writes nothing');
 });
 
 test('calendar: a new attendee must be a household member', async () => {
-  const ok = await call('POST', '/calendar', { body: { title: 'Arzt', start_datetime: '2030-03-01T10:00:00', assigned_to: [BEN] } });
+  const ok = await call('POST', '/api/v1/calendar', { body: { title: 'Arzt', start_datetime: '2030-03-01T10:00:00', assigned_to: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('POST', '/calendar', { body: { title: 'Gast', start_datetime: '2030-03-01T11:00:00', assigned_to: [EMIL] } }), 'guest attendee');
+  assertRejectsNonMember(await call('POST', '/api/v1/calendar', { body: { title: 'Gast', start_datetime: '2030-03-01T11:00:00', assigned_to: [EMIL] } }), 'guest attendee');
 });
 
 test('calendar: a stored staff attendee stays saveable, a newly added guest does not', async () => {
@@ -427,11 +444,11 @@ test('calendar: a stored staff attendee stays saveable, a newly added guest does
   `).run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(eventId, CLARA);
 
-  const kept = await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', eventId), byId([BEN, CLARA]));
 
-  assertRejectsNonMember(await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
+  assertRejectsNonMember(await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
   assert.deepEqual(assignedIds('event_assignments', 'event_id', eventId), byId([BEN, CLARA]), 'a rejected PUT writes nothing');
 });
 
@@ -442,83 +459,83 @@ test('calendar: a single occurrence keeps the series attendees and takes no new 
   `).run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(seriesId, CLARA);
 
-  const kept = await call('PUT', `/calendar/${seriesId}/occurrences/2030-04-03`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-04-03`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-04-04`, { body: { assigned_to: [CLARA, DORA] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-04-04`, { body: { assigned_to: [CLARA, DORA] } }),
     'guest added to one occurrence',
   );
 });
 
 test('budget: a new responsible person must be a household member', async () => {
-  const ok = await call('POST', '/budget', { body: { title: 'Strom', amount: -10, date: '2030-01-05', responsible_user_ids: [BEN] } });
+  const ok = await call('POST', '/api/v1/budget', { body: { title: 'Strom', amount: -10, date: '2030-01-05', responsible_user_ids: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assertRejectsNonMember(
-    await call('POST', '/budget', { body: { title: 'Putzhilfe', amount: -40, date: '2030-01-06', responsible_user_ids: [CLARA] } }),
+    await call('POST', '/api/v1/budget', { body: { title: 'Putzhilfe', amount: -40, date: '2030-01-06', responsible_user_ids: [CLARA] } }),
     'staff responsible',
   );
 });
 
 test('budget: a stored staff responsible stays saveable, a newly added guest does not', async () => {
-  const created = await call('POST', '/budget', { body: { title: 'Wasser', amount: -20, date: '2030-01-07', responsible_user_ids: [BEN] } });
+  const created = await call('POST', '/api/v1/budget', { body: { title: 'Wasser', amount: -20, date: '2030-01-07', responsible_user_ids: [BEN] } });
   assert.equal(created.status, 201, JSON.stringify(created.body));
   const entryId = created.body.data.id;
   db.prepare('INSERT INTO budget_entry_responsibles (entry_id, user_id) VALUES (?, ?)').run(entryId, CLARA);
 
-  const kept = await call('PUT', `/budget/${entryId}`, { body: { responsible_user_ids: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/budget/${entryId}`, { body: { responsible_user_ids: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('budget_entry_responsibles', 'entry_id', entryId), byId([BEN, CLARA]));
 
-  assertRejectsNonMember(await call('PUT', `/budget/${entryId}`, { body: { responsible_user_ids: [BEN, CLARA, DORA] } }), 'added guest');
+  assertRejectsNonMember(await call('PUT', `/api/v1/budget/${entryId}`, { body: { responsible_user_ids: [BEN, CLARA, DORA] } }), 'added guest');
   assert.deepEqual(assignedIds('budget_entry_responsibles', 'entry_id', entryId), byId([BEN, CLARA]), 'a rejected PUT writes nothing');
 });
 
 test('budget: a series takes no newly added non-member responsible', async () => {
-  const created = await call('POST', '/budget', { body: { title: 'Miete', amount: -500, date: '2030-01-01', is_recurring: 1 } });
+  const created = await call('POST', '/api/v1/budget', { body: { title: 'Miete', amount: -500, date: '2030-01-01', is_recurring: 1 } });
   assert.equal(created.status, 201, JSON.stringify(created.body));
   const entryId = created.body.data.id;
 
-  const ok = await call('PUT', `/budget/${entryId}/series`, { body: { responsible_user_ids: [BEN] } });
+  const ok = await call('PUT', `/api/v1/budget/${entryId}/series`, { body: { responsible_user_ids: [BEN] } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('PUT', `/budget/${entryId}/series`, { body: { responsible_user_ids: [BEN, EMIL] } }), 'guest on a series');
+  assertRejectsNonMember(await call('PUT', `/api/v1/budget/${entryId}/series`, { body: { responsible_user_ids: [BEN, EMIL] } }), 'guest on a series');
   assert.deepEqual(assignedIds('budget_entry_responsibles', 'entry_id', entryId), [BEN], 'a rejected PUT writes nothing');
 });
 
 test('schedule: a new schedule owner must be a household member', async () => {
   const pattern = { name: 'Woche', anchor_date: '2030-01-01', cycle_length: 7 };
-  const ok = await call('POST', '/schedule/patterns', { body: { ...pattern, user_id: BEN } });
+  const ok = await call('POST', '/api/v1/schedule/patterns', { body: { ...pattern, user_id: BEN } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('POST', '/schedule/patterns', { body: { ...pattern, user_id: DORA } }), 'guest pattern');
-  assertRejectsNonMember(await call('PUT', '/schedule/overrides/2030-01-02', { body: { user_id: DORA, shift_type_id: null } }), 'guest override');
-  assertRejectsNonMember(await call('POST', '/schedule/overrides/fill', { body: { user_id: EMIL, from: '2030-01-02', to: '2030-01-03' } }), 'guest override fill');
+  assertRejectsNonMember(await call('POST', '/api/v1/schedule/patterns', { body: { ...pattern, user_id: DORA } }), 'guest pattern');
+  assertRejectsNonMember(await call('PUT', '/api/v1/schedule/overrides/2030-01-02', { body: { user_id: DORA, shift_type_id: null, note: null, field_values: {} } }), 'guest override');
+  assertRejectsNonMember(await call('POST', '/api/v1/schedule/overrides/fill', { body: { user_id: EMIL, from: '2030-01-02', to: '2030-01-03' } }), 'guest override fill');
 
-  const extra = await call('POST', '/schedule/extras', { body: { user_id: BEN, date_key: '2030-01-04', shift_type_id: SHIFT } });
+  const extra = await call('POST', '/api/v1/schedule/extras', { body: { user_id: BEN, date_key: '2030-01-04', shift_type_id: SHIFT } });
   assert.equal(extra.status, 201, JSON.stringify(extra.body));
-  assertRejectsNonMember(await call('POST', '/schedule/extras', { body: { user_id: DORA, date_key: '2030-01-04', shift_type_id: SHIFT } }), 'guest extra shift');
-  assertRejectsNonMember(await call('POST', '/schedule/extras/fill', { body: { user_id: DORA, from: '2030-01-05', to: '2030-01-06', shift_type_id: SHIFT } }), 'guest extra fill');
+  assertRejectsNonMember(await call('POST', '/api/v1/schedule/extras', { body: { user_id: DORA, date_key: '2030-01-04', shift_type_id: SHIFT } }), 'guest extra shift');
+  assertRejectsNonMember(await call('POST', '/api/v1/schedule/extras/fill', { body: { user_id: DORA, from: '2030-01-05', to: '2030-01-06', shift_type_id: SHIFT } }), 'guest extra fill');
 });
 
 test('schedule: staff who already own a schedule keep it editable', async () => {
-  const override = await call('PUT', '/schedule/overrides/2030-01-08', { body: { user_id: CLARA, shift_type_id: null } });
+  const override = await call('PUT', '/api/v1/schedule/overrides/2030-01-08', { body: { user_id: CLARA, shift_type_id: null, note: null, field_values: {} } });
   assert.equal(override.status, 200, JSON.stringify(override.body));
-  const extra = await call('POST', '/schedule/extras', { body: { user_id: CLARA, date_key: '2030-01-09', shift_type_id: SHIFT } });
+  const extra = await call('POST', '/api/v1/schedule/extras', { body: { user_id: CLARA, date_key: '2030-01-09', shift_type_id: SHIFT } });
   assert.equal(extra.status, 201, JSON.stringify(extra.body));
 });
 
 test('rewards: only a household member can be enrolled, an old enrolment can still be switched', async () => {
-  const ok = await call('PUT', `/rewards/participants/${BEN}`, { body: { enabled: true } });
+  const ok = await call('PUT', `/api/v1/rewards/participants/${BEN}`, { body: { enabled: true } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('PUT', `/rewards/participants/${EMIL}`, { body: { enabled: true } }), 'guest enrolment');
+  assertRejectsNonMember(await call('PUT', `/api/v1/rewards/participants/${EMIL}`, { body: { enabled: true } }), 'guest enrolment');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM reward_participants WHERE user_id = ?').get(EMIL).n, 0, 'a rejected PUT writes nothing');
 
   // Doras Einschreibung stammt von frueher: sie bleibt stehen, laesst sich
   // bestaetigen und abschalten - nur neu anlegen laesst sie sich nicht mehr.
-  const still = await call('PUT', `/rewards/participants/${DORA}`, { body: { enabled: true } });
+  const still = await call('PUT', `/api/v1/rewards/participants/${DORA}`, { body: { enabled: true } });
   assert.equal(still.status, 200, JSON.stringify(still.body));
-  const off = await call('PUT', `/rewards/participants/${DORA}`, { body: { enabled: false } });
+  const off = await call('PUT', `/api/v1/rewards/participants/${DORA}`, { body: { enabled: false } });
   assert.equal(off.status, 200, JSON.stringify(off.body));
   assert.equal(db.prepare('SELECT enabled FROM reward_participants WHERE user_id = ?').get(DORA).enabled, 0, 'switched off, not deleted');
-  assertRejectsNonMember(await call('PUT', `/rewards/participants/${DORA}`, { body: { enabled: true } }), 'switching an old guest enrolment back on');
+  assertRejectsNonMember(await call('PUT', `/api/v1/rewards/participants/${DORA}`, { body: { enabled: true } }), 'switching an old guest enrolment back on');
 });
 
 // --------------------------------------------------------------------------
@@ -552,11 +569,11 @@ test('synced calendars: a new ICS subscription default assignee must be a househ
   // Kein Netz: 127.0.0.1 weist die SSRF-Pruefung vor jedem Abruf ab. Ein
   // Mitglied kommt an der Personenpruefung vorbei und scheitert erst dort - die
   // Positivkontrolle dafuer, dass die Ablehnung darunter die Mitgliedschaft meint.
-  const member = await call('POST', '/calendar/subscriptions', { body: { ...body, default_assignee_user_id: BEN } });
+  const member = await call('POST', '/api/v1/calendar/subscriptions', { body: { ...body, default_assignee_user_id: BEN } });
   assert.equal(member.status, 400, JSON.stringify(member.body));
   assert.match(String(member.body?.error), /private IP/i);
   assertRejectsNonMember(
-    await call('POST', '/calendar/subscriptions', { body: { ...body, default_assignee_user_id: CLARA } }),
+    await call('POST', '/api/v1/calendar/subscriptions', { body: { ...body, default_assignee_user_id: CLARA } }),
     'staff as default assignee of a new subscription',
   );
 });
@@ -570,11 +587,11 @@ test('synced calendars: a stored ICS subscription assignee stays saveable, a new
   db.prepare('INSERT INTO ics_subscription_assignees (subscription_id, user_id) VALUES (?, ?)').run(subId, CLARA);
   const assignee = () => db.prepare('SELECT user_id AS a FROM ics_subscription_assignees WHERE subscription_id = ?').get(subId)?.a;
 
-  const kept = await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { name: 'Verein neu', default_assignee_user_id: CLARA } });
+  const kept = await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { name: 'Verein neu', default_assignee_user_id: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  assertRejectsNonMember(await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: DORA } }), 'guest as default assignee');
+  assertRejectsNonMember(await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: DORA } }), 'guest as default assignee');
   assert.equal(assignee(), CLARA, 'a rejected PATCH writes nothing');
-  const member = await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: BEN } });
+  const member = await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assert.equal(assignee(), BEN);
 });
@@ -586,14 +603,14 @@ test('synced calendars: an external calendar default assignee (Google, Apple, Ca
   db.prepare('INSERT INTO external_calendar_assignees (calendar_id, user_id) VALUES (?, ?)').run(calId, CLARA);
   const assignee = () => db.prepare('SELECT user_id AS a FROM external_calendar_assignees WHERE calendar_id = ?').get(calId)?.a;
 
-  const kept = await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } });
+  const kept = await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  assertRejectsNonMember(await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: EMIL } }), 'guest as default assignee');
+  assertRejectsNonMember(await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: EMIL } }), 'guest as default assignee');
   assert.equal(assignee(), CLARA, 'a rejected PATCH writes nothing');
-  const member = await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: BEN } });
+  const member = await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assertRejectsNonMember(
-    await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } }),
+    await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } }),
     'staff chosen again after being replaced',
   );
 });
@@ -604,13 +621,13 @@ test('synced calendars: a stored Outlook account owner stays saveable, a new non
   `).run(CLARA).lastInsertRowid);
   const owner = () => db.prepare('SELECT owner_user_id AS o FROM outlook_accounts WHERE id = ?').get(accountId).o;
 
-  const kept = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { name: 'Arbeit neu', ownerUserId: CLARA } });
+  const kept = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { name: 'Arbeit neu', ownerUserId: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  const guestOwner = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } });
+  const guestOwner = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } });
   assertRejectsNonMember(guestOwner, 'guest as owner');
   assert.equal(guestOwner.body.reason, 'calendar_assignee_not_member', 'die App sagt den Satz (#1909)');
   assert.equal(owner(), CLARA, 'a rejected PUT writes nothing');
-  const member = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: BEN } });
+  const member = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assert.equal(owner(), BEN);
 });
@@ -618,15 +635,15 @@ test('synced calendars: a stored Outlook account owner stays saveable, a new non
 test('split expenses: members and guests can join a group, staff cannot, a stored staff membership stays', async () => {
   const membership = (groupId, userId) => db.prepare('SELECT role FROM expense_group_members WHERE group_id = ? AND user_id = ?').get(groupId, userId);
 
-  const member = await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: BEN } });
+  const member = await call('POST', `/api/v1/split-expenses/groups/${GROUP}/members`, { body: { user_id: BEN } });
   assert.equal(member.status, 201, JSON.stringify(member.body));
-  const guest = await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: EMIL } });
+  const guest = await call('POST', `/api/v1/split-expenses/groups/${GROUP}/members`, { body: { user_id: EMIL } });
   assert.equal(guest.status, 201, `the guest mechanism stays: a guest of another group can still join ${JSON.stringify(guest.body)}`);
-  assertRejectsNonMember(await call('POST', `/split-expenses/groups/${GROUP}/members`, { body: { user_id: CLARA } }), 'staff joining a group');
+  assertRejectsNonMember(await call('POST', `/api/v1/split-expenses/groups/${GROUP}/members`, { body: { user_id: CLARA } }), 'staff joining a group');
   assert.equal(membership(GROUP, CLARA), undefined, 'a rejected POST writes nothing');
 
   db.prepare("INSERT INTO expense_group_members (group_id, user_id, role) VALUES (?, ?, 'guest')").run(OTHER, CLARA);
-  const kept = await call('POST', `/split-expenses/groups/${OTHER}/members`, { body: { user_id: CLARA, role: 'admin' } });
+  const kept = await call('POST', `/api/v1/split-expenses/groups/${OTHER}/members`, { body: { user_id: CLARA, role: 'admin' } });
   assert.equal(kept.status, 201, JSON.stringify(kept.body));
   assert.equal(membership(OTHER, CLARA).role, 'admin', 'a stored staff membership can still be changed');
 });
@@ -651,7 +668,7 @@ test('calendar: the series path of PUT keeps a stored staff attendee and takes n
   const seriesId = addSeries('Wochenplan', '2030-05-01T08:00:00', [CLARA]);
   // Ein abgewandeltes Vorkommen zwingt PUT /:id in den Serienpfad
   // (updateSeriesWithOverrides) statt in das einfache Update.
-  const occurrence = await call('PUT', `/calendar/${seriesId}/occurrences/2030-05-03`, { body: { title: 'Anders' } });
+  const occurrence = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-05-03`, { body: { title: 'Anders' } });
   assert.equal(occurrence.status, 200, JSON.stringify(occurrence.body));
   assert.ok(db.prepare('SELECT 1 FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId), 'Vorbedingung: ein verknuepftes Vorkommen existiert');
 
@@ -661,10 +678,10 @@ test('calendar: the series path of PUT keeps a stored staff attendee and takes n
     rows: eventRows(),
   });
   const before = series();
-  assertRejectsNonMember(await call('PUT', `/calendar/${seriesId}`, { body: { assigned_to: [CLARA, DORA] } }), 'guest added to a series with an override');
+  assertRejectsNonMember(await call('PUT', `/api/v1/calendar/${seriesId}`, { body: { assigned_to: [CLARA, DORA] } }), 'guest added to a series with an override');
   assert.deepEqual(series(), before, 'a rejected series PUT writes nothing');
 
-  const kept = await call('PUT', `/calendar/${seriesId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', seriesId), byId([BEN, CLARA]));
 });
@@ -678,12 +695,12 @@ test('calendar: this-and-following keeps a stored staff attendee and takes no ne
   });
   const before = series();
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [CLARA, EMIL] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [CLARA, EMIL] } }),
     'guest added to this and the following occurrences',
   );
   assert.deepEqual(series(), before, 'a rejected split writes nothing: same series, no following series');
 
-  const kept = await call('PUT', `/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 201, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', kept.body.data.id), byId([BEN, CLARA]));
 });
@@ -694,21 +711,21 @@ test('calendar: an occurrence that owns its attendees is the stored state, not t
   // gespeichert - sie wieder hinzuzufuegen ist eine neue Wahl. Genau so
   // bestimmt upsertOccurrenceOverride() den geltenden Stand.
   const seriesId = addSeries('Einkauf', '2030-08-01T09:00:00', [CLARA]);
-  const removed = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN] } });
+  const removed = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN] } });
   assert.equal(removed.status, 200, JSON.stringify(removed.body));
   const child = db.prepare('SELECT id, overridden_fields FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?').get(seriesId, '2030-08-03T09:00:00');
   assert.match(String(child?.overridden_fields), /assignments/, 'Vorbedingung: das Vorkommen besitzt seine Zuweisungen');
   assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN]);
 
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN, CLARA] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN, CLARA] } }),
     'staff re-added to an occurrence that had removed them',
   );
   assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN], 'a rejected PUT writes nothing');
 
   // Gegenprobe: ein Vorkommen ohne eigene Zuweisung erbt die der Serie, dort
   // bleibt Clara gespeichert.
-  const inherited = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-04`, { body: { assigned_to: [BEN, CLARA] } });
+  const inherited = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-04`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(inherited.status, 200, JSON.stringify(inherited.body));
 });
 
@@ -730,12 +747,12 @@ test('calendar: a rejected attendee leaves no staged attachment behind', async (
     const dataUrl = `data:text/plain;base64,${Buffer.from('Anhang').toString('base64')}`;
 
     // Gegenprobe zuerst: legt dieser Aufbau ueberhaupt eine Datei ab?
-    const ok = await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN], attachment_data: dataUrl, attachment_name: 'gut.txt' } });
+    const ok = await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN], attachment_data: dataUrl, attachment_name: 'gut.txt' } });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
     assert.equal(await files(), 1, 'Vorbedingung: ein gelungener Anhang liegt im Ordner');
 
     assertRejectsNonMember(
-      await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, DORA], attachment_data: dataUrl, attachment_name: 'waise.txt' } }),
+      await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, DORA], attachment_data: dataUrl, attachment_name: 'waise.txt' } }),
       'guest added together with an attachment',
     );
     assert.equal(await files(), 1, 'the attachment staged for the rejected request was cleaned up');
@@ -755,9 +772,9 @@ test('calendar: a rejected attendee leaves no staged attachment behind', async (
 test('documents: a new document can only be shared with household members', async () => {
   const contentData = `data:text/plain;base64,${Buffer.from('Vertrag').toString('base64')}`;
   const body = { name: 'Vertrag', original_name: 'vertrag.txt', content_data: contentData, visibility: 'restricted' };
-  assertRejectsNonMember(await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN, CLARA] } }), 'staff shared on a new document');
-  assertRejectsNonMember(await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN, DORA] } }), 'guest shared on a new document');
-  const ok = await call('POST', '/documents', { body: { ...body, allowed_member_ids: [BEN] } });
+  assertRejectsNonMember(await call('POST', '/api/v1/documents', { body: { ...body, allowed_member_ids: [BEN, CLARA] } }), 'staff shared on a new document');
+  assertRejectsNonMember(await call('POST', '/api/v1/documents', { body: { ...body, allowed_member_ids: [BEN, DORA] } }), 'guest shared on a new document');
+  const ok = await call('POST', '/api/v1/documents', { body: { ...body, allowed_member_ids: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assert.deepEqual(ok.body.data.allowed_member_ids, [BEN]);
 });
@@ -770,7 +787,7 @@ test('documents: a stored grant stays saveable, a removed one cannot come back',
   db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, CLARA);
   const access = () => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
     .all(docId).map((row) => row.user_id);
-  const save = (ids) => call('PUT', `/documents/${docId}`, { body: { name: 'Mietvertrag', visibility: 'restricted', allowed_member_ids: ids } });
+  const save = (ids) => call('PUT', `/api/v1/documents/${docId}`, { body: { name: 'Mietvertrag', visibility: 'restricted', allowed_member_ids: ids } });
 
   const kept = await save([CLARA, BEN]);
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
@@ -794,10 +811,10 @@ test('split expenses: creating a group follows the same rule as adding a member'
   // POST /groups/:id/members ablehnt.
   const groups = () => db.prepare('SELECT COUNT(*) AS n FROM expense_groups').get().n;
   const before = groups();
-  assertRejectsNonMember(await call('POST', '/split-expenses/groups', { as: CLARA, body: { name: 'Putzkasse' } }), 'staff creating a group');
+  assertRejectsNonMember(await call('POST', '/api/v1/split-expenses/groups', { as: CLARA, body: { name: 'Putzkasse' } }), 'staff creating a group');
   assert.equal(groups(), before, 'a refused request creates no group');
 
-  const ok = await call('POST', '/split-expenses/groups', { as: ANNA, body: { name: 'Haushaltskasse' } });
+  const ok = await call('POST', '/api/v1/split-expenses/groups', { as: ANNA, body: { name: 'Haushaltskasse' } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   assert.equal(groups(), before + 1);
 });
@@ -806,13 +823,13 @@ test('split member candidates: a stored member who may not join anew stays liste
   // Clara (Hauspersonal) ist seit dem Test oben Mitglied der zweiten Gruppe.
   // Der Editor baut seine Kaestchen nur aus den Kandidaten - fehlt sie dort,
   // kann niemand ihre Mitgliedschaft sehen oder beenden.
-  const other = await call('GET', `/split-expenses/groups/${OTHER}/member-candidates`);
+  const other = await call('GET', `/api/v1/split-expenses/groups/${OTHER}/member-candidates`);
   assert.equal(other.status, 200);
   const users = other.body.data.filter((row) => row.source === 'user');
   assert.deepEqual(idsOf(users, 'user_id'), [ANNA, BEN, CLARA, EMIL]);
   assert.equal(users.find((row) => row.user_id === CLARA).in_group, 1);
 
-  const here = await call('GET', `/split-expenses/groups/${GROUP}/member-candidates`);
+  const here = await call('GET', `/api/v1/split-expenses/groups/${GROUP}/member-candidates`);
   assert.ok(!idsOf(here.body.data.filter((row) => row.source === 'user'), 'user_id').includes(CLARA),
     'not offered for a group she does not belong to');
 });
@@ -825,7 +842,7 @@ test('rewards: an old enrolment of an account that is not a member earns, redeem
   // Clara (Hauspersonal) ist seit der Fixture eingeschrieben (enabled = 1).
   const taskId = Number(db.prepare("INSERT INTO tasks (title, status, points, created_by) VALUES ('Fenster', 'open', 5, ?)").run(ANNA).lastInsertRowid);
   for (const id of [BEN, CLARA]) db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(taskId, id);
-  const done = await call('PATCH', `/tasks/${taskId}/status`, { body: { status: 'done' } });
+  const done = await call('PATCH', `/api/v1/tasks/${taskId}/status`, { body: { status: 'done' } });
   assert.equal(done.status, 200, JSON.stringify(done.body));
   const earned = db.prepare("SELECT user_id FROM reward_ledger WHERE task_id = ? AND type = 'earn' ORDER BY user_id").all(taskId)
     .map((row) => row.user_id);
@@ -833,12 +850,12 @@ test('rewards: an old enrolment of an account that is not a member earns, redeem
 
   const itemId = Number(db.prepare("INSERT INTO reward_catalog (name, cost, created_by) VALUES ('Eis', 1, ?)").run(ANNA).lastInsertRowid);
   db.prepare("INSERT INTO reward_ledger (user_id, delta, type, reason, created_by) VALUES (?, 10, 'bonus', 'Altbestand', ?)").run(CLARA, ANNA);
-  const redeem = await call('POST', '/rewards/redemptions', { body: { catalog_id: itemId, user_id: CLARA } });
+  const redeem = await call('POST', '/api/v1/rewards/redemptions', { body: { catalog_id: itemId, user_id: CLARA } });
   assert.equal(redeem.status, 400, `redeeming for an old staff enrolment: ${JSON.stringify(redeem.body)}`);
-  const bonus = await call('POST', '/rewards/bonus', { body: { user_id: CLARA, delta: 3 } });
+  const bonus = await call('POST', '/api/v1/rewards/bonus', { body: { user_id: CLARA, delta: 3 } });
   assert.equal(bonus.status, 400, `a bonus for an old staff enrolment: ${JSON.stringify(bonus.body)}`);
 
-  const ok = await call('POST', '/rewards/redemptions', { body: { catalog_id: itemId, user_id: BEN } });
+  const ok = await call('POST', '/api/v1/rewards/redemptions', { body: { catalog_id: itemId, user_id: BEN } });
   assert.equal(ok.status, 201, `the member redeems as before: ${JSON.stringify(ok.body)}`);
 });
 
@@ -854,7 +871,7 @@ test('auth: othersCanRead names the modules another account can read, staff incl
     ON CONFLICT(subject_type, subject_id, resource_type, resource_key) DO UPDATE SET access = excluded.access
   `).run(String(userId), key, access);
   const readers = async () => {
-    const me = await call('GET', '/auth/me', { as: ANNA });
+    const me = await call('GET', '/api/v1/auth/me', { as: ANNA });
     assert.equal(me.status, 200);
     return me.body.othersCanRead;
   };
@@ -870,5 +887,220 @@ test('auth: othersCanRead names the modules another account can read, staff incl
   } finally {
     db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'user' AND resource_type = 'module' AND subject_id IN (?, ?)`)
       .run(String(BEN), String(CLARA));
+  }
+});
+
+// --------------------------------------------------------------------------
+// Phase 2 B9: the rights questions of othersCanRead and displayActingPerson
+// against server/authorize/. Each table holds three things per row: the answer
+// of the production path, a literal expectation, and the answer the question to
+// server/authorize/ gives for the same accounts.
+// --------------------------------------------------------------------------
+
+const authorizeApi = await import('../server/authorize/index.ts');
+const { displayActingPerson } = await import('../server/services/display-acting.js');
+
+const PRIVACY_KEYS = ['calendar', 'documents', 'tasks'];
+const LEVELS = ['write', 'read', 'none', 'absent'];
+
+/**
+ * One module row for a user or a role profile; 'absent' deletes it.
+ * @param {string} subjectType @param {number|string} subjectId @param {string} key @param {string} level
+ */
+function setModuleRow(subjectType, subjectId, key, level) {
+  db.prepare(`DELETE FROM access_permissions WHERE subject_type = ? AND subject_id = ? AND resource_type = 'module' AND resource_key = ?`)
+    .run(subjectType, String(subjectId), key);
+  if (level === 'absent') return;
+  db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access) VALUES (?, ?, 'module', ?, ?)`)
+    .run(subjectType, String(subjectId), key, level);
+}
+
+/**
+ * Temporary account rows for one test; removed again in `finally`.
+ * @param {string} username
+ * @param {{ role?: string, familyRole?: string, display?: boolean, deactivated?: boolean }} [options]
+ */
+function tempAccount(username, { role = 'member', familyRole = 'other', display = false, deactivated = false } = {}) {
+  const id = addUser(username, username, role, familyRole);
+  if (display) db.prepare('INSERT INTO display_accounts (user_id) VALUES (?)').run(id);
+  if (deactivated) db.prepare("UPDATE users SET deactivated_at = '2026-01-01T00:00:00Z' WHERE id = ?").run(id);
+  ROLE[id] = role;
+  return id;
+}
+/** @param {number[]} ids */
+function dropAccounts(ids) {
+  for (const id of ids) {
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?`).run(String(id));
+    db.prepare('DELETE FROM display_accounts WHERE user_id = ?').run(id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    delete ROLE[id];
+  }
+}
+
+/**
+ * The question to server/authorize/ for othersCanRead: per other active account
+ * (family or display) ONE resolution with the display flag, then authorize(read)
+ * per key. Written from the public pieces, not from the production function.
+ * @param {number} viewerId
+ */
+function othersCanReadByAuthorize(viewerId) {
+  const others = db.prepare(`
+    SELECT u.id, u.role, u.family_role,
+      EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = u.id) AS is_display
+    FROM users u
+    WHERE u.id != ? AND u.deactivated_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM split_expense_guest_users sg WHERE sg.user_id = u.id)
+  `).all(viewerId);
+  const actors = others.map((/** @type {any} */ other) => ({
+    kind: 'system', userId: other.id, role: other.role, familyRole: other.family_role, scopes: null,
+    moduleAccess: authorizeApi.buildSessionModuleAccess(
+      authorizeApi.resolvePermissions(db, other, { isDisplay: other.is_display === 1 })),
+    deviceId: null, unresolved: false,
+  }));
+  return PRIVACY_KEYS.filter((key) => actors.some((/** @type {any} */ actor) => authorizeApi.authorize(actor, 'read', { module: key }).allowed));
+}
+
+test('B9: othersCanRead per kind of other account and level - production, literal, authorize agree', async () => {
+  const readersAs = async (/** @type {number} */ viewer) => {
+    const me = await call('GET', '/api/v1/auth/me', { as: viewer });
+    assert.equal(me.status, 200);
+    return me.body.othersCanRead;
+  };
+  const ALL = PRIVACY_KEYS;
+  const DISPLAY_READS = ['calendar', 'tasks']; // DISPLAY_SCOPE_MODULES among the three
+  /** @type {number[]} */
+  const created = [];
+  const rows = [];
+  try {
+    // Baseline: nobody but the subject of a row reads anything. Anna is the viewer
+    // unless the subject is the admin herself; Ben and Clara are closed per row.
+    for (const key of ALL) { setModuleRow('user', BEN, key, 'none'); setModuleRow('user', CLARA, key, 'none'); }
+    assert.deepEqual(await readersAs(ANNA), [], 'baseline: guests and closed accounts read nothing');
+
+    /** subject, viewer, levels per key -> expected */
+    const cases = [];
+    for (const level of LEVELS) {
+      const open = level === 'none' ? [] : ALL;
+      cases.push({ kind: 'family member', subject: BEN, viewer: ANNA, levels: [level, level, level], expected: open });
+      cases.push({ kind: 'family staff', subject: CLARA, viewer: ANNA, levels: [level, level, level], expected: open });
+      cases.push({ kind: 'family admin', subject: ANNA, viewer: BEN, levels: [level, level, level], expected: ALL });
+      cases.push({ kind: 'display', subject: 'display', viewer: ANNA, levels: [level, level, level], expected: DISPLAY_READS });
+      cases.push({ kind: 'split guest', subject: DORA, viewer: ANNA, levels: [level, level, level], expected: [] });
+      cases.push({ kind: 'deactivated', subject: 'former', viewer: ANNA, levels: [level, level, level], expected: [] });
+    }
+    cases.push({ kind: 'family member', subject: BEN, viewer: ANNA, levels: ['none', 'read', 'absent'], expected: ['documents', 'tasks'] });
+    cases.push({ kind: 'family member', subject: BEN, viewer: ANNA, levels: ['write', 'none', 'none'], expected: ['calendar'] });
+    cases.push({ kind: 'display', subject: 'display', viewer: ANNA, levels: ['none', 'write', 'none'], expected: DISPLAY_READS });
+
+    // The display and the deactivated account exist only for their own rows: a
+    // display reads calendar and tasks whatever its rows say.
+    let seq = 0;
+    const makeSubject = (/** @type {number|string} */ subject) => {
+      if (typeof subject === 'number') return subject;
+      seq += 1;
+      const id = tempAccount(`b9${subject}${seq}`, { display: subject === 'display', deactivated: subject === 'former' });
+      created.push(id);
+      return id;
+    };
+    for (const spec of cases) {
+      const c = { ...spec, subject: makeSubject(spec.subject) };
+      const before = PRIVACY_KEYS.map((key) => db.prepare(`SELECT access FROM access_permissions WHERE subject_type = 'user' AND subject_id = ? AND resource_type = 'module' AND resource_key = ?`).get(String(c.subject), key)?.access ?? 'absent');
+      PRIVACY_KEYS.forEach((key, i) => setModuleRow('user', c.subject, key, c.levels[i]));
+      // Ben is closed in the baseline; as the viewer of the admin row he does not count.
+      const production = await readersAs(c.viewer);
+      const byAuthorize = othersCanReadByAuthorize(c.viewer);
+      rows.push(c);
+      const label = `${c.kind} ${c.levels.join('/')}`;
+      assert.deepEqual(production, c.expected, `${label}: production`);
+      assert.deepEqual(byAuthorize, c.expected, `${label}: authorize`);
+      PRIVACY_KEYS.forEach((key, i) => setModuleRow('user', c.subject, key, before[i]));
+      if (c.subject !== spec.subject) dropAccounts(created.splice(created.indexOf(c.subject), 1));
+    }
+    assert.equal(rows.length, 27, 'the table has 27 rows');
+  } finally {
+    dropAccounts(created);
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'user' AND resource_type = 'module' AND subject_id IN (?, ?, ?, ?)`)
+      .run(String(ANNA), String(BEN), String(CLARA), String(DORA));
+  }
+});
+
+test('B9: displayActingPerson per role, family role, level and module - production, literal, authorize agree', () => {
+  const NO_ACCESS = {
+    ok: false, status: 403,
+    error: 'The selected person does not have access to this module.',
+    reason: 'acting_person_no_access',
+  };
+  const notMember = (/** @type {number} */ id) => ({ ok: false, status: 400, error: `Only household members can be chosen here - user ${id} is not a household member.` });
+  /** @type {number[]} */
+  const created = [];
+  let rowCount = 0;
+  try {
+    const people = {
+      'admin/parent': tempAccount('b9adminparent', { role: 'admin', familyRole: 'parent' }),
+      'member/parent': tempAccount('b9memberparent', { role: 'member', familyRole: 'parent' }),
+      'member/child': tempAccount('b9memberchild', { role: 'member', familyRole: 'child' }),
+      'member/other': tempAccount('b9memberother', { role: 'member', familyRole: 'other' }),
+    };
+    created.push(...Object.values(people));
+    // Role profile rows: `child` may only read tasks and has no rewards.
+    /** @type {Record<string, Record<string, string>>} */
+    const PROFILE = { child: { tasks: 'read', rewards: 'none' } };
+    for (const [familyRole, rights] of Object.entries(PROFILE)) {
+      for (const [key, level] of Object.entries(rights)) setModuleRow('role', familyRole, key, level);
+    }
+
+    for (const [name, id] of Object.entries(people)) {
+      const [role, familyRole] = name.split('/');
+      for (const moduleKey of /** @type {const} */ (['tasks', 'rewards'])) {
+        for (const level of LEVELS) {
+          setModuleRow('user', id, moduleKey, level);
+          const effective = level === 'absent' ? (PROFILE[familyRole]?.[moduleKey] ?? 'write') : level;
+          const expected = role === 'admin' || effective === 'write' ? { ok: true, userId: id } : NO_ACCESS;
+          const production = displayActingPerson({}, id, moduleKey, { db });
+          const actor = authorizeApi.actorForUser(db, id);
+          const verdict = authorizeApi.authorize(actor, 'write', { module: moduleKey });
+          const byAuthorize = verdict.allowed ? { ok: true, userId: id } : NO_ACCESS;
+          const label = `${name} ${moduleKey} ${level}`;
+          assert.deepEqual(production, expected, `${label}: production`);
+          assert.deepEqual(byAuthorize, expected, `${label}: authorize`);
+          rowCount += 1;
+          setModuleRow('user', id, moduleKey, 'absent');
+        }
+      }
+    }
+
+    // Accounts that never reach the rights question: the household-member check
+    // answers first, with the same 400 for each. With `write` everywhere, so the
+    // refusal cannot come from the module.
+    const display = tempAccount('b9actdisplay', { display: true });
+    const former = tempAccount('b9actformer', { deactivated: true });
+    created.push(display, former);
+    for (const [name, id] of /** @type {[string, number][]} */ ([['staff', CLARA], ['split guest', DORA], ['display', display], ['deactivated', former]])) {
+      for (const moduleKey of /** @type {const} */ (['tasks', 'rewards'])) {
+        setModuleRow('user', id, moduleKey, 'write');
+        assert.deepEqual(displayActingPerson({}, id, moduleKey, { db }), notMember(id), `${name} ${moduleKey}`);
+        rowCount += 1;
+      }
+    }
+    assert.deepEqual(displayActingPerson({}, 999999, 'tasks', { db }), notMember(999999), 'unknown account');
+    assert.deepEqual(displayActingPerson({}, null, 'tasks', { db }),
+      { ok: false, status: 400, error: 'A paired display must name the person it is acting for.' }, 'no person');
+    rowCount += 2;
+    // A module key the two display actions do not use is refused, whoever is chosen:
+    // authorize() denies by list and would let a key outside the catalog through, so a
+    // typo in a future caller has to close, not open (as before B9).
+    for (const moduleKey of ['dashboard', 'budget', 'constructor', '__proto__', '']) {
+      for (const name of /** @type {const} */ (['member/parent', 'admin/parent'])) {
+        assert.deepEqual(displayActingPerson({}, people[name], /** @type {any} */ (moduleKey), { db }),
+          NO_ACCESS, `${name} ${moduleKey || '(empty)'}: no display action`);
+        rowCount += 1;
+      }
+    }
+    assert.equal(rowCount, 52, 'the table has 52 rows');
+  } finally {
+    dropAccounts(created);
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'role' AND subject_id = 'child' AND resource_type = 'module'`).run();
+    db.prepare(`DELETE FROM access_permissions WHERE subject_type = 'user' AND resource_type = 'module' AND subject_id IN (?, ?)`)
+      .run(String(CLARA), String(DORA));
   }
 });

@@ -10,7 +10,7 @@
  * Gemessen ueber den echten Router auf einer In-Memory-DB: wer verlaengern
  * darf, und dass eine Absage NICHTS geschrieben hat.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-subscription-renew-permission.js
+ * Ausfuehren: node --test test/test-subscription-renew-permission.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -19,10 +19,9 @@ delete process.env.FIXER_API_KEY;
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 
 const dbmod = await import('../server/db.js');
-const { default: subscriptionsRouter } = await import('../server/routes/subscriptions.js');
 const db = dbmod.get();
 
 const user = (name, role) => db.prepare(
@@ -40,10 +39,12 @@ db.prepare(`INSERT INTO sync_config (key, value) VALUES ('currency', 'EUR')
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run();
 
 let actor = { id: OWNER, role: 'member' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id, role: actor.role }; next(); });
-app.use('/', subscriptionsRouter);
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['subscriptions'],
+  auth: (req, _res, next) => { req.authUserId = actor.id; req.authRole = actor.role; req.session = { userId: actor.id, role: actor.role }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -59,7 +60,7 @@ async function call(method, route, { as, role = 'member', body } = {}) {
   const headers = {};
   let payload;
   if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-  const res = await fetch(`${baseUrl}${route}`, { method, headers, body: payload });
+  const res = await fetch(`${baseUrl}/api/v1/budget/subscriptions${route}`, { method, headers, body: payload });
   const text = await res.text();
   let json = null;
   try { json = JSON.parse(text); } catch { /* leer */ }

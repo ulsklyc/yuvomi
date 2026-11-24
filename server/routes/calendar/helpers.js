@@ -6,17 +6,13 @@
 
 import { StorageError } from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
-import {
-  applyDocumentAccess, attachmentAccessMode, eventAudienceChanged, filterVisibleDocumentIds,
-} from '../../services/document-access.js';
 import { documentViewer } from '../../services/document-links.js';
-import { mayWriteModule } from '../../permissions.js';
+import {
+  mayWriteModule,
+  filterVisible,
+} from '../../authorize/index.ts';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
 import { contentMatchesMime } from '../../utils/file-signature.js';
-import { isAdminRequest } from '../../middleware/require-admin.js';
-import {
-  fanOutEventReminders, dropInheritedEventReminders, eventAuthorId,
-} from '../../services/event-reminder-fanout.js';
 import {
   buildRecurrenceCapabilityMap, isLinkedOccurrence,
   parseOverrideFields, recurrenceIdFor, seriesIdFor,
@@ -24,7 +20,12 @@ import {
 import { personAvatarUrlSql } from '../../services/person-avatar.js';
 import { seriesReadingZone } from '../../services/calendar-events.js';
 
-export const VALID_SOURCES  = ['local', 'google', 'apple', 'ics'];
+// The event assignment write path lives in a service so the calendar syncs reach
+// it without importing a route; re-exported here for the calendar routes.
+export { setEventAssignments } from '../../services/event-assignments.ts';
+
+// The source filter of `GET /calendar` (server/services/calendar-fields.js, #2810).
+export { VALID_SOURCES } from '../../services/calendar-fields.js';
 // Ein Termin-Anhang ist ein Upload wie jeder andere und teilt deshalb die
 // gemeinsame Grenze (#806).
 export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
@@ -72,10 +73,6 @@ export function getUserId(req) {
   return null;
 }
 
-/** Bleibt als Name fuer die Kalender-Router und das Dashboard; die Regel steht in isAdminRequest(). */
-export function isAdminUser(req) {
-  return isAdminRequest(req);
-}
 
 export function eventIcon(value) {
   const raw = typeof value === 'string' && value.trim() ? value.trim() : 'calendar';
@@ -100,7 +97,7 @@ export function parseAttachment(dataUrl) {
 }
 
 // CalDAV-Ziel eines Events validieren (Issue #241). Liefert {value, error}
-// im Stil der validate.js-Helfer, damit collectErrors 400 statt 500 erzeugt.
+// im Stil der formats.ts-Helfer, damit collectErrors 400 statt 500 erzeugt.
 // Leere/fehlende account_id bedeutet "Lokal" (kein Outbound-Sync).
 export function caldavTarget(body) {
   const rawId  = body.target_caldav_account_id;
@@ -303,7 +300,7 @@ function insertAttachmentClone(database, source, staged) {
  * zwar als Erstes, vor jeder Suche, die mit 404 antworten koennte. Der Dialog
  * blendet die Ablage aus demselben Grund aus (`eventAttachmentFieldHtml()`).
  */
-export const ATTACHMENT_UPLOAD_REFUSAL = 'Attaching a file needs write access to documents.';
+const ATTACHMENT_UPLOAD_REFUSAL = 'Attaching a file needs write access to documents.';
 
 /** Bringt der Body einen neuen Anhang mit? Jeder nicht leere Wert zaehlt. */
 function bodyUploadsAttachment(body) {
@@ -313,8 +310,25 @@ function bodyUploadsAttachment(body) {
 }
 
 /** `true`, wenn der Body hochlaedt und der Aufrufer Dokumente nicht schreiben darf. */
-export function attachmentUploadRefused(req) {
+function attachmentUploadRefused(req) {
   return bodyUploadsAttachment(req.body) && !mayWriteModule(req, 'documents');
+}
+
+/**
+ * Dieselbe Absage als Middleware VOR der Pruefung der Anfrage (#2810, Gruppe 10
+ * Entscheidung 4): sie liest nur, ob `attachment_data` einen Wert traegt, und
+ * steht deshalb vor Schema, Suche und Zeilenrecht - die Absage verraet weder,
+ * ob es den Termin gibt, noch, ob der Rest des Rumpfs stimmt (DECISIONS.md
+ * Eintrag 10). Seit Schritt (b) die einzige Stelle: die Zeile im Handler ist weg.
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+export function refuseUploadWithoutDocumentsWrite(req, res, next) {
+  if (attachmentUploadRefused(req)) {
+    return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
+  }
+  return next();
 }
 
 /* WER DEN GESPEICHERTEN ANHANG NICHT SIEHT, LOEST IHN NICHT AB (#1358).
@@ -330,7 +344,7 @@ export function storedAttachmentLocked(req, database, storedDocumentId) {
   const viewer = documentViewer(req);
   if (!viewer.readsDocuments) return true;
   if (storedDocumentId == null) return false;
-  return filterVisibleDocumentIds(database, [storedDocumentId], viewer.userId).length === 0;
+  return filterVisible(database, 'documents', [storedDocumentId], viewer.userId).length === 0;
 }
 
 export function attachmentDataUrl(event) {
@@ -353,100 +367,6 @@ export function parseAssignedTo(val) {
   if (Array.isArray(val)) return val.map(Number).filter(Boolean);
   if (val !== null && val !== undefined && val !== '') return [Number(val)].filter(Boolean);
   return [];
-}
-
-/**
- * Das Anhang-Dokument folgt Sichtbarkeit und Zuweisung des Termins - aber nur,
- * wenn `mayWiden(documentId)` das zugesteht: `true` (Dokumente schreiben, das
- * Dokument sehen UND verwalten, #1358) gleicht voll ab, `ATTACHMENT_NARROW_ONLY`
- * (in diesem Schreiben neu hochgeladen) verengt nur. Sonst bleibt das Dokument,
- * wie die Besitzerin es gesetzt hat (#1443): `applyDocumentAccess()` in
- * services/document-access.js.
- *
- * UND NUR, WENN SICH DAS PUBLIKUM AENDERT (#1443): `before` ist, wer den Termin
- * vor diesem Speichern sah (`{ visibility, userIds }`, `null` fuer einen neuen
- * Termin). Bleibt es gleich, bleibt auch das Dokument - ausser der Anhang ist
- * in diesem Speichern neu gesetzt (`attachmentSet`), denn ein neues Anhang-
- * Dokument entsteht als `family` und bekommt seine Rechte erst hier.
- */
-export function syncAttachmentDocumentAccess(d, documentId, eventVisibility, userIds, {
-  mayWiden = () => false, grantAssignees = false, before = null, attachmentSet = false,
-} = {}) {
-  if (!documentId) return;
-  if (!attachmentSet && !eventAudienceChanged(before, { visibility: eventVisibility, userIds })) return;
-  const visibility = eventVisibility === 'private'
-    ? 'private'
-    : eventVisibility === 'assignees'
-      ? 'restricted'
-      : 'family';
-  applyDocumentAccess(d, documentId, {
-    visibility, userIds, ...attachmentAccessMode(mayWiden(documentId)), grantAssignees,
-  });
-}
-
-/**
- * `options.mayWidenAttachment` kommt vom Aufrufer (`attachmentRights()` in
- * crud.js); ohne ihn bleibt das Anhang-Dokument unangetastet (#1443).
- * `options.grantAssigneesOnly` (Standard-Zuweisung der Kalender-Syncs): der
- * Sync aendert Dokumentrechte nie, ausser dass an einem Termin fuer
- * Zugewiesene ein schon eingeschraenktes Dokument die Zugewiesenen als
- * Freigabe dazubekommt - nichts wird `family`, nichts Privates geht auf,
- * nichts wird enger, keine Freigabe faellt weg.
- *
- * Das Dokument wird nur abgeglichen, wenn sich in diesem Speichern aendert, wer
- * den Termin sieht (#1443). Die Zugewiesenen davor liest diese Funktion selbst;
- * die Sichtbarkeit davor kennt nur der Aufrufer, der sie schreibt:
- *   - `options.previous: { visibility }` - der Stand vor dem UPDATE;
- *   - `options.previous: null` - ein neuer Termin, immer abgleichen;
- *   - ohne `previous` - der Aufrufer aendert die Sichtbarkeit nicht (Syncs).
- * `options.attachmentSet`: der Anhang ist in diesem Speichern neu gesetzt.
- */
-export function setEventAssignments(d, eventId, userIds, {
-  mayWidenAttachment, grantAssigneesOnly = false, previous, attachmentSet = false,
-} = {}) {
-  // Wer VORHER dranstand - gebraucht wird das eine Zeile weiter unten, um die
-  // Erinnerungen derer abzuraeumen, die nicht mehr dranstehen (#921). Deshalb
-  // hier und nicht erst nach dem DELETE, das die Auskunft vernichtet.
-  const before = d.prepare('SELECT user_id FROM event_assignments WHERE event_id = ?')
-    .all(eventId).map((r) => r.user_id);
-
-  d.prepare('DELETE FROM event_assignments WHERE event_id = ?').run(eventId);
-  const ins = d.prepare('INSERT OR IGNORE INTO event_assignments (event_id, user_id) VALUES (?, ?)');
-  for (const uid of userIds) ins.run(eventId, uid);
-
-  /* DIE ERINNERUNGEN FOLGEN DER ZUWEISUNG (#921).
-   *
-   * Hier und nicht in den beiden Routen, die diese Funktion rufen: eine
-   * Zuweisung, die die Erinnerung NICHT mitbringt, meldet sich nicht - sie
-   * aeussert sich als ein Termin, von dem jemand nichts erfahren hat. Genau so
-   * war der Fall gemeldet. An der einen Schreibstelle kann kein Aufrufer sie
-   * vergessen.
-   *
-   * Beim ANLEGEN eines Termins ist hier noch nichts zu verteilen: das Formular
-   * speichert erst den Termin und dann die Erinnerungen, und der zweite Schritt
-   * fuehrt denselben Abgleich noch einmal aus. Beide Wege enden gleich. */
-  const author = eventAuthorId(d, eventId);
-  const removed = before.filter((uid) => !userIds.includes(uid));
-  dropInheritedEventReminders(d, eventId, removed);
-  if (author !== null) fanOutEventReminders(d, eventId, author);
-
-  const event = d.prepare(`
-    SELECT attachment_document_id, visibility
-    FROM calendar_events
-    WHERE id = ?
-  `).get(eventId);
-  syncAttachmentDocumentAccess(
-    d,
-    event?.attachment_document_id,
-    event?.visibility,
-    userIds,
-    {
-      mayWiden: mayWidenAttachment,
-      grantAssignees: grantAssigneesOnly,
-      before: previous === null ? null : { visibility: previous?.visibility ?? event?.visibility, userIds: before },
-      attachmentSet,
-    },
-  );
 }
 
 function recurrenceMetadata(event, context) {
@@ -592,7 +512,7 @@ function visibleAttachmentDocumentIds(events, context) {
   const viewer = context?.viewer;
   if (!context?.database || viewer?.readsDocuments !== true) return new Set();
   const ids = events.map((event) => event?.attachment_document_id).filter((id) => id != null);
-  return new Set(filterVisibleDocumentIds(context.database, ids, viewer.userId));
+  return new Set(filterVisible(context.database, 'documents', ids, viewer.userId));
 }
 
 /** Serializes a result set with one capability classification per master. */

@@ -18,7 +18,7 @@
  *   5. Ein Admin sieht fremde Geraete nicht und kann ein Mitglied nur pauschal
  *      abmelden, die Token-Verwaltung fasst sie nicht an.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-signed-in-devices.js
+ * Ausfuehren: node --test test/test-signed-in-devices.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -316,7 +316,7 @@ test('ein Admin ist auf dem Geraet auch in der Rechte-Aufloesung ein Mitglied', 
   const phone = await fetch(`${API}/notes/categories`, { method: 'POST', headers: bearer(credential), body });
   assert.equal(phone.status, 403, 'canManageHousehold liest die Rolle aus users');
 
-  const { requestHasCapability } = await import('../server/permissions.js');
+  const { requestHasCapability } = await import('../server/authorize/index.ts');
   const key = 'notes_manage_household_categories';
   const asAdmin = { authUserId: me.user.id, authRole: 'admin' };
   assert.equal(requestHasCapability(db, asAdmin, key), true, 'die Sitzung des Admins');

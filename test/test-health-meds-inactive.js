@@ -24,14 +24,13 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
+import { createHealthApp } from './health-app.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'health-meds-inactive-test-secret';
 
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: healthRouter } = await import('../server/routes/health.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { __test: page } = await import('../public/pages/health.js');
 const { currentSchedules, medicationCountsToday } = await import('../public/utils/health-meds.js');
@@ -65,18 +64,19 @@ moduleDatabase.close();
 const ANNA = Number(db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
   VALUES ('anna-1950', 'Anna', '$2b$12$x', 'admin')`).run().lastInsertRowid);
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(ANNA);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
-  next();
+// createHealthApp (test/health-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createHealthApp({
+  auth: (req, _res, next) => {
+    const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(ANNA);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
+    next();
+  },
+  after: [['/api/v1/dashboard', dashboardRouter]],
 });
-app.use('/api/v1/health', healthRouter);
-app.use('/api/v1/dashboard', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}/api/v1`;

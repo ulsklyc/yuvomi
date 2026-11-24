@@ -35,22 +35,23 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createBudgetApp } from './budget-app.js';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { germanIn, outboundLiterals } from './error-language.js';
 
 const dbmod = await import('../server/db.js');
-const { default: budgetRouter } = await import('../server/routes/budget.js');
 const db = dbmod.get();
 
 const ADMIN = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run().lastInsertRowid;
 db.prepare(`INSERT INTO sync_config (key, value) VALUES ('budget_mode', 'shared')
             ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run();
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = ADMIN; req.authRole = 'admin'; req.session = { userId: ADMIN }; next(); });
-app.use('/', budgetRouter);
+// At their real prefix with the central error handler (#2810): validateRequest()
+// finds its operation by the mount and answers through next(err).
+const app = await createBudgetApp({
+  mount: ['budget'],
+  auth: (req, _res, next) => { req.authUserId = ADMIN; req.authRole = 'admin'; req.session = { userId: ADMIN }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -59,7 +60,7 @@ async function call(method, route, body) {
   const headers = {};
   let payload;
   if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-  const res = await fetch(`${baseUrl}${route}`, { method, headers, body: payload });
+  const res = await fetch(`${baseUrl}/api/v1/budget${route}`, { method, headers, body: payload });
   const text = await res.text();
   let json = null;
   try { json = JSON.parse(text); } catch { /* kein JSON */ }
@@ -231,7 +232,8 @@ test('keine Absage der Budget-Routen traegt deutschen Wortlaut', async () => {
 // Der Leser (`outboundLiterals`) steht in test/error-language.js.
 test('kein Satz und kein Feldname, den die Budget-Routen hinausreichen, ist deutsch', () => {
   const dir = new URL('../server/routes/budget/', import.meta.url);
-  const files = readdirSync(dir).filter((f) => f.endsWith('.js'));
+  // .ts too: a route file written in TypeScript (phase 2 onward) is a route file.
+  const files = readdirSync(dir).filter((f) => /\.(js|ts)$/.test(f));
   assert.ok(files.length >= 8, `Vorbedingung: die Routen-Dateien sind da (${files.length})`);
   let read = 0;
   const offenders = [];

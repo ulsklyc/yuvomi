@@ -1,13 +1,13 @@
 /**
  * Modul: Notification-Channel-Test
  * Zweck: Gotify/ntfy Kanalverwaltung, Provider-Mapping, Reminder-Fan-out und Admin-Routen.
- * Ausführen: node --experimental-sqlite test/test-notifications.js
+ * Ausführen: node test/test-notifications.js
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
 import express from 'express';
+import { createErrorHandler } from '../server/middleware/error-handler.js';
 import { MIGRATIONS } from '../server/db.js';
 
 function notificationMigration() {
@@ -29,6 +29,9 @@ function makeDb({ withNotificationTables = true } = {}) {
       -- Vorsorge-Erinnerung kommt aus users.display_name.
       display_name TEXT NOT NULL DEFAULT ''
     );
+    -- actorForUser fragt je Empfaenger Gast und Display; fehlt eine Tabelle, schliesst es.
+    CREATE TABLE split_expense_guest_users (user_id INTEGER PRIMARY KEY, group_id INTEGER);
+    CREATE TABLE display_accounts (user_id INTEGER PRIMARY KEY);
     -- Der Vorrats-Voll-Sync fragt beide Rechte-Achsen (#467): sync_config fuer
     -- die haushaltweite Abschaltung, access_permissions je Empfaenger. Fehlt
     -- eine der Tabellen, scheitert er still im try/catch von
@@ -56,7 +59,7 @@ function makeDb({ withNotificationTables = true } = {}) {
       goal_minutes INTEGER
     );
     -- Die Sichtbarkeitsspalten und Zuweisungstabellen, an denen die Zustellung
-    -- seit services/reminder-targets.js haengt - mit den Vorgaben des echten
+    -- seit authorize/rows/reminders.ts haengt - mit den Vorgaben des echten
     -- Schemas, damit eine Zeile ohne Angabe wie in Produktion fuer alle da ist.
     CREATE TABLE tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,7 +109,7 @@ function makeDb({ withNotificationTables = true } = {}) {
     );
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
     -- Sichtbarkeit und Freigaben wie im echten Schema: die Zustellung fragt
-    -- seit services/reminder-targets.js, ob ein Dokument fuer alle da ist.
+    -- seit authorize/rows/reminders.ts, ob ein Dokument fuer alle da ist.
     CREATE TABLE family_documents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -461,7 +464,7 @@ test('ein Platzhalter mit Sonderzeichen wird gemeldet, nicht durchgewinkt (#692)
   // Die Pruefung sagt zu, Unbekanntes abzulehnen. Mit einem gemeinsamen \w+ galt
   // diese Zusage nur fuer Wortzeichen: {{task-title}} war fuer Erkennung UND
   // Ersetzung unsichtbar und ging woertlich an den Empfaenger.
-  const { unknownTemplatePlaceholders } = await import('../server/services/notification-providers/webhook.js');
+  const { unknownTemplatePlaceholders } = await import('../server/services/notification-providers/webhook-template.js');
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{task-title}}"}'), ['task-title']);
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{ title }}"}'), [' title ']);
   assert.deepEqual(unknownTemplatePlaceholders('{"text":"{{item.name}}"}'), ['item.name']);
@@ -502,16 +505,17 @@ test('die OpenAPI-Provider-Liste kennt jeden angebotenen Kanal (#692)', async ()
   // Als Regel formuliert, nicht als Liste - der naechste Provider faellt sonst
   // in dieselbe Luecke.
   const { NOTIFICATION_PROVIDERS } = await import('../server/services/notification-channels.js');
-  const source = readFileSync(new URL('../server/openapi/schemas.js', import.meta.url), 'utf8');
-  // Nur die beiden Notification-Schemata: `provider` gibt es auch im DMS-Schema,
-  // und das kennt paperless/papra, nicht gotify.
-  const enums = ['NotificationChannel', 'NotificationChannelInput'].map((name) => {
-    const at = source.indexOf(`        ${name}: {`);
-    assert.ok(at !== -1, `Schema ${name} muss es geben`);
-    const block = source.slice(at, at + 2000);
-    const m = /provider: \{ type: 'string', enum: \[([^\]]+)\] \}/.exec(block);
-    assert.ok(m, `${name} muss ein provider-Enum tragen`);
-    return m[1].split(',').map((s) => s.trim().replace(/'/g, ''));
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  /** @type {Record<string, any>} */
+  const schemas = buildOpenApiSpec(null, '0.0.0').components.schemas;
+  // Only the notification schemas: the DMS schema has a `provider` too, with
+  // paperless/papra, not gotify. Since #2810 create and update each have an
+  // input schema of their own; read from the built document, not the source.
+  const enums = ['NotificationChannel', 'NotificationChannelInput', 'NotificationChannelUpdateInput'].map((name) => {
+    assert.ok(schemas[name], `Schema ${name} muss es geben`);
+    const values = schemas[name].properties?.provider?.enum;
+    assert.ok(Array.isArray(values), `${name} muss ein provider-Enum tragen`);
+    return values;
   });
   for (const values of enums) {
     for (const { id } of NOTIFICATION_PROVIDERS) {
@@ -663,6 +667,59 @@ test('ohne fetchImpl senden alle drei Provider ueber guardedFetch (die Voreinste
   }
 });
 
+// Die regulaere Erinnerungsschleife ohne `fetchImpl` und ohne `providers`: echte
+// Provider, echte Voreinstellung aus channel-delivery.js. Kaeme in
+// processDueNotifications() ein eigener fetch-Default zurueck, faellt es hier auf.
+test('ohne fetchImpl geht die faellige Erinnerung ueber den SSRF-Schutz - ein privates Ziel bleibt unerreicht', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  /** @type {string[]} */
+  const hits = [];
+  /** @type {import('node:http').RequestListener} */
+  const record = (req, res) => {
+    req.resume();
+    req.on('end', () => {
+      hits.push(String(req.url));
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{}');
+    });
+  };
+  const { base, close } = await startLocalServer(record);
+  // Ein frischer Haushalt je Lauf: eine Erinnerung geht nur einmal raus.
+  const runOnce = async () => {
+    const db = makeDb();
+    const store = createNotificationChannelStore({ db });
+    // Der Store nimmt das private Ziel nur mit dem Schalter an; der Versand prueft danach selbst.
+    await withPrivateNetworkAllowed(() => {
+      store.createChannel({ provider: 'webhook', name: 'Hook', enabled: true, config: { baseUrl: `${base}/hook` }, secrets: {} });
+    });
+    db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Müll rausbringen', 1)").run();
+    db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1)")
+      .run('2026-06-19T09:59:00.000Z');
+    // Push erreicht niemanden, die Zaehler gelten dem Kanal allein.
+    const pushService = /** @type {any} */ ({ sendPushToUser: async () => 0 });
+    return processDueNotifications({ database: db, channelStore: store, pushService, now: new Date() });
+  };
+  const before = process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+  try {
+    delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    const guarded = await runOnce();
+    assert.deepEqual(hits, [], 'der lokale Server darf nichts empfangen haben');
+    assert.equal(guarded.sent, 0);
+    assert.equal(guarded.failed, 1, 'die abgelehnte Zustellung zaehlt als fehlgeschlagen');
+
+    // Gegenprobe: der Schalter oeffnet das private Netz auch fuer diesen Pfad.
+    const opened = await withPrivateNetworkAllowed(() => runOnce());
+    assert.deepEqual(hits, ['/hook'], 'mit dem Schalter kommt genau eine Anfrage an');
+    assert.equal(opened.sent, 1);
+    assert.equal(opened.failed, 0);
+  } finally {
+    if (before === undefined) delete process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK;
+    else process.env.NOTIFICATION_ALLOW_PRIVATE_NETWORK = before;
+    await close();
+  }
+});
+
 test('providers throw sanitized HTTP errors', async () => {
   const { gotifyProvider } = await import('../server/services/notification-providers/gotify.js');
   await assert.rejects(() => gotifyProvider.send({
@@ -769,7 +826,7 @@ test('next-fast channel notification uses household-localized actionable copy', 
   const db = makeDb();
   const store = createNotificationChannelStore({ db });
   // Fasten ist Gesundheit und geht nur an die Person selbst: an ihren eigenen
-  // Kanal, nie an den des Haushalts (services/reminder-targets.js). Beide
+  // Kanal, nie an den des Haushalts (authorize/rows/reminders.ts). Beide
   // stehen hier, damit der Test auch sieht, wohin die Meldung NICHT geht.
   store.createChannel({ provider: 'ntfy', name: 'household', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
   store.createChannel({ provider: 'ntfy', name: 'mine', enabled: true, scope: 'user', userId: 1, config: { baseUrl: 'https://ntfy.test', topic: 'me' }, secrets: {} });
@@ -1187,16 +1244,19 @@ test('admin notification routes manage channels and test sends', async () => {
     const app = express();
     app.use(express.json());
     app.use((req, _res, next) => { req.authUserId = 1; req.authRole = authRole; next(); });
-    app.use('/notifications', router);
+    // At its real prefix, with the central error handler: validateRequest() finds
+    // its operation by the mount and hands its 400 on (#2810).
+    app.use('/api/v1/notifications', router);
+    app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
     return app;
   };
-  assert.equal((await call(makeApp('member'), 'GET', '/notifications/channels')).status, 403);
+  assert.equal((await call(makeApp('member'), 'GET', '/api/v1/notifications/channels')).status, 403);
 
-  const providers = await call(makeApp(), 'GET', '/notifications/providers');
+  const providers = await call(makeApp(), 'GET', '/api/v1/notifications/providers');
   assert.equal(providers.status, 200);
   assert.deepEqual(providers.json.data.map((p) => p.id), ['gotify', 'ntfy', 'webhook']);
 
-  const created = await call(makeApp(), 'POST', '/notifications/channels', {
+  const created = await call(makeApp(), 'POST', '/api/v1/notifications/channels', {
     provider: 'gotify',
     name: 'Gotify',
     enabled: true,
@@ -1207,7 +1267,7 @@ test('admin notification routes manage channels and test sends', async () => {
   assert.equal(created.json.data.secretSet, true);
   assert.equal(created.json.data.secrets, undefined);
 
-  const updated = await call(makeApp(), 'PUT', `/notifications/channels/${created.json.data.id}`, {
+  const updated = await call(makeApp(), 'PUT', `/api/v1/notifications/channels/${created.json.data.id}`, {
     name: 'Gotify renamed',
     config: { priority: 7 },
   });
@@ -1215,12 +1275,12 @@ test('admin notification routes manage channels and test sends', async () => {
   assert.equal(updated.json.data.config.priority, 7);
   assert.equal(JSON.parse(db.prepare('SELECT secret_json FROM notification_channels WHERE id = ?').get(created.json.data.id).secret_json).appToken, 'secret');
 
-  const testSend = await call(makeApp(), 'POST', `/notifications/channels/${created.json.data.id}/test`, {});
+  const testSend = await call(makeApp(), 'POST', `/api/v1/notifications/channels/${created.json.data.id}/test`, {});
   assert.equal(testSend.status, 200);
   assert.equal(sent.length, 1);
   assert.match(sent[0].body, /Yuvomi/);
 
-  const deleted = await call(makeApp(), 'DELETE', `/notifications/channels/${created.json.data.id}`);
+  const deleted = await call(makeApp(), 'DELETE', `/api/v1/notifications/channels/${created.json.data.id}`);
   assert.equal(deleted.status, 200);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM notification_channels').get().c, 0);
 });
@@ -1240,7 +1300,10 @@ function channelRouteHarness(store, db, buildRouter) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
-  app.use('/notifications', router);
+  // At its real prefix, with the central error handler: validateRequest() finds
+  // its operation by the mount and hands its 400 on (#2810).
+  app.use('/api/v1/notifications', router);
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   return app;
 }
 
@@ -1274,7 +1337,7 @@ for (const [label, owner] of [
     const store = createNotificationChannelStore({ db });
     const app = channelRouteHarness(store, db, buildRouter);
 
-    const created = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, ...owner });
+    const created = await call(app, 'POST', '/api/v1/notifications/channels', { ...NTFY_CHANNEL, ...owner });
 
     assert.equal(created.status, 201);
     assert.equal(created.json.data.scope, 'household');
@@ -1291,7 +1354,7 @@ for (const [label, owner] of [
     const app = channelRouteHarness(store, db, buildRouter);
     const channel = store.createChannel(NTFY_CHANNEL);
 
-    const updated = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { name: 'Neu', ...owner });
+    const updated = await call(app, 'PUT', `/api/v1/notifications/channels/${channel.id}`, { name: 'Neu', ...owner });
 
     assert.equal(updated.status, 200);
     assert.equal(updated.json.data.name, 'Neu', 'Der Rest des Bodys wirkt weiter.');
@@ -1309,7 +1372,7 @@ test('PUT aendert keinen persoenlichen Kanal: sein Ziel bleibt, wo es ist', asyn
   const app = channelRouteHarness(store, db, buildRouter);
   const channel = store.createChannel({ ...NTFY_CHANNEL, name: 'bobs', scope: 'user', userId: 2 });
 
-  const refused = await call(app, 'PUT', `/notifications/channels/${channel.id}`, {
+  const refused = await call(app, 'PUT', `/api/v1/notifications/channels/${channel.id}`, {
     config: { baseUrl: 'https://anderes-ziel.test' },
     enabled: false,
   });
@@ -1325,7 +1388,7 @@ test('PUT aendert keinen persoenlichen Kanal: sein Ziel bleibt, wo es ist', asyn
   assert.deepEqual(await channelsHearingPrivateReminder(db, store), ['bobs']);
 
   // Und ein Admin wird so eine Zeile weiterhin los.
-  assert.equal((await call(app, 'DELETE', `/notifications/channels/${channel.id}`)).status, 200);
+  assert.equal((await call(app, 'DELETE', `/api/v1/notifications/channels/${channel.id}`)).status, 200);
 });
 
 /* ------------------------------------------------------------------ *
@@ -1449,7 +1512,7 @@ test('der Mail-Transport gibt vor dem Aufrufer auf (#944)', async () => {
   });
   await service.sendMail({ to: 'a@b.de', subject: 's', text: 't', html: '<p>t</p>' });
 
-  const { PROVIDER_TIMEOUT_MS } = await import('../server/services/notifications.js');
+  const { PROVIDER_TIMEOUT_MS } = await import('../server/services/channel-delivery.js');
   for (const key of ['connectionTimeout', 'greetingTimeout', 'socketTimeout']) {
     assert.ok(Number.isFinite(opts[key]), `${key} muss gesetzt sein - sonst wartet nodemailer unbegrenzt`);
     assert.ok(opts[key] < PROVIDER_TIMEOUT_MS,
@@ -1575,9 +1638,12 @@ test('die Kanalliste meldet einen Anbieter als nicht einsatzbereit, bevor ein Te
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
-  app.use('/notifications', router);
+  // At its real prefix, with the central error handler: validateRequest() finds
+  // its operation by the mount and hands its 400 on (#2810).
+  app.use('/api/v1/notifications', router);
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 
-  const res = await call(app, 'GET', '/notifications/providers');
+  const res = await call(app, 'GET', '/api/v1/notifications/providers');
   assert.equal(res.status, 200);
   const byId = Object.fromEntries(res.json.data.map((p) => [p.id, p]));
   assert.equal(byId.email.ready, false, 'Mail ohne SMTP ist nicht einsatzbereit');
@@ -1641,15 +1707,15 @@ test('Kanal anlegen: Pruefung bleibt 400 mit Satz, ein Datenbankfehler wird 500 
   const store = createNotificationChannelStore({ db });
   const app = channelRouteHarness(store, db, buildRouter);
 
-  const invalid = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, config: { baseUrl: 'https://ntfy.test', topic: '' } });
+  const invalid = await call(app, 'POST', '/api/v1/notifications/channels', { ...NTFY_CHANNEL, config: { baseUrl: 'https://ntfy.test', topic: '' } });
   assert.equal(invalid.status, 400);
   assert.equal(invalid.json.error, 'ntfy topic is required.');
 
   db.exec(`CREATE TRIGGER h_guard_channels AFTER INSERT ON notification_channels
     BEGIN INSERT INTO h_guard_missing_channels (x) VALUES (1); END`);
-  const broken = await call(app, 'POST', '/notifications/channels', NTFY_CHANNEL);
+  const broken = await call(app, 'POST', '/api/v1/notifications/channels', NTFY_CHANNEL);
   assert.equal(broken.status, 500, JSON.stringify(broken.json));
-  assert.equal(broken.json.error, 'Internal error.');
+  assert.equal(broken.json.error, 'Internal server error.');
   assert.doesNotMatch(JSON.stringify(broken.json), /h_guard_missing_channels|no such table/);
 });
 
@@ -1666,22 +1732,25 @@ test('Kanaltest: ein Netzfehler wird als Code gespeichert, ein eigener Satz blei
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; next(); });
-  app.use('/notifications', router);
+  // At its real prefix, with the central error handler: validateRequest() finds
+  // its operation by the mount and hands its 400 on (#2810).
+  app.use('/api/v1/notifications', router);
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const channel = store.createChannel(NTFY_CHANNEL);
 
   thrown = new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED 10.0.0.9:8080'), { code: 'ECONNREFUSED' }) });
-  assert.equal((await call(app, 'POST', `/notifications/channels/${channel.id}/test`)).status, 500);
+  assert.equal((await call(app, 'POST', `/api/v1/notifications/channels/${channel.id}/test`)).status, 500);
   assert.equal(db.prepare('SELECT last_error FROM notification_channels WHERE id = ?').get(channel.id).last_error, 'ECONNREFUSED');
 
   const lastError = () => db.prepare('SELECT last_error FROM notification_channels WHERE id = ?').get(channel.id).last_error;
   const { NotificationProviderError } = await import('../server/services/notification-providers/provider-error.js');
   thrown = new NotificationProviderError('Webhook authentication failed.');
-  await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+  await call(app, 'POST', `/api/v1/notifications/channels/${channel.id}/test`);
   assert.equal(lastError(), 'Webhook authentication failed.');
 
   // nodemailer: its own code in `code`, the socket's in `originalCode`.
   thrown = Object.assign(new Error('connect ECONNREFUSED 10.0.0.9:587'), { code: 'ESOCKET', originalCode: 'ECONNREFUSED' });
-  await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+  await call(app, 'POST', `/api/v1/notifications/channels/${channel.id}/test`);
   assert.equal(lastError(), 'ECONNREFUSED');
 
   // A refused SMTP login carries the server's reply; anything without a class
@@ -1692,7 +1761,7 @@ test('Kanaltest: ein Netzfehler wird als Code gespeichert, ein eigener Satz blei
     new TypeError("Cannot read properties of undefined (reading 'host')"),
   ]) {
     thrown = other;
-    await call(app, 'POST', `/notifications/channels/${channel.id}/test`);
+    await call(app, 'POST', `/api/v1/notifications/channels/${channel.id}/test`);
     assert.equal(lastError(), 'The test notification could not be delivered.', other.message);
   }
 });
@@ -1729,9 +1798,12 @@ test('Kanal anlegen: ein kaputter Rumpf ist kein 400 mit Engine-Text, sondern ei
   const store = createNotificationChannelStore({ db });
   const app = channelRouteHarness(store, db, buildRouter);
 
-  const broken = await call(app, 'POST', '/notifications/channels', { ...NTFY_CHANNEL, clearSecrets: 5 });
-  assert.equal(broken.status, 500, JSON.stringify(broken.json));
-  assert.equal(broken.json.error, 'Internal error.');
+  // Since #2810 the schema of the operation refuses this body before the
+  // store sees it: a 400 that names the field, still without the engine's text.
+  // The fixed 500 for an unmarked error stays held by the database cases.
+  const broken = await call(app, 'POST', '/api/v1/notifications/channels', { ...NTFY_CHANNEL, clearSecrets: 5 });
+  assert.equal(broken.status, 400, JSON.stringify(broken.json));
+  assert.deepEqual(broken.json.fields, [{ path: 'body/clearSecrets', rule: 'type' }]);
   assert.doesNotMatch(JSON.stringify(broken.json), /iterable|TypeError/);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM notification_channels').get().c, 0);
 });
@@ -1745,18 +1817,19 @@ test('Kanal aendern: Pruefung bleibt 400 mit Satz, Datenbank und kaputter Rumpf 
   const app = channelRouteHarness(store, db, buildRouter);
   const channel = store.createChannel(NTFY_CHANNEL);
 
-  const invalid = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { config: { topic: '' } });
+  const invalid = await call(app, 'PUT', `/api/v1/notifications/channels/${channel.id}`, { config: { topic: '' } });
   assert.equal(invalid.status, 400, JSON.stringify(invalid.json));
   assert.equal(invalid.json.error, 'ntfy topic is required.');
 
-  const malformed = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { clearSecrets: 5 });
-  assert.equal(malformed.status, 500, JSON.stringify(malformed.json));
-  assert.equal(malformed.json.error, 'Internal error.');
+  // Since #2810 a malformed body is the schema's 400, before the store (see above).
+  const malformed = await call(app, 'PUT', `/api/v1/notifications/channels/${channel.id}`, { clearSecrets: 5 });
+  assert.equal(malformed.status, 400, JSON.stringify(malformed.json));
+  assert.deepEqual(malformed.json.fields, [{ path: 'body/clearSecrets', rule: 'type' }]);
 
   db.exec(`CREATE TRIGGER h_guard_channels_update AFTER UPDATE ON notification_channels
     BEGIN INSERT INTO h_guard_missing_update (x) VALUES (1); END`);
-  const failing = await call(app, 'PUT', `/notifications/channels/${channel.id}`, { name: 'Neu' });
+  const failing = await call(app, 'PUT', `/api/v1/notifications/channels/${channel.id}`, { name: 'Neu' });
   assert.equal(failing.status, 500, JSON.stringify(failing.json));
-  assert.equal(failing.json.error, 'Internal error.');
+  assert.equal(failing.json.error, 'Internal server error.');
   assert.doesNotMatch(JSON.stringify(failing.json), /h_guard_missing_update|no such table/);
 });

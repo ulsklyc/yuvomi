@@ -766,7 +766,7 @@ test('truncateRuleBefore behaelt "am letzten Tag des Monats" (#960)', async () =
 
   // Und das Ergebnis muss der Server annehmen, sonst scheitert das Speichern
   // des zurueckbleibenden Teils.
-  const { RRULE_RE } = await import('../server/middleware/validate.js');
+  const { RRULE_RE } = await import('../server/api/formats.ts');
   assert.ok(RRULE_RE.test(truncateRuleBefore('FREQ=MONTHLY;BYMONTHDAY=-1', '2026-05-31')));
 });
 

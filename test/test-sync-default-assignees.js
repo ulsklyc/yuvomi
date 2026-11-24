@@ -34,7 +34,6 @@ process.env.DB_PATH = ':memory:';
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 const dbmod = await import('../server/db.js');
@@ -63,13 +62,14 @@ const tableExists = (name) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE ty
 const ics = await import('../server/services/ics-subscription.js');
 const reminders = await import('../server/services/caldav-reminders-sync.js');
 const { removeUser } = await import('../server/services/user-removal.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 const CAL_TOGETHER = 'https://dav.example/together/';
 const CAL_BEN = 'https://dav.example/ben/';
 const UID = 'dentist@example.org';
 
-let OWNER; let ANNA; let BEN; let CHRIS; let STAFF;
+/** @type {number} */ let OWNER; /** @type {number} */ let ANNA; /** @type {number} */ let BEN;
+/** @type {number} */ let CHRIS; /** @type {number} */ let STAFF;
 
 function addUser(username, color = '#123456') {
   return Number(db.prepare(`
@@ -80,6 +80,7 @@ function addUser(username, color = '#123456') {
 
 function resetTables() {
   for (const t of ['reminders', 'event_assignments', 'calendar_event_exceptions', 'calendar_events',
+    'family_document_access', 'family_documents',
     'external_calendar_assignees', 'ics_subscription_assignees', 'caldav_reminder_assignees',
     'external_calendars', 'caldav_calendar_selection', 'caldav_reminder_selection', 'task_assignments',
     'tasks', 'ics_subscriptions', 'caldav_accounts', 'calendar_pending_deletions', 'housekeeping_workers', 'users']) {
@@ -212,6 +213,26 @@ describe('Kalender mit mehreren Standard-Personen (#1897)', () => {
     assert.equal(await sa.applyDefaultAssigneesToExisting(db, candidates), 1);
     assert.deepEqual(assignmentsOf(id), sorted([ANNA, BEN]));
     assert.equal(primaryOf(id), ANNA);
+  });
+
+  it('the backfill adds the set to a restricted attachment of an assignees-only event, nothing else', async () => {
+    const together = calendar(CAL_TOGETHER, 'Zusammen', [ANNA, BEN]);
+    const documentId = Number(db.prepare(`
+      INSERT INTO family_documents (name, original_name, mime_type, file_size, content_data, visibility, created_by)
+      VALUES ('anhang', 'anhang.txt', 'text/plain', 1, 'x', 'restricted', ?) RETURNING id
+    `).get(OWNER).id);
+    db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(documentId, CHRIS);
+    const id = Number(db.prepare(`INSERT INTO calendar_events (title, start_datetime, created_by, external_source,
+      external_calendar_id, calendar_ref_id, visibility, attachment_document_id)
+      VALUES ('x', '2026-04-01T09:00', ?, 'caldav', 'u-doc', ?, 'assignees', ?) RETURNING id`).get(OWNER, together, documentId).id);
+
+    assert.equal(await sa.applyDefaultAssigneesToExisting(db, sa.listBackfillCandidates(db)), 1);
+    assert.deepEqual(assignmentsOf(id), sorted([ANNA, BEN]));
+    const doc = db.prepare('SELECT visibility FROM family_documents WHERE id = ?').get(documentId);
+    const access = db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+      .pluck().all(documentId);
+    assert.equal(doc.visibility, 'restricted', 'nothing becomes family');
+    assert.deepEqual(access, sorted([ANNA, BEN, CHRIS]), 'the set sees the event and gets the document; Chris keeps the owner\'s grant');
   });
 
   it('the list of earlier moves names both sets, and a ticked move applies the new set', async () => {
@@ -370,16 +391,16 @@ describe('Routen', () => {
     db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(OWNER);
     actor = { id: OWNER, role: 'admin' };
     if (!server) {
-      const app = express();
-      app.use((req, _res, next) => {
-        req.authUserId = actor.id; req.authRole = actor.role;
-        req.session = { userId: actor.id, role: actor.role };
-        next();
+      const app = await createCalendarApp({
+        mount: ['calendar'],
+        auth: (req, _res, next) => {
+          req.authUserId = actor.id; req.authRole = actor.role;
+          req.session = { userId: actor.id, role: actor.role };
+          next();
+        },
       });
-      app.use(express.json());
-      app.use('/', calendarRouter);
       server = app.listen(0, '127.0.0.1');
-      baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+      baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
     }
   });
 
@@ -408,7 +429,9 @@ describe('Routen', () => {
 
   it('PATCH /external-calendars refuses a non-member, an unknown id and a non-number with a reason', async () => {
     calendar('cal-1', 'Eins', [], 'google');
-    for (const [ids, reason] of [[[ANNA, STAFF], 'calendar_assignee_not_member'], [[987654], 'calendar_assignee_unknown'], [['abc'], 'calendar_assignee_invalid']]) {
+    // A non-number is the schema's 400 since #2810 group 10b (`reason: validation`),
+    // the route's own `calendar_assignee_invalid` before.
+    for (const [ids, reason] of [[[ANNA, STAFF], 'calendar_assignee_not_member'], [[987654], 'calendar_assignee_unknown'], [['abc'], 'validation']]) {
       const res = await call('PATCH', '/external-calendars', { source: 'google', external_id: 'cal-1', default_assignee_user_ids: ids });
       assert.equal(res.status, 400);
       assert.equal(res.body.reason, reason);
@@ -419,8 +442,10 @@ describe('Routen', () => {
   it('POST /import assigns the chosen people and refuses a non-member before writing', async () => {
     const icsText = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:route-1', 'SUMMARY:R',
       'DTSTART:20260601T090000Z', 'DTEND:20260601T100000Z', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    // A non-number is the schema's 400 since #2810 (`reason: validation`), the
+    // route's own `calendar_assignee_invalid` before.
     for (const [body, reason] of [[{ assignee_user_ids: [STAFF] }, 'calendar_assignee_not_member'],
-      [{ assignee_user_id: 987654 }, 'calendar_assignee_unknown'], [{ assignee_user_ids: ['x'] }, 'calendar_assignee_invalid']]) {
+      [{ assignee_user_id: 987654 }, 'calendar_assignee_unknown'], [{ assignee_user_ids: ['x'] }, 'validation']]) {
       const refused = await call('POST', '/import', { ics: icsText, ...body });
       assert.equal(refused.status, 400);
       assert.equal(refused.body.reason, reason);

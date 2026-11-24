@@ -10,7 +10,7 @@
  *        eingehaengter Router sieht das globale Gate nie.
  *        Die Token-Seite war nie offen (unbekanntes Modul = verweigert), bekam
  *        aber das Spiegelbild: ein Token mit `notes:read` scheiterte an `/Notes`.
- * Ausfuehren: node --experimental-sqlite --test test/test-module-gate-path-case.js
+ * Ausfuehren: node --test test/test-module-gate-path-case.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

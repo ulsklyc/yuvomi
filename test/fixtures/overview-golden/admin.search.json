@@ -1,0 +1,733 @@
+{
+  "private": {
+    "status": 200,
+    "body": {
+      "tasks": [
+        {
+          "id": 2,
+          "title": "task.admin.private mxtaskadmin",
+          "status": "open",
+          "priority": "high",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        },
+        {
+          "id": 10,
+          "title": "task.admin.private.legacy-assigned-member mxtaskadmin",
+          "status": "open",
+          "priority": "high",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        }
+      ],
+      "events": [
+        {
+          "id": 2,
+          "title": "event.admin.private mxevtadmin",
+          "start_datetime": "2026-03-13",
+          "all_day": 1
+        }
+      ],
+      "notes": [
+        {
+          "id": 2,
+          "title": "note.admin.private mxnoteadmin",
+          "content": "note.admin.private"
+        }
+      ],
+      "contacts": [],
+      "items": [],
+      "meds": [
+        {
+          "id": 1,
+          "title": "medication.admin.private mxmedadmin",
+          "dosage_text": null,
+          "active": 1
+        }
+      ],
+      "activities": [
+        {
+          "id": 1,
+          "title": "matrix",
+          "note": "activity.admin.private mxactadmin",
+          "performed_at": "2026-03-11T08:00",
+          "excerpt": "activity.admin.private mxactadmin"
+        }
+      ],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [
+        {
+          "id": 2,
+          "title": "document.admin.private mxdocadmin",
+          "category": "other"
+        }
+      ],
+      "birthdays": [],
+      "budget": [
+        {
+          "id": 1,
+          "title": "budget.admin.private mxbudgetadmin",
+          "amount": -10,
+          "date": "2026-03-11"
+        }
+      ]
+    }
+  },
+  "mxtaskmember": {
+    "status": 200,
+    "body": {
+      "tasks": [
+        {
+          "id": 4,
+          "title": "task.member.all mxtaskmember",
+          "status": "open",
+          "priority": "high",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        }
+      ],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxevtchild": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [
+        {
+          "id": 7,
+          "title": "event.child.all mxevtchild",
+          "start_datetime": "2026-03-13",
+          "all_day": 1
+        }
+      ],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxnoteadmin": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [
+        {
+          "id": 2,
+          "title": "note.admin.private mxnoteadmin",
+          "content": "note.admin.private"
+        },
+        {
+          "id": 1,
+          "title": "note.admin.all mxnoteadmin",
+          "content": "note.admin.all"
+        }
+      ],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxdocchild": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [
+        {
+          "id": 7,
+          "title": "document.child.family mxdocchild",
+          "category": "other"
+        }
+      ],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "mxbudgetmember": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": [
+        {
+          "id": 5,
+          "title": "budget.member.shared mxbudgetmember",
+          "amount": -10,
+          "date": "2026-03-11"
+        }
+      ]
+    }
+  },
+  "mxmedmember": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [
+        {
+          "id": 4,
+          "title": "medication.member.family mxmedmember",
+          "dosage_text": null,
+          "active": 1
+        }
+      ],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "quokka": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [
+        {
+          "id": 14,
+          "title": "golden.item.infix-fillers",
+          "list_id": 51,
+          "excerpt": "aquokka01 aquokka02 aquokka03 aquokka04…"
+        },
+        {
+          "id": 15,
+          "title": "zquokka99",
+          "list_id": 51
+        }
+      ],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  },
+  "goldkiwi": {
+    "status": 200,
+    "body": {
+      "tasks": [
+        {
+          "id": 26,
+          "title": "goldkiwi task assigned three",
+          "status": "open",
+          "priority": "low",
+          "due_date": "2026-03-09",
+          "archived_at": null
+        },
+        {
+          "id": 19,
+          "title": "goldkiwi task a",
+          "status": "open",
+          "priority": "low",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        },
+        {
+          "id": 20,
+          "title": "goldkiwi task b",
+          "status": "open",
+          "priority": "low",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        },
+        {
+          "id": 21,
+          "title": "goldkiwi task c",
+          "status": "open",
+          "priority": "low",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        },
+        {
+          "id": 22,
+          "title": "goldkiwi task d",
+          "status": "open",
+          "priority": "low",
+          "due_date": "2026-03-11",
+          "archived_at": null
+        }
+      ],
+      "events": [
+        {
+          "id": 12,
+          "title": "goldkiwi event a",
+          "start_datetime": "2026-04-10",
+          "all_day": 1
+        },
+        {
+          "id": 13,
+          "title": "goldkiwi event b",
+          "start_datetime": "2026-04-11",
+          "all_day": 1
+        },
+        {
+          "id": 14,
+          "title": "goldkiwi event c",
+          "start_datetime": "2026-04-12",
+          "all_day": 1
+        },
+        {
+          "id": 15,
+          "title": "goldkiwi event d",
+          "start_datetime": "2026-04-13",
+          "all_day": 1
+        },
+        {
+          "id": 16,
+          "title": "goldkiwi event e",
+          "start_datetime": "2026-04-14",
+          "all_day": 1
+        }
+      ],
+      "notes": [
+        {
+          "id": 14,
+          "title": "goldkiwi note g",
+          "content": "golden note g"
+        },
+        {
+          "id": 13,
+          "title": "goldkiwi note f",
+          "content": "golden note f"
+        },
+        {
+          "id": 12,
+          "title": "goldkiwi note e",
+          "content": "golden note e"
+        },
+        {
+          "id": 11,
+          "title": "goldkiwi note d",
+          "content": "golden note d"
+        },
+        {
+          "id": 10,
+          "title": "goldkiwi note c",
+          "content": "golden note c"
+        }
+      ],
+      "contacts": [
+        {
+          "id": 16,
+          "title": "goldkiwi contact 0"
+        },
+        {
+          "id": 9,
+          "title": "goldkiwi contact a"
+        },
+        {
+          "id": 10,
+          "title": "goldkiwi contact b"
+        },
+        {
+          "id": 11,
+          "title": "goldkiwi contact c"
+        },
+        {
+          "id": 12,
+          "title": "goldkiwi contact d"
+        }
+      ],
+      "items": [
+        {
+          "id": 17,
+          "title": "goldkiwi item 0",
+          "list_id": 51
+        },
+        {
+          "id": 1,
+          "title": "goldkiwi item a",
+          "list_id": 5
+        },
+        {
+          "id": 2,
+          "title": "goldkiwi item b",
+          "list_id": 5
+        },
+        {
+          "id": 3,
+          "title": "goldkiwi item c",
+          "list_id": 5
+        },
+        {
+          "id": 4,
+          "title": "goldkiwi item d",
+          "list_id": 5
+        }
+      ],
+      "meds": [
+        {
+          "id": 11,
+          "title": "goldkiwi medication a",
+          "dosage_text": null,
+          "active": 1
+        },
+        {
+          "id": 12,
+          "title": "goldkiwi medication b",
+          "dosage_text": null,
+          "active": 1
+        },
+        {
+          "id": 13,
+          "title": "goldkiwi medication c",
+          "dosage_text": null,
+          "active": 1
+        },
+        {
+          "id": 14,
+          "title": "goldkiwi medication d",
+          "dosage_text": null,
+          "active": 1
+        },
+        {
+          "id": 15,
+          "title": "goldkiwi medication e",
+          "dosage_text": null,
+          "active": 1
+        }
+      ],
+      "activities": [
+        {
+          "id": 13,
+          "title": "golden",
+          "note": "goldkiwi activity g",
+          "performed_at": "2026-03-10T07:00",
+          "excerpt": "goldkiwi activity g"
+        },
+        {
+          "id": 12,
+          "title": "golden",
+          "note": "goldkiwi activity f",
+          "performed_at": "2026-03-10T06:00",
+          "excerpt": "goldkiwi activity f"
+        },
+        {
+          "id": 11,
+          "title": "golden",
+          "note": "goldkiwi activity e",
+          "performed_at": "2026-03-10T05:00",
+          "excerpt": "goldkiwi activity e"
+        },
+        {
+          "id": 10,
+          "title": "golden",
+          "note": "goldkiwi activity d",
+          "performed_at": "2026-03-10T04:00",
+          "excerpt": "goldkiwi activity d"
+        },
+        {
+          "id": 9,
+          "title": "golden",
+          "note": "goldkiwi activity c",
+          "performed_at": "2026-03-10T03:00",
+          "excerpt": "goldkiwi activity c"
+        }
+      ],
+      "waste": [
+        {
+          "id": 9,
+          "title": "goldkiwi bin z",
+          "icon": "trash-2",
+          "color": "#6B7280"
+        },
+        {
+          "id": 10,
+          "title": "goldkiwi bin 1",
+          "icon": "trash-2",
+          "color": "#6B7280"
+        },
+        {
+          "id": 1,
+          "title": "goldkiwi bin a",
+          "icon": "trash-2",
+          "color": "#6B7280"
+        },
+        {
+          "id": 2,
+          "title": "goldkiwi bin b",
+          "icon": "trash-2",
+          "color": "#6B7280"
+        },
+        {
+          "id": 3,
+          "title": "goldkiwi bin c",
+          "icon": "trash-2",
+          "color": "#6B7280"
+        }
+      ],
+      "recipes": [
+        {
+          "id": 8,
+          "title": "goldkiwi recipe 0"
+        },
+        {
+          "id": 9,
+          "title": "goldkiwi recipe 0"
+        },
+        {
+          "id": 1,
+          "title": "goldkiwi recipe a"
+        },
+        {
+          "id": 2,
+          "title": "goldkiwi recipe b"
+        },
+        {
+          "id": 3,
+          "title": "goldkiwi recipe c"
+        }
+      ],
+      "pantry": [
+        {
+          "id": 9,
+          "title": "goldkiwi pantry 0",
+          "quantity": 1,
+          "unit": "pcs",
+          "expires_on": null
+        },
+        {
+          "id": 10,
+          "title": "goldkiwi pantry 0",
+          "quantity": 1,
+          "unit": "pcs",
+          "expires_on": null
+        },
+        {
+          "id": 1,
+          "title": "goldkiwi pantry a",
+          "quantity": 1,
+          "unit": "pcs",
+          "expires_on": "2026-03-11"
+        },
+        {
+          "id": 2,
+          "title": "goldkiwi pantry b",
+          "quantity": 1,
+          "unit": "pcs",
+          "expires_on": null
+        },
+        {
+          "id": 3,
+          "title": "goldkiwi pantry c",
+          "quantity": 1,
+          "unit": "pcs",
+          "expires_on": null
+        }
+      ],
+      "inventory": [
+        {
+          "id": 9,
+          "title": "goldkiwi inventory 1",
+          "brand": "golden brand",
+          "model": null,
+          "status": "active"
+        },
+        {
+          "id": 1,
+          "title": "goldkiwi inventory a",
+          "brand": "golden brand",
+          "model": null,
+          "status": "active"
+        },
+        {
+          "id": 2,
+          "title": "goldkiwi inventory b",
+          "brand": "golden brand",
+          "model": null,
+          "status": "active"
+        },
+        {
+          "id": 3,
+          "title": "goldkiwi inventory c",
+          "brand": "golden brand",
+          "model": null,
+          "status": "active"
+        },
+        {
+          "id": 4,
+          "title": "goldkiwi inventory d",
+          "brand": "golden brand",
+          "model": null,
+          "status": "active"
+        }
+      ],
+      "documents": [
+        {
+          "id": 20,
+          "title": "goldkiwi document tie y",
+          "category": "other"
+        },
+        {
+          "id": 19,
+          "title": "goldkiwi document tie x",
+          "category": "other"
+        },
+        {
+          "id": 16,
+          "title": "goldkiwi document g",
+          "category": "other"
+        },
+        {
+          "id": 15,
+          "title": "goldkiwi document f",
+          "category": "other"
+        },
+        {
+          "id": 14,
+          "title": "goldkiwi document e",
+          "category": "other"
+        }
+      ],
+      "birthdays": [
+        {
+          "id": 11,
+          "title": "goldkiwi birthday 0",
+          "birth_date": "1980-02-01",
+          "year_unknown": false
+        },
+        {
+          "id": 12,
+          "title": "goldkiwi birthday 0",
+          "birth_date": "1980-02-01",
+          "year_unknown": false
+        },
+        {
+          "id": 1,
+          "title": "goldkiwi birthday a",
+          "birth_date": "1950-03-11",
+          "year_unknown": false
+        },
+        {
+          "id": 2,
+          "title": "goldkiwi birthday b",
+          "birth_date": "1950-03-20",
+          "year_unknown": false
+        },
+        {
+          "id": 3,
+          "title": "goldkiwi birthday c",
+          "birth_date": "1950-03-29",
+          "year_unknown": false
+        }
+      ],
+      "budget": [
+        {
+          "id": 24,
+          "title": "goldkiwi budget later y",
+          "amount": -8,
+          "date": "2026-04-02"
+        },
+        {
+          "id": 23,
+          "title": "goldkiwi budget later x",
+          "amount": -6,
+          "date": "2026-04-02"
+        },
+        {
+          "id": 17,
+          "title": "goldkiwi budget g",
+          "amount": -75,
+          "date": "2026-03-07"
+        },
+        {
+          "id": 16,
+          "title": "goldkiwi budget f",
+          "amount": -65,
+          "date": "2026-03-06"
+        },
+        {
+          "id": 15,
+          "title": "goldkiwi budget e",
+          "amount": -55,
+          "date": "2026-03-05"
+        }
+      ]
+    }
+  },
+  "zzqxnohitzz": {
+    "status": 200,
+    "body": {
+      "tasks": [],
+      "events": [],
+      "notes": [],
+      "contacts": [],
+      "items": [],
+      "meds": [],
+      "activities": [],
+      "waste": [],
+      "recipes": [],
+      "pantry": [],
+      "inventory": [],
+      "documents": [],
+      "birthdays": [],
+      "budget": []
+    }
+  }
+}

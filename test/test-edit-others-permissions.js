@@ -9,7 +9,7 @@
  *        Alle Anfragen laufen mit API-Tokens durch `requireAuth`: derselbe Weg,
  *        den eine Integration und die MCP-Bruecke (`call_api_operation`, per
  *        Loopback auf dieselben Routen) nehmen.
- * Ausfuehren: node --experimental-sqlite --test test/test-edit-others-permissions.js
+ * Ausfuehren: node --test test/test-edit-others-permissions.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'edit-others-test-secret';
 process.env.DB_PATH = ':memory:';
@@ -17,17 +17,16 @@ process.env.DB_PATH = ':memory:';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import test from 'node:test';
-import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { requireAuth } = await import('../server/auth.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 const { default: notesRouter } = await import('../server/routes/notes.js');
 const { default: inventoryRouter } = await import('../server/routes/inventory/index.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const {
   applyChildStartPermissions, CHILD_START_PERMISSIONS, PERMISSION_CAPABILITIES, resolvePermissions,
-} = await import('../server/permissions.js');
+} = await import('../server/authorize/index.ts');
 const db = dbmod.get();
 
 function user(username, role, familyRole) {
@@ -52,14 +51,22 @@ for (const [name, id] of Object.entries({ admin: ADMIN, parent: PARENT, child: C
   tokens[name] = token;
 }
 
-const app = express();
-app.use(express.json({ limit: '2mb' }));
-app.use('/calendar', requireAuth, calendarRouter);
-app.use('/notes', requireAuth, notesRouter);
-app.use('/inventory', requireAuth, inventoryRouter);
-app.use('/tasks', requireAuth, tasksRouter);
+// As server/index.js: a missing body is `{}`, and the 400 of validateRequest()
+// (#2810) goes to the central error handler behind the routers
+// (test/tasks-app.js). The tasks stand in front of the others there.
+const app = await createTasksApp({
+  jsonLimit: '2mb',
+  before: [
+    ['/api/v1/tasks', requireAuth],
+  ],
+  after: [
+    ['/api/v1/calendar', requireAuth, calendarRouter],
+    ['/api/v1/notes', requireAuth, notesRouter],
+    ['/api/v1/inventory', requireAuth, inventoryRouter],
+  ],
+});
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}/api/v1`)));
 test.after(() => server.close());
 
 async function call(who, method, path, body) {

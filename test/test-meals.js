@@ -2,7 +2,7 @@
  * Modul: Essensplan-Test
  * Zweck: Validiert alle Meals-API-Abfragen, Zutaten-CRUD, Wochensortierung,
  *        Einkaufslisten-Integration
- * Ausführen: node --experimental-sqlite test-meals.js
+ * Ausführen: node test-meals.js
  */
 
 import { DatabaseSync } from 'node:sqlite';

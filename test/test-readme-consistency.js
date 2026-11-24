@@ -38,6 +38,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { dictBlock, dictKeysMatching, dictValue, stripTags, unescapeJs } from './docs-dict.js';
+import { TOGGLEABLE_MODULES } from '../server/settings/values.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const READMES = { en: 'README.md', de: 'README.de.md' };
@@ -568,6 +569,25 @@ for (const lang of Object.keys(READMES)) {
     assert.deepEqual(nameless, [], 'Bilder ohne Alt-Text (GitHub verlinkt sie, der Link bliebe namenlos)');
   });
 
+  // (7) Phase 1a (November 2026): die App wird gebaut ausgeliefert, und die
+  // Mindestversion von Node ist 24.12. Der Satz "No build step" und jede Node-
+  // Zahl unter 24 waren bis dahin wahr und stehen seitdem als Behauptung im
+  // Weg: wer sie liest, baut nicht und wundert sich ueber einen Server, der
+  // ohne dist/ nicht startet. Rot gegen main vor dem Regelwerk-PR (Abschnitt F).
+  test(`${READMES[/** @type {keyof typeof READMES} */ (lang)]}: kein "No build step" und keine Node-Version unter 24`, () => {
+    const text = readme(lang);
+    const claims = text.split('\n')
+      .map((line, i) => (/\b(no|kein|ohne)\s+build[- ]?(step|schritt)\b/i.test(line) ? `${i + 1}: ${line.trim()}` : null))
+      .filter(Boolean);
+    assert.deepEqual(claims, [],
+      'Die App wird seit Phase 1a gebaut ausgeliefert (CONTRIBUTING.md, "Hard Constraints" und "Build"):\n  ' + claims.join('\n  '));
+    const nodes = [...text.matchAll(/\bNode(?:\.js)?\s+(\d+)(?:\.(\d+))?/g)]
+      .filter((m) => Number(m[1]) < 24 || (Number(m[1]) === 24 && m[2] !== undefined && Number(m[2]) < 12))
+      .map((m) => m[0]);
+    assert.deepEqual(nodes, [],
+      'engines.node in package.json ist ^24.12.0 || >=26.0.0; die README nennt eine aeltere Version: ' + nodes.join(', '));
+  });
+
   test(`${READMES[lang]}: kein Em- oder En-Dash`, () => {
     const hits = readme(lang).split('\n')
       .map((line, i) => (/[–—]/.test(line) ? `${i + 1}: ${line.trim()}` : null))
@@ -602,7 +622,7 @@ const README_FACTS = [
     what: 'Uebernahme-Dialog Einkauf -> Vorrat mit Menge und Einheit (public/pages/shopping.js openPantryTransfer)' },
   { says: { en: /Inventory,\s+Waste collection and Schedule start switched off/, de: /Inventar,\s+Entsorgung und Schichtplan sind anfangs aus/ },
     holds: (s) => ['inventory', 'waste', 'schedule'].every((m) => new RegExp(`disabled\\.push\\('${m}'\\)`).test(s.db) && s.toggleable.includes(m)),
-    what: 'Migrationen in server/db.js schalten die drei ab, TOGGLEABLE_MODULES (server/routes/preferences.js) kennt sie' },
+    what: 'Migrationen in server/db.js schalten die drei ab, TOGGLEABLE_MODULES (server/settings/values.ts, seit Phase 2 C3 importiert) kennt sie' },
   { says: { en: /amd64 and arm64 \(Raspberry Pi 4\/5\)/, de: /amd64 und arm64 \(Raspberry Pi 4\/5\)/ },
     holds: (s) => /platforms:\s*linux\/amd64,\s*linux\/arm64/.test(s.dockerPublish),
     what: 'Multi-Arch-Build (.github/workflows/docker-publish.yml platforms)' },
@@ -631,10 +651,10 @@ const README_FACTS = [
     what: "Offline-Cache der Einkaufsliste (public/sw.js API_CACHE_WHITELIST '/shopping')" },
   { says: { en: /each module is full, read only or not at all/, de: /jedes Modul voll, nur lesen oder gar nicht/ },
     holds: (s) => /MODULE_ACCESS_LEVELS = Object\.freeze\(\['none', 'read', 'write'\]\)/.test(s.permissions),
-    what: 'drei Zugriffsstufen je Modul (server/permissions.js MODULE_ACCESS_LEVELS)' },
+    what: 'drei Zugriffsstufen je Modul (server/authorize/catalog.ts MODULE_ACCESS_LEVELS)' },
   { says: { en: /a child without a phone gets an account created directly/, de: /ein Kind ohne Handy bekommt sein Konto direkt angelegt/ },
     holds: (s) => /FAMILY_ROLES = Object\.freeze\(\[[^\]]*'child'/.test(s.permissions),
-    what: "Kind als Familienrolle (server/permissions.js FAMILY_ROLES 'child')" },
+    what: "Kind als Familienrolle (server/authorize/catalog.ts FAMILY_ROLES 'child')" },
   // "Wie sicher ist der Zugang von aussen?" (Before you commit), wie long_a4 der Homepage.
   { says: { en: /an admin can require it for the whole household/, de: /ein Admin kann ihn f[uü]r den ganzen Haushalt verlangen/ },
     holds: (s) => /export function setRequiredForHousehold/.test(s.twoFactor) && /user_recovery_codes/.test(s.twoFactor),
@@ -693,8 +713,6 @@ const LAN_OPEN = {
 
 function factSources() {
   const src = (p) => read(p);
-  const prefs = src('server/routes/preferences.js');
-  const toggleable = (prefs.match(/TOGGLEABLE_MODULES = \[([\s\S]*?)\]/) || [, ''])[1];
   return {
     readmes: { en: readme('en'), de: readme('de') },
     shoppingPage: src('public/pages/shopping.js'),
@@ -702,7 +720,8 @@ function factSources() {
     // Seit R23 (D2) liest der Import den Essensplan ueber die geteilte Quelle.
     kitchenHandover: src('server/services/kitchen-handover.js'),
     db: src('server/db.js'),
-    toggleable: [...toggleable.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]),
+    // Die Liste steht seit Phase 2, C3 im Einstellungs-Register: importiert, nicht geschnitten.
+    toggleable: [...TOGGLEABLE_MODULES],
     dockerPublish: src('.github/workflows/docker-publish.yml'),
     auth: src('server/auth.js'),
     installer: src('tools/installer/install-server.js'),
@@ -714,7 +733,7 @@ function factSources() {
     display: src('server/display-scopes.js'),
     rewards: src('server/services/rewards.js'),
     sw: src('public/sw.js'),
-    permissions: src('server/permissions.js'),
+    permissions: src('server/authorize/catalog.ts'),
     twoFactor: src('server/services/two-factor.js'),
     invites: src('server/services/invites.js'),
     pages: { 'docs/index.html': src('docs/index.html'), 'docs/install.html': src('docs/install.html') },

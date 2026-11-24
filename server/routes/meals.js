@@ -4,21 +4,22 @@
  * Abhängigkeiten: express, server/db.js, server/auth.js
  */
 
-import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, date, num, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../middleware/validate.js';
+import { str, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../api/formats.ts';
 import { addDays, mealWeekday, datesForTemplateInRange } from '../services/meal-recurrence.js';
 import { todayKey } from '../utils/timezone.js';
-import { mayWriteModule } from '../permissions.js';
+import { mayWriteModule } from '../authorize/index.ts';
 import { handOverToShoppingList, mealPlanSource } from '../services/kitchen-handover.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL, cookField, cookForNewOccurrence, cookRefusal } from '../services/meal-cook.js';
+import { validateRequest } from '../api/validate-request.ts';
 
-const log = createLogger('Meals');
-
+// Ein unerwarteter Fehler geht an den zentralen Fehlerhandler
+// (server/middleware/error-handler.js, 500 `Internal server error.`). Die
+// Mahlzeit-Typen und die `scope`-Werte prueft seit #2810 allein das Schema
+// (`enum` aus server/services/meals-fields.js), bevor ein Handler laeuft.
 const router  = express.Router();
 
-const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 const VALID_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6]; // 0 = Monday, 6 = Sunday
 
 // Haushaltsweit gültige Wochenstartag-Werte, gespiegelt aus preferences.js.
@@ -28,10 +29,39 @@ const WEEK_START_DAY = { monday: 1, sunday: 0, saturday: 6 };
 // Hilfsfunktionen
 // --------------------------------------------------------
 
+/**
+ * A path id as the number the schema checked: plain decimal digits with an
+ * optional minus, at most MAX_PATH_ID (validateRequest(), #2810). `parseInt`
+ * read `7abc` as 7 until the schema stood in front; it lets nothing but digits
+ * through now, so `Number` reads the same value. `0`, `-0` and `-1` find no
+ * row (404), a leading zero reaches the row.
+ * @param {any} req
+ * @param {string} [name]
+ * @returns {number}
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
+
+/**
+ * Die Rezept-id einer Mahlzeit als Zahl, `null` fuer keine. Das Schema laesst
+ * seit #2810 nur eine ganze Zahl, Ziffern-Text (die Altform des Dialogs, auch
+ * mit fuehrender Null) und `null` durch; `num()` wies davor alles ab, was
+ * keine endliche Zahl ergab, und las `"0x10"` als 16 und `true` als 1.
+ * @param {unknown} raw
+ * @returns {number|null}
+ */
+function recipeIdOf(raw) {
+  return raw === undefined || raw === null ? null : Number(raw);
+}
+
 /** Wochenstartag des Haushalts als JS-getDay()-Wert (0 = So, 1 = Mo, 6 = Sa). */
 function householdWeekStartDay() {
   const row = db.get().prepare("SELECT value FROM sync_config WHERE key = 'week_start'").get();
-  return WEEK_START_DAY[row?.value] ?? 1;
+  // Nur eigene Schluessel (#2810): ein gespeicherter Wert `constructor` oder
+  // `toString` fand sonst eine Funktion des Prototyps statt keines Eintrags,
+  // und jede Wochenansicht antwortete mit 500 (`Invalid time value`).
+  return Object.hasOwn(WEEK_START_DAY, row?.value ?? '') ? WEEK_START_DAY[row.value] : 1;
 }
 
 /**
@@ -236,24 +266,19 @@ function materializeRecurringMeals(from, to) {
  * Query: ?q=<string>
  * Response: { data: [{ title, meal_type }] }
  */
-router.get('/suggestions', (req, res) => {
-  try {
-    const q = (req.query.q || '').trim();
-    if (!q) return res.json({ data: [] });
+router.get('/suggestions', validateRequest(), (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json({ data: [] });
 
-    const rows = db.get().prepare(`
-      SELECT DISTINCT title, meal_type
-      FROM meals
-      WHERE title LIKE ? COLLATE NOCASE
-      ORDER BY title ASC
-      LIMIT 10
-    `).all(`${q}%`);
+  const rows = db.get().prepare(`
+    SELECT DISTINCT title, meal_type
+    FROM meals
+    WHERE title LIKE ? COLLATE NOCASE
+    ORDER BY title ASC
+    LIMIT 10
+  `).all(`${q}%`);
 
-    res.json({ data: rows });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: rows });
 });
 
 // --------------------------------------------------------
@@ -270,103 +295,101 @@ router.get('/suggestions', (req, res) => {
  *         cook_color, recurrence_cook_user_id, ingredients: Ingredient[] }
  * Ingredient: { id, meal_id, name, quantity, on_shopping_list }
  */
-router.get('/', (req, res) => {
-  try {
-    const refDate = req.query.week && DATE_RE.test(req.query.week)
-      ? req.query.week
-      : todayKey(db.get());
+router.get('/', validateRequest(), (req, res) => {
+  // Ein `week`, das kein Tag ist, weist seit #2810 das Schema ab. Die
+  // Musterpruefung bleibt: der Wert geht in die Datumsrechnung von
+  // weekStart() (Senke, nicht Route); ohne `week` gilt die aktuelle Woche.
+  const refDate = req.query.week && DATE_RE.test(req.query.week)
+    ? req.query.week
+    : todayKey(db.get());
 
-    const from = weekStart(refDate);
-    const to   = weekEnd(refDate);
+  const from = weekStart(refDate);
+  const to   = weekEnd(refDate);
 
-    materializeRecurringMeals(from, to);
+  materializeRecurringMeals(from, to);
 
-    // recurrence_end_date kommt aus der Vorlage mit: die Oberfläche zeigt im
-    // Bearbeiten-Dialog, bis wann die Serie läuft, und muss dafür nicht pro Karte
-    // nachfragen. NULL heißt unbegrenzt.
-    // recurrence_cook_user_id ebenso (#1679): der Koch der SERIE neben dem
-    // dieser Mahlzeit. Der Dialog braucht beide, um beim Speichern der ganzen
-    // Serie zu wissen, ob die Serie den gezeigten Koch schon hat. NULL heisst
-    // "die Serie hat keinen Koch" oder "keine Serie" - `recurrence_template_id`
-    // sagt, welches von beiden.
-    const meals = db.get().prepare(`
-      SELECT m.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
-             mrt.end_date AS recurrence_end_date,
-           mrt.cook_user_id AS recurrence_cook_user_id,${MEAL_COOK_COLUMNS_SQL},
-             -- Hat das verknuepfte Rezept ein Bild (#1059)? Der Planer stellt
-             -- damit den Platzhalter ODER das Vorschaubild, ohne je Karte
-             -- nachzufragen - und ohne einen Request, der fuer ein bildloses
-             -- Rezept ohnehin nur ein 404 waere. Zwei Quellen, zwei Flags: das
-             -- eigene Bild (Schritt 2) und das des Providers (Schritt 1). Die
-             -- Bilddaten selbst gehen NIE mit, die holt der Browser je Route.
-             r.provider_has_image AS recipe_has_image,
-             -- Version des Providerbildes fuer ?v= (#2048, routes/recipes.js).
-             r.provider_updated_at AS recipe_image_version,
-             (r.image_data IS NOT NULL) AS recipe_has_own_image
-      FROM meals m
-      LEFT JOIN users u ON u.id = m.created_by
-      ${MEAL_COOK_JOIN_SQL}
-      LEFT JOIN meal_recurrence_templates mrt ON mrt.id = m.recurrence_template_id
-      LEFT JOIN recipes r ON r.id = m.recipe_id
-      WHERE m.date BETWEEN ? AND ?
-      ORDER BY m.date ASC,
-        CASE m.meal_type
-          WHEN 'breakfast' THEN 0
-          WHEN 'lunch'     THEN 1
-          WHEN 'dinner'    THEN 2
-          WHEN 'snack'     THEN 3
-          ELSE 4
-        END ASC
-    `).all(from, to);
+  // recurrence_end_date kommt aus der Vorlage mit: die Oberfläche zeigt im
+  // Bearbeiten-Dialog, bis wann die Serie läuft, und muss dafür nicht pro Karte
+  // nachfragen. NULL heißt unbegrenzt.
+  // recurrence_cook_user_id ebenso (#1679): der Koch der SERIE neben dem
+  // dieser Mahlzeit. Der Dialog braucht beide, um beim Speichern der ganzen
+  // Serie zu wissen, ob die Serie den gezeigten Koch schon hat. NULL heisst
+  // "die Serie hat keinen Koch" oder "keine Serie" - `recurrence_template_id`
+  // sagt, welches von beiden.
+  const meals = db.get().prepare(`
+    SELECT m.*, u.display_name AS creator_name, u.avatar_color AS creator_color,
+           mrt.end_date AS recurrence_end_date,
+         mrt.cook_user_id AS recurrence_cook_user_id,${MEAL_COOK_COLUMNS_SQL},
+           -- Hat das verknuepfte Rezept ein Bild (#1059)? Der Planer stellt
+           -- damit den Platzhalter ODER das Vorschaubild, ohne je Karte
+           -- nachzufragen - und ohne einen Request, der fuer ein bildloses
+           -- Rezept ohnehin nur ein 404 waere. Zwei Quellen, zwei Flags: das
+           -- eigene Bild (Schritt 2) und das des Providers (Schritt 1). Die
+           -- Bilddaten selbst gehen NIE mit, die holt der Browser je Route.
+           r.provider_has_image AS recipe_has_image,
+           -- Version des Providerbildes fuer ?v= (#2048, routes/recipes.js).
+           r.provider_updated_at AS recipe_image_version,
+           (r.image_data IS NOT NULL) AS recipe_has_own_image
+    FROM meals m
+    LEFT JOIN users u ON u.id = m.created_by
+    ${MEAL_COOK_JOIN_SQL}
+    LEFT JOIN meal_recurrence_templates mrt ON mrt.id = m.recurrence_template_id
+    LEFT JOIN recipes r ON r.id = m.recipe_id
+    WHERE m.date BETWEEN ? AND ?
+    ORDER BY m.date ASC,
+      CASE m.meal_type
+        WHEN 'breakfast' THEN 0
+        WHEN 'lunch'     THEN 1
+        WHEN 'dinner'    THEN 2
+        WHEN 'snack'     THEN 3
+        ELSE 4
+      END ASC
+  `).all(from, to);
 
-    // Zutaten für alle Mahlzeiten in einer Abfrage holen
-    const mealIds = meals.map((m) => m.id);
-    let ingredientMap = {};
+  // Zutaten für alle Mahlzeiten in einer Abfrage holen
+  const mealIds = meals.map((m) => m.id);
+  let ingredientMap = {};
 
-    if (mealIds.length > 0) {
-      const placeholders = mealIds.map(() => '?').join(',');
-      const ingredients  = db.get().prepare(`
-        SELECT * FROM meal_ingredients
-        WHERE meal_id IN (${placeholders})
-        ORDER BY id ASC
-      `).all(...mealIds);
+  if (mealIds.length > 0) {
+    const placeholders = mealIds.map(() => '?').join(',');
+    const ingredients  = db.get().prepare(`
+      SELECT * FROM meal_ingredients
+      WHERE meal_id IN (${placeholders})
+      ORDER BY id ASC
+    `).all(...mealIds);
 
-      for (const ing of ingredients) {
-        if (!ingredientMap[ing.meal_id]) ingredientMap[ing.meal_id] = [];
-        ingredientMap[ing.meal_id].push(ing);
-      }
+    for (const ing of ingredients) {
+      if (!ingredientMap[ing.meal_id]) ingredientMap[ing.meal_id] = [];
+      ingredientMap[ing.meal_id].push(ing);
     }
-
-    // Aus einem Rezept geplante Mahlzeiten tragen nur dessen recipe_id, keine
-    // eigenen meal_ingredients - die entstehen erst beim ersten Transfer
-    // (siehe POST /:id/to-shopping-list). Ohne diesen Zähler bliebe der
-    // Einkaufslisten-Button auf genau solchen Karten unsichtbar, obwohl die
-    // Zutaten bekannt sind. Bewusst nur die ZAHL, keine virtuellen Zutaten:
-    // Einträge ohne echte id würden das Zutaten-Formular brechen.
-    const recipeCountMap = {};
-    const fromRecipe = meals.filter((m) => m.recipe_id && !(ingredientMap[m.id]?.length));
-    if (fromRecipe.length > 0) {
-      const recipeIds = [...new Set(fromRecipe.map((m) => m.recipe_id))];
-      const counts = db.get().prepare(`
-        SELECT recipe_id, COUNT(*) AS c FROM recipe_ingredients
-        WHERE recipe_id IN (${recipeIds.map(() => '?').join(',')})
-        GROUP BY recipe_id
-      `).all(...recipeIds);
-      const byRecipe = Object.fromEntries(counts.map((r) => [r.recipe_id, r.c]));
-      for (const m of fromRecipe) recipeCountMap[m.id] = byRecipe[m.recipe_id] ?? 0;
-    }
-
-    const result = meals.map((m) => ({
-      ...m,
-      ingredients: ingredientMap[m.id] || [],
-      recipe_ingredient_count: recipeCountMap[m.id] ?? 0,
-    }));
-
-    res.json({ data: result, weekStart: from, weekEnd: to });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
+
+  // Aus einem Rezept geplante Mahlzeiten tragen nur dessen recipe_id, keine
+  // eigenen meal_ingredients - die entstehen erst beim ersten Transfer
+  // (siehe POST /:id/to-shopping-list). Ohne diesen Zähler bliebe der
+  // Einkaufslisten-Button auf genau solchen Karten unsichtbar, obwohl die
+  // Zutaten bekannt sind. Bewusst nur die ZAHL, keine virtuellen Zutaten:
+  // Einträge ohne echte id würden das Zutaten-Formular brechen.
+  const recipeCountMap = {};
+  const fromRecipe = meals.filter((m) => m.recipe_id && !(ingredientMap[m.id]?.length));
+  if (fromRecipe.length > 0) {
+    const recipeIds = [...new Set(fromRecipe.map((m) => m.recipe_id))];
+    const counts = db.get().prepare(`
+      SELECT recipe_id, COUNT(*) AS c FROM recipe_ingredients
+      WHERE recipe_id IN (${recipeIds.map(() => '?').join(',')})
+      GROUP BY recipe_id
+    `).all(...recipeIds);
+    const byRecipe = Object.fromEntries(counts.map((r) => [r.recipe_id, r.c]));
+    for (const m of fromRecipe) recipeCountMap[m.id] = byRecipe[m.recipe_id] ?? 0;
+  }
+
+  const result = meals.map((m) => ({
+    ...m,
+    ingredients: ingredientMap[m.id] || [],
+    recipe_ingredient_count: recipeCountMap[m.id] ?? 0,
+  }));
+
+  res.json({ data: result, weekStart: from, weekEnd: to });
 });
 
 // --------------------------------------------------------
@@ -381,91 +404,85 @@ router.get('/', (req, res) => {
  * `repeat_weekly` traegt ihn auch die Serie.
  * Response: { data: Meal }
  */
-router.post('/', (req, res) => {
-  try {
-    const { ingredients = [] } = req.body;
-    const vDate       = date(req.body.date, 'date', true);
-    const vType       = oneOf(req.body.meal_type, VALID_MEAL_TYPES, 'meal_type');
-    const vTitle      = str(req.body.title, 'title', { max: MAX_TITLE });
-    const vNotes      = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
-    const vRecipeUrl  = str(req.body.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false });
-    const vRecipeId   = num(req.body.recipe_id, 'recipe_id', { required: false });
-    const vCook       = cookField(req.body.cook_user_id);
-    const repeatWeekly = req.body.repeat_weekly === true;
-    // Leeres/fehlendes repeat_until heißt „ohne Ende" - die Serie bleibt dann
-    // unbegrenzt, wie vor #619, aber jetzt als bewusste Wahl statt als einziger Zustand.
-    const vRepeatUntil = repeatWeekly
-      ? date(req.body.repeat_until, 'repeat_until')
-      : { value: null, error: null };
-    const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl, vRecipeId, vCook, vRepeatUntil]);
-    if (!req.body.meal_type) errors.push('Mahlzeit-Typ ist erforderlich.');
-    if (vRepeatUntil.value && vDate.value && vRepeatUntil.value < vDate.value) {
-      errors.push('Wiederholungs-Ende darf nicht vor dem Datum liegen.');
-    }
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-
-    // Das GEWAEHLTE Rezept fehlt (#1909): jemand hat es inzwischen geloescht,
-    // oder der Abgleich mit einer Rezeptquelle hat es entfernt. Der Grund nennt
-    // den Fall, den Satz sagt die Seite (`meals_selected_recipe_not_found`).
-    if (vRecipeId.value !== null) {
-      const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(vRecipeId.value);
-      if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
-    }
-
-    // Kochen kann nur ein Haushaltsmitglied (#1679) - dieselbe Liste, die der
-    // Dialog anbietet. Eine neue Mahlzeit hat noch keinen gespeicherten Stand.
-    const cookError = cookRefusal(vCook.value);
-    if (cookError) return res.status(400).json({ error: cookError, code: 400 });
-
-    const meal = db.transaction(() => {
-      const cleanIngredients = sanitizedIngredients(ingredients);
-      let recurrenceTemplateId = null;
-
-      if (repeatWeekly) {
-        const template = db.get().prepare(`
-          INSERT INTO meal_recurrence_templates
-            (start_date, end_date, weekday, meal_type, title, notes, recipe_url, recipe_id, cook_user_id, created_by)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          vDate.value,
-          vRepeatUntil.value,
-          mealWeekday(vDate.value),
-          vType.value,
-          vTitle.value,
-          vNotes.value,
-          vRecipeUrl.value,
-          vRecipeId.value,
-          vCook.value,
-          req.authUserId || req.session.userId
-        );
-        recurrenceTemplateId = template.lastInsertRowid;
-
-        const insertTemplateIng = db.get().prepare(`
-          INSERT INTO meal_recurrence_ingredients (template_id, name, quantity, category)
-          VALUES (?, ?, ?, ?)
-        `);
-        for (const ing of cleanIngredients) {
-          insertTemplateIng.run(recurrenceTemplateId, ing.name, ing.quantity, ing.category);
-        }
-      }
-
-      const result = db.get().prepare(`
-        INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, recurrence_template_id, cook_user_id, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(vDate.value, vType.value, vTitle.value, vNotes.value, vRecipeUrl.value, vRecipeId.value, recurrenceTemplateId, vCook.value, req.authUserId || req.session.userId);
-
-      const mealId = result.lastInsertRowid;
-
-      insertMealIngredients(mealId, cleanIngredients);
-
-      return loadMealWithIngredients(mealId);
-    });
-
-    res.status(201).json({ data: meal });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+router.post('/', validateRequest(), (req, res) => {
+  const { ingredients = [] } = req.body;
+  const vDate       = date(req.body.date, 'date', true);
+  const vTitle      = str(req.body.title, 'title', { max: MAX_TITLE });
+  const vNotes      = str(req.body.notes, 'notes', { max: MAX_TEXT, required: false });
+  const vRecipeUrl  = str(req.body.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false });
+  const recipeId    = recipeIdOf(req.body.recipe_id);
+  const vCook       = cookField(req.body.cook_user_id);
+  const repeatWeekly = req.body.repeat_weekly === true;
+  // Leeres/fehlendes repeat_until heißt „ohne Ende" - die Serie bleibt dann
+  // unbegrenzt, wie vor #619, aber jetzt als bewusste Wahl statt als einziger Zustand.
+  const vRepeatUntil = repeatWeekly
+    ? date(req.body.repeat_until, 'repeat_until')
+    : { value: null, error: null };
+  // `meal_type` ist Pflicht und einer aus MEAL_TYPES: das prueft das Schema (#2810).
+  const errors = collectErrors([vDate, vTitle, vNotes, vRecipeUrl, vCook, vRepeatUntil]);
+  if (vRepeatUntil.value && vDate.value && vRepeatUntil.value < vDate.value) {
+    errors.push('Wiederholungs-Ende darf nicht vor dem Datum liegen.');
   }
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+
+  // Das GEWAEHLTE Rezept fehlt (#1909): jemand hat es inzwischen geloescht,
+  // oder der Abgleich mit einer Rezeptquelle hat es entfernt. Der Grund nennt
+  // den Fall, den Satz sagt die Seite (`meals_selected_recipe_not_found`).
+  if (recipeId !== null) {
+    const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(recipeId);
+    if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
+  }
+
+  // Kochen kann nur ein Haushaltsmitglied (#1679) - dieselbe Liste, die der
+  // Dialog anbietet. Eine neue Mahlzeit hat noch keinen gespeicherten Stand.
+  const cookError = cookRefusal(vCook.value);
+  if (cookError) return res.status(400).json({ error: cookError, code: 400 });
+
+  const meal = db.transaction(() => {
+    const cleanIngredients = sanitizedIngredients(ingredients);
+    let recurrenceTemplateId = null;
+
+    if (repeatWeekly) {
+      const template = db.get().prepare(`
+        INSERT INTO meal_recurrence_templates
+          (start_date, end_date, weekday, meal_type, title, notes, recipe_url, recipe_id, cook_user_id, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        vDate.value,
+        vRepeatUntil.value,
+        mealWeekday(vDate.value),
+        req.body.meal_type,
+        vTitle.value,
+        vNotes.value,
+        vRecipeUrl.value,
+        recipeId,
+        vCook.value,
+        req.authUserId || req.session.userId
+      );
+      recurrenceTemplateId = template.lastInsertRowid;
+
+      const insertTemplateIng = db.get().prepare(`
+        INSERT INTO meal_recurrence_ingredients (template_id, name, quantity, category)
+        VALUES (?, ?, ?, ?)
+      `);
+      for (const ing of cleanIngredients) {
+        insertTemplateIng.run(recurrenceTemplateId, ing.name, ing.quantity, ing.category);
+      }
+    }
+
+    const result = db.get().prepare(`
+      INSERT INTO meals (date, meal_type, title, notes, recipe_url, recipe_id, recurrence_template_id, cook_user_id, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(vDate.value, req.body.meal_type, vTitle.value, vNotes.value, vRecipeUrl.value, recipeId, recurrenceTemplateId, vCook.value, req.authUserId || req.session.userId);
+
+    const mealId = result.lastInsertRowid;
+
+    insertMealIngredients(mealId, cleanIngredients);
+
+    return loadMealWithIngredients(mealId);
+  });
+
+  res.status(201).json({ data: meal });
 });
 
 /**
@@ -478,103 +495,96 @@ router.post('/', (req, res) => {
  * (Discussion #1380), und nennt die uebrigen in `skipped`.
  * Response: 201 { data: Meal[] } bzw. mit skip_occupied { data, skipped }
  */
-router.post('/apply-plan', (req, res) => {
-  try {
-    const assignments = Array.isArray(req.body.assignments) ? req.body.assignments : [];
-    const replaceExisting = req.body.replace_existing === true;
-    // skip_occupied ist neu und von Anfang an streng: ein "true" als String
-    // liefe sonst still im additiven Modus und fuellte belegte Slots doppelt.
-    // replace_existing bleibt, wie es war (`=== true`), sonst bricht ein Client.
-    if (req.body.skip_occupied !== undefined && typeof req.body.skip_occupied !== 'boolean') {
-      return res.status(400).json({ error: 'skip_occupied must be true or false.', code: 400 });
-    }
-    const skipOccupied = req.body.skip_occupied === true;
-    if (replaceExisting && skipOccupied) {
-      return res.status(400).json({ error: 'skip_occupied and replace_existing cannot be combined.', code: 400 });
-    }
-    if (!assignments.length) {
-      return res.status(400).json({ error: 'At least one meal is required.', code: 400 });
-    }
-
-    const prepared = [];
-    const recipeIds = new Set();
-    const cookIds = new Set();
-    for (const assignment of assignments) {
-      const vDate = date(assignment.date, 'date', true);
-      const vType = oneOf(assignment.meal_type, VALID_MEAL_TYPES, 'meal_type');
-      const vTitle = str(assignment.title, 'title', { max: MAX_TITLE });
-      const vNotes = str(assignment.notes, 'notes', { max: MAX_TEXT, required: false });
-      const vRecipeUrl = str(assignment.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false });
-      const vRecipeId = num(assignment.recipe_id, 'recipe_id', { required: false });
-      const vCook = cookField(assignment.cook_user_id);
-      const errors = collectErrors([vDate, vType, vTitle, vNotes, vRecipeUrl, vRecipeId, vCook]);
-      if (!assignment.meal_type) errors.push('Mahlzeit-Typ ist erforderlich.');
-      if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-      if (vRecipeId.value !== null) recipeIds.add(vRecipeId.value);
-      if (vCook.value !== null) cookIds.add(vCook.value);
-      prepared.push({
-        date: vDate.value,
-        meal_type: vType.value,
-        title: vTitle.value,
-        notes: vNotes.value,
-        recipe_url: vRecipeUrl.value,
-        recipe_id: vRecipeId.value,
-        cook_user_id: vCook.value,
-        ingredients: assignment.ingredients || [],
-      });
-    }
-
-    for (const recipeId of recipeIds) {
-      const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(recipeId);
-      if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
-    }
-
-    // Jede Zuweisung legt eine NEUE Mahlzeit an, auch mit replace_existing: ein
-    // gespeicherter Stand, der einen Koch gueltig hielte, gibt es hier nicht
-    // (#1679). Ein Nicht-Mitglied in EINER Zuweisung weist den ganzen Aufruf ab,
-    // wie ein unbekanntes Rezept - geschrieben ist bis hier nichts.
-    for (const cookId of cookIds) {
-      const cookError = cookRefusal(cookId);
-      if (cookError) return res.status(400).json({ error: cookError, code: 400 });
-    }
-
-    const skipped = [];
-    const created = db.transaction(() => {
-      const actorId = req.authUserId || req.session.userId;
-      if (skipOccupied) {
-        // "Besetzt" zaehlt gegen den Stand VOR dem Aufruf: erst alle Slots
-        // pruefen, dann schreiben. Mehrere Zuweisungen fuer denselben vorher
-        // leeren Slot landen damit alle, wie im additiven Standardmodus.
-        const isOccupied = slotOccupancyChecker();
-        const occupied = new Map();
-        const toCreate = prepared.filter((assignment, index) => {
-          const slot = `${assignment.date}\u0000${assignment.meal_type}`;
-          if (!occupied.has(slot)) occupied.set(slot, isOccupied(assignment.date, assignment.meal_type));
-          if (!occupied.get(slot)) return true;
-          skipped.push({ index, date: assignment.date, meal_type: assignment.meal_type, reason: 'occupied' });
-          return false;
-        });
-        return toCreate.map((assignment) => createMealRecord(assignment, actorId));
-      }
-      if (replaceExisting) {
-        const slots = [...new Set(prepared.map((assignment) => `${assignment.date}\u0000${assignment.meal_type}`))];
-        const selectMeals = db.get().prepare('SELECT * FROM meals WHERE date = ? AND meal_type = ? ORDER BY id ASC');
-        for (const slot of slots) {
-          const [slotDate, slotType] = slot.split('\u0000');
-          const existingMeals = selectMeals.all(slotDate, slotType);
-          for (const meal of existingMeals) deleteMealOccurrence(meal, actorId);
-        }
-      }
-
-      return prepared.map((assignment) => createMealRecord(assignment, actorId));
-    });
-
-    // `skipped` nur im neuen Modus: ohne die Option bleibt die Antwort, wie sie war.
-    res.status(201).json(skipOccupied ? { data: created, skipped } : { data: created });
-  } catch (err) {
-    log.error('POST /apply-plan', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+router.post('/apply-plan', validateRequest(), (req, res) => {
+  // Senke, nicht Route: die Schleife unten laeuft ueber `assignments`, also
+  // bleibt die eigene Listenpruefung, auch wenn das Schema eine Nicht-Liste
+  // und eine leere Liste schon abweist (`minItems: 1`).
+  const assignments = Array.isArray(req.body.assignments) ? req.body.assignments : [];
+  const replaceExisting = req.body.replace_existing === true;
+  // skip_occupied ist streng ein Boolean: das prueft seit #2810 das Schema (ein
+  // "true" als String liefe sonst still im additiven Modus und fuellte belegte
+  // Slots doppelt).
+  const skipOccupied = req.body.skip_occupied === true;
+  if (replaceExisting && skipOccupied) {
+    return res.status(400).json({ error: 'skip_occupied and replace_existing cannot be combined.', code: 400 });
   }
+  if (!assignments.length) {
+    return res.status(400).json({ error: 'At least one meal is required.', code: 400 });
+  }
+
+  const prepared = [];
+  const recipeIds = new Set();
+  const cookIds = new Set();
+  for (const assignment of assignments) {
+    const vDate = date(assignment.date, 'date', true);
+    const vTitle = str(assignment.title, 'title', { max: MAX_TITLE });
+    const vNotes = str(assignment.notes, 'notes', { max: MAX_TEXT, required: false });
+    const vRecipeUrl = str(assignment.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false });
+    const recipeId = recipeIdOf(assignment.recipe_id);
+    const vCook = cookField(assignment.cook_user_id);
+    const errors = collectErrors([vDate, vTitle, vNotes, vRecipeUrl, vCook]);
+    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+    if (recipeId !== null) recipeIds.add(recipeId);
+    if (vCook.value !== null) cookIds.add(vCook.value);
+    prepared.push({
+      date: vDate.value,
+      meal_type: assignment.meal_type,
+      title: vTitle.value,
+      notes: vNotes.value,
+      recipe_url: vRecipeUrl.value,
+      recipe_id: recipeId,
+      cook_user_id: vCook.value,
+      ingredients: assignment.ingredients || [],
+    });
+  }
+
+  for (const recipeId of recipeIds) {
+    const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(recipeId);
+    if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
+  }
+
+  // Jede Zuweisung legt eine NEUE Mahlzeit an, auch mit replace_existing: ein
+  // gespeicherter Stand, der einen Koch gueltig hielte, gibt es hier nicht
+  // (#1679). Ein Nicht-Mitglied in EINER Zuweisung weist den ganzen Aufruf ab,
+  // wie ein unbekanntes Rezept - geschrieben ist bis hier nichts.
+  for (const cookId of cookIds) {
+    const cookError = cookRefusal(cookId);
+    if (cookError) return res.status(400).json({ error: cookError, code: 400 });
+  }
+
+  const skipped = [];
+  const created = db.transaction(() => {
+    const actorId = req.authUserId || req.session.userId;
+    if (skipOccupied) {
+      // "Besetzt" zaehlt gegen den Stand VOR dem Aufruf: erst alle Slots
+      // pruefen, dann schreiben. Mehrere Zuweisungen fuer denselben vorher
+      // leeren Slot landen damit alle, wie im additiven Standardmodus.
+      const isOccupied = slotOccupancyChecker();
+      const occupied = new Map();
+      const toCreate = prepared.filter((assignment, index) => {
+        const slot = `${assignment.date}\u0000${assignment.meal_type}`;
+        if (!occupied.has(slot)) occupied.set(slot, isOccupied(assignment.date, assignment.meal_type));
+        if (!occupied.get(slot)) return true;
+        skipped.push({ index, date: assignment.date, meal_type: assignment.meal_type, reason: 'occupied' });
+        return false;
+      });
+      return toCreate.map((assignment) => createMealRecord(assignment, actorId));
+    }
+    if (replaceExisting) {
+      const slots = [...new Set(prepared.map((assignment) => `${assignment.date}\u0000${assignment.meal_type}`))];
+      const selectMeals = db.get().prepare('SELECT * FROM meals WHERE date = ? AND meal_type = ? ORDER BY id ASC');
+      for (const slot of slots) {
+        const [slotDate, slotType] = slot.split('\u0000');
+        const existingMeals = selectMeals.all(slotDate, slotType);
+        for (const meal of existingMeals) deleteMealOccurrence(meal, actorId);
+      }
+    }
+
+    return prepared.map((assignment) => createMealRecord(assignment, actorId));
+  });
+
+  // `skipped` nur im neuen Modus: ohne die Option bleibt die Antwort, wie sie war.
+  res.status(201).json(skipOccupied ? { data: created, skipped } : { data: created });
 });
 
 /**
@@ -586,169 +596,167 @@ router.post('/apply-plan', (req, res) => {
  * `?scope=series` die Vorlage und alle Mahlzeiten der Serie.
  * Response: { data: Meal }
  */
-router.put('/:id', (req, res) => {
-  try {
-    const id   = parseInt(req.params.id, 10);
-    const meal = db.get().prepare('SELECT * FROM meals WHERE id = ?').get(id);
-    if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
+router.put('/:id', validateRequest(), (req, res) => {
+  const id   = pathId(req);
+  const meal = db.get().prepare('SELECT * FROM meals WHERE id = ?').get(id);
+  if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
 
-    const checks = [];
-    if (req.body.date       !== undefined) checks.push(date(req.body.date, 'date'));
-    if (req.body.meal_type  !== undefined) checks.push(oneOf(req.body.meal_type, VALID_MEAL_TYPES, 'meal_type'));
-    if (req.body.title      !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: false }));
-    if (req.body.notes      !== undefined) checks.push(str(req.body.notes, 'notes', { max: MAX_TEXT, required: false }));
-    if (req.body.recipe_url !== undefined) checks.push(str(req.body.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false }));
-    if (req.body.recipe_id  !== undefined) checks.push(num(req.body.recipe_id, 'recipe_id', { required: false }));
-    const vCook = cookField(req.body.cook_user_id);
-    checks.push(vCook);
-    const errors = collectErrors(checks);
-    if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+  // `meal_type` (einer aus MEAL_TYPES, nie `null`) und die Form von
+  // `recipe_id` prueft seit #2810 das Schema; hier bleiben Kalender, Laengen
+  // nach dem Trimmen und der Koch.
+  const checks = [];
+  if (req.body.date       !== undefined) checks.push(date(req.body.date, 'date'));
+  if (req.body.title     !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: false }));
+  if (req.body.notes      !== undefined) checks.push(str(req.body.notes, 'notes', { max: MAX_TEXT, required: false }));
+  if (req.body.recipe_url !== undefined) checks.push(str(req.body.recipe_url, 'recipe_url', { max: MAX_TEXT, required: false }));
+  const vCook = cookField(req.body.cook_user_id);
+  checks.push(vCook);
+  const errors = collectErrors(checks);
+  if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    if (req.body.recipe_id !== undefined && req.body.recipe_id !== null && req.body.recipe_id !== '') {
-      const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(req.body.recipe_id);
-      if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
-    }
+  if (req.body.recipe_id !== undefined && req.body.recipe_id !== null && req.body.recipe_id !== '') {
+    const recipeExists = db.get().prepare('SELECT id FROM recipes WHERE id = ?').get(req.body.recipe_id);
+    if (!recipeExists) return res.status(400).json({ error: 'Recipe not found.', code: 400, reason: 'meals_selected_recipe_not_found' });
+  }
 
-    // scope=series schreibt die inhaltlichen Felder (nicht das Datum) auf das Template
-    // und auf alle bereits materialisierten Instanzen zurück; Zutaten werden – falls
-    // mitgeschickt – überall vollständig ersetzt.
-    if (req.query.scope === 'series' && meal.recurrence_template_id) {
-      const templateId = meal.recurrence_template_id;
-      const tpl = db.get().prepare('SELECT * FROM meal_recurrence_templates WHERE id = ?').get(templateId);
+  // scope=series schreibt die inhaltlichen Felder (nicht das Datum) auf das Template
+  // und auf alle bereits materialisierten Instanzen zurück; Zutaten werden – falls
+  // mitgeschickt – überall vollständig ersetzt.
+  if (req.query.scope === 'series' && meal.recurrence_template_id) {
+    const templateId = meal.recurrence_template_id;
+    const tpl = db.get().prepare('SELECT * FROM meal_recurrence_templates WHERE id = ?').get(templateId);
 
-      const nMealType  = req.body.meal_type  !== undefined ? req.body.meal_type                 : tpl.meal_type;
-      const nTitle     = req.body.title      !== undefined ? (req.body.title?.trim() || tpl.title) : tpl.title;
-      const nNotes     = req.body.notes      !== undefined ? (req.body.notes      || null)       : tpl.notes;
-      const nRecipeUrl = req.body.recipe_url !== undefined ? (req.body.recipe_url || null)       : tpl.recipe_url;
-      const nRecipeId  = req.body.recipe_id  !== undefined ? (req.body.recipe_id  || null)       : tpl.recipe_id;
+    const nMealType  = req.body.meal_type  !== undefined ? req.body.meal_type                 : tpl.meal_type;
+    const nTitle     = req.body.title      !== undefined ? (req.body.title?.trim() || tpl.title) : tpl.title;
+    const nNotes     = req.body.notes      !== undefined ? (req.body.notes      || null)       : tpl.notes;
+    const nRecipeUrl = req.body.recipe_url !== undefined ? (req.body.recipe_url || null)       : tpl.recipe_url;
+    const nRecipeId  = req.body.recipe_id  !== undefined ? (req.body.recipe_id  || null)       : tpl.recipe_id;
 
-      // DER KOCH DER SERIE (#1679). Mitgeschickt, gilt er fuer die Vorlage und
-      // fuer jede Mahlzeit der Serie; fehlt das Feld, bleibt er UEBERALL, wie
-      // er ist - auch an den Mahlzeiten, die einzeln einen anderen bekommen
-      // haben. Die Inhaltsfelder darueber fallen ohne Angabe auf die Vorlage
-      // zurueck; fuer den Koch waere das ein stilles Ueberschreiben jeder
-      // einzeln getroffenen Wahl bei einer blossen Titelaenderung.
-      // GESPEICHERT IST HIER DER KOCH DER VORLAGE, NICHT DER DIESER MAHLZEIT.
-      // Der Aufruf schreibt auf die Vorlage und auf JEDE Mahlzeit der Serie;
-      // "schon gespeichert" gilt deshalb nur fuer den Datensatz, der die Serie
-      // ist. Ein Nicht-Mitglied, das allein an dieser einen Mahlzeit steht,
-      // waere fuer die Vorlage und alle anderen Mahlzeiten eine NEUE Wahl - und
-      // kaeme ueber die Vorlage in jede kuenftige Woche. Die Mahlzeit selbst
-      // bleibt mit ihm speicherbar: ohne `scope`, und im Serien-Umfang, solange
-      // der Koch nicht mitgeschickt wird (der Dialog schickt ihn zur Serie nur,
-      // wenn ihn jemand dort gewaehlt hat - public/pages/meals.js,
-      // `wireCookPicker()`).
-      if (vCook.given) {
-        const cookError = cookRefusal(vCook.value, [tpl.cook_user_id]);
-        if (cookError) return res.status(400).json({ error: cookError, code: 400 });
-      }
-
-      // repeat_until: leerer String heißt ausdrücklich „ohne Ende", ein fehlendes
-      // Feld lässt die bestehende Grenze stehen.
-      let nEndDate = tpl.end_date;
-      if (req.body.repeat_until !== undefined) {
-        const vRepeatUntil = date(req.body.repeat_until, 'repeat_until');
-        if (vRepeatUntil.error) return res.status(400).json({ error: vRepeatUntil.error, code: 400 });
-        if (vRepeatUntil.value && vRepeatUntil.value < tpl.start_date) {
-          return res.status(400).json({ error: 'repeat_until must not be before the start of the series.', code: 400 });
-        }
-        nEndDate = vRepeatUntil.value;
-      }
-
-      db.transaction(() => {
-        db.get().prepare(`
-          UPDATE meal_recurrence_templates
-          SET meal_type = ?, title = ?, notes = ?, recipe_url = ?, recipe_id = ?, end_date = ?
-          WHERE id = ?
-        `).run(nMealType, nTitle, nNotes, nRecipeUrl, nRecipeId, nEndDate, templateId);
-
-        // Ein neu gesetztes (oder vorgezogenes) Ende muss die bereits
-        // materialisierten Instanzen dahinter mitnehmen - sonst bliebe die Serie
-        // sichtbar über ihr eigenes Ende hinaus bestehen.
-        if (nEndDate) {
-          db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ? AND date > ?')
-            .run(templateId, nEndDate);
-          db.get().prepare('DELETE FROM meal_recurrence_exceptions WHERE template_id = ? AND date > ?')
-            .run(templateId, nEndDate);
-        }
-
-        db.get().prepare(`
-          UPDATE meals
-          SET meal_type = ?, title = ?, notes = ?, recipe_url = ?, recipe_id = ?
-          WHERE recurrence_template_id = ?
-        `).run(nMealType, nTitle, nNotes, nRecipeUrl, nRecipeId, templateId);
-
-        if (vCook.given) {
-          db.get().prepare('UPDATE meal_recurrence_templates SET cook_user_id = ? WHERE id = ?')
-            .run(vCook.value, templateId);
-          db.get().prepare('UPDATE meals SET cook_user_id = ? WHERE recurrence_template_id = ?')
-            .run(vCook.value, templateId);
-        }
-
-        if (Array.isArray(req.body.ingredients)) {
-          const cleanIngredients = sanitizedIngredients(req.body.ingredients);
-
-          db.get().prepare('DELETE FROM meal_recurrence_ingredients WHERE template_id = ?').run(templateId);
-          const insertTemplateIng = db.get().prepare(`
-            INSERT INTO meal_recurrence_ingredients (template_id, name, quantity, category)
-            VALUES (?, ?, ?, ?)
-          `);
-          for (const ing of cleanIngredients) {
-            insertTemplateIng.run(templateId, ing.name, ing.quantity, ing.category);
-          }
-
-          const instances = db.get().prepare('SELECT id FROM meals WHERE recurrence_template_id = ?').all(templateId);
-          const deleteIng  = db.get().prepare('DELETE FROM meal_ingredients WHERE meal_id = ?');
-          for (const inst of instances) {
-            deleteIng.run(inst.id);
-            insertMealIngredients(inst.id, cleanIngredients);
-          }
-        }
-      });
-
-      return res.json({ data: loadMealWithIngredients(id) });
-    }
-
-    // Nur diese Mahlzeit: neu waehlbar ist ein Haushaltsmitglied, der schon
-    // gespeicherte Koch bleibt gueltig (#1679). Die Serie bleibt unberuehrt.
+    // DER KOCH DER SERIE (#1679). Mitgeschickt, gilt er fuer die Vorlage und
+    // fuer jede Mahlzeit der Serie; fehlt das Feld, bleibt er UEBERALL, wie
+    // er ist - auch an den Mahlzeiten, die einzeln einen anderen bekommen
+    // haben. Die Inhaltsfelder darueber fallen ohne Angabe auf die Vorlage
+    // zurueck; fuer den Koch waere das ein stilles Ueberschreiben jeder
+    // einzeln getroffenen Wahl bei einer blossen Titelaenderung.
+    // GESPEICHERT IST HIER DER KOCH DER VORLAGE, NICHT DER DIESER MAHLZEIT.
+    // Der Aufruf schreibt auf die Vorlage und auf JEDE Mahlzeit der Serie;
+    // "schon gespeichert" gilt deshalb nur fuer den Datensatz, der die Serie
+    // ist. Ein Nicht-Mitglied, das allein an dieser einen Mahlzeit steht,
+    // waere fuer die Vorlage und alle anderen Mahlzeiten eine NEUE Wahl - und
+    // kaeme ueber die Vorlage in jede kuenftige Woche. Die Mahlzeit selbst
+    // bleibt mit ihm speicherbar: ohne `scope`, und im Serien-Umfang, solange
+    // der Koch nicht mitgeschickt wird (der Dialog schickt ihn zur Serie nur,
+    // wenn ihn jemand dort gewaehlt hat - public/pages/meals.js,
+    // `wireCookPicker()`).
     if (vCook.given) {
-      const cookError = cookRefusal(vCook.value, [meal.cook_user_id]);
+      const cookError = cookRefusal(vCook.value, [tpl.cook_user_id]);
       if (cookError) return res.status(400).json({ error: cookError, code: 400 });
     }
 
-    if (meal.recurrence_template_id && req.body.date !== undefined && req.body.date !== meal.date) {
-      db.get().prepare(`
-        INSERT OR IGNORE INTO meal_recurrence_exceptions (template_id, date, created_by)
-        VALUES (?, ?, ?)
-      `).run(meal.recurrence_template_id, meal.date, req.authUserId || req.session.userId);
+    // repeat_until: leerer String heißt ausdrücklich „ohne Ende", ein fehlendes
+    // Feld lässt die bestehende Grenze stehen.
+    let nEndDate = tpl.end_date;
+    if (req.body.repeat_until !== undefined) {
+      const vRepeatUntil = date(req.body.repeat_until, 'repeat_until');
+      if (vRepeatUntil.error) return res.status(400).json({ error: vRepeatUntil.error, code: 400 });
+      if (vRepeatUntil.value && vRepeatUntil.value < tpl.start_date) {
+        return res.status(400).json({ error: 'repeat_until must not be before the start of the series.', code: 400 });
+      }
+      nEndDate = vRepeatUntil.value;
     }
 
-    db.get().prepare(`
-      UPDATE meals
-      SET date       = COALESCE(?, date),
-          meal_type  = COALESCE(?, meal_type),
-          title      = COALESCE(?, title),
-          notes      = ?,
-          recipe_url = ?,
-          recipe_id  = ?,
-          cook_user_id = ?
-      WHERE id = ?
-    `).run(
-      req.body.date      ?? null,
-      req.body.meal_type ?? null,
-      req.body.title?.trim() ?? null,
-      req.body.notes       !== undefined ? (req.body.notes || null)       : meal.notes,
-      req.body.recipe_url  !== undefined ? (req.body.recipe_url || null)  : meal.recipe_url,
-      req.body.recipe_id   !== undefined ? (req.body.recipe_id || null)   : meal.recipe_id,
-      vCook.given ? vCook.value : meal.cook_user_id,
-      id
-    );
+    db.transaction(() => {
+      db.get().prepare(`
+        UPDATE meal_recurrence_templates
+        SET meal_type = ?, title = ?, notes = ?, recipe_url = ?, recipe_id = ?, end_date = ?
+        WHERE id = ?
+      `).run(nMealType, nTitle, nNotes, nRecipeUrl, nRecipeId, nEndDate, templateId);
 
-    res.json({ data: loadMealWithIngredients(id) });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+      // Ein neu gesetztes (oder vorgezogenes) Ende muss die bereits
+      // materialisierten Instanzen dahinter mitnehmen - sonst bliebe die Serie
+      // sichtbar über ihr eigenes Ende hinaus bestehen.
+      if (nEndDate) {
+        db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ? AND date > ?')
+          .run(templateId, nEndDate);
+        db.get().prepare('DELETE FROM meal_recurrence_exceptions WHERE template_id = ? AND date > ?')
+          .run(templateId, nEndDate);
+      }
+
+      db.get().prepare(`
+        UPDATE meals
+        SET meal_type = ?, title = ?, notes = ?, recipe_url = ?, recipe_id = ?
+        WHERE recurrence_template_id = ?
+      `).run(nMealType, nTitle, nNotes, nRecipeUrl, nRecipeId, templateId);
+
+      if (vCook.given) {
+        db.get().prepare('UPDATE meal_recurrence_templates SET cook_user_id = ? WHERE id = ?')
+          .run(vCook.value, templateId);
+        db.get().prepare('UPDATE meals SET cook_user_id = ? WHERE recurrence_template_id = ?')
+          .run(vCook.value, templateId);
+      }
+
+      // Senke, nicht Route: sanitizedIngredients() laeuft ueber die Liste, also
+      // bleibt die eigene Listenpruefung neben dem Schema (`type: array`).
+      if (Array.isArray(req.body.ingredients)) {
+        const cleanIngredients = sanitizedIngredients(req.body.ingredients);
+
+        db.get().prepare('DELETE FROM meal_recurrence_ingredients WHERE template_id = ?').run(templateId);
+        const insertTemplateIng = db.get().prepare(`
+          INSERT INTO meal_recurrence_ingredients (template_id, name, quantity, category)
+          VALUES (?, ?, ?, ?)
+        `);
+        for (const ing of cleanIngredients) {
+          insertTemplateIng.run(templateId, ing.name, ing.quantity, ing.category);
+        }
+
+        const instances = db.get().prepare('SELECT id FROM meals WHERE recurrence_template_id = ?').all(templateId);
+        const deleteIng  = db.get().prepare('DELETE FROM meal_ingredients WHERE meal_id = ?');
+        for (const inst of instances) {
+          deleteIng.run(inst.id);
+          insertMealIngredients(inst.id, cleanIngredients);
+        }
+      }
+    });
+
+    return res.json({ data: loadMealWithIngredients(id) });
   }
+
+  // Nur diese Mahlzeit: neu waehlbar ist ein Haushaltsmitglied, der schon
+  // gespeicherte Koch bleibt gueltig (#1679). Die Serie bleibt unberuehrt.
+  if (vCook.given) {
+    const cookError = cookRefusal(vCook.value, [meal.cook_user_id]);
+    if (cookError) return res.status(400).json({ error: cookError, code: 400 });
+  }
+
+  if (meal.recurrence_template_id && req.body.date !== undefined && req.body.date !== meal.date) {
+    db.get().prepare(`
+      INSERT OR IGNORE INTO meal_recurrence_exceptions (template_id, date, created_by)
+      VALUES (?, ?, ?)
+    `).run(meal.recurrence_template_id, meal.date, req.authUserId || req.session.userId);
+  }
+
+  db.get().prepare(`
+    UPDATE meals
+    SET date       = COALESCE(?, date),
+        meal_type  = COALESCE(?, meal_type),
+        title      = COALESCE(?, title),
+        notes      = ?,
+        recipe_url = ?,
+        recipe_id  = ?,
+        cook_user_id = ?
+    WHERE id = ?
+  `).run(
+    req.body.date      ?? null,
+    req.body.meal_type ?? null,
+    req.body.title?.trim() ?? null,
+    req.body.notes       !== undefined ? (req.body.notes || null)       : meal.notes,
+    req.body.recipe_url  !== undefined ? (req.body.recipe_url || null)  : meal.recipe_url,
+    req.body.recipe_id   !== undefined ? (req.body.recipe_id || null)   : meal.recipe_id,
+    vCook.given ? vCook.value : meal.cook_user_id,
+    id
+  );
+
+  res.json({ data: loadMealWithIngredients(id) });
 });
 
 /**
@@ -756,63 +764,58 @@ router.put('/:id', (req, res) => {
  * Mahlzeit löschen (Zutaten werden per CASCADE mitgelöscht).
  * Response: 204 No Content
  */
-router.delete('/:id', (req, res) => {
-  try {
-    const id     = parseInt(req.params.id, 10);
-    const meal   = db.get().prepare('SELECT * FROM meals WHERE id = ?').get(id);
-    if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
+router.delete('/:id', validateRequest(), (req, res) => {
+  const id     = pathId(req);
+  const meal   = db.get().prepare('SELECT * FROM meals WHERE id = ?').get(id);
+  if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
 
-    // scope=series entfernt die gesamte Serie: alle materialisierten Instanzen plus
-    // das Template (CASCADE räumt Template-Zutaten und Ausnahmen ab). Da
-    // meals.recurrence_template_id ON DELETE SET NULL ist, müssen die Instanzen vor
-    // dem Template explizit gelöscht werden, sonst blieben sie als Einzel-Mahlzeiten zurück.
-    if (req.query.scope === 'series' && meal.recurrence_template_id) {
-      const templateId = meal.recurrence_template_id;
-      db.transaction(() => {
-        db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ?').run(templateId);
-        db.get().prepare('DELETE FROM meal_recurrence_templates WHERE id = ?').run(templateId);
-      });
-      return res.status(204).end();
-    }
-
-    // scope=future beendet die Serie an dieser Stelle: das Template bekommt ein
-    // Ende vor diesem Termin, alle Instanzen ab hier verschwinden. Das ist der
-    // Ausweg für eine Serie, deren erster Termin längst gelöscht wurde - ohne ihn
-    // blieb nur das Löschen jedes einzelnen Vorkommens, während die Woche danach
-    // schon wieder ein neues erzeugte (#619).
-    if (req.query.scope === 'future' && meal.recurrence_template_id) {
-      const templateId = meal.recurrence_template_id;
-      const tpl = db.get().prepare('SELECT start_date FROM meal_recurrence_templates WHERE id = ?').get(templateId);
-      const newEnd = addDays(meal.date, -1);
-
-      db.transaction(() => {
-        db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ? AND date >= ?')
-          .run(templateId, meal.date);
-
-        // Endet die Serie vor ihrem eigenen Beginn, bleibt kein Termin übrig -
-        // dann ist die Vorlage selbst überflüssig (CASCADE räumt Zutaten und
-        // Ausnahmen ab).
-        if (!tpl || newEnd < tpl.start_date) {
-          db.get().prepare('DELETE FROM meal_recurrence_templates WHERE id = ?').run(templateId);
-        } else {
-          db.get().prepare('UPDATE meal_recurrence_templates SET end_date = ? WHERE id = ?')
-            .run(newEnd, templateId);
-          db.get().prepare('DELETE FROM meal_recurrence_exceptions WHERE template_id = ? AND date >= ?')
-            .run(templateId, meal.date);
-        }
-      });
-      return res.status(204).end();
-    }
-
-    deleteMealOccurrence(meal, req.authUserId || req.session.userId);
-    const result = { changes: 1 };
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'Meal not found.', code: 404 });
-    res.status(204).end();
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  // scope=series entfernt die gesamte Serie: alle materialisierten Instanzen plus
+  // das Template (CASCADE räumt Template-Zutaten und Ausnahmen ab). Da
+  // meals.recurrence_template_id ON DELETE SET NULL ist, müssen die Instanzen vor
+  // dem Template explizit gelöscht werden, sonst blieben sie als Einzel-Mahlzeiten zurück.
+  if (req.query.scope === 'series' && meal.recurrence_template_id) {
+    const templateId = meal.recurrence_template_id;
+    db.transaction(() => {
+      db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ?').run(templateId);
+      db.get().prepare('DELETE FROM meal_recurrence_templates WHERE id = ?').run(templateId);
+    });
+    return res.status(204).end();
   }
+
+  // scope=future beendet die Serie an dieser Stelle: das Template bekommt ein
+  // Ende vor diesem Termin, alle Instanzen ab hier verschwinden. Das ist der
+  // Ausweg für eine Serie, deren erster Termin längst gelöscht wurde - ohne ihn
+  // blieb nur das Löschen jedes einzelnen Vorkommens, während die Woche danach
+  // schon wieder ein neues erzeugte (#619).
+  if (req.query.scope === 'future' && meal.recurrence_template_id) {
+    const templateId = meal.recurrence_template_id;
+    const tpl = db.get().prepare('SELECT start_date FROM meal_recurrence_templates WHERE id = ?').get(templateId);
+    const newEnd = addDays(meal.date, -1);
+
+    db.transaction(() => {
+      db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ? AND date >= ?')
+        .run(templateId, meal.date);
+
+      // Endet die Serie vor ihrem eigenen Beginn, bleibt kein Termin übrig -
+      // dann ist die Vorlage selbst überflüssig (CASCADE räumt Zutaten und
+      // Ausnahmen ab).
+      if (!tpl || newEnd < tpl.start_date) {
+        db.get().prepare('DELETE FROM meal_recurrence_templates WHERE id = ?').run(templateId);
+      } else {
+        db.get().prepare('UPDATE meal_recurrence_templates SET end_date = ? WHERE id = ?')
+          .run(newEnd, templateId);
+        db.get().prepare('DELETE FROM meal_recurrence_exceptions WHERE template_id = ? AND date >= ?')
+          .run(templateId, meal.date);
+      }
+    });
+    return res.status(204).end();
+  }
+
+  deleteMealOccurrence(meal, req.authUserId || req.session.userId);
+  const result = { changes: 1 };
+  if (result.changes === 0)
+    return res.status(404).json({ error: 'Meal not found.', code: 404 });
+  res.status(204).end();
 });
 
 // --------------------------------------------------------
@@ -825,29 +828,24 @@ router.delete('/:id', (req, res) => {
  * Body: { name, quantity? }
  * Response: { data: Ingredient }
  */
-router.post('/:id/ingredients', (req, res) => {
-  try {
-    const mealId = parseInt(req.params.id, 10);
-    const meal   = db.get().prepare('SELECT id FROM meals WHERE id = ?').get(mealId);
-    if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
+router.post('/:id/ingredients', validateRequest(), (req, res) => {
+  const mealId = pathId(req);
+  const meal   = db.get().prepare('SELECT id FROM meals WHERE id = ?').get(mealId);
+  if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
 
-    const { name, quantity = null, category = 'Sonstiges' } = req.body;
-    if (!name || !name.trim())
-      return res.status(400).json({ error: 'name is required.', code: 400 });
+  const { name, quantity = null, category = 'Sonstiges' } = req.body;
+  if (!name || !name.trim())
+    return res.status(400).json({ error: 'name is required.', code: 400 });
 
-    const result = db.get().prepare(`
-      INSERT INTO meal_ingredients (meal_id, name, quantity, category) VALUES (?, ?, ?, ?)
-    `).run(mealId, name.trim(), quantity?.trim() || null, String(category || '').trim() || 'Sonstiges');
+  const result = db.get().prepare(`
+    INSERT INTO meal_ingredients (meal_id, name, quantity, category) VALUES (?, ?, ?, ?)
+  `).run(mealId, name.trim(), quantity?.trim() || null, String(category || '').trim() || 'Sonstiges');
 
-    const ing = db.get().prepare(
-      'SELECT * FROM meal_ingredients WHERE id = ?'
-    ).get(result.lastInsertRowid);
+  const ing = db.get().prepare(
+    'SELECT * FROM meal_ingredients WHERE id = ?'
+  ).get(result.lastInsertRowid);
 
-    res.status(201).json({ data: ing });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.status(201).json({ data: ing });
 });
 
 /**
@@ -856,38 +854,33 @@ router.post('/:id/ingredients', (req, res) => {
  * Body: { name?, quantity?, on_shopping_list? }
  * Response: { data: Ingredient }
  */
-router.patch('/ingredients/:ingId', (req, res) => {
-  try {
-    const ingId = parseInt(req.params.ingId, 10);
-    const ing   = db.get().prepare('SELECT * FROM meal_ingredients WHERE id = ?').get(ingId);
-    if (!ing) return res.status(404).json({ error: 'Ingredient not found.', code: 404 });
+router.patch('/ingredients/:ingId', validateRequest(), (req, res) => {
+  const ingId = pathId(req, 'ingId');
+  const ing   = db.get().prepare('SELECT * FROM meal_ingredients WHERE id = ?').get(ingId);
+  if (!ing) return res.status(404).json({ error: 'Ingredient not found.', code: 404 });
 
-    const { name, quantity, on_shopping_list, category } = req.body;
+  const { name, quantity, on_shopping_list, category } = req.body;
 
-    db.get().prepare(`
-      UPDATE meal_ingredients
-      SET name             = COALESCE(?, name),
-          quantity         = ?,
-          category         = COALESCE(?, category),
-          on_shopping_list = COALESCE(?, on_shopping_list)
-      WHERE id = ?
-    `).run(
-      name?.trim() ?? null,
-      quantity !== undefined ? (quantity?.trim() || null) : ing.quantity,
-      category !== undefined ? (String(category || '').trim() || 'Sonstiges') : null,
-      on_shopping_list !== undefined ? (on_shopping_list ? 1 : 0) : null,
-      ingId
-    );
+  db.get().prepare(`
+    UPDATE meal_ingredients
+    SET name             = COALESCE(?, name),
+        quantity         = ?,
+        category         = COALESCE(?, category),
+        on_shopping_list = COALESCE(?, on_shopping_list)
+    WHERE id = ?
+  `).run(
+    name?.trim() ?? null,
+    quantity !== undefined ? (quantity?.trim() || null) : ing.quantity,
+    category !== undefined ? (String(category || '').trim() || 'Sonstiges') : null,
+    on_shopping_list !== undefined ? (on_shopping_list ? 1 : 0) : null,
+    ingId
+  );
 
-    const updated = db.get().prepare(
-      'SELECT * FROM meal_ingredients WHERE id = ?'
-    ).get(ingId);
+  const updated = db.get().prepare(
+    'SELECT * FROM meal_ingredients WHERE id = ?'
+  ).get(ingId);
 
-    res.json({ data: updated });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: updated });
 });
 
 /**
@@ -895,22 +888,45 @@ router.patch('/ingredients/:ingId', (req, res) => {
  * Zutat löschen.
  * Response: 204 No Content
  */
-router.delete('/ingredients/:ingId', (req, res) => {
-  try {
-    const ingId  = parseInt(req.params.ingId, 10);
-    const result = db.get().prepare('DELETE FROM meal_ingredients WHERE id = ?').run(ingId);
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'Ingredient not found.', code: 404 });
-    res.status(204).end();
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.delete('/ingredients/:ingId', validateRequest(), (req, res) => {
+  const ingId  = pathId(req, 'ingId');
+  const result = db.get().prepare('DELETE FROM meal_ingredients WHERE id = ?').run(ingId);
+  if (result.changes === 0)
+    return res.status(404).json({ error: 'Ingredient not found.', code: 404 });
+  res.status(204).end();
 });
 
 // --------------------------------------------------------
 // Integration: Zutaten → Einkaufsliste (Phase 2, Schritt 12)
 // --------------------------------------------------------
+
+/**
+ * WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1290).
+ *
+ * Die beiden Riegel in server/index.js urteilen am ERSTEN PFADSEGMENT
+ * (`moduleForPath`): diese Aufrufe laufen unter `/meals` und werden deshalb
+ * als `meals` gemessen - angelegt werden aber `shopping_items`. Ein
+ * Mitglied mit `meals: write` und `shopping: none` fuellte so eine Liste,
+ * die es nicht einmal oeffnen darf, und ein Token mit `meals:write` ohne
+ * jeden Einkaufs-Scope genauso. Die Zuordnung am Pfad ist dafuer die
+ * falsche Frage: was ein Aufruf SCHREIBT, weiss nur die Route selbst.
+ * `mayWriteModule()` prueft beide Achsen (Mitgliedsrecht und Token-Scope)
+ * in einem Aufruf.
+ *
+ * VOR DEN 404ern, nicht danach: sonst verriete die Antwort einem
+ * Gesperrten noch, welche Mahlzeit und welche Liste es gibt. Und vor
+ * validateRequest() (#2810): das Recht haengt an keiner Zeile, ein
+ * Gesperrter bekommt seine 403 auch fuer eine kaputte Anfrage.
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+function requireShoppingWrite(req, res, next) {
+  if (!mayWriteModule(req, 'shopping')) {
+    return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
+  }
+  return next();
+}
 
 /**
  * POST /api/v1/meals/:id/to-shopping-list
@@ -929,53 +945,30 @@ router.delete('/ingredients/:ingId', (req, res) => {
  * „schon übertragen" zurück - die Zutaten wären dann weder auf der Liste noch
  * erneut übertragbar.
  */
-router.post('/:id/to-shopping-list', (req, res) => {
-  try {
-    // WER IN DEN EINKAUF SCHREIBT, BRAUCHT DAS EINKAUFS-RECHT (#1290).
-    //
-    // Die beiden Riegel in server/index.js urteilen am ERSTEN PFADSEGMENT
-    // (`moduleForPath`): dieser Aufruf laeuft unter `/meals` und wird deshalb
-    // als `meals` gemessen - angelegt werden aber `shopping_items`. Ein
-    // Mitglied mit `meals: write` und `shopping: none` fuellte so eine Liste,
-    // die es nicht einmal oeffnen darf, und ein Token mit `meals:write` ohne
-    // jeden Einkaufs-Scope genauso. Die Zuordnung am Pfad ist dafuer die
-    // falsche Frage: was ein Aufruf SCHREIBT, weiss nur die Route selbst.
-    // `mayWriteModule()` prueft beide Achsen (Mitgliedsrecht und Token-Scope)
-    // in einem Aufruf.
-    //
-    // VOR DEN 404ern, nicht danach: sonst verriete die Antwort einem
-    // Gesperrten noch, welche Mahlzeit und welche Liste es gibt.
-    if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
-    }
+router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (req, res) => {
+  // Das Einkaufs-Recht prueft requireShoppingWrite() vor diesem Handler.
+  const mealId = pathId(req);
+  const meal   = db.get().prepare('SELECT id, recipe_id FROM meals WHERE id = ?').get(mealId);
+  if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
 
-    const mealId = parseInt(req.params.id, 10);
-    const meal   = db.get().prepare('SELECT id, recipe_id FROM meals WHERE id = ?').get(mealId);
-    if (!meal) return res.status(404).json({ error: 'Meal not found.', code: 404 });
+  // `listId` ist Pflicht, eine ganze Zahl ab 1: das prueft das Schema (#2810).
+  const { listId } = req.body;
 
-    const { listId } = req.body;
-    if (!listId)
-      return res.status(400).json({ error: 'listId is required.', code: 400 });
+  const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404 });
 
-    const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(listId);
-    if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404 });
+  // Rezept-Mahlzeiten bekommen beim ersten Transfer ihre Rezeptzutaten als
+  // echte meal_ingredients (materializeRecipeIngredients, dort begruendet) -
+  // seit R23 derselbe Weg wie im Wochen- und im Listenimport.
+  const result = db.transaction(() => {
+    const { rows } = mealPlanSource(db.get(), { mealId });
+    if (!rows.length) return null;
+    return handOverToShoppingList(db.get(), listId, rows);
+  });
 
-    // Rezept-Mahlzeiten bekommen beim ersten Transfer ihre Rezeptzutaten als
-    // echte meal_ingredients (materializeRecipeIngredients, dort begruendet) -
-    // seit R23 derselbe Weg wie im Wochen- und im Listenimport.
-    const result = db.transaction(() => {
-      const { rows } = mealPlanSource(db.get(), { mealId });
-      if (!rows.length) return null;
-      return handOverToShoppingList(db.get(), listId, rows);
-    });
+  if (!result) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [], ingredient_ids: [] } });
 
-    if (!result) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [], ingredient_ids: [] } });
-
-    res.json({ data: { transferred: result.added_ids.length, ...result } });
-  } catch (err) {
-    log.error('POST /:id/to-shopping-list', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: { transferred: result.added_ids.length, ...result } });
 });
 
 /**
@@ -991,40 +984,30 @@ router.post('/:id/to-shopping-list', (req, res) => {
  * der Oberfläche; die IDs stehen trotzdem in der Antwort, damit ein künftiger
  * Aufrufer nicht als einziger Erzeuger-Pfad ohne Rücknahme dasteht.
  */
-router.post('/week-to-shopping-list', (req, res) => {
-  try {
-    // Derselbe Grund wie beim Einzel-Transfer darueber (#1290): der Pfad sagt
-    // `meals`, geschrieben wird in den Einkauf.
-    if (!mayWriteModule(req, 'shopping')) {
-      return res.status(403).json({ error: 'Write access to the shopping list is required.', code: 403, reason: 'cross_module_access' });
-    }
+router.post('/week-to-shopping-list', requireShoppingWrite, validateRequest(), (req, res) => {
+  // Das Einkaufs-Recht prueft requireShoppingWrite() vor diesem Handler.
+  // `listId` prueft das Schema (#2810). `week` behaelt seine Musterpruefung:
+  // der Wert geht in die Datumsrechnung von weekStart() (Senke, nicht Route).
+  const { listId, week } = req.body;
 
-    const { listId, week } = req.body;
+  if (!week || !DATE_RE.test(week))
+    return res.status(400).json({ error: 'A valid date (YYYY-MM-DD) is required.', code: 400 });
 
-    if (!listId)
-      return res.status(400).json({ error: 'listId is required.', code: 400 });
-    if (!week || !DATE_RE.test(week))
-      return res.status(400).json({ error: 'A valid date (YYYY-MM-DD) is required.', code: 400 });
+  const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(listId);
+  if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404 });
 
-    const list = db.get().prepare('SELECT id FROM shopping_lists WHERE id = ?').get(listId);
-    if (!list) return res.status(404).json({ error: 'Shopping list not found.', code: 404 });
+  const from = weekStart(week);
+  const to   = weekEnd(week);
 
-    const from = weekStart(week);
-    const to   = weekEnd(week);
+  const result = db.transaction(() => {
+    const { rows } = mealPlanSource(db.get(), { from, to });
+    if (!rows.length) return null;
+    return handOverToShoppingList(db.get(), listId, rows);
+  });
 
-    const result = db.transaction(() => {
-      const { rows } = mealPlanSource(db.get(), { from, to });
-      if (!rows.length) return null;
-      return handOverToShoppingList(db.get(), listId, rows);
-    });
+  if (!result) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [], ingredient_ids: [] } });
 
-    if (!result) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [], ingredient_ids: [] } });
-
-    res.json({ data: { transferred: result.added_ids.length, ...result } });
-  } catch (err) {
-    log.error('POST /week-to-shopping-list', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+  res.json({ data: { transferred: result.added_ids.length, ...result } });
 });
 
 export default router;

@@ -1,4 +1,5 @@
-import { idParam, op, withCaseReasons } from '../helpers.js';
+import { idParam, op, withCaseReasons, withValidationRefusal } from '../helpers.js';
+import { DISPLAY_IDLE_STEPS } from '../../../public/utils/display-device-settings.js';
 
 export function displaysPaths() {
   return withCaseReasons('displays', CASE_REASONS, {
@@ -8,7 +9,7 @@ export function displaysPaths() {
         tag: 'Displays',
         description: 'Admin only. A display is a `users` row of its own kind (#1208, DECISIONS entry 4): not a household member, without a password, and unable to sign in with a username and password or through SSO. This list is the exact counterpart of the member predicate - it shows only the accounts every list of people leaves out. Each entry carries `device_settings` (null until saved, otherwise night_from/night_until, idle_seconds, show_clock and cover_photo; #2436), `show_screensaver` (whether the display may show the photo screensaver, #1766) and its devices with "last seen" and, for a revoked one, the moment it was revoked; no secret is ever returned. Beside `data` the answer carries `area_modules`: the modules a paired display reads besides the overview itself, derived from its fixed scope list.',
       }),
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Create a wall display',
         tag: 'Displays',
         stateChanging: true,
@@ -27,8 +28,9 @@ export function displaysPaths() {
                 properties: {
                   display_name: {
                     type: 'string',
+                    minLength: 1,
                     maxLength: 128,
-                    description: 'What this tablet is called in the settings list, for example "Kitchen".',
+                    description: 'What this tablet is called in the settings list, for example "Kitchen". At most 128 characters as sent; empty after trimming spaces is refused.',
                   },
                 },
               },
@@ -36,10 +38,10 @@ export function displaysPaths() {
           },
         },
         description: 'Admin only. Body: { display_name }. Creates a new `users` row marked as a display; an existing account can never be turned into one, because that would silently strip a person out of every list and void their password. The account has no usable password from the start, and no device until one is paired.',
-      }),
+      })),
     },
     '/api/v1/displays/pair': {
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Exchange a pairing code for a device credential',
         tag: 'Displays',
         // Die einzige Route dieses Moduls OHNE Anmeldung - sie haengt in
@@ -67,18 +69,18 @@ export function displaysPaths() {
                   label: {
                     type: ['string', 'null'],
                     maxLength: 120,
-                    description: 'Optional name for this device, shown beside "last seen" in the settings list.',
+                    description: 'Optional name for this device, shown beside "last seen" in the settings list. At most 120 characters as sent; `null` or `""` means none.',
                   },
                 },
               },
             },
           },
         },
-        description: 'The only route a display itself calls, and the only one that needs no authentication - a freshly mounted tablet has nothing to identify itself with yet, the same reason `/auth/login` is public. Body: { code, label? }. The credential is returned **only** as an httpOnly cookie and never in the response body, so no script on the page can read it. A code is valid once, expires after 15 minutes, and is replaced when a newer one is issued for the same display; all three failures answer the same 400, so guessing learns nothing. Rate-limited like the sign-in routes. A successful exchange revokes the display\'s previous device: one display, one tablet.',
-      }),
+        description: 'The only route a display itself calls, and the only one that needs no authentication - a freshly mounted tablet has nothing to identify itself with yet, the same reason `/auth/login` is public. Body: { code, label? }. The credential is returned **only** as an httpOnly cookie and never in the response body, so no script on the page can read it. A code is valid once, expires after 15 minutes, and is replaced when a newer one is issued for the same display; all three failures answer the same 400, so guessing learns nothing. Rate-limited like the sign-in routes. A successful exchange revokes the display\'s previous device: one display, one tablet. A body outside the schema (no `code`, a `code` or `label` that is not text, a `label` over 120 characters) answers 400 with `fields`; it counts against the rate limit and leaves a signed-in session in place.',
+      })),
     },
     '/api/v1/displays/{id}': {
-      patch: op({
+      patch: withValidationRefusal(op({
         summary: 'Manage a wall display’s night hours and screensaver',
         tag: 'Displays',
         stateChanging: true,
@@ -91,7 +93,7 @@ export function displaysPaths() {
               schema: {
                 type: 'object',
                 minProperties: 1,
-                anyOf: [{ required: ['show_screensaver'] }, { required: ['device_settings'] }],
+                anyOf: [{ properties: { show_screensaver: { type: 'boolean' } }, required: ['show_screensaver'] }, { properties: { device_settings: { type: 'object' } }, required: ['device_settings'] }],
                 properties: {
                   device_settings: {
                     type: 'object', additionalProperties: false,
@@ -99,7 +101,8 @@ export function displaysPaths() {
                     properties: {
                       night_from: { type: 'integer', minimum: 0, maximum: 23, description: 'Start hour in household time. Must differ from night_until.' },
                       night_until: { type: 'integer', minimum: 0, maximum: 23 },
-                      idle_seconds: { type: 'integer', enum: [60, 120, 300, 600, 900] },
+                      // The one list of public/utils/display-device-settings.js (#2810).
+                      idle_seconds: { type: 'integer', enum: [...DISPLAY_IDLE_STEPS] },
                       show_clock: { type: 'boolean' }, cover_photo: { type: 'boolean' },
                     },
                   },
@@ -113,8 +116,8 @@ export function displaysPaths() {
           },
         },
         description: 'Admin only (#1766, #2436). Supply show_screensaver, a complete device_settings object, or both. Invalid values reject the whole change with 400. Device options are returned by GET /displays and only to that tablet in GET /preferences as display_device_settings. Until first saved, device_settings is null and local tablet choices remain active. An online visible tablet checks every 30 seconds and on resume; night/idle apply then and clock/cover apply on the next screensaver start. A display changes no settings itself, so whether it shows the photo screensaver is chosen here, per display, and off by default. While it is off the display\'s requests to `/screensaver/photos` and `/screensaver/photos/{id}` are refused at the scope gate; the change applies from the tablet\'s next request. Only a real boolean is accepted.',
-      }),
-      delete: op({
+      })),
+      delete: withValidationRefusal(op({
         summary: 'Delete a wall display',
         tag: 'Displays',
         stateChanging: true,
@@ -123,17 +126,17 @@ export function displaysPaths() {
         // ab und ein erzeugter Client kann die Id gar nicht mitgeben.
         params: [idParam('id', 'Display ID')],
         description: 'Admin only. Removes the account and, through `ON DELETE CASCADE`, its pairing codes and devices - any paired tablet stops working on its next request.',
-      }),
+      })),
     },
     '/api/v1/displays/{id}/pairing-code': {
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Issue a one-time pairing code',
         tag: 'Displays',
         stateChanging: true,
         params: [idParam('id', 'Display ID')],
         requestBody: null,
         description: 'Admin only. Returns a ten-character code in plaintext exactly once, valid for 15 minutes. Issuing a new code spends the previous one immediately: two open codes would be two keys to the same door, and the older one would hang around unnoticed.',
-      }),
+      })),
     },
     '/api/v1/displays/people': {
       get: op({
@@ -143,14 +146,14 @@ export function displaysPaths() {
       }),
     },
     '/api/v1/displays/{id}/devices/{deviceId}/revoke': {
-      post: op({
+      post: withValidationRefusal(op({
         summary: 'Revoke a paired device',
         tag: 'Displays',
         stateChanging: true,
         params: [idParam('id', 'Display ID'), idParam('deviceId', 'Device ID')],
         requestBody: null,
         description: 'Admin only. Sets `revoked_at` rather than deleting the row, so a revocation stays provable. Access ends on the device\'s next request - the credential is checked against the database every time, so there is no cached state a revocation would have to catch up with. The device has to belong to the display named in the path.',
-      }),
+      })),
     },
     '/api/v1/displays/{id}/devices/{deviceId}/remove': {
       post: op({

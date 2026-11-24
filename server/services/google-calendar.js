@@ -1639,7 +1639,7 @@ function inboundFields(item, calTimeZone) {
 }
 
 // Yuvomi speichert getimte Events als "YYYY-MM-DDTHH:MM" (ohne Sekunden,
-// siehe validate.js). Die Google Calendar API verlangt RFC 3339 mit
+// siehe api/formats.ts). Die Google Calendar API verlangt RFC 3339 mit
 // Sekunden, sonst "Bad Request" bzw. bei Wiederholungen "Invalid
 // recurrence rule" (Issue #217). Sekunden ergänzen, falls sie fehlen.
 function toRfc3339(dt) {

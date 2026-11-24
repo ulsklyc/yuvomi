@@ -35,7 +35,7 @@
  *        Zukunftsdaten (2098/2099) + relativer Ordnung; keine Kopplung an "heute".
  *        Geteilte :memory:-DB (pro Testdatei ein Prozess): Aggregat-Routen nutzen
  *        eindeutige Titel-/Suchmarker + Enthaltensein statt Gesamtzahl.
- * Ausführen: node --experimental-sqlite --test test/test-calendar-routes.js
+ * Ausführen: node --test test/test-calendar-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -43,11 +43,10 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { readFileSync } from 'node:fs';
 
 const dbmod = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const {
   calendarOccurrenceDeleteTarget,
   calendarOccurrenceMutationTarget,
@@ -88,22 +87,25 @@ db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALU
 
 // ── App mit injizierter Auth (actor zur Request-Zeit gelesen) ────────────────────
 let actor = ADMIN;
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
-  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
-  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
-  // Modulrechte und Token-Scope fuer die Dokumentenrecht-Faelle (#1358).
-  req.sessionModuleAccess = actor.moduleAccess ?? null;
-  req.authScopes = actor.authScopes ?? null;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+    // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+    req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
+    // Modulrechte und Token-Scope fuer die Dokumentenrecht-Faelle (#1358).
+    req.sessionModuleAccess = actor.moduleAccess ?? null;
+    req.authScopes = actor.authScopes ?? null;
+    next();
+  },
 });
-app.use(express.json({ limit: '10mb' }));
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
 
 test.after(() => server.close());
 
@@ -161,7 +163,9 @@ const titles = (rows) => rows.map((e) => e.title);
 test('GET / — 400 bei ungültigem from/to', async () => {
   const res = await call('GET', '/?from=2035-3-1&to=xxxx');
   assert.equal(res.status, 400);
-  assert.match(res.body.error, /YYYY-MM-DD/);
+  // Seit #2810 die 400 des Schemas (`format: date`), mit dem Feld statt Satz.
+  assert.equal(res.body.reason, 'validation');
+  assert.equal(res.body.fields[0].path, 'query/from');
 });
 
 test('GET / — liefert Termine im Fenster (all-sichtbar)', async () => {
@@ -533,8 +537,8 @@ test('Sync-Routen: Nicht-Admin erhält 403 (requireAdmin-Gate)', async () => {
 // ════════════════════════════════════════════════════════════════════════════════
 
 test('PATCH /external-calendars — Validierung + 404 (nicht synchronisiert)', async () => {
-  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'x', external_id: 'a' } })).status, 400);
-  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: '' } })).status, 400);
+  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'x', external_id: 'a', default_assignee_user_ids: [] } })).status, 400);
+  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: '', default_assignee_user_ids: [] } })).status, 400);
   assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'c1', default_assignee_user_id: 'abc' } })).status, 400);
   assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'c1', default_assignee_user_id: 999 } })).status, 400);
   const notSynced = await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'never-synced', default_assignee_user_id: 2 } });
@@ -1420,7 +1424,7 @@ test('PATCH /subscriptions/:id — 400/404/403/Happy', async () => {
   assert.equal((await call('PATCH', `/subscriptions/${subId}`, { body: { name: '' } })).status, 400);
   assert.equal((await call('PATCH', `/subscriptions/${subId}`, { body: { color: 'nope' } })).status, 400);
   // Maria (Owner, non-admin) darf eigenen Sub ändern
-  const ok = await call('PATCH', `/subscriptions/${subId}`, { actor: MARIA, body: { name: 'Renamed', shared: 1 } });
+  const ok = await call('PATCH', `/subscriptions/${subId}`, { actor: MARIA, body: { name: 'Renamed', shared: true } });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.data.name, 'Renamed');
   // Tom (non-admin, fremd) -> 403
@@ -1442,7 +1446,7 @@ test('DELETE /subscriptions/:id - Mitglieds-Token neben einer Admin-Sitzung 403,
   const withToken = await call('DELETE', `/subscriptions/${subId}`, {
     actor: { ...TOM, cookieSession: { userId: ADMIN.id, role: 'admin' } },
   });
-  assert.equal(withToken.status, 403, 'isAdminUser urteilt nach der Rolle des Token-Subjekts');
+  assert.equal(withToken.status, 403, 'isAdminRequest urteilt nach der Rolle des Token-Subjekts');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM ics_subscriptions WHERE id=?').get(subId).n, 1);
   assert.equal((await call('DELETE', `/subscriptions/${subId}`, { actor: ADMIN })).status, 204);
 });
@@ -2240,12 +2244,18 @@ test('POST /:id/exceptions — 404 + 400 keine Serie + 400 extern', async () => 
 
 test('single event PUT ignores irrelevant orphan confirmation metadata', async () => {
   const id = insertEvent({ title: 'Single confirmation', start_datetime: '2042-02-03T09:00' });
-  for (const count of [0, null, 'obsolete metadata', -1]) {
+  // Seit #2810 prueft das Schema die Form (`integer >= 0`): was keine solche
+  // Zahl ist (`null`, Text, `-1`), ist eine 400, bevor der Handler sie
+  // ignorieren koennte; eine Zahl ohne Bedeutung fuer einen Einzeltermin bleibt
+  // ohne Wirkung.
+  for (const count of [0, 3, null, 'obsolete metadata', -1]) {
+    const valid = Number.isInteger(count) && Number(count) >= 0;
     const result = await call('PUT', `/${id}`, {
       body: { title: 'Still editable', confirmed_orphan_count: count },
     });
-    assert.equal(result.status, 200);
-    assert.equal(result.body.data.title, 'Still editable');
+    assert.equal(result.status, valid ? 200 : 400, JSON.stringify(count));
+    if (valid) assert.equal(result.body.data.title, 'Still editable');
+    else assert.equal(result.body.reason, 'validation');
   }
 });
 
@@ -3595,10 +3605,11 @@ test('occurrence mutation routes reject schema-invalid values before persistence
         body,
       });
       assert.equal(response.status, 400, `${suffix || '/only'} ${JSON.stringify(body)}`);
-      // Englisch fuer API-Clients, ohne Grund: das Formular laesst keinen dieser
-      // Werte durch, die App sagt ihren allgemeinen Satz (#1909).
+      // Englisch fuer API-Clients, ohne eigenen Fall: das Formular laesst keinen
+      // dieser Werte durch, die App sagt ihren allgemeinen Satz (#1909). Seit
+      // #2810 antwortet das Schema die Formfehler mit `reason: validation`.
       assert.doesNotMatch(response.body.error, /[äöüß]|Gib |Wähle/);
-      assert.equal(response.body.reason, undefined, JSON.stringify(body));
+      assert.ok([undefined, 'validation'].includes(response.body.reason), JSON.stringify(body));
       assert.equal(db.prepare(`
         SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
       `).get(seriesId).count, 0);
@@ -4387,12 +4398,15 @@ test('PUT / — eine Serie mit eigener Zone wird an ihrem Ortstag geprueft', asy
 // ID, Vorschau- und Download-URL, Name, Typ und Groesse sind `null`, auf jedem
 // Leseweg des Kalenders.
 test('Anhang: ohne Dokumentenrecht oder Sicht aufs Dokument nennt der Termin ihn nicht (#1358)', async () => {
-  // Zehn Tage voraus in der Haushaltszone: im 90-Tage-Fenster von /upcoming.
+  // Morgen um Mitternacht in der Haushaltszone: vor jedem spaeteren Vorkommen der offenen
+  // Serien, die andere Tests dieser Datei anlegen. Zehn Tage voraus fiel der
+  // Termin aus den 20 Plaetzen von /upcoming, sobald das Datum der Serien
+  // (2026-01-15 taeglich und weitere) das Fenster fuellt.
   const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
-  const day = shiftDateKey(todayKey(db), 10);
+  const day = shiftDateKey(todayKey(db), 1);
   const dataUrl = `data:text/plain;base64,${Buffer.from('Geheimer Anhang').toString('base64')}`;
   const created = await call('POST', '/', { actor: ADMIN, body: {
-    title: 'Qzxanhangsrecht', start_datetime: `${day}T09:00`,
+    title: 'Qzxanhangsrecht', start_datetime: `${day}T00:00`,
     attachment_data: dataUrl, attachment_name: 'vertrag.txt',
   } });
   assert.equal(created.status, 201);
@@ -5572,9 +5586,10 @@ test('die Termin-Faelle tragen einen reason und einen englischen Text (#1909)', 
       english(res, `${method} ${route}`);
     }
     // Eine Kennung, die keine Zahl ist, schickt nur ein Aufrufer: kein Fall.
+    // Seit #2810 die 400 des Schemas, `reason: validation`.
     const malformed = await call('POST', '/', { body: { title: 'Neu', start_datetime: '2035-03-10T09:00', local_calendar_id: 'x' } });
     assert.equal(malformed.status, 400);
-    assert.equal(malformed.body.reason, undefined);
+    assert.equal(malformed.body.reason, 'validation');
     english(malformed, 'local_calendar_id x');
     // Ein leerer Titel ebenso (das Formular prueft ihn selbst).
     const untitled = await call('POST', '/', { body: { title: '', start_datetime: '2035-03-10T09:00' } });

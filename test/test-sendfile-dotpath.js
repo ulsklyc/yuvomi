@@ -19,7 +19,7 @@
  *          - Gegenprobe: dieselbe Route in der ALTEN Form (absoluter Pfad) muss
  *            unter dem Dot-Pfad im Error-Handler landen. Wird DIESER Test rot,
  *            hat sich das send-Verhalten geaendert, auf dem der Fix beruht.
- * Ausführen: node --experimental-sqlite --test test/test-sendfile-dotpath.js
+ * Ausführen: node --test test/test-sendfile-dotpath.js
  */
 
 import os from 'node:os';

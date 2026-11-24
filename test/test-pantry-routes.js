@@ -8,7 +8,7 @@
  *        Teil-Update sowie beide Import-Richtungen inklusive Chargen-Regel
  *        (gleiches MHD addiert, abweichendes MHD legt eine neue Zeile an).
  *        Persistenz jeweils per DB-Assertion belegt.
- * Ausführen: node --experimental-sqlite --test test/test-pantry-routes.js
+ * Ausführen: node --test test/test-pantry-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -21,6 +21,8 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { default: pantryRouter } = await import('../server/routes/pantry.js');
 const { default: shoppingRouter } = await import('../server/routes/shopping.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const USER = db.prepare(`
@@ -30,14 +32,18 @@ const USER = db.prepare(`
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = USER;
   req.authRole = 'member';
   req.session = { userId: USER, role: 'member' };
   next();
 });
-app.use('/pantry', pantryRouter);
-app.use('/shopping', shoppingRouter);
+// At their real prefix: validateRequest() reads the operation from the mount (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { if (/^\/(pantry|shopping)(\/|\?|$)/.test(req.url)) req.url = `/api/v1${req.url}`; next(); });
+app.use('/api/v1/pantry', pantryRouter);
+app.use('/api/v1/shopping', shoppingRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -125,10 +131,14 @@ test('POST /pantry: ohne Menge → 1 (nicht 0), Default-Einheit pcs', async () =
   assert.equal(r.body.data.created_by, USER);
 });
 
-test('POST /pantry: unbekannte Einheit wird normalisiert statt abgelehnt', async () => {
+test('POST /pantry: unbekannte Einheit ist seit #2810 ein 400 (sie wurde still zu pcs)', async () => {
   const r = await call('POST', '/pantry', { name: 'Kaffee', unit: 'faesser' });
-  assert.equal(r.status, 201);
-  assert.equal(r.body.data.unit, 'pcs');
+  assert.equal(r.status, 400);
+  assert.deepEqual(r.body.fields, [{ path: 'body/unit', rule: 'enum' }]);
+  // Left out, the unit is still the default.
+  const without = await call('POST', '/pantry', { name: 'Kaffee' });
+  assert.equal(without.status, 201);
+  assert.equal(without.body.data.unit, 'pcs');
 });
 
 test('POST /pantry: Menge wird auf zwei Nachkommastellen gerundet', async () => {
@@ -404,8 +414,10 @@ test('D3 import-shopping/undo: stellt den Vorrat genau wieder her', async () => 
   const added = r.body.data.changes.filter((c) => c.kind === 'added');
   const again = await call('POST', '/pantry/import-shopping/undo', { changes: added });
   assert.deepEqual(again.body.data, { removed: 0, reduced: 0 }, 'eine geloeschte Charge wird still uebergangen');
+  // Entries that are not the server's own shape were skipped silently; since #2810 they are a 400.
   const junk = await call('POST', '/pantry/import-shopping/undo', { changes: [{ pantry_item_id: 'x', kind: 'added' }, { kind: 'nope' }] });
-  assert.deepEqual(junk.body.data, { removed: 0, reduced: 0 });
+  assert.equal(junk.status, 400);
+  assert.deepEqual(junk.body.fields, [{ path: 'body/changes/0/pantry_item_id', rule: 'type' }]);
 });
 
 test('POST /pantry/import-shopping: räumt die Einkaufsliste bewusst NICHT ab', async () => {
@@ -524,7 +536,8 @@ test('undo-transfer: unbekannte IDs werden uebergangen, leerer Body ist kein Feh
 
   const list = await call('POST', '/shopping', { name: 'Teilweise' });
   const added = await call('POST', `/shopping/${list.body.data.id}/items`, { name: 'Butter' });
-  const r = await call('POST', '/shopping/items/undo-transfer', { ids: [added.body.data.id, 999999, 'x'] });
+  // `'x'` stand hier bis #2810 mit drin; das Schema weist ihn jetzt ab.
+  const r = await call('POST', '/shopping/items/undo-transfer', { ids: [added.body.data.id, 999999] });
   assert.equal(r.body.data.removed, 1);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM shopping_items WHERE list_id = ?').get(list.body.data.id).n, 0);
 });
@@ -634,7 +647,7 @@ test('DELETE /pantry/products/:id: a product with batches is refused with 409 an
 
 test('DELETE /pantry/products/:id: behind the pantry write permission, like the delete of a batch', async () => {
   const { sessionModuleAccessRequirement, tokenAccessRequirement } = await import('../server/scopes.js');
-  const { moduleAccessVerdict, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED } = await import('../server/permissions.js');
+  const { moduleAccessVerdict, MODULE_ACCESS_READ_ONLY, MODULE_ACCESS_DENIED } = await import('../server/authorize/index.ts');
   // Both gates in server/index.js ask these two functions, at the path below /api/v1.
   for (const ask of [sessionModuleAccessRequirement, tokenAccessRequirement]) {
     assert.deepEqual(ask('/pantry/products/5', 'DELETE'), ask('/pantry/5', 'DELETE'), 'the same requirement as a batch');
@@ -653,7 +666,9 @@ test('DELETE /pantry/products/:id: behind the pantry write permission, like the 
     if (verdict === MODULE_ACCESS_READ_ONLY) return res.status(403).json({ code: 403, reason: 'module_read_only' });
     return next();
   });
-  gated.use('/pantry', pantryRouter);
+  // Behind the gate the router sits at its real prefix (#2810).
+  gated.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { req.url = `/api/v1${req.url}`; next(); });
+  gated.use('/api/v1/pantry', pantryRouter);
   const gatedServer = gated.listen(0, '127.0.0.1');
   await new Promise((r) => gatedServer.on('listening', r));
   try {
@@ -721,7 +736,9 @@ test('write-through: min_quantity on a batch sets the minimum of its product, fo
 
   // A create without a number leaves the minimum of the product alone: null, '' or missing.
   await call('POST', '/pantry', { name: 'reis', quantity: 1, unit: 'kg', min_quantity: null });
-  await call('POST', '/pantry', { name: 'Reis', quantity: 1, unit: 'kg', min_quantity: '' });
+  // '' is no number since #2810: refused, and it changes nothing either.
+  const empty = await call('POST', '/pantry', { name: 'Reis', quantity: 1, unit: 'kg', min_quantity: '' });
+  assert.equal(empty.status, 400);
   assert.equal(productMin(a.id), 2, 'a new batch does not clear the minimum of its product');
   // ... a number sets it.
   await call('POST', '/pantry', { name: 'Reis', quantity: 1, unit: 'kg', min_quantity: 3 });
@@ -744,7 +761,10 @@ test('write-through: min_quantity on a batch sets the minimum of its product, fo
   const bad = await call('PATCH', `/pantry/${b.id}`, { min_quantity: -1 });
   assert.equal(bad.status, 400);
   assert.equal(productMin(a.id), 1);
-  await call('PATCH', `/pantry/${b.id}`, { min_quantity: '' });
+  // null clears (the documented form); '' is a 400 since #2810.
+  assert.equal((await call('PATCH', `/pantry/${b.id}`, { min_quantity: '' })).status, 400);
+  assert.equal(productMin(a.id), 1);
+  await call('PATCH', `/pantry/${b.id}`, { min_quantity: null });
   assert.equal(productMin(a.id), null);
   // The stepper (quantity only) never touches it.
   await call('PATCH', `/pantry/${b.id}`, { min_quantity: 2 });

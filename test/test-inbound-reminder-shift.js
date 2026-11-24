@@ -43,6 +43,7 @@ import express from 'express';
 // Nach dem Setzen von DB_PATH: server/db.js verbindet BEIM IMPORT.
 const db = (await import('../server/db.js')).get();
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { sync: caldavSync } = await import('../server/services/caldav-sync.js');
 const { sync: appleSync } = await import('../server/services/apple-calendar.js');
 const { sync: icsSync } = await import('../server/services/ics-subscription.js');
@@ -67,10 +68,13 @@ app.use((req, _res, next) => {
   req.session = { userId: actingUser, role: 'member' };
   next();
 });
-app.use('/', remindersRouter);
+// At its real prefix, with the central error handler: validateRequest() finds
+// its operation by the mount (#2810).
+app.use('/api/v1/reminders', remindersRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const apiServer = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => apiServer.on('listening',
-  () => r(`http://127.0.0.1:${apiServer.address().port}`)));
+  () => r(`http://127.0.0.1:${apiServer.address().port}/api/v1/reminders`)));
 
 // Der Feed des ICS-Abos: was in `feed` steht, liefert der Server aus.
 let feed = '';

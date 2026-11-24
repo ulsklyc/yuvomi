@@ -29,7 +29,7 @@ test('fasting clients receive concrete lifecycle schemas, revision transports an
   assert.deepEqual(create.required, ['start_tzid']);
   assert.equal(create.properties.goal_minutes.multipleOf, 60);
   assert.equal(create.properties.goal_minutes.maximum, 20160);
-  assert.equal(create.properties.end_at.nullable, true);
+  assert.deepEqual(create.properties.end_at.type, ['string', 'null']);
   assert.equal(create.properties.note.maxLength, 2000);
   assert.deepEqual(schema('fasting/{id}', 'patch').required, ['expected_revision']);
   assert.deepEqual(schema('fasting/{id}/finish', 'post').required, ['expected_revision']);
@@ -101,7 +101,8 @@ test('meals apply-plan documents skip_occupied and the skipped answer (Discussio
 });
 const indexSrc = readFileSync(new URL('index.js', pathsDir), 'utf8');
 const moduleFiles = readdirSync(pathsDir)
-  .filter((f) => f.endsWith('.js') && f !== 'index.js')
+  // .ts too: a path module written in TypeScript (phase 2 onward) is a path module.
+  .filter((f) => /\.(js|ts)$/.test(f) && f !== 'index.js')
   .sort();
 
 async function fragmentOf(file) {
@@ -601,11 +602,17 @@ test('#2062 events_calendar an GET /dashboard ist als Query-Parameter deklariert
   assert.ok(param, 'Query-Parameter events_calendar fehlt');
   assert.equal(param.in, 'query');
   assert.equal(param.required, false);
+  // Seit #2810 (Gruppe 10, Entscheidung 9) traegt das Schema die zugesagte
+  // Toleranz: Text ohne Muster und ohne Hoechstzahl, denn validateRequest()
+  // liest es, und ein fremder Schluessel faellt laut Beschreibung weg. Form
+  // und Grenze stehen in der Beschreibung.
   assert.equal(param.schema?.type, 'array');
-  assert.equal(param.schema.maxItems, 50);
-  assert.equal(param.schema.items?.pattern, '^(local|cal|sub):[1-9][0-9]{0,14}$');
+  assert.equal(param.schema.maxItems, undefined);
+  assert.deepEqual(param.schema.items, { type: 'string' });
   assert.equal(param.explode, true);
   assert.match(param.description, /GET \/calendar\/calendars/, 'nennt den Katalog');
+  assert.match(param.description, /`local:<id>`.*`cal:<id>`.*`sub:<id>`/, 'nennt die Form');
+  assert.match(param.description, /capped at 50; a value of any other shape is dropped/, 'nennt Grenze und Toleranz');
 });
 
 test('#2062 GET /calendar/calendars beschreibt sources neben data', () => {

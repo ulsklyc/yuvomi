@@ -19,15 +19,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
-import { renderServiceWorkerSource } from '../server/utils/service-worker.js';
+import { renderServiceWorker } from '../scripts/build/service-worker.ts';
 import { createNavigateHarness, HARNESS_ROUTES } from './router-navigate-harness.js';
 import { createOfflineSession } from '../public/utils/offline-session.js';
 
 const TEST_BUILD_REVISION = 'sw-api-cache-test';
-const SRC = renderServiceWorkerSource(
-  readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'),
-  TEST_BUILD_REVISION,
-);
+// Wie der Build ihn schreibt (scripts/build/service-worker.ts): Version aus
+// package.json und Revision eingesetzt, die Listen vorne.
+const SRC = renderServiceWorker(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), {
+  precache: ['/', '/index.html', '/locales/de.json'],
+  locales: ['/locales/de.json'],
+  release: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version,
+  revision: TEST_BUILD_REVISION,
+});
 const ORIGIN = 'https://app.test';
 
 // --------------------------------------------------------

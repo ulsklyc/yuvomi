@@ -8,7 +8,7 @@
  *        (2) Bestandshaushalt: der Wert ist ein JSON-Array in einer
  *            sync_config-Zeile und muss gemergt werden - ein blindes Ersetzen
  *            wuerde bereits abgeschaltete Module wieder einschalten.
- * Ausführen: node --experimental-sqlite --test test/test-inventory-default-off-migration.js
+ * Ausführen: node --test test/test-inventory-default-off-migration.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -99,9 +99,9 @@ test('Zweiter Lauf fuegt inventory kein zweites Mal hinzu', () => {
 test('inventory ist ein gueltiger Slug fuer die Lese-/Schreibseite', async () => {
   // parseDisabledModules filtert gegen TOGGLEABLE_MODULES - stuende inventory
   // dort nicht, waere der von der Migration geschriebene Wert wirkungslos.
-  const source = await import('node:fs/promises')
-    .then((fs) => fs.readFile(new URL('../server/routes/preferences.js', import.meta.url), 'utf8'));
-  const list = source.match(/const TOGGLEABLE_MODULES = \[([\s\S]*?)\];/)?.[1];
-  assert.ok(list, 'TOGGLEABLE_MODULES nicht gefunden');
-  assert.match(list, /'inventory'/);
+  // Seit dem Einstellungs-Register (Phase 2, C3) wird die Liste importiert und
+  // die Leseseite gefragt, nicht mehr der Routentext geschnitten.
+  const { TOGGLEABLE_MODULES, parseDisabledModules } = await import('../server/settings/values.ts');
+  assert.ok(TOGGLEABLE_MODULES.includes('inventory'));
+  assert.deepEqual(parseDisabledModules(JSON.stringify(['inventory'])), ['inventory']);
 });

@@ -14,7 +14,7 @@
  *  - die Detailansicht schaltet die Kaestchen frei, Dashboard und Kalender nicht
  *  - i18n: die neuen Keys in allen Locales
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-tasks-checklist.js
+ * Ausfuehren: node --test test/test-tasks-checklist.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -22,11 +22,10 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { readFile, readdir } from 'node:fs/promises';
 
 const dbmod = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const database = dbmod.get();
 
 const mkUser = (name) => database
@@ -41,17 +40,16 @@ const OUTSIDER = mkUser('outsider');
 let actingUser = OWNER;
 let actingRole = 'member';
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actingUser;
-  req.authRole   = actingRole;
-  req.session    = { userId: actingUser, role: actingRole };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actingUser;
+    req.authRole   = actingRole;
+    req.session    = { userId: actingUser, role: actingRole };
+    next();
+  },
 });
-app.use('/', tasksRouter);
 const server  = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/tasks`)));
 test.after(() => server.close());
 
 /* KEIN VERKEHR AUSSER ZUM EIGENEN TESTSERVER.

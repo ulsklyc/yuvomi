@@ -26,6 +26,8 @@ process.env.TZ = 'UTC';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 
 const moduleDatabase = get();
@@ -75,6 +77,7 @@ const OTHER_MEMBER = seedUser('member');
 function createHarness({ userId = OWNER, role = 'member', authScopes = null, sessionModuleAccess = null } = {}) {
   const app = express();
   app.use(express.json());
+  app.use(defaultEmptyBody);
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
@@ -85,6 +88,8 @@ function createHarness({ userId = OWNER, role = 'member', authScopes = null, ses
   });
   app.use('/api/v1/documents', documentsRouter);
   app.use('/api/v1/reminders', remindersRouter);
+  // The central error handler answers the 400 of validateRequest() as JSON (#2810).
+  app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {
@@ -275,7 +280,7 @@ test('PUT /documents/:id verschiebt die Erinnerung, wenn sich das Ablaufdatum ae
     const id = created.body.data.id;
     assert.equal(reminderRows(id)[0].remind_at, `${daysFromToday(25)}T09:00`);
 
-    await h.call('PUT', `/${id}`, { expires_at: daysFromToday(60), expiry_reminder_days: 5 });
+    await h.call('PUT', `/${id}`, { expires_at: daysFromToday(60), expiry_reminder_days: 5, allowed_member_ids: [] });
     const rows = reminderRows(id);
     assert.equal(rows.length, 1, 'die alte Zeile darf nicht liegen bleiben');
     assert.equal(rows[0].remind_at, `${daysFromToday(55)}T09:00`);
@@ -294,7 +299,7 @@ test('PUT /documents/:id raeumt die Erinnerung ab, wenn das Ablaufdatum entfernt
     const id = created.body.data.id;
     assert.equal(reminderRows(id).length, 1);
 
-    await h.call('PUT', `/${id}`, { expires_at: null });
+    await h.call('PUT', `/${id}`, { expires_at: null, allowed_member_ids: [] });
     assert.equal(reminderRows(id).length, 0);
   } finally {
     await h.close();
@@ -356,7 +361,7 @@ test('PUT /documents/:id mit status=archived raeumt die Erinnerung ebenso ab', a
     const id = created.body.data.id;
     assert.equal(reminderRows(id).length, 1);
 
-    await h.call('PUT', `/${id}`, { status: 'archived' });
+    await h.call('PUT', `/${id}`, { status: 'archived', allowed_member_ids: [] });
     assert.equal(reminderRows(id).length, 0);
   } finally {
     await h.close();
@@ -401,7 +406,7 @@ test('die Erinnerung gehoert created_by, nicht der bearbeitenden Person (Admin)'
 
     // Ein Admin darf das fremde Dokument bearbeiten (#989) - die Erinnerung
     // bleibt trotzdem bei der Person, die das Dokument angelegt hat.
-    const edited = await admin.call('PUT', `/${id}`, { expires_at: daysFromToday(90), expiry_reminder_days: 3 });
+    const edited = await admin.call('PUT', `/${id}`, { expires_at: daysFromToday(90), expiry_reminder_days: 3, allowed_member_ids: [] });
     assert.equal(edited.status, 200);
     const rows = reminderRows(id);
     assert.equal(rows.length, 1);

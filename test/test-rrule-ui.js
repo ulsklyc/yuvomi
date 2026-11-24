@@ -281,11 +281,11 @@ test('ohne Ausgangsregel entsteht die Regel wie bisher aus den Feldern', () => {
 
 test('eine neu gebaute Regel besteht weiterhin den Server-Validator', async () => {
   // DER ECHTE AUSDRUCK, NICHT SEINE KOPIE. Hier stand bis #960 ein
-  // handabgeschriebenes Duplikat von `server/middleware/validate.js` - und als
+  // handabgeschriebenes Duplikat von `server/api/formats.ts` - und als
   // der Validator um BYMONTHDAY erweitert wurde, prüfte der Test weiter gegen
   // die alte Fassung, ohne rot zu werden. Ein Guard, der eine Kopie der Regel
   // hält, prüft ab dem ersten Auseinanderlaufen sich selbst.
-  const { RRULE_RE } = await import('../server/middleware/validate.js');
+  const { RRULE_RE } = await import('../server/api/formats.ts');
   const gebaut = [
     buildRRule({ freq: 'WEEKLY', interval: 2, byday: ['MO', 'TH'], until: '', count: 5 }),
     buildRRule({ freq: 'MONTHLY', interval: 1, byday: [], until: '', lastDay: true }),
@@ -366,7 +366,7 @@ test('der Server nimmt nur BYMONTHDAY=-1 an, nichts Weiteres (#960)', async () =
   // Fassung liess den vollen RFC-Bereich durch: `FREQ=WEEKLY;BYMONTHDAY=15`
   // liess sich speichern und lief danach woechentlich, ohne den angenommenen
   // Monatstag je anzuwenden - eine Regel, die etwas anderes tut, als sie sagt.
-  const { RRULE_RE } = await import('../server/middleware/validate.js');
+  const { RRULE_RE } = await import('../server/api/formats.ts');
   assert.ok(RRULE_RE.test('FREQ=MONTHLY;BYMONTHDAY=-1'), 'die eine unterstuetzte Form');
   assert.ok(RRULE_RE.test('FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=-1;COUNT=5'));
   for (const wert of ['15', '31', '-2', '-31', '0', '1,15']) {

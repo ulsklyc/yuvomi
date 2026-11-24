@@ -8,17 +8,19 @@
 
 import { nextOccurrence, matchesRRuleByday } from './recurrence.js';
 import { shiftDateKey } from '../utils/timezone.js';
-import { str, color as validateColorField, collectErrors } from '../middleware/validate.js';
+import { str, color as validateColorField, collectErrors } from '../api/formats.ts';
 
-export const RECURRENCE_KINDS = Object.freeze(['weekly', 'monthly_fixed_day', 'monthly_ordinal_weekday']);
-export const WEEKDAY_CODES = Object.freeze(['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']);
+import { RECURRENCE_KINDS, WEEKDAY_CODES, ORDINAL_WEEKDAY_VALUES, TYPE_NAME_MAX, TYPE_ICON_MAX, NOTE_MAX } from './waste-fields.js';
+
+// Die Listen und Grenzen stehen in waste-fields.js (#2810), die das
+// OpenAPI-Dokument mitliest; hier bleiben sie unter ihrem alten Namen erreichbar.
+export { RECURRENCE_KINDS, WEEKDAY_CODES, ORDINAL_WEEKDAY_VALUES, TYPE_NAME_MAX, NOTE_MAX };
 export const WEEKLY_INTERVAL_MAX = 52;
 export const MONTHLY_INTERVAL_MAX = 24;
-// -1 (last) or 1-4 (nth) - the same bound server/services/recurrence.js's own
-// `bydayOrdinal` accepts, for the same reason: every month has at least four
-// of any given weekday, so only these values are ever guaranteed to exist
-// (#1063 Phase 9).
-export const ORDINAL_WEEKDAY_VALUES = Object.freeze([-1, 1, 2, 3, 4]);
+// ORDINAL_WEEKDAY_VALUES: -1 (last) or 1-4 (nth) - the same bound
+// server/services/recurrence.js's own `bydayOrdinal` accepts, for the same
+// reason: every month has at least four of any given weekday, so only these
+// values are ever guaranteed to exist (#1063 Phase 9).
 
 // Matches Schedule's own established ceiling - a range read is never allowed
 // to scan an arbitrary multi-year window.
@@ -55,8 +57,6 @@ export class WasteExpansionError extends Error {
 
 export const DEFAULT_TYPE_ICON = 'trash-2';
 export const DEFAULT_TYPE_COLOR = '#22C55E';
-export const TYPE_NAME_MAX = 100;
-export const NOTE_MAX = 500;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -94,7 +94,7 @@ export function validateType(input, { partial = false } = {}) {
     value.name = v.value;
   }
   if (!partial || input.icon !== undefined) {
-    const v = str(input.icon ?? DEFAULT_TYPE_ICON, 'icon', { max: 60 });
+    const v = str(input.icon ?? DEFAULT_TYPE_ICON, 'icon', { max: TYPE_ICON_MAX });
     checks.push(v);
     value.icon = v.value;
   }

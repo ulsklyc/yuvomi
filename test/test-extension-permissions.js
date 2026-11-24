@@ -1,6 +1,6 @@
 /**
  * Test: Extension module permissions
- * Run: node --experimental-sqlite --test test/test-extension-permissions.js
+ * Run: node --test test/test-extension-permissions.js
  */
 
 import os from 'node:os';
@@ -70,7 +70,7 @@ const {
   setExtensionPermissionCatalog,
   buildSessionModuleAccess,
   moduleAccessVerdict,
-} = await import('../server/permissions.js');
+} = await import('../server/authorize/index.ts');
 const { extensionPermissionKey, normalizeCapabilities } = await import('../server/services/module-capabilities.js');
 const { moduleForPath, setExtensionScopeModules } = await import('../server/scopes.js');
 

@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 22.14+ or 23.6+ on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 24.12 or newer on the host. The browser-based wizard is fully localized (27 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### CLI Installer (Linux / macOS)
 
@@ -171,59 +171,51 @@ git --version              # git version 2.x.x
 
 ### Browser Support
 
-Measured on 21 September 2026 (v2.68.0) from what the shipped code in `public/` uses, with the
-version data of MDN's [browser-compat-data](https://github.com/mdn/browser-compat-data) 8.1.2
-([#1369](https://github.com/ulsklyc/yuvomi/issues/1369)). Edge, Opera, Samsung Internet and
-other Chromium browsers follow the Chrome column. Every browser on iPhone and iPad uses Safari's
-engine, so there the iOS version counts, not the browser.
+Measured on 9 November 2026 against the browser floor the app is built for (`build.target` in
+`vite.config.ts`), with the version data of MDN's
+[browser-compat-data](https://github.com/mdn/browser-compat-data). Edge, Opera, Samsung
+Internet and other Chromium browsers follow the Chrome column. Every browser on iPhone and iPad
+uses Safari's engine, so there the iOS version counts, not the browser.
 
 | | Chrome / Edge | Firefox | Safari (macOS) | iOS / iPadOS |
 |---|---|---|---|---|
-| **Everything as designed** | 117 | 129 | 17.5 | 17.5 |
-| **Starts, every screen opens, scrolls** | 87 | 79 | 14.1 | 14.5 |
+| **Starts, every screen opens, scrolls** | 105 | 115 | 15.4 | 15.4 |
 
-**Below the second row Yuvomi does not work.** Four things set that floor:
+**Below this row Yuvomi shows a notice page instead of the app.** A small script that runs
+before anything else checks for two features that arrived at the floor (CSS cascade layers and
+`Object.hasOwn`); a browser without them is sent to a page in German or English that names
+these versions and suggests updating the browser or the device, or using another browser.
+Chrome 99 to 104 and Firefox 97 to 114 pass that check although they are below the row: there
+the app starts, but single screens can stay empty.
 
-- Every screen is drawn with `replaceChildren()` (Chrome 86, Firefox 78, Safari 14). Without it
-  the app shows only its error page.
-- The date field that the start loads declares a static class field (Safari 14.1, iOS 14.5).
-  An older Safari rejects the whole script, and nothing renders at all.
-- Dialogs are placed with the CSS property `inset` (Chrome 87, Safari 14.1). Without it every
-  dialog opens below the visible window, so nothing can be created or edited.
-- The calendar and fasting screens use `||=` and `??=` (Firefox 79). An older Firefox cannot
-  load those two screens.
-
-**Between the two rows Yuvomi works but looks or behaves differently.** What is missing up to
-which version:
+**Above the row Yuvomi works but looks or behaves differently up to these versions:**
 
 | Feature | Chrome | Firefox | Safari | Without it |
 |---|---|---|---|---|
 | `color-mix()` | 111 | 113 | 16.2 | Tinted surfaces and hover states lose their color; the dialog backdrop loses its tint. Where that would lose information, a plain color stands in: primary buttons, the add button, toasts, holidays, selected rows and filters, the search overlay, note and shift colors (as a ring) and empty checklist boxes |
 | `:has()` | 105 | 121 | 15.4 | Layout details: toolbar wrapping, the space kept free above the bottom navigation, full-height split pages |
 | Container queries | 105 | 110 | 16 | Cards and lists keep their narrow layout; split views stay in one column |
-| Popover | 114 | 125 | 17 | The menus behind a button are not available and stay hidden: every "more" menu (module tools, list rows, documents), the account menu at the foot of the sidebar, the Overview's New and tools menus, the calendar's view menu. Their buttons do nothing; Log out is also under Settings > Account. The date field's calendar does not open (typing a date works, touch devices get the system picker) |
 | `dvh` | 108 | 101 | 15.4 | Heights fall back to `vh`; on a phone the bottom edge can sit under the browser's toolbar |
-| `Object.hasOwn`, `Array.at()`, `findLastIndex()` | 97 | 104 | 15.4 | Single actions fail: note category filter, notification channel form, document storage settings, folder upload, fasting controls and durations, a birthday's custom reminder |
-| `<dialog>` `showModal()` | 37 | 98 | 15.4 | Icon picker and photo crop do not open |
 | `inert` | 102 | 112 | 15.5 | Behind an open dialog the page stays reachable with the keyboard |
-| `:focus-visible` | 86 | 85 | 15.4 | No focus ring; where a rule pairs it with hover, the hover state goes too |
-| Listener clean-up via `AbortSignal` | 90 | 86 | 15 | Event listeners outlive the screen that set them |
 | Subgrid, `text-wrap: balance`, `@starting-style` | 117 | 129 | 17.5 | Fasting week chart alignment, balanced headings, the date picker's fade-in |
 | Document preview (bundled PDF.js 4.10) | 94 | 93 | 16.4 | PDFs do not open in the viewer; PDF.js itself targets current browsers, so treat these as a lower bound |
+
+Menus behind a button (Popover, Chrome 114, Firefox 125, Safari 17) work below those versions
+too: where the browser lacks the feature, Yuvomi loads a small polyfill for it; browsers that
+have it load nothing extra.
 
 Newer features that change nothing essential are not counted: `text-wrap: pretty`,
 `hyphenate-limit-chars`, `prefers-reduced-transparency`, `scrollbar-width` and `scrollbar-color`
 (WebKit has its own scrollbar styling), masonry behind `@supports`. On iOS before 18.3 a popover
 menu does not close when you tap next to it.
 
-Firefox ESR 115 lies between the rows: it works, but without `:has()`, the popover menus and
-balanced headings.
-Firefox ESR 128 and later match the first row except for the date picker's fade-in.
+Firefox ESR 115 sits at the floor: it works, but without `:has()` and balanced headings. Firefox ESR 128 and later have everything except the date picker's fade-in.
 
-`npm run test:old-browser-fallbacks` keeps the second row true: the scripts that run before the
-first screen may not call APIs newer than it, no module may use syntax newer than it, and no
-stylesheet may use a construct that makes such a browser drop a whole block. The suite reads the
-second row from this table, so a change to the floor changes the guard with it.
+`npm run test:old-browser-fallbacks` keeps the row true: the scripts that run before the first
+screen may not call APIs newer than it, no module may use syntax newer than it, and no
+stylesheet may use a construct that makes such a browser drop a whole block. The suite reads
+the row from this table, so a change to the floor changes the guard with it;
+`npm run test:browser-floor-page` holds the notice page to `build.target`.
 
 ---
 
@@ -235,7 +227,7 @@ There are nine ways to get Yuvomi running. **Option A** (web installer) is recom
 
 ### Option A — Web Installer (Recommended)
 
-Requires Node.js 22.14+ or 23.6+ and Docker on the host.
+Requires Node.js 24.12 or newer and Docker on the host.
 
 #### 1. Clone the Repository
 
@@ -311,13 +303,20 @@ That prints **two** values: paste one as `SESSION_SECRET` and the other as `DB_E
 docker compose up -d
 ```
 
-Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no Node.js installation needed.
+Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. Nothing to build or install on the host, not even Node.js; the image carries the built app.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.86.0` (exact version), `2.86` (latest patch of that minor), plus a moving `main`
+> `2.94.0` (exact version), `2.93` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.86.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.94.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
+>
+> **Going back to an earlier release** is the same move in reverse: pin the previous tag and
+> restart. Whether your database can follow depends on whether the newer release ran a
+> migration, see [Going back](#going-back). A foundation release (its CHANGELOG block starts
+> with "Foundation") changes the toolchain and not the database, so it rolls back this way with
+> your data untouched.
+
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
 > time with [cosign](https://github.com/sigstore/cosign), keyless, under the identity of
@@ -325,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.86.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.94.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -334,7 +333,27 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. No build step, no No
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.86.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.94.0 --format '{{ json .Provenance }}'`.
+
+> **Verify a release tarball.** Releases from November 2026 on also carry the app as a tarball,
+> `yuvomi-<version>-dist.tar.gz` (one top-level folder `yuvomi-<version>/`), next to a
+> `SHA256SUMS` file and a build provenance attestation over both, made by
+> `.github/workflows/release-assets.yml` from the release tag. YunoHost and the Proxmox script
+> install from it. If you install from the tarball yourself, check it before you unpack it:
+>
+> ```bash
+> gh release download v<version> --repo ulsklyc/yuvomi --pattern 'yuvomi-*-dist.tar.gz' --pattern SHA256SUMS
+> sha256sum -c SHA256SUMS
+> gh attestation verify yuvomi-<version>-dist.tar.gz -R ulsklyc/yuvomi \
+>   --signer-workflow ulsklyc/yuvomi/.github/workflows/release-assets.yml \
+>   --source-ref refs/tags/v<version>
+> ```
+>
+> `sha256sum -c` proves the download is complete and matches the published sum;
+> `gh attestation verify` proves GitHub built the file from this repository with that
+> workflow, from that release tag, which a checksum alone cannot. On macOS use `shasum -a 256 -c SHA256SUMS`. The
+> YunoHost package does not need either step from you: its manifest pins the sha256 of the
+> tarball it installs, and YunoHost refuses a download that does not match it.
 
 Continue with [Step 4 — Verify](#4-verify-the-container-is-running).
 
@@ -379,12 +398,30 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.86.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.94.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
 
 Press `Ctrl+C` to stop following the logs (the container keeps running).
+
+Two paths answer without a login and tell you how the instance is doing:
+
+| Path | Says | During a restore | Use it for |
+|---|---|---|---|
+| `/health` | the process answers | `200` | the container healthcheck (all shipped descriptors use it) |
+| `/readyz` | the instance can serve right now | `503` | a load balancer, a reverse proxy check, an uptime monitor |
+
+`/readyz` answers `200 {"status":"ready"}`, or `503 {"status":"not_ready","reason":"..."}` with one
+of four reasons: `restore_in_progress`, `database_closed` (a restore failed and left no open
+database - restart Yuvomi), `schema_behind` (the database is older than this version expects) and
+`data_dir_not_writable` (the folder of the database file refuses writes - check the volume's
+ownership). Do not point a container healthcheck at `/readyz`: Docker would restart the container
+in the middle of a restore.
+
+```bash
+curl -s http://localhost:3000/readyz
+```
 
 ### 5. Create the First Admin Account
 
@@ -601,7 +638,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | `SESSION_SECURE` | Set to `true` when running behind an HTTPS reverse proxy (Caddy, Nginx, Traefik). Leave unset for direct HTTP access (e.g. TrueNAS, bare Docker). | `false` | No |
 | `RATE_LIMIT_WINDOW_MS` | Time window for rate limiting (ms) | `60000` | No |
 | `RATE_LIMIT_MAX_ATTEMPTS` | Max attempts per window on the credential routes: sign-in, the second factor, and password reset | `5` | No |
-| `ENABLE_API_DOCS` | API documentation (`/docs`, `/openapi.json`) is admin-only and hidden entirely in production. Set to `true` to expose it to signed-in admins in production too. | `false` (hidden) | No |
+| `ENABLE_API_DOCS` | In production the `/docs` page returns `404` unless this is `true`; set to `true` to show it to signed-in admins. The OpenAPI document at `/api/v1/openapi.json` and `/openapi.json` stays available to signed-in admins either way. | `false` (`/docs` hidden) | No |
 | `MCP_INTERNAL_BASE_URL` | Base URL the built-in MCP endpoint (`/mcp`) uses when its `call_api_operation` bridge calls the REST API back over loopback. Only needed when neither default reaches the app. | `BASE_URL`, otherwise `http://<BIND_ADDRESS>:<PORT>` (`127.0.0.1` while `BIND_ADDRESS` is unset) | No |
 
 Generate a secure `SESSION_SECRET`:

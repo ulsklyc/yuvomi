@@ -80,6 +80,18 @@ function jsonBody(schemaRef, description = 'JSON request body') {
   };
 }
 
+/**
+ * One operation of the document. Parameters, request body and responses are
+ * plain OpenAPI objects; the type only says so, so that a path file can hand
+ * them in without the checker reading `[]` and `null` as their only shape.
+ * @param {{
+ *   summary: string, operationId?: string, tag: string, description?: string,
+ *   auth?: boolean, admin?: boolean, params?: Array<Record<string, unknown>>,
+ *   requestBody?: Record<string, unknown> | null, responses?: Record<string, unknown> | null,
+ *   stateChanging?: boolean, documentDeleteConflict?: boolean, documentLinkRefusal?: boolean,
+ * }} options
+ * @returns {Record<string, any> & { responses: Record<string, unknown> }}
+ */
 function op({
   summary,
   operationId,
@@ -94,6 +106,7 @@ function op({
   documentDeleteConflict = false,
   documentLinkRefusal = false,
 }) {
+  /** @type {Record<string, any> & { responses: Record<string, unknown> }} */
   const operation = {
     tags: [tag],
     summary,
@@ -127,23 +140,49 @@ function op({
   return operation;
 }
 
+/**
+ * An operation of `op()` that also answers the 400 of validateRequest() (#2810):
+ * a path parameter or body outside its schema, with `reason: 'validation'`.
+ * For operations that keep the default answers of `op()` otherwise.
+ * @template {{ responses: Record<string, unknown> }} T
+ * @param {T} operation
+ * @returns {T}
+ */
+function withValidationRefusal(operation) {
+  operation.responses[400] = { $ref: '#/components/responses/BadRequest' };
+  return operation;
+}
+
+/**
+ * Upper bound of a numeric path id (#2810): Number.MAX_SAFE_INTEGER. Above it
+ * a JavaScript number no longer holds every integer, so the id a handler reads
+ * is not the one the client sent. No lower bound: `0` and a negative id stay
+ * the route's own answer.
+ */
+const MAX_PATH_ID = 9007199254740991;
+
 function idParam(name = 'id', description = 'Resource ID') {
   return {
     name,
     in: 'path',
     required: true,
     description,
-    schema: { type: 'integer' },
+    schema: { type: 'integer', maximum: MAX_PATH_ID },
   };
 }
 
-function stringPathParam(name, description) {
+/**
+ * A path parameter that is text, optionally held to a `pattern` (#2810,
+ * group 11b: the country and region codes of the holiday routes).
+ * @param {string} name @param {string} description @param {string} [pattern]
+ */
+function stringPathParam(name, description, pattern) {
   return {
     name,
     in: 'path',
     required: true,
     description,
-    schema: { type: 'string' },
+    schema: pattern ? { type: 'string', pattern } : { type: 'string' },
   };
 }
 
@@ -165,26 +204,25 @@ function langParam({ fallback = 'default' } = {}) {
       in: 'query',
       required: false,
       description: `${supported} Without it, or with a value that is not supported, the labels come in the household language (the \`language\` preference, else derived from \`region\`, else ${DEFAULT_LOCALE}). The response names the language it used in \`lang\`.`,
-      schema: {
-        type: 'string',
-        enum: [...locales],
-      },
+      // No `enum` (#2810): validateRequest() reads one, and the tolerance this
+      // description promises (#1859) would turn into a 400.
+      schema: { type: 'string' },
     };
   }
   return {
     name: 'lang',
     in: 'query',
     required: false,
-    description: `${supported} Defaults to ${DEFAULT_LOCALE}.`,
-    schema: {
-      type: 'string',
-      default: DEFAULT_LOCALE,
-      enum: [...locales],
-    },
+    description: `${supported} Defaults to ${DEFAULT_LOCALE}; a value that is not supported falls back to ${DEFAULT_LOCALE} as well.`,
+    // No `enum` (#2810, group 11b): validateRequest() reads one, and the
+    // holiday route promises English for an unsupported value (#1723), not
+    // a 400.
+    schema: { type: 'string' },
   };
 }
 
 export {
   authSecurity, csrfHeaderParam, idempotencyHeaderParam, jsonBody, op, idParam, stringPathParam, langParam,
   withCaseReasons, DOCUMENT_LINKS_READ_NOTE, DOCUMENT_LINK_REFUSAL, BUDGET_LINKS_READ_NOTE,
+  withValidationRefusal,
 };

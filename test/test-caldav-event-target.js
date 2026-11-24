@@ -7,7 +7,7 @@
  *        Zweite Invariante (Issue #618): GET /calendar/sync-targets liefert die
  *        Auswahlliste des Dropdowns auch Nicht-Admins - vorher hing sie an den
  *        admin-only Verwaltungsrouten und blieb fuer Familienmitglieder leer.
- * Ausführen: node --experimental-sqlite test/test-caldav-event-target.js
+ * Ausführen: node test/test-caldav-event-target.js
  */
 
 // Env vor dem Import der Route setzen (auth.js erwartet SESSION_SECRET,
@@ -17,13 +17,12 @@ process.env.DB_PATH = ':memory:';
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 // Dynamisch importieren, damit die oben gesetzten Env-Vars greifen:
 // statische ES-Imports werden gehoistet und würden db.js sonst mit der
 // echten DB_PATH initialisieren, bevor die Zuweisungen oben laufen.
 const db = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 
 describe('CalDAV-Ziel an Events (Issue #241)', () => {
   let server;
@@ -50,17 +49,20 @@ describe('CalDAV-Ziel an Events (Issue #241)', () => {
        VALUES (?, ?, 'Familie', '#4A90E2', 1)`
     ).run(accountId, calUrl);
 
-    const app = express();
-    app.use(express.json({ limit: '10mb' }));
     // Auth-Middleware aus index.js wird hier durch eine Stub-Injection ersetzt.
     // authRole ist umschaltbar, damit derselbe Server auch die Sicht eines
     // Familienmitglieds (Rolle "user", Issue #618) abbilden kann.
-    app.use((req, _res, next) => { req.authUserId = userId; req.authRole = role; next(); });
-    app.use('/calendar', calendarRouter);
+    // createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody
+    // und der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+    const app = await createCalendarApp({
+      mount: ['calendar'],
+      jsonLimit: '10mb',
+      auth: (req, _res, next) => { req.authUserId = userId; req.authRole = role; next(); },
+    });
 
     await new Promise((resolve) => {
       server = app.listen(0, '127.0.0.1', () => {
-        baseUrl = `http://127.0.0.1:${server.address().port}`;
+        baseUrl = `http://127.0.0.1:${server.address().port}/api/v1`;
         resolve();
       });
     });

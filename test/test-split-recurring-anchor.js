@@ -24,7 +24,7 @@
  * KEINE UHR: der Lauf bekommt seinen Tag als Argument, und wo "heute" aus der
  * Zone kommt (Fortsetzen, Migration), stehen Uhr UND Haushaltszone fest.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-split-recurring-anchor.js
+ * Ausfuehren: node --test test/test-split-recurring-anchor.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -39,6 +39,8 @@ import { tempDir } from './tmp-dir.js';
 
 const dbmod = await import('../server/db.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { nextRunNotBefore, processDueRecurringExpenses } = await import('../server/services/split-expenses-scheduler.js');
 const { MIGRATIONS, migrate } = dbmod;
 const db = dbmod.get();
@@ -51,6 +53,7 @@ const MEM = mkUser(db, 'mem');
 
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = OWNER;
   req.authRole = 'member';
@@ -59,9 +62,12 @@ app.use((req, _res, next) => {
   req.authScopes = null;
   next();
 });
-app.use('/', splitRouter);
+// Der echte Praefix aus server/index.js samt zentralem Fehlerhandler: validateRequest()
+// liest die Operation aus `req.baseUrl` (#2810).
+app.use('/api/v1/split-expenses', splitRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/split-expenses`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {

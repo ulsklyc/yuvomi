@@ -1631,9 +1631,10 @@ test('calendar: write schreibt die Erinnerung weiter wie bisher', async () => {
   const posts = erinnerungsAufrufe(calls).filter((c) => c.method === 'post');
   assert.equal(posts.length, 1, 'der Weg mit Schreibrecht bleibt offen');
   assert.equal(posts[0].body.entity_type, 'task');
-  // Die id kommt aus dem versteckten Feld und ist ein String - so geht sie
-  // auch im Browser raus; der Server nimmt sie so.
-  assert.equal(posts[0].body.entity_id, '7');
+  // The id comes from the hidden field as a string; since #2810 the page sends
+  // it as the number the API schema names (the schema still takes digit text
+  // from older service workers).
+  assert.equal(posts[0].body.entity_id, 7);
   // Der Zeitpunkt entsteht als WANDUHRZEIT (`new Date('...T23:59:59')`) und
   // geht als UTC raus - in Europe/Berlin am 1.10. also zwei Stunden davor. Die
   // Zone nagelt das npm-Script fest; geprueft wird hier nur, DASS der Wert
@@ -5094,7 +5095,7 @@ test('Haushaltshilfe hat keine Display-Ausnahme, und ein Display erreicht die Se
     'gaebe es hier eine Route, brauchte die Seite ein actingAsDisplay() VOR der Modulregel');
   const scopes = display.slice(display.indexOf('DISPLAY_SCOPES = Object.freeze(['));
   assert.ok(!/housekeeping:/.test(scopes.slice(0, scopes.indexOf(']);'))),
-    'ohne Scope setzt server/permissions.js das Modul fuer ein Display auf none - die Seite ist fuer es nicht offen');
+    'ohne Scope setzt server/authorize/catalog.ts das Modul fuer ein Display auf none - die Seite ist fuer es nicht offen');
 });
 
 test('Aufgaben-Dokumente ohne Dokumentenrecht: keine Zahl, keine Zeile, kein Link auf /documents/null (#1358)', () => {

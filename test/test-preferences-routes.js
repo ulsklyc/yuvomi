@@ -26,26 +26,25 @@ process.env.TZ = 'UTC';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
+import { createPreferencesApp, PREFERENCES_PREFIX } from './preferences-app.js';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const holidays = await import('../server/services/holidays.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 
 // Modulweiter Akteur; die Middleware liest ihn zur Request-Zeit.
 const actor = { userId: 1, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.userId;
-  req.authRole = actor.role;
-  next();
+const app = await createPreferencesApp({
+  mount: ['preferences'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.userId;
+    req.authRole = actor.role;
+    next();
+  },
 });
-app.use('/', preferencesRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
+const base = `http://127.0.0.1:${server.address().port}${PREFERENCES_PREFIX}`;
 
 test.after(() => { server.close(); holidays.__setFetchImpl(null); });
 // Deterministisch nach JEDEM Test zuruecksetzen, damit ein Fehlschlag (z. B. in
@@ -462,6 +461,54 @@ test('PUT calendar_default_duration: unzulässig -> 400, gültig -> persist', as
 });
 
 // --------------------------------------------------------
+// Vier Haushaltsfelder nur fuer Admins (Phase 2, C4 / E9)
+// --------------------------------------------------------
+// Waehrung, App-Name, Zahlungsaufgaben der Haushaltshilfe und die
+// Standarddauer neuer Termine gelten fuer den ganzen Haushalt. Bis C4 durfte
+// jedes Mitglied sie ueber die Route setzen, obwohl die Oberflaeche sie nur
+// Admins zeigt. Je Feld: das Mitglied bekommt die eine Admin-Absage (ganze
+// Antwort verglichen) und der gespeicherte Wert bleibt; der Admin kommt durch.
+const ADMIN_REQUIRED = { error: 'Admin access required.', code: 403, reason: 'admin_required' };
+const C4_FIELDS = [
+  { field: 'currency', start: 'CHF', member: 'USD', invalid: 'XYZ' },
+  { field: 'app_name', start: 'Haus Admin', member: 'Haus Mitglied', invalid: 'x'.repeat(101) },
+  { field: 'housekeeping_payment_tasks', start: false, member: true, invalid: 'yes' },
+  { field: 'calendar_default_duration', start: 45, member: 90, invalid: 4 },
+];
+for (const { field, start, member, invalid } of C4_FIELDS) {
+  test(`PUT ${field}: Mitglied -> 403 mit der Admin-Absage, der Wert bleibt (C4)`, async () => {
+    assert.equal((await put({ [field]: start })).status, 200);
+    const res = await put({ [field]: member }, { role: 'member', userId: 2 });
+    assert.deepEqual(res, { status: 403, body: ADMIN_REQUIRED });
+    assert.equal((await get({ role: 'member', userId: 2 })).body.data[field], start, 'das Mitglied liest weiter den alten Wert');
+    assert.equal((await get()).body.data[field], start, 'ein 403 hat nichts geschrieben');
+  });
+  test(`PUT ${field}: Admin kommt durch, der Wert ist gespeichert (C4)`, async () => {
+    const res = await put({ [field]: member });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.data[field], member);
+    assert.equal((await get({ role: 'member', userId: 2 })).body.data[field], member, 'Mitglieder lesen den Wert weiter');
+  });
+  // Die Rechtepruefung laeuft vor der Wertpruefung: ein ungueltiger Wert eines
+  // Mitglieds war bis C4 eine 400, jetzt ist es dieselbe 403.
+  test(`PUT ${field}: ungueltiger Wert eines Mitglieds -> 403 statt 400, Admin weiter 400 (C4)`, async () => {
+    assert.equal((await put({ [field]: invalid })).status, 400);
+    assert.deepEqual(await put({ [field]: invalid }, { role: 'member', userId: 2 }), { status: 403, body: ADMIN_REQUIRED });
+  });
+}
+test('PUT gemischtes Patch eines Mitglieds (erlaubtes Feld + Admin-Feld) -> 403, nichts geschrieben (C4)', async () => {
+  assert.equal((await put({ week_start: 'monday', currency: 'CHF' })).status, 200);
+  const res = await put({ week_start: 'sunday', currency: 'USD' }, { role: 'member', userId: 2 });
+  assert.deepEqual(res, { status: 403, body: ADMIN_REQUIRED });
+  const after = (await get()).body.data;
+  assert.equal(after.week_start, 'monday', 'auch das erlaubte Feld ist nicht geschrieben');
+  assert.equal(after.currency, 'CHF');
+  // Das erlaubte Feld allein darf das Mitglied weiter setzen.
+  assert.equal((await put({ week_start: 'sunday' }, { role: 'member', userId: 2 })).status, 200);
+  assert.equal((await put({ week_start: 'monday' })).status, 200);
+});
+
+// --------------------------------------------------------
 // calendar_default_reminders / assign_me (per-user)
 // --------------------------------------------------------
 test('PUT calendar_default_reminders: Validierung + dedup/sort persist', async () => {
@@ -786,9 +833,16 @@ test('GET /holidays/subdivisions/:cc?lang=: Namen in der UI-Sprache, sonst Engli
     // Eine App-Sprache, die die API fuer dieses Land nicht fuehrt.
     assert.deepEqual(await namen('?lang=ja'), englisch);
     // Nichts davon ist eine App-Sprache - und nichts davon erreicht den Service.
-    for (const boese of ['?lang=xx', '?lang=..%2Fde', '?lang=de%26countryIsoCode%3DFR', '?lang=de&lang=fr', '?lang=']) {
+    for (const boese of ['?lang=xx', '?lang=..%2Fde', '?lang=de%26countryIsoCode%3DFR', '?lang=']) {
       assert.deepEqual(await namen(boese), englisch, `${boese} faellt auf Englisch`);
     }
+    // Doppelt gegeben ist `lang` kein Text mehr (#2810, Gruppe 11b): das
+    // Dokument liest den Parameter einmal, validateRequest() antwortet 400,
+    // bevor etwas den Service erreicht. Vorher fiel es auf Englisch.
+    const doppelt = await raw('GET', '/holidays/subdivisions/DE?lang=de&lang=fr');
+    assert.equal(doppelt.status, 400);
+    assert.equal(doppelt.body.reason, 'validation');
+    assert.deepEqual(doppelt.body.fields.map((f) => f.path), ['query/lang']);
     assert.ok(urls.length > 0 && urls.every((url) => url.endsWith('/Subdivisions?countryIsoCode=DE')),
       `lang geht nicht an die Fremd-API: ${[...new Set(urls)].join(', ')}`);
   } finally {
@@ -929,7 +983,7 @@ async function assertPatchAppliesNothing(patch, expected, actorOpts = {}) {
   const res = await put(patch, actorOpts);
   assert.equal(res.status, expected.status);
   // Die Antwort selbst bleibt, wie sie war: Status und Body des abgelehnten Feldes.
-  assert.deepEqual(res.body, { error: expected.error, code: expected.status });
+  assert.deepEqual(res.body, { error: expected.error, code: expected.status, ...(expected.reason ? { reason: expected.reason } : {}) });
   const after = (await get(actorOpts)).body.data;
   for (const key of expected.untouched) {
     assert.deepEqual(after[key], before[key], `${key} wurde trotz ${expected.status} geschrieben`);
@@ -978,7 +1032,7 @@ test('abgelehnte Patch: auch ein 403 nimmt die Felder davor zurueck (#1622)', as
   cfgSet('hidden_modules:user:1', '["budget"]');
   await assertPatchAppliesNothing(
     { week_start: 'saturday', hidden_modules: ['tasks'], holiday_show_public: true },
-    { status: 403, error: 'Admin access required.', untouched: ['week_start', 'hidden_modules'] },
+    { status: 403, error: 'Admin access required.', reason: 'admin_required', untouched: ['week_start', 'hidden_modules'] },
     { role: 'member' },
   );
   cfgDelete('week_start'); cfgDelete('hidden_modules:user:1');

@@ -15,6 +15,9 @@ import { REGION_TAG, formatUnit, getNumberFormat } from '../public/i18n.js';
 import { withoutCommentsKeepingLines } from './source-text.js';
 import { withLocales } from './i18n-env.js';
 import { formatDateKey, isRegionTag, regionLocale, resolveHouseholdLocale } from '../server/utils/i18n.js';
+// The backend lists live in the settings registry since phase 2, C3: imported,
+// not cut from the route's text.
+import { VALID_DATE_FORMATS, VALID_TIME_FORMATS, isValidRegionValue } from '../server/settings/values.ts';
 
 // Die Formprüfung aus getFormatLocale() wird IMPORTIERT, nicht gespiegelt. Bis
 // 20.09.2026 stand hier eine Kopie des Musters, und eine Kopie belegt nur, dass
@@ -22,20 +25,10 @@ import { formatDateKey, isRegionTag, regionLocale, resolveHouseholdLocale } from
 // grün und misst die alte Form weiter.
 const BCP47_TAG = REGION_TAG;
 
-async function backendList(name) {
-  const src = await readFile(
-    new URL('../server/routes/preferences.js', import.meta.url),
-    'utf8',
-  );
-  const match = src.match(new RegExp(`const ${name} = \\[([^\\]]+)\\]`));
-  assert.ok(match, `${name} must be declared in preferences route`);
-  return [...match[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
-}
-
 test('every region preset maps to backend-valid currency, date and time values', async () => {
   const currencies = CURRENCY_CODES;
-  const dateFormats = await backendList('VALID_DATE_FORMATS');
-  const timeFormats = await backendList('VALID_TIME_FORMATS');
+  const dateFormats = VALID_DATE_FORMATS;
+  const timeFormats = VALID_TIME_FORMATS;
 
   for (const [code, preset] of Object.entries(REGION_PRESETS)) {
     assert.ok(currencies.includes(preset.currency), `${code}: invalid currency ${preset.currency}`);
@@ -201,7 +194,7 @@ test('numberLocaleFor derives the tag even without a stored region, and empties 
 // also dazwischen erlaubt. Ein Guard, den man enger macht, wird still blind,
 // und das ist hier innerhalb einer Viertelstunde zweimal passiert.
 test('es gibt nur ZWEI Formprüfungen für einen Regions-Tag', async () => {
-  const dateien = ['public/i18n.js', 'server/routes/preferences.js', 'server/utils/i18n.js'];
+  const dateien = ['public/i18n.js', 'server/routes/preferences.js', 'server/settings/registry.ts', 'server/settings/values.ts', 'server/utils/i18n.js'];
   const gefunden = [];
   for (const file of dateien) {
     const src = await readFile(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -508,8 +501,13 @@ test('i18n.js exports getFormatLocale + gecachten getNumberFormat als Zahl-Forma
 // Abwesenheit einer Region. Die drei Leser (Sprachableitung, Zahlenformat,
 // Regionsabfrage) dürfen es nicht als Tag nehmen, sonst ginge ein
 // Anzeige-Hinweis als Locale an Intl.
+//
+// Seit dem Einstellungs-Register (Phase 2, C3) steht die Regel als
+// isValidRegionValue() in server/settings/values.ts und wird IMPORTIERT - die
+// Kopie `value === 'custom' || isRegionTag(value)`, die hier stand, belegte nur,
+// dass jemand sie einmal abgeschrieben hat.
 test('preferences route validates the region field shape', async () => {
-  const akzeptiert = (value) => value === 'custom' || isRegionTag(value);
+  const akzeptiert = isValidRegionValue;
 
   for (const code of REGION_CODES) {
     assert.ok(akzeptiert(code), `${code} must pass the region check`);
@@ -521,13 +519,14 @@ test('preferences route validates the region field shape', async () => {
   assert.ok(!akzeptiert(''));
   assert.ok(!isRegionTag('custom'), "'custom' ist kein Tag - kein Leser darf es als Locale nehmen");
 
-  // Und die Route greift wirklich danach, statt ein eigenes Muster zu tragen.
+  // Und der Registereintrag `region` greift wirklich danach, statt ein eigenes
+  // Muster zu tragen (bis C3 stand diese Pruefung im Text der Route).
   const src = await readFile(
-    new URL('../server/routes/preferences.js', import.meta.url),
+    new URL('../server/settings/registry.ts', import.meta.url),
     'utf8',
   );
-  assert.match(src, /isRegionTag/,
-    'Die Route prüft die Region nicht mehr über isRegionTag - es gibt einen zweiten Pfad.');
+  assert.match(src, /field: 'region',[\s\S]{0,400}?isValidRegionValue\(/,
+    'Der Registereintrag region prüft nicht mehr über isValidRegionValue - es gibt einen zweiten Pfad.');
 });
 
 // --------------------------------------------------------------------------
@@ -666,9 +665,9 @@ test('the demo seed writes backend-valid formats that resolve to a region preset
   };
 
   assert.ok(CURRENCY_CODES.includes(triple.currency), `seed: invalid currency ${triple.currency}`);
-  assert.ok((await backendList('VALID_DATE_FORMATS')).includes(triple.date_format),
+  assert.ok(VALID_DATE_FORMATS.includes(triple.date_format),
     `seed: invalid date_format ${triple.date_format}`);
-  assert.ok((await backendList('VALID_TIME_FORMATS')).includes(triple.time_format),
+  assert.ok(VALID_TIME_FORMATS.includes(triple.time_format),
     `seed: invalid time_format ${triple.time_format}`);
   assert.notEqual(detectRegion(triple), CUSTOM_REGION,
     `seed: ${JSON.stringify(triple)} matches no region preset, so the demo household has no region`);

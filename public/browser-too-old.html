@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" data-no-locale-preload data-browser-floor-notice>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#F5F3ED" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex">
+  <title>Browser too old - Yuvomi</title>
+  <!-- DIE HINWEISSEITE DER BROWSER-UNTERGRENZE (Phase 1a, Abschnitt E).
+       Hierher schickt browser-floor.js einen Browser, der das gebaute Buendel
+       nicht laden kann (unter Chrome 105 / Firefox 115 / Safari und iOS 15.4,
+       vite.config.ts `build.target`). Bis dahin sah er eine leere Seite.
+
+       WAS HIER NICHT LAEUFT, UND WARUM: kein Modul, kein App-Stylesheet, kein
+       t(). Genau der Browser, fuer den die Seite da ist, versteht die App-Kette
+       nicht. Die Seite laedt deshalb nur klassische ES5-Skripte, die auch
+       offline.html und index.html laden (Probe, Theme und Sprache). Die Probe
+       laeuft hier andersherum (`data-browser-floor-notice`, #2651): ein
+       faehiger Browser geht zurueck auf `/`, ein zu alter bleibt. Den
+       Sprach-Preload schaltet `data-no-locale-preload` ab - die Seite laedt
+       keine Sprachdatei.
+
+       ZWEI SPRACHEN FEST IN DER SEITE (Ticket 14): Deutsch und Englisch je in
+       einem Block, sichtbar ist der zu `<html lang>` (gesetzt von lang-init.js:
+       gespeicherte Sprache vor navigator.language), Englisch fuer jede andere.
+       Das ist die dokumentierte Ausnahme von "UI-Text nur ueber t()" fuer genau
+       diese Seite und offline.html. Jeder Text ist der Wert seines Schluessels
+       (`data-key`) in de.json bzw. en.json, die Versionen die von build.target -
+       test:browser-floor-page haelt beides.
+
+       KEIN INLINE-SKRIPT: die CSP dieses Servers erlaubt nur `script-src 'self'`. -->
+  <script src="/browser-floor.js"></script>
+  <script src="/night-hours.js"></script>
+  <script src="/theme-init.js"></script>
+  <script src="/lang-init.js"></script>
+  <style>
+    /* Lokale Spiegel der App-Tokens (styles/tokens.css), wie in offline.html.
+     *
+     * WARUM GESPIEGELT: tokens.css ist auf dem Zielbrowser dieser Seite nicht
+     * garantiert - die App-Stylesheets duerfen alles nutzen, was die
+     * Untergrenze kann. Die Seite fuehrt deshalb dieselben WERTE als Literale.
+     *
+     * VERFALLSDATUM AN BEIDEN ENDEN (test:browser-floor-page): der Anlass
+     * (die Seite laedt kein App-Stylesheet) und die Gleichheit (jeder Wert hier
+     * ist der aufgeloeste Wert desselben Tokens in tokens.css). Wer hier etwas
+     * aendert, aendert es in tokens.css mit - und umgekehrt meldet der Guard,
+     * was nachzuziehen ist.
+     *
+     * DIE BUEHNE DER ZUGANGSSEITEN (DESIGN.md "Anmeldeseite"): Lichtfeld auf
+     * dem Grund, eine Glastafel, darin die Bildmarke als Absender, ein Titel,
+     * der Satz, die Versionen, der Weg und EIN Knopf. Dieselbe Form wie
+     * offline.html - zwei Zustaende ausserhalb der App, eine Gestalt.
+     *
+     * ALTE BROWSER ZUERST: alles, was ein alter Browser nicht kennt, ist eine
+     * Verfeinerung ueber einem Rueckfall, der allein steht. Breite physisch
+     * (`width`/`max-width`, nicht `inline-size`/`min()`), Abstaende per
+     * Marge (kein `gap` in Flex, Safari 14.1), Lichtfeld per color-mix() (ohne
+     * es faellt die Deklaration weg, der Grund bleibt plan), Glas nur in
+     * @supports, Fokusring auch ohne :focus-visible (Safari 15.4). */
+    :root {
+      color-scheme: light;
+      /* Farben - Light (tokens.css :root) */
+      --color-bg:             #F5F3ED;  /* --neutral-100 */
+      --color-surface:        #FFFFFF;
+      --color-text:           #1D1B17;  /* --color-text-primary */
+      --color-text-secondary: #63615B;  /* --neutral-600 */
+      --color-fill-well:      #EDEAE3;  /* --color-surface-3, das Inset-Well */
+      --color-accent:         #6C3AED;
+      --color-ink-on-vivid:   #FFFFFF;
+
+      /* Die Bildmarke kippt nicht mit dem Theme (utils/brand-mark.js). */
+      --brand-mark-from:      #8B5CF6;
+      --brand-mark-to:        #6C3AED;
+      --brand-mark-ink:       #FFFFFF;
+
+      /* Lichtfeld und Glastafel (tokens.css --brand-field, --glass-*). */
+      --brand-field-opacity:  0.20;
+      --glass-bg-elevated:    rgba(251, 250, 247, 0.86);
+      --glass-border:         rgba(255, 255, 255, 0.65);
+      --glass-inset-elevated: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+      --glass-shadow-lg:      0 10px 44px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.45);
+      --shadow-md:            0 2px 10px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+
+      /* Form */
+      --radius-md: 12px;                /* das Well der Versionen */
+      --radius-xl: 26px;                /* schwebende Flaeche */
+
+      /* Typografie - die Rollen der Kartenseiten (auth.css): Absender 20/600
+       * (--type-section-title), Titel 22/700 (--type-toolbar-title), Satz 15
+       * (Subheadline), Knopf 17 (Body). */
+      --type-sender:    1.25rem;    /* 20px */
+      --type-title:     1.375rem;   /* 22px */
+      --type-body:      1.0625rem;  /* 17px */
+      --type-secondary: 0.9375rem;  /* 15px */
+      --line-height-tight: 1.21;
+      --line-height-base:  1.47;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    /* Dark - dieselben Werte wie der Dark-Block in tokens.css, zweimal: das
+     * System (prefers-color-scheme) und die ausdrueckliche Wahl (data-theme,
+     * gesetzt von theme-init.js). Die Wahl steht zuletzt und gewinnt. */
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --color-bg:             #191816;
+        --color-surface:        #2B2825;
+        --color-text:           #F5F3ED;
+        --color-text-secondary: #B4AEA5;
+        --color-fill-well:      #37332E;
+        --color-accent:         #A78BFA;
+        --color-ink-on-vivid:   #0A0A0C;
+        --brand-field-opacity:  0.26;
+        --glass-bg-elevated:    rgba(45, 42, 39, 0.88);
+        --glass-border:         rgba(255, 255, 255, 0.12);
+        --glass-shadow-lg:      0 10px 44px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.05);
+        --shadow-md:            0 4px 14px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.06);
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --color-bg:             #191816;
+      --color-surface:        #2B2825;
+      --color-text:           #F5F3ED;
+      --color-text-secondary: #B4AEA5;
+      --color-fill-well:      #37332E;
+      --color-accent:         #A78BFA;
+      --color-ink-on-vivid:   #0A0A0C;
+      --brand-field-opacity:  0.26;
+      --glass-bg-elevated:    rgba(45, 42, 39, 0.88);
+      --glass-border:         rgba(255, 255, 255, 0.12);
+      --glass-shadow-lg:      0 10px 44px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      --shadow-md:            0 4px 14px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    /* Wer Transparenz oder mehr Kontrast verlangt, bekommt die opake Tafel
+     * ohne Feld - dieselbe Weiche wie tokens.css. */
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+      :root {
+        --brand-field-opacity: 0;
+        --glass-bg-elevated:   var(--color-surface);
+      }
+    }
+
+    /* Die Sprache: sichtbar ist der Block zu <html lang>, Englisch sonst.
+     * static-page-title.js trifft dieselbe Wahl fuer den <title>. */
+    .copy { display: none; }
+    .copy[lang="en"] { display: block; }
+    :root:lang(de) .copy[lang="en"] { display: none; }
+    :root:lang(de) .copy[lang="de"] { display: block; }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100%;
+      background-color: var(--color-bg);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      -webkit-text-size-adjust: 100%;
+    }
+    ::selection {
+      background-color: var(--color-accent);
+      color: var(--color-ink-on-vivid);
+    }
+    /* Das Marken-Lichtfeld, Kurve und Lage wie in offline.html. */
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      padding: 16px;
+      background-image:
+        radial-gradient(circle 24rem at calc(50% - 13rem) calc(50% - 12rem),
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 100%), transparent) 0%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 90%), transparent) 20%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 65%), transparent) 40%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 35%), transparent) 60%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 10%), transparent) 80%,
+          transparent 100%),
+        radial-gradient(circle 22rem at calc(50% + 15rem) calc(50% - 1rem),
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 100%), transparent) 0%,
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 90%), transparent) 20%,
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 65%), transparent) 40%,
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 35%), transparent) 60%,
+          color-mix(in srgb, var(--brand-mark-to) calc(var(--brand-field-opacity) * 10%), transparent) 80%,
+          transparent 100%),
+        radial-gradient(circle 23rem at calc(50% - 1rem) calc(50% + 17rem),
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 80%), transparent) 0%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 72%), transparent) 20%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 52%), transparent) 40%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 28%), transparent) 60%,
+          color-mix(in srgb, var(--brand-mark-from) calc(var(--brand-field-opacity) * 8%), transparent) 80%,
+          transparent 100%);
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+
+    /* Die Glastafel, 412px wie in offline.html. `margin: auto` stellt sie in
+     * die Mitte und klemmt nicht, wenn das Fenster niedriger ist als sie. */
+    .stage {
+      margin: auto;
+      width: 100%;
+      max-width: 412px;
+      padding: 32px 16px 16px;
+      text-align: center;
+      background-color: var(--color-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--glass-inset-elevated), var(--glass-shadow-lg);
+    }
+    @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+      .stage {
+        background-color: var(--glass-bg-elevated);
+        backdrop-filter: blur(32px) saturate(200%);
+        -webkit-backdrop-filter: blur(32px) saturate(200%);
+      }
+    }
+
+    .sender { margin-bottom: 24px; }
+    .mark {
+      display: block;
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 8px;
+      border-radius: 22.5%;
+      box-shadow: var(--shadow-md);
+    }
+    .mark__from { stop-color: var(--brand-mark-from); }
+    .mark__to   { stop-color: var(--brand-mark-to); }
+    .mark__circles { fill: var(--brand-mark-ink); fill-opacity: 0.82; }
+    .sender__name {
+      font-size: var(--type-sender);
+      font-weight: 600;
+      line-height: var(--line-height-tight);
+      color: var(--color-text);
+    }
+
+    h1 {
+      font-size: var(--type-title);
+      line-height: var(--line-height-tight);
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-wrap: balance;
+    }
+    p {
+      font-size: var(--type-secondary);
+      color: var(--color-text-secondary);
+      line-height: var(--line-height-base);
+      margin-bottom: 16px;
+      text-wrap: pretty;
+    }
+    /* Die Versionen sind der Satz, nach dem gehandelt wird: Label-Farbe in
+     * einem Inset-Well, Ziffern gleich breit - eine Tatsache, kein Absatz. */
+    .floor {
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      background-color: var(--color-fill-well);
+      color: var(--color-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .copy p:last-of-type { margin-bottom: 24px; }
+
+    /* Die Kapsel, EINE Buttonform (DESIGN.md), so breit wie die Tafel. */
+    .retry {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 24px;
+      background: var(--color-accent);
+      color: var(--color-ink-on-vivid);
+      border: none;
+      border-radius: 999px;
+      font-size: var(--type-body);
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .retry svg { flex: none; margin-right: 8px; }
+    .retry:hover { opacity: 0.85; }
+    /* Der Ring steht auch dort, wo :focus-visible fehlt (vor Safari 15.4):
+     * die zweite Regel verwirft ein solcher Browser ganz, der Ring bleibt. */
+    .retry:focus {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+    .retry:focus:not(:focus-visible) { outline: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .retry { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <div class="sender">
+      <!-- Die Bildmarke (utils/brand-mark.js, docs/logo.svg), dekorativ. -->
+      <svg class="mark" viewBox="0 0 160 160" fill="none" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="floor-mark" x1="0" y1="0" x2="160" y2="160" gradientUnits="userSpaceOnUse">
+            <stop class="mark__from" offset="0%"/>
+            <stop class="mark__to" offset="100%"/>
+          </linearGradient>
+        </defs>
+        <rect width="160" height="160" rx="36" fill="url(#floor-mark)"/>
+        <g class="mark__circles">
+          <circle cx="64" cy="72" r="27"/>
+          <circle cx="100" cy="78" r="25"/>
+          <circle cx="80" cy="106" r="24"/>
+        </g>
+      </svg>
+      <p class="sender__name">Yuvomi</p>
+    </div>
+    <!-- Der Knopf fuehrt auf die Wurzel: nach einem Update startet dort die
+         App, sonst kommt der Browser hierher zurueck. Ein Link, kein Skript. -->
+    <div class="copy" lang="de" data-title="Browser zu alt - Yuvomi" dir="ltr">
+      <h1 data-key="browserTooOld.title">Dieser Browser ist zu alt für Yuvomi</h1>
+      <p data-key="browserTooOld.body">Yuvomi braucht ein paar Funktionen, die dieser Browser noch nicht kennt. Deine Daten sind davon nicht betroffen.</p>
+      <p class="floor" data-key="browserTooOld.versions">Yuvomi läuft ab Chrome und Edge 105, Firefox 115 und Safari 15.4, auf iPhone und iPad ab iOS 15.4.</p>
+      <p data-key="browserTooOld.action">Aktualisiere den Browser oder das Gerät und versuche es dann erneut. Geht das nicht, öffne Yuvomi in einem anderen Browser.</p>
+      <a class="retry" href="/" data-key="common.retry"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Erneut versuchen</a>
+    </div>
+    <div class="copy" lang="en" data-title="Browser too old - Yuvomi" dir="ltr">
+      <h1 data-key="browserTooOld.title">This browser is too old for Yuvomi</h1>
+      <p data-key="browserTooOld.body">Yuvomi needs a few features this browser does not have yet. Your data is not affected.</p>
+      <p class="floor" data-key="browserTooOld.versions">Yuvomi runs on Chrome and Edge 105, Firefox 115 and Safari 15.4 or newer, and on iPhone and iPad from iOS 15.4.</p>
+      <p data-key="browserTooOld.action">Update the browser or the device, then try again. If that is not possible, open Yuvomi in another browser.</p>
+      <a class="retry" href="/" data-key="common.retry"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Try again</a>
+    </div>
+  </main>
+  <script src="/static-page-title.js"></script>
+</body>
+</html>

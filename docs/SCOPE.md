@@ -278,12 +278,14 @@ deletions cannot be learned at all. Tracked as #1002.
 The rule is often stated as "Yuvomi has no dependencies". That is not true, and stating it
 that way has cost more than one request a proper answer. What is true splits in two:
 
-- **In the browser: no runtime dependencies, and this half is absolute.** Not because
-  third-party code is bad, but because there is no build step. A browser dependency would
-  have to arrive either through a bundler or from a CDN at runtime, and both are excluded
-  permanently. Third-party frontend code enters by hand instead: copied into
-  `public/vendor/`, committed, with its license and its update steps written down. That
-  path is open and it is used.
+- **In the browser: nothing arrives at runtime, and this half is absolute.** Not because
+  third-party code is bad, but because a household's browser should load only what its own
+  server ships. Since November 2026 the app is built (Vite), and a frontend dependency enters
+  as an npm package with an exact version that the build bundles, listed in the generated
+  third-party notices; a load from a CDN or any other host at runtime stays excluded
+  permanently. Every new browser dependency needs an issue first, because it ends up in every
+  household's browser (the five guarantees in CONTRIBUTING.md, "Hard Constraints"). The hand
+  copies under `public/vendor/` remain until the roadmap moves them.
 - **On the server: small, deliberate, and emphatically not zero.** See `package.json` for
   the current list - it is all infrastructure, and it is chosen rather than accumulated.
 

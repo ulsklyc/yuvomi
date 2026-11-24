@@ -7,6 +7,10 @@ const MAX_ZIP_MB = ZIP_LIMITS.maxCompressed / (1024 * 1024);
 
 const SWITCH_NOTE = 'Exists only where the operator set `MODULES_ALLOW_WEB_INSTALL=true` (off by default): otherwise 403 `module_web_install_disabled`, before the body is read.';
 
+// validateRequest() (#2810) runs after the admin, switch and session gates and
+// the two rate limiters, so a refused request counts against them.
+const SCHEMA_REFUSAL = 'A request outside the schema of the operation (query or body) is refused before anything is read or downloaded, with `fields` as in `ApiError`; its `reason` is `bad_url` for a missing, non-text or overlong `url` and for a body that is not an object, else `validation`.';
+
 const SESSION_NOTE = 'Only from a signed-in browser session: an API token (and therefore the MCP bridge) gets 403 `module_session_required`, and the operation is not offered as an MCP tool.';
 
 const INSTALL_NOTE = `${SWITCH_NOTE} A module is same-origin JavaScript that runs with the session of every member who opens it; installing one is equivalent to copying its folder onto the server. Every install and every replace lands DISABLED: the install record in the module folder (\`install.approved: false\`) keeps it off, whatever the database says, until an admin enables it with PATCH /api/v1/modules/{id} from a browser session. A replace resets that approval even when it comes from the same repository. Only the module folder is copied, files other than web assets are skipped and listed in \`skipped\`, and nothing from the archive runs on the server. Limited to 10 install requests per 10 minutes per user; the 409 \`exists\` and 422 \`multiple\` answers that ask back do not count there, but every request counts against a second limit of 30 attempts per 10 minutes, because those answers come after the download and the unpack. Errors carry a stable \`reason\`. ${SESSION_NOTE}`;
@@ -36,7 +40,7 @@ function installResponses(extra = {}) {
       description: 'Module installed (or replaced). `data` is the module as listed by GET /api/v1/modules?admin=1.',
       content: { 'application/json': { schema: { $ref: '#/components/schemas/ModuleInstallResponse' } } },
     },
-    400: { description: 'Invalid archive or manifest. `reason` is one of `bad_url`, `not_zip`, `unsafe_path`, `symlink`, `encrypted`, `zip64`, `method`, `crc`, `duplicate`, `corrupt` (also for an incomplete upload), `bad_manifest`, `no_manifest`, `path_not_found`.', content: errorContent() },
+    400: { description: `Invalid archive or manifest. \`reason\` is one of \`bad_url\`, \`not_zip\`, \`unsafe_path\`, \`symlink\`, \`encrypted\`, \`zip64\`, \`method\`, \`crc\`, \`duplicate\`, \`corrupt\` (also for an incomplete upload), \`bad_manifest\`, \`no_manifest\`, \`path_not_found\`. ${SCHEMA_REFUSAL}`, content: errorContent() },
     401: { $ref: '#/components/responses/Unauthorized' },
     403: { $ref: '#/components/responses/Forbidden' },
     409: { description: 'A module with this id is installed (`exists`, with `existing: { id, name, version, install }` and `incoming: { id, name, version }`; `existing.install` is always the install record, because only a recorded module reaches this answer; retry with overwrite, which leaves the module disabled until it is approved again), the folder `modules/<id>` carries no install record, so it was copied to the server by hand and is not replaced from here (`not_web_installed`, without `existing`, with or without overwrite; remove the folder on the server first, then install again), `modules/<id>` is a symbolic link or a file (`not_a_module`, cannot be replaced from here), or another install/delete is running (`busy`).', content: errorContent() },
@@ -56,11 +60,19 @@ export function modulesPaths() {
         summary: 'List installed extension modules',
         tag: 'Modules',
         description: 'Returns discovered third-party modules from the modules directory, including normalized capabilities (widgets, permissions, API prefix) when declared in module.json. Pass `admin=1` as an admin to include disabled and errored modules and the `install` metadata (source, URL, commit, whether it was approved, who installed it); other listings leave `install` out.',
+        params: [{
+          name: 'admin',
+          in: 'query',
+          required: false,
+          description: '`1` asks for the admin listing; it only counts for an admin. Any other value is the listing for everyone.',
+          schema: { type: 'string' },
+        }],
         responses: {
           200: {
             description: 'Extension modules',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/ModulesListResponse' } } },
           },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
@@ -136,7 +148,7 @@ export function modulesPaths() {
             description: 'Updated module',
             content: { 'application/json': { schema: { type: 'object', properties: { data: { $ref: '#/components/schemas/ExtensionModule' } }, required: ['data'] } } },
           },
-          400: { description: 'Invalid request, or the module has errors and cannot be enabled' },
+          400: { description: 'Invalid request, or the module has errors and cannot be enabled. A body outside the schema (`enabled` missing or not a boolean) carries `fields` as in `ApiError`, with `reason: validation`.' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { description: 'Not an admin, or `enabled: true` without a browser session (`module_session_required`)', content: errorContent() },
           404: { description: 'Module not found' },
@@ -178,6 +190,7 @@ export function modulesPaths() {
         description: 'Files whose path has a segment starting with `.` (for example `.yuvomi-install.json`) are never served and answer 404.',
         responses: {
           200: { description: 'Module asset (JavaScript or CSS)' },
+          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           404: { description: 'Module or asset not found' },
           500: { $ref: '#/components/responses/InternalServerError' },

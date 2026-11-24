@@ -46,16 +46,15 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { register } from 'node:module';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 register('./test-browser-loader.mjs', import.meta.url);
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'wall-tasks-test-secret';
 
-const { resolvePermissions, buildSessionModuleAccess } = await import('../server/permissions.js');
+const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 const { DISPLAY_SCOPES } = await import('../server/services/display-accounts.js');
 
@@ -97,18 +96,21 @@ const CLEO = addUser('Cleo');
 let viewer = ANNA;
 /** Ein gekoppeltes Display: Methode, Scopes und Rechte wie `requireAuth` sie setzt. */
 let asDisplay = false;
-const app = express();
-app.use((req, _res, next) => {
-  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(viewer);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  if (asDisplay) { req.authMethod = 'display'; req.authScopes = [...DISPLAY_SCOPES]; }
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user, { isDisplay: asDisplay }));
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(viewer);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    if (asDisplay) { req.authMethod = 'display'; req.authScopes = [...DISPLAY_SCOPES]; }
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user, { isDisplay: asDisplay }));
+    next();
+  },
+  before: [['/api/v1/reminders', remindersRouter]],
 });
-app.use('/reminders', remindersRouter);
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -120,7 +122,7 @@ test.after(async () => {
 
 async function wallTasksFor(userId = ANNA) {
   viewer = userId;
-  const res = await fetch(`${base}/`);
+  const res = await fetch(`${base}/api/v1/dashboard/`);
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.ok(Array.isArray(body.wallTasks), 'Reichweite: die Antwort traegt wallTasks');
@@ -228,9 +230,9 @@ test('Server: die Kategorie-Auswahl der Uebersicht gilt auch fuer die Wand', wit
   db.prepare("UPDATE tasks SET category = 'school' WHERE id = ?").run(school);
   db.prepare("UPDATE tasks SET category = 'household' WHERE id IN (?, ?)").run(home, doneHome);
   viewer = ANNA;
-  const all = Object.fromEntries((await (await fetch(`${base}/`)).json()).wallTasks.map((e) => [e.user_id, e]));
+  const all = Object.fromEntries((await (await fetch(`${base}/api/v1/dashboard/`)).json()).wallTasks.map((e) => [e.user_id, e]));
   assert.equal(all[BEN].open_count, 2, 'Vorbedingung: ohne Auswahl beide');
-  const filtered = Object.fromEntries((await (await fetch(`${base}/?tasks_category=school`)).json()).wallTasks.map((e) => [e.user_id, e]));
+  const filtered = Object.fromEntries((await (await fetch(`${base}/api/v1/dashboard/?tasks_category=school`)).json()).wallTasks.map((e) => [e.user_id, e]));
   assert.deepEqual(titles(filtered[BEN].open), ['Schule']);
   assert.equal(filtered[BEN].done_count, 0, 'auch das Erledigte folgt der Auswahl');
 }));
@@ -757,7 +759,7 @@ const tzClient = await import('/utils/timezone.js');
 
 async function overview(userId, query = '') {
   viewer = userId;
-  const res = await fetch(`${base}/${query}`);
+  const res = await fetch(`${base}/api/v1/dashboard/${query}`);
   assert.equal(res.status, 200);
   return res.json();
 }
@@ -922,7 +924,7 @@ const DISPLAY = addUser('Wandtablett');
 
 async function reminders(userId, query = '') {
   viewer = userId;
-  const res = await fetch(`${base}/reminders/pending${query}`);
+  const res = await fetch(`${base}/api/v1/reminders/pending${query}`);
   assert.equal(res.status, 200);
   return (await res.json()).data;
 }
@@ -1027,7 +1029,14 @@ test('Persoenliches: die Haushaltsfassung traegt es gar nicht - auch nicht fuer 
 
 test('Persoenliches: auch die Erinnerungen fallen bei doppeltem Parameter nicht auf die persoenliche Fassung zurueck', withClock(NOON_BERLIN, 'Europe/Berlin', async () => {
   seedPersonal();
-  assert.deepEqual(await reminders(BEN, '?audience=household&audience=household'), []);
+  // Since #2810 `audience` is one text value in the schema of the operation:
+  // given twice it is refused with a 400 - still nothing personal goes out.
+  viewer = BEN;
+  const twice = await fetch(`${base}/api/v1/reminders/pending?audience=household&audience=household`);
+  assert.equal(twice.status, 400);
+  const refusal = await twice.json();
+  assert.deepEqual(refusal.fields, [{ path: 'query/audience', rule: 'type' }]);
+  assert.equal(refusal.data, undefined);
   assert.equal((await overview(BEN, '?audience=household&audience=household')).health.dosesTotal, 0);
   // Ein anderes Wort bleibt, was es war.
   assert.equal((await reminders(BEN, '?audience=me')).length, 1);
@@ -1221,7 +1230,7 @@ test('Persoenliches: die Glocke der Shell fragt ueber einer Wand die Haushaltsfa
       globalThis.__apiStub = {
         get: (path) => {
           asked.push(path);
-          const answer = fetch(`${base}${path}`).then((res) => res.json());
+          const answer = fetch(`${base}/api/v1${path}`).then((res) => res.json());
           inflight.push(answer);
           return answer;
         },
@@ -1296,7 +1305,7 @@ test('Persoenliches: die Glocke der Shell fragt ueber einer Wand die Haushaltsfa
 // lag auf dem Geraet. Jetzt gilt die Umkehrung, und diese Tests messen sie an
 // der ECHTEN Route.
 
-const visibility = await import('../server/services/visibility.js');
+const visibility = await import('../server/authorize/index.ts');
 
 const HELGA = addUser('Helga');
 let SHOPPING_LIST = null;

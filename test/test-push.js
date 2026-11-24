@@ -1,14 +1,14 @@
 /**
  * Modul: Push-Test
  * Zweck: VAPID-Auflösung, Subscribe/Unsubscribe-Routen, Versand, Scheduler.
- * Ausführen: node --experimental-sqlite test/test-push.js
+ * Ausführen: node test/test-push.js
  */
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import express from 'express';
 import { buildRouter } from '../server/routes/push.js';
+import { createPreferencesApp, PUSH_PREFIX } from './preferences-app.js';
 import { processDuePushes } from '../server/services/push-scheduler.js';
 import { MIGRATIONS } from '../server/db.js';
 import { fetchRetry } from './fetch-retry.js';
@@ -23,6 +23,10 @@ function makeDb() {
       -- D6: der Subjekt-Name auf der geerbten Vorsorge-Erinnerung
       -- kommt aus users.display_name.
       display_name TEXT NOT NULL DEFAULT '');
+    -- actorForUser fragt fuer jeden Empfaenger nach Ausgaben-Gast und Display;
+    -- fehlt eine der Tabellen, schliesst das Nachschlagen (wie in Produktion nie).
+    CREATE TABLE split_expense_guest_users (user_id INTEGER PRIMARY KEY, group_id INTEGER);
+    CREATE TABLE display_accounts (user_id INTEGER PRIMARY KEY);
     CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT);
     -- Zweite Rechte-Achse des Vorrats-Voll-Syncs (#467).
     CREATE TABLE access_permissions (
@@ -30,7 +34,7 @@ function makeDb() {
       resource_key TEXT NOT NULL, access TEXT NOT NULL,
       PRIMARY KEY (subject_type, subject_id, resource_type, resource_key));
     -- Die Sichtbarkeitsspalten und Zuweisungstabellen, an denen die Zustellung
-    -- seit services/reminder-targets.js haengt - mit den Vorgaben des echten
+    -- seit authorize/rows/reminders.ts haengt - mit den Vorgaben des echten
     -- Schemas, damit eine Zeile ohne Angabe wie in Produktion fuer alle da ist.
     CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
       created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -52,7 +56,7 @@ function makeDb() {
       quantity REAL NOT NULL DEFAULT 1, expires_on TEXT, created_by INTEGER REFERENCES users(id) ON DELETE SET NULL);
     -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
     -- Sichtbarkeit und Freigaben wie im echten Schema: die Zustellung fragt
-    -- seit services/reminder-targets.js, ob ein Dokument fuer alle da ist.
+    -- seit authorize/rows/reminders.ts, ob ein Dokument fuer alle da ist.
     CREATE TABLE family_documents (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       expires_at TEXT, created_by INTEGER, visibility TEXT NOT NULL DEFAULT 'family');
     CREATE TABLE family_document_access (document_id INTEGER NOT NULL, user_id INTEGER NOT NULL);
@@ -379,13 +383,21 @@ test('PUT /wall-mode aendert nur das eigene Abo - nicht das eines anderen Nutzer
  * Innerhalb eines `test()`-Callbacks bindet der Hook an genau diesen Test und
  * laeuft direkt danach - auch nach einer geworfenen Assertion.
  */
-async function startApp(db, webpush, userId = 1) {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => { req.authUserId = userId; next(); });
+async function startApp(db, webpush, userId = 1, { viaSession = false } = {}) {
   const { createPushService } = await import('../server/services/push.js');
   const pushService = createPushService({ db, webpush });
-  app.use('/', buildRouter({ pushService, database: db }));
+  // The push router at its real prefix (#2810, test/preferences-app.js), built
+  // through its factory with this suite's push service and database.
+  const app = await createPreferencesApp({
+    mount: [],
+    // Token requests carry `authUserId`, browser requests only the session.
+    auth: (req, _res, next) => {
+      if (viaSession) req.session = { userId };
+      else req.authUserId = userId;
+      next();
+    },
+    after: [[PUSH_PREFIX, buildRouter({ pushService, database: db })]],
+  });
   const server = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
 
   after(async () => {
@@ -395,7 +407,7 @@ async function startApp(db, webpush, userId = 1) {
     await new Promise((r) => server.close(r));
   });
 
-  return { baseUrl: `http://127.0.0.1:${server.address().port}` };
+  return { baseUrl: `http://127.0.0.1:${server.address().port}${PUSH_PREFIX}` };
 }
 
 test('GET /vapid-public-key returns the key', async () => {
@@ -480,6 +492,23 @@ test('POST /test only counts the current user devices', async () => {
   const json = await res.json();
   assert.equal(json.data.devices, 0);
 });
+
+for (const via of ['token', 'session']) {
+  test(`POST /test goes only to the requester (${via}), never to another member's devices`, async () => {
+    // The test push is the one sender whose recipient check is "the requester
+    // themself": it carries the text the client sent, so it must not reach anyone
+    // else. Both members have a device; only the requester's may get the push.
+    const db = makeDb();
+    const webpush = makeWebpushMock();
+    db.prepare("INSERT INTO push_subscriptions (user_id,endpoint,p256dh,auth) VALUES (1,'https://push/alice','p','a'),(2,'https://push/bob','p','a')").run();
+    const app = await startApp(db, webpush, 2, { viaSession: via === 'session' });
+    const res = await fetchRetry(`${app.baseUrl}/test`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Nur Bob' }) });
+    const json = await res.json();
+    assert.equal(res.status, 200);
+    assert.deepEqual(json.data, { sent: 1, devices: 1 });
+    assert.deepEqual(webpush.calls.map((c) => c.endpoint), ['https://push/bob']);
+  });
+}
 
 function pastIso() { return new Date(Date.now() - 60_000).toISOString(); }
 function futureIso() { return new Date(Date.now() + 3_600_000).toISOString(); }

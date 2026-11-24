@@ -5,6 +5,8 @@
  *        antwortet, liess den Start haengen, obwohl alles im Cache lag. Jetzt
  *        laeuft das Netz gegen eine Frist; danach kommt der Cache-Treffer, und
  *        die Netzantwort fuellt den Cache weiter nach.
+ *        Dazu das Routing nach Dateiart: gehashte Dateien unter /assets/
+ *        cache-first ohne Netzumlauf (#2633), pdf.js am Worker vorbei (#2634).
  * Ausfuehren: node --test test/test-sw-network-first.js
  *
  * sw.js laeuft wie in test-sw-api-cache.js per node:vm in einer Sandbox. DIE
@@ -15,14 +17,18 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
-import { renderServiceWorkerSource } from '../server/utils/service-worker.js';
+import { renderServiceWorker } from '../scripts/build/service-worker.ts';
 
-const SRC = renderServiceWorkerSource(
-  readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'),
-  'sw-network-first-test',
-);
+// Wie der Build ihn schreibt (scripts/build/service-worker.ts): Listen vorne,
+// Version und Revision eingesetzt. Die Seiten liegen gebaut unter /assets/.
+const SRC = renderServiceWorker(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), {
+  precache: ['/', '/index.html', '/router.js', '/api.js', '/assets/tasks-test.js', '/locales/de.json'],
+  locales: readdirSync(new URL('../public/locales/', import.meta.url)).filter((f) => f.endsWith('.json')).map((f) => `/locales/${f}`),
+  release: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version,
+  revision: 'sw-network-first-test',
+});
 const ORIGIN = 'https://app.test';
 // Die Version kommt aus dem Worker selbst: ein festes Literal hier brach die
 // Suite bei jedem Versionssprung, weil die Saat dann im Cache der alten
@@ -30,14 +36,16 @@ const ORIGIN = 'https://app.test';
 const RELEASE = SRC.match(/const APP_RELEASE\s*=\s*'([^']+)'/)[1];
 
 class MockResponse {
-  constructor(body, { status = 200, type = 'basic' } = {}) {
+  /** @param {any} body @param {{ status?: number, type?: string, contentType?: string | null }} [init] */
+  constructor(body, { status = 200, type = 'basic', contentType = null } = {}) {
     this.body = body;
     this.status = status;
     this.ok = status >= 200 && status < 300;
     this.type = type;
-    this.headers = { get: () => null };
+    this.contentType = contentType;
+    this.headers = { get: (/** @type {string} */ name) => (String(name).toLowerCase() === 'content-type' ? this.contentType : null) };
   }
-  clone() { return new MockResponse(this.body, { status: this.status, type: this.type }); }
+  clone() { return new MockResponse(this.body, { status: this.status, type: this.type, contentType: this.contentType }); }
 }
 
 class MockRequest {
@@ -142,8 +150,9 @@ function loadSw(fetchImpl) {
       const request = new MockRequest(`${ORIGIN}${path}`, { mode });
       const waited = [];
       let result;
-      listeners.fetch[0]({ request, respondWith(p) { result = Promise.resolve(p); }, waitUntil(p) { waited.push(p); } });
-      return { request, result, waited };
+      let responded = false;
+      listeners.fetch[0]({ request, respondWith(p) { responded = true; result = Promise.resolve(p); }, waitUntil(p) { waited.push(p); } });
+      return { request, result, waited, responded };
     },
   };
 }
@@ -163,12 +172,13 @@ async function seed(env, cacheName, path, body) {
 }
 
 const SHELL = 'yuvomi-shell-';
-const PAGES = 'yuvomi-pages-';
 
+// Network-First mit Frist gilt fuer die UNGEHASHTEN Dateien. Die gehashten
+// unter /assets/ gehen cache-first (#2633, eigene Faelle weiter unten).
 for (const [label, path, cacheName, mode] of [
   ['navigation', '/', SHELL, 'navigate'],
   ['shell module', '/router.js', SHELL, 'cors'],
-  ['page module', '/pages/tasks.js', PAGES, 'cors'],
+  ['facade', '/api.js', SHELL, 'cors'],
   ['stylesheet', '/styles/layout.css', SHELL, 'cors'],
 ]) {
   test(`${label}: a network that never answers gets the cached copy after the deadline`, async () => {
@@ -254,7 +264,7 @@ test('one missed deadline covers the whole start: the next cached files come at 
   const env = loadSw(net.impl);
   await seed(env, SHELL, '/router.js', 'router');
   await seed(env, SHELL, '/api.js', 'api');
-  await seed(env, PAGES, '/pages/tasks.js', 'tasks');
+  await seed(env, SHELL, '/styles/layout.css', 'layout');
 
   const first = env.fetchEvent('/router.js');
   await settle();
@@ -264,15 +274,15 @@ test('one missed deadline covers the whole start: the next cached files come at 
   // Die naechste Ebene des Modulgraphen: ohne die Regel wartete jede Ebene
   // erneut 1,5 s auf ein Netz, das eben nicht geantwortet hat.
   const second = env.fetchEvent('/api.js');
-  const third = env.fetchEvent('/pages/tasks.js');
+  const third = env.fetchEvent('/styles/layout.css');
   assert.equal((await within(second.result)).body, 'api');
-  assert.equal((await within(third.result)).body, 'tasks');
+  assert.equal((await within(third.result)).body, 'layout');
   assert.equal(env.timers.length, 0, 'keine neue Frist im Langsam-Fenster');
   assert.equal(net.calls.length, 3, 'das Netz wird trotzdem gefragt - es fuellt den Cache nach');
   assert.equal(second.waited.length, 1);
 
   // Was nicht im Cache liegt, wartet auch im Fenster aufs Netz.
-  const uncached = env.fetchEvent('/pages/never-seen.js');
+  const uncached = env.fetchEvent('/styles/never-seen.css');
   await settle();
   let answered = false;
   uncached.result.then(() => { answered = true; });
@@ -302,7 +312,7 @@ test('without a cached copy the deadline changes nothing: the request keeps wait
   const net = heldFetch();
   const env = loadSw(net.impl);
 
-  const { result } = env.fetchEvent('/pages/tasks.js');
+  const { result } = env.fetchEvent('/i18n.js');
   await settle();
   env.expireDeadlines();
   await settle();
@@ -353,9 +363,9 @@ test('what is not an app route never gets the shell before the network has actua
 
 test('a failing network still falls back at once, without waiting for the deadline', async () => {
   const env = loadSw(() => Promise.reject(new TypeError('Failed to fetch')));
-  await seed(env, PAGES, '/pages/tasks.js', 'cached');
+  await seed(env, SHELL, '/api.js', 'cached');
 
-  const { result } = env.fetchEvent('/pages/tasks.js');
+  const { result } = env.fetchEvent('/api.js');
   assert.equal((await within(result)).body, 'cached');
 });
 
@@ -454,4 +464,197 @@ test('a locale request while offline and never cached gets the offline page, not
   const response = await within(result);
   assert.equal(response.body, 'offline-page');
   assert.equal(response.ok, true);
+});
+
+// Guertel zum 404 des Servers (Review auf #2631): bekommt eine Datei-Anfrage
+// HTML zurueck (ein alter Server, ein Proxy, der auf die Shell umleitet), darf
+// das nie die gute Kopie im Cache ersetzen - der naechste Offline-Start bekaeme
+// sonst index.html als Modul.
+test('an HTML answer to a .js, .css or .json request never replaces the cached file', async () => {
+  for (const [path, cacheName] of [['/api.js', SHELL], ['/styles/layout.css', SHELL], ['/locales/de.json', 'yuvomi-locales-']]) {
+    const env = loadSw(async () => new MockResponse('<!DOCTYPE html><html></html>', { contentType: 'text/html; charset=utf-8' }));
+    await seed(env, cacheName, path, 'good');
+    const { result, waited } = env.fetchEvent(path);
+    await result;
+    await Promise.all(waited);
+    await settle();
+    const name = (await env.caches.keys()).find((n) => n.startsWith(cacheName));
+    const cached = await (await env.caches.open(name)).match(`${ORIGIN}${path}`);
+    assert.equal(cached.body, 'good', `${path}: die HTML-Antwort hat die Kopie im Cache ersetzt`);
+  }
+  // Eine echte Datei wird weiter abgelegt.
+  const env = loadSw(async () => new MockResponse('fresh', { contentType: 'text/javascript' }));
+  await seed(env, SHELL, '/api.js', 'old');
+  const { result, waited } = env.fetchEvent('/api.js');
+  await result;
+  await Promise.all(waited);
+  await settle();
+  const name = (await env.caches.keys()).find((n) => n.startsWith(SHELL));
+  assert.equal((await (await env.caches.open(name)).match(`${ORIGIN}/api.js`)).body, 'fresh');
+});
+
+
+// --------------------------------------------------------
+// Gehashte Dateien unter /assets/: cache-first (#2633)
+// --------------------------------------------------------
+
+const ASSET = '/assets/tasks-test.js';
+
+/**
+ * Die Namen der Caches, die einen Eintrag unter `path` halten.
+ * @param {ReturnType<typeof loadSw>} env
+ * @param {string} path
+ */
+async function entriesFor(env, path) {
+  const out = [];
+  for (const name of await env.caches.keys()) {
+    if (await (await env.caches.open(name)).match(`${ORIGIN}${path}`)) out.push(name);
+  }
+  return out;
+}
+
+test('a cached hashed asset is answered from the cache without asking the network', async () => {
+  const net = heldFetch();
+  const env = loadSw(net.impl);
+  await seed(env, SHELL, ASSET, 'cached');
+
+  const { result, responded } = env.fetchEvent(ASSET);
+  assert.equal(responded, true);
+  assert.equal((await within(result)).body, 'cached');
+  await settle();
+  assert.equal(net.calls.length, 0, 'ein gehashter Name aendert sich nie - kein Netzumlauf vor dem Ausliefern');
+  assert.equal(env.timers.length, 0, 'keine Frist: es gibt kein Rennen');
+});
+
+test('the precache of install is where a hashed asset is found', async () => {
+  // Kein zweiter Ablageort: install legt die Datei in den Shell-Cache, und
+  // genau dort sucht der Abruf.
+  let calls = 0;
+  const env = loadSw(async () => { calls += 1; return new MockResponse('precached', { contentType: 'text/javascript' }); });
+  await env.install();
+  const afterInstall = calls;
+
+  const { result } = env.fetchEvent(ASSET);
+  assert.equal((await within(result)).body, 'precached');
+  assert.equal(calls, afterInstall, 'der Abruf nach install fragt das Netz nicht mehr');
+});
+
+test('a hashed asset missing from the cache is fetched once and stored in the shell cache, nowhere else', async () => {
+  const net = heldFetch();
+  const env = loadSw(net.impl);
+
+  const { result, waited } = env.fetchEvent(ASSET);
+  await settle();
+  assert.equal(net.calls.length, 1);
+  net.calls[0].resolve(new MockResponse('fresh', { contentType: 'text/javascript' }));
+  assert.equal((await within(result)).body, 'fresh');
+  await within(Promise.all(waited));
+  await settle();
+
+  const names = await entriesFor(env, ASSET);
+  assert.equal(names.length, 1, `genau ein Ablageort, gefunden: ${names.join(', ')}`);
+  assert.ok(names[0].startsWith(SHELL), names[0]);
+
+  const again = env.fetchEvent(ASSET);
+  assert.equal((await within(again.result)).body, 'fresh');
+  assert.equal(net.calls.length, 1, 'der zweite Abruf kommt aus dem Cache');
+});
+
+test('a failed or foreign answer for a hashed asset is never stored under its name', async () => {
+  for (const [label, response] of [
+    ['404 after a release', new MockResponse('not found', { status: 404, contentType: 'text/plain' })],
+    ['HTML from an old server or proxy', new MockResponse('<!DOCTYPE html>', { contentType: 'text/html; charset=utf-8' })],
+    ['opaque', new MockResponse('x', { type: 'opaque', status: 0 })],
+  ]) {
+    const env = loadSw(async () => response);
+    const { result, waited } = env.fetchEvent(ASSET);
+    await within(result);
+    await within(Promise.all(waited));
+    await settle();
+    assert.deepEqual(await entriesFor(env, ASSET), [], `${label}: liegt jetzt unter dem Namen der Datei im Cache`);
+  }
+});
+
+test('an uncached hashed asset while offline fails as a file, never as the shell', async () => {
+  const env = loadSw(() => Promise.reject(new TypeError('Failed to fetch')));
+  await seed(env, SHELL, '/index.html', 'shell');
+  await seed(env, SHELL, '/offline.html', 'offline-page');
+
+  const response = await within(env.fetchEvent(ASSET).result);
+  assert.equal(response.ok, false, 'eine HTML-Seite als Modul liesse den Import mit einem MIME-Fehler scheitern');
+  assert.notEqual(response.body, 'shell');
+  assert.notEqual(response.body, 'offline-page');
+});
+
+test('the bypass window after an update serves a cached hashed asset from the cache too', async () => {
+  // Das Fenster gibt es, weil ungehashte Dateien unter ihrem Namen wechseln.
+  // Ein gehashter Name im Cache DIESER Revision ist die Datei, die der Server
+  // auch liefern wuerde.
+  const net = heldFetch();
+  const env = loadSw(net.impl);
+  await seed(env, SHELL, ASSET, 'cached');
+  await env.activate();
+
+  const { result } = env.fetchEvent(ASSET);
+  assert.equal((await within(result)).body, 'cached');
+  assert.equal(net.calls.length, 0);
+});
+
+test('the unhashed shell stays network-first', async () => {
+  for (const [path, mode, cacheName] of [
+    ['/', 'navigate', SHELL],
+    ['/index.html', 'cors', SHELL],
+    ['/api.js', 'cors', SHELL],
+    ['/i18n.js', 'cors', SHELL],
+    ['/utils/html.js', 'cors', SHELL],
+    ['/manifest.json', 'cors', SHELL],
+    ['/locales/de.json', 'cors', LOCALES],
+  ]) {
+    const net = heldFetch();
+    const env = loadSw(net.impl);
+    await seed(env, cacheName, path, 'cached');
+    const { result } = env.fetchEvent(path, { mode });
+    await settle();
+    assert.equal(net.calls.length, 1, `${path}: das Netz wird zuerst gefragt`);
+    net.calls[0].resolve(new MockResponse('fresh'));
+    assert.equal((await within(result)).body, 'fresh', path);
+  }
+});
+
+// --------------------------------------------------------
+// pdf.js bleibt ganz aus den Caches (#2634, Entscheidung 10.11.2026)
+// --------------------------------------------------------
+
+const PDFJS_FILES = ['/vendor/pdfjs/pdf.min.mjs', '/vendor/pdfjs/pdf.worker.min.mjs', '/vendor/pdfjs/standard_fonts/FoxitSans.pfb'];
+
+test('pdf.js passes the worker: no respondWith, no fetch of its own, no cache entry', async () => {
+  let calls = 0;
+  const env = loadSw(async () => { calls += 1; return new MockResponse('pdf', { contentType: 'text/javascript' }); });
+  await settle(); // die Bypass-Initialisierung ist durch
+  for (const path of PDFJS_FILES) {
+    const { responded, waited } = env.fetchEvent(path);
+    assert.equal(responded, false, `${path}: der Worker beantwortet es selbst - dann landet es im Cache`);
+    await Promise.all(waited);
+    await settle();
+    assert.deepEqual(await entriesFor(env, path), [], `${path} liegt in einem Cache`);
+  }
+  assert.equal(calls, 0, 'der Browser holt pdf.js selbst, nicht der Worker');
+});
+
+test('pdf.js passes the worker also in the first event after start and in the bypass window', async () => {
+  // Erstes Event: die Bypass-Initialisierung laeuft noch.
+  const fresh = loadSw(async () => new MockResponse('pdf'));
+  assert.equal(fresh.fetchEvent(PDFJS_FILES[0]).responded, false, 'vor dem Ende der Initialisierung');
+
+  const env = loadSw(async () => new MockResponse('pdf'));
+  await env.activate();
+  assert.equal(env.fetchEvent(PDFJS_FILES[0]).responded, false, 'im Bypass-Fenster');
+});
+
+test('the other vendor files stay with the worker', async () => {
+  const env = loadSw(async () => new MockResponse('lib', { contentType: 'text/javascript' }));
+  await settle();
+  for (const path of ['/vendor/sortablejs/sortable.esm.min.js', '/vendor/libphonenumber/core.min.mjs']) {
+    assert.equal(env.fetchEvent(path).responded, true, path);
+  }
 });

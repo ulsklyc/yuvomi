@@ -3,8 +3,8 @@
  * Zweck: Die als Countdown markierten Termine und Aufgaben und die bald
  *        ablaufenden Dokumente zu EINER nach Nähe sortierten Liste
  *        zusammenführen - die Datenseite des Übersichts-Widgets.
- * Abhängigkeiten: server/services/calendar-events.js, server/services/visibility.js,
- *                 server/services/document-access.js
+ * Abhängigkeiten: server/services/calendar-events.js, server/authorize/rows/assignees.ts,
+ *                 server/authorize/rows/ics-subscriptions.ts, server/authorize/rows/documents.ts
  *
  * WARUM ZWEI QUELLEN UND NICHT EINE TABELLE. Der Thread zu #647 ist genau an
  * dieser Frage entlanggegangen und bei zwei Quellen gelandet: @Kyrodan zählt bis
@@ -51,9 +51,9 @@ import { expandRecurringEvents, loadEventExceptions, MAX_EXPANSION_ITERATIONS } 
 import { modulesLeftOut, notBirthdayEventSql } from './household-modules.js';
 import { eventProjectionSql, resolveProjectedEventRows } from './calendar-event-reader.js';
 import { notCancelledEventSql } from './reminder-deleted-occurrence.js';
-import { icsSubscriptionVisibleWhere, visibilityWhere } from './visibility.js';
-import { documentVisibleSql } from './document-access.js';
+import { personReader, readerBinds, readerVisibleWhere, taskVisibleWhere, visibleWhere } from '../authorize/index.ts';
 import { hasExplicitZone, householdTimeZone, storedToWall, utcToWall } from '../utils/timezone.js';
+import { DEFAULT_OVERDUE_GRACE_DAYS } from '../settings/values.ts';
 // Dieselbe Rangfolge wie im Kalender und auf der Uebersicht - eine Regel, eine
 // Datei. Der Server importiert oefter aus `public/utils/` (date, folder-tree,
 // currency-codes, ...), immer fuer abhaengigkeitsfreie geteilte Regeln.
@@ -65,16 +65,9 @@ import { expiryDueSoon } from '../../public/utils/document-expiry.js';
 // Vorrat ist für die größte Fassung bemessen, wie bei den Geburtstagen.
 const DEFAULT_LIMIT = 5;
 
-/**
- * So viele Tage bleibt ein abgelaufener Countdown stehen, bevor er still
- * herausfällt - solange der Haushalt nichts anderes einstellt (#969).
- *
- * Sieben, weil die Nachfrist eine Woche Alltag abdecken soll: wer freitags nicht
- * hinsieht, findet den verpassten Stichtag am Montag noch vor. Länger wäre keine
- * Nachfrist mehr, sondern eine zweite Aufgabenliste - und diese Kachel ist
- * ausdrücklich keine.
- */
-export const DEFAULT_OVERDUE_GRACE_DAYS = 7;
+// Die Standard-Nachfrist (#969, sieben Tage) steht beim Register der
+// Einstellung `countdown_grace_days` (server/settings/values.ts) - eine Antwort,
+// nicht zwei (docs/DECISIONS.md #2).
 
 // Das Ende des Fensters, in dem die Kachel das naechste Vorkommen sucht: keine
 // fachliche Grenze, sondern der letzte Tag, der als YYYY-MM-DD noch richtig
@@ -256,13 +249,17 @@ export const COUNTDOWN_MODULES = COUNTDOWN_SOURCES.map((source) => source.module
  *        entzogen sind (`access_permissions`, #467) - eine andere Achse als die
  *        haushaltweite Abschaltung unten, die dieselbe Antwort verdient.
  * @param {number} [opts.limit]
+ * @param {import('../authorize/index.ts').RowReader | null} [opts.reader] der Leser der
+ *        Anfrage (rowReader in server/authorize) for the event and task countdowns: a
+ *        paired display reads them under the wall rule. Without it the person rule
+ *        for `userId` applies, so existing callers keep their answer.
  * @returns {{items: Array<{source: 'event'|'task'|'document', id: number, title: string,
  *                  date: string, days_until: number, icon: string|null,
  *                  color: string|null, recurring: boolean,
  *                  person_name?: string|null}>, total: number}}
  */
 export function getCountdowns(d, {
-  userId = null, todayKey, hiddenModules = null, limit = DEFAULT_LIMIT,
+  userId = null, todayKey, hiddenModules = null, limit = DEFAULT_LIMIT, reader = null,
 } = {}) {
   /* EIN ABGESCHALTETES MODUL LIEFERT HIER GAR NICHTS MEHR (Review zu PR #793).
    *
@@ -294,7 +291,7 @@ export function getCountdowns(d, {
   const graceDays = overdueGraceDays(d);
   const items = COUNTDOWN_SOURCES
     .filter((source) => !hidden.has(source.module))
-    .flatMap((source) => source.read(d, { userId, todayKey, graceDays, hidden }));
+    .flatMap((source) => source.read(d, { userId, todayKey, graceDays, hidden, reader: reader ?? personReader(userId) }));
 
   const sorted = items
     // Nächstes zuerst - überfällige also ganz oben, weil ihre Tageszahl negativ
@@ -316,7 +313,12 @@ export function getCountdowns(d, {
   return { items: sorted.slice(0, limit), total: sorted.length };
 }
 
-function eventCountdowns(d, { userId, todayKey, graceDays, hidden }) {
+/**
+ * @param {any} d
+ * @param {{ todayKey: string, graceDays: number, hidden: Set<string>,
+ *           reader: import('../authorize/index.ts').RowReader }} opts
+ */
+function eventCountdowns(d, { todayKey, graceDays, hidden, reader }) {
   // Ein Geburtstagstermin kann als Countdown markiert sein. Er steht in
   // `calendar_events`, gehoert aber dem Schalter `birthdays` (#1660).
   const withBirthdays = !hidden.has('birthdays');
@@ -353,10 +355,12 @@ function eventCountdowns(d, { userId, todayKey, graceDays, hidden }) {
       -- Vom Anbieter abgesagt (#2499): kein Countdown auf einen Termin, der
       -- nicht stattfindet.
       AND ${notCancelledEventSql(d)}
-      AND ${icsSubscriptionVisibleWhere('e')}
-      AND ${visibilityWhere('e', 'event_assignments', 'event_id')}${
+      -- A paired display reads under the wall rule (rowReader), everyone else under
+      -- the event row rule for userId.
+      AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '?')}
+      AND ${readerVisibleWhere(reader, 'events', 'e', '?')}${
         withBirthdays ? '' : ` AND ${notBirthdayEventSql('e')}`}
-  `).all(userId, userId, userId);
+  `).all(...readerBinds(reader, 'ics_subscriptions'), ...readerBinds(reader, 'events'));
 
   const exceptionsByEvent = loadEventExceptions(
     d,
@@ -414,7 +418,12 @@ function eventCountdowns(d, { userId, todayKey, graceDays, hidden }) {
   return out;
 }
 
-function taskCountdowns(d, { userId, todayKey, graceDays }) {
+/**
+ * @param {any} d
+ * @param {{ todayKey: string, graceDays: number,
+ *           reader: import('../authorize/index.ts').RowReader }} opts
+ */
+function taskCountdowns(d, { todayKey, graceDays, reader }) {
   // Eine erledigte oder abgelegte Aufgabe zählt nicht mehr herunter: bei einer
   // wiederkehrenden hat das Abhaken die NÄCHSTE Instanz schon erzeugt (die dann
   // ihrerseits hier steht), und eine abgelegte ist aus dem Lauf genommen -
@@ -425,6 +434,8 @@ function taskCountdowns(d, { userId, todayKey, graceDays }) {
   // Wiederkehrende sind ausgenommen - für sie hat das Abhaken ein nächstes Mal,
   // sie laufen nicht ab.
   const floor = shiftKey(todayKey, -graceDays) ?? todayKey;
+  // A paired display reads under the wall rule (rowReader), everyone else under
+  // the task row rule for `userId` (getCountdowns hands in the reader).
   const rows = d.prepare(`
     SELECT t.id, t.title, t.due_date, t.is_recurring, t.recurrence_from_completion
     FROM tasks t
@@ -433,8 +444,8 @@ function taskCountdowns(d, { userId, todayKey, graceDays }) {
       AND t.archived_at IS NULL
       AND t.due_date IS NOT NULL
       AND t.due_date >= CASE WHEN t.is_recurring = 1 THEN @today ELSE @floor END
-      AND ${visibilityWhere('t', 'task_assignments', 'task_id', '@me')}
-  `).all({ today: todayKey, floor, me: userId });
+      AND ${taskVisibleWhere(reader, 't')}
+  `).all({ today: todayKey, floor, me: reader.userId });
 
   const out = [];
   for (const row of rows) {
@@ -467,7 +478,7 @@ function documentCountdowns(d, { userId, todayKey, graceDays }) {
     WHERE x.status = 'active'
       AND x.expires_at IS NOT NULL
       AND x.expires_at >= @floor
-      AND ${documentVisibleSql('x', 'me')}
+      AND ${visibleWhere('documents', 'x', '@me')}
   `).all({ floor, me: userId });
 
   const out = [];

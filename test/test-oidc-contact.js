@@ -13,7 +13,7 @@
  * also das, was der Callback nach der kryptografischen Pruefung sieht (Claims und
  * UserInfo) - wie in test/test-staff-sign-in.js.
  *
- * Ausfuehren: node --experimental-sqlite --experimental-test-module-mocks --test test/test-oidc-contact.js
+ * Ausfuehren: node --experimental-test-module-mocks --test test/test-oidc-contact.js
  */
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'oidc-contact-test-secret';
 process.env.DB_PATH = ':memory:';
@@ -28,7 +28,7 @@ process.env.OIDC_REDIRECT_URI = 'http://127.0.0.1/api/v1/auth/oidc/callback';
 
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createAuthApp } from './auth-app.js';
 
 /** Was der Anbieter beim naechsten Callback liefert. */
 let idp = { claims: {}, userinfo: {} };
@@ -53,10 +53,7 @@ const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
 const database = dbmod.get();
 
-const app = express();
-app.use(express.json());
-app.use(sessionMiddleware);
-app.use('/api/v1/auth', authRouter);
+const app = await createAuthApp({ session: sessionMiddleware, routers: [authRouter] });
 const server = app.listen(0, '127.0.0.1');
 const base = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

@@ -20,7 +20,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -50,7 +49,7 @@ Element.prototype.remove = function remove() { this.removed = true; };
 Element.prototype.focus = Element.prototype.focus ?? function focus() {};
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { setPermissions } = await import('../public/permissions.js');
 const taskDetail = await import('../public/components/task-detail.js');
 const { __test: detail } = taskDetail;
@@ -85,15 +84,15 @@ const bo = db.prepare(`INSERT INTO users (username, display_name, password_hash,
   VALUES ('bo', 'Bo', '$2b$12$x', 'member')`).run().lastInsertRowid;
 
 let actor = ada;
-const app = express();
-app.use(express.json({ limit: '1mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = actor;
-  req.authRole = 'member';
-  req.session = { userId: actor, role: 'member' };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actor;
+    req.authRole = 'member';
+    req.session = { userId: actor, role: 'member' };
+    next();
+  },
+  jsonLimit: '1mb',
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));

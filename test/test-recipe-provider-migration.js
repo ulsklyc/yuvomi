@@ -11,7 +11,7 @@
  * Legacy-DB-Datei-Migration) und den migration-vNN-Tests in
  * test/test-document-storage.js (dort für v51).
  *
- * Ausführen: node --experimental-sqlite --test test/test-recipe-provider-migration.js
+ * Ausführen: node --test test/test-recipe-provider-migration.js
  */
 
 import test from 'node:test';

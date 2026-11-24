@@ -738,3 +738,81 @@ test('wording options: an empty or missing value never blanks a text', async () 
   ]);
   assert.equal(rowActionLabels(blank).at(-1), 'category.deleteNamed');
 });
+
+// #2810: a manager whose keys are ids (the pantry locations) sends the order as
+// numbers; every other manager keeps sending the key text its route reads.
+/** @param {Record<string, unknown>} options */
+async function sentOrder(options) {
+  const manager = managerWithCategory(options);
+  manager._fetch = async () => {};
+  manager._announceMove = () => {};
+  manager._notifyChanged = () => {};
+  const previousPatch = api.patch;
+  /** @type {any} */
+  let sent = null;
+  api.patch = async (/** @type {string} */ _path, /** @type {any} */ body) => { sent = body; return { data: [] }; };
+  try {
+    await manager._persistOrder('', ['5', '3', '12'], '3');
+  } finally {
+    api.patch = previousPatch;
+  }
+  return sent?.order;
+}
+
+test('numericKeys: the order goes out as numbers', async () => {
+  assert.deepEqual(await sentOrder({ numericKeys: true }), [5, 3, 12]);
+});
+
+test('without numericKeys the order stays the key text', async () => {
+  assert.deepEqual(await sentOrder({}), ['5', '3', '12']);
+  assert.deepEqual(await sentOrder({ numericKeys: 'yes' }), ['5', '3', '12'], 'only a real true switches it on');
+});
+
+// The order of the sub rows (child locations of the inventory) follows the
+// same option: `PATCH basePath/{parent}/subcategories/reorder`.
+/** @param {Record<string, unknown>} options */
+async function sentSubOrder(options) {
+  const manager = managerWithCategory(options);
+  manager._fetch = async () => {};
+  manager._renderSublist = () => {};
+  manager._announceMove = () => {};
+  manager._notifyChanged = () => {};
+  const previousPatch = api.patch;
+  /** @type {any} */
+  let sent = null;
+  /** @type {string} */
+  let sentPath = '';
+  api.patch = async (/** @type {string} */ path, /** @type {any} */ body) => { sentPath = path; sent = body; return { data: [] }; };
+  try {
+    await manager._persistSubOrder('7', ['5', '3', '12'], '3');
+  } finally {
+    api.patch = previousPatch;
+  }
+  return { path: sentPath, order: sent?.order };
+}
+
+test('numericKeys: the order of the sub rows goes out as numbers too', async () => {
+  const sent = await sentSubOrder({ numericKeys: true });
+  assert.match(sent.path, /\/7\/subcategories\/reorder$/);
+  assert.deepEqual(sent.order, [5, 3, 12]);
+});
+
+test('without numericKeys the order of the sub rows stays the key text', async () => {
+  assert.deepEqual((await sentSubOrder({})).order, ['5', '3', '12']);
+});
+
+// The shopping categories joined in #2810 (group 8): their keys are row ids too,
+// and the route reads the order as numbers.
+test('numericKeys: only the managers keyed by row ids switch it on (pantry and inventory locations, shopping categories)', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const { withoutCommentsKeepingLines } = await import('./source-text.js');
+  const dir = new URL('../public/pages/', import.meta.url);
+  const found = [];
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
+    const page = withoutCommentsKeepingLines(readFileSync(new URL(file, dir), 'utf8'));
+    for (const m of page.matchAll(/basePath:\s*'([^']+)'[\s\S]*?\}\);/g)) {
+      if (/numericKeys:\s*true/.test(m[0])) found.push(`${file}: ${m[1]}`);
+    }
+  }
+  assert.deepEqual(found.sort(), ['inventory.js: /inventory/locations', 'pantry.js: /pantry/locations', 'shopping.js: /shopping/categories']);
+});

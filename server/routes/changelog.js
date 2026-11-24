@@ -9,6 +9,7 @@
 import express from 'express';
 import { readFileSync } from 'node:fs';
 import { createLogger } from '../logger.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const log = createLogger('Changelog');
 
@@ -90,6 +91,19 @@ function splitEntry(rawText) {
   };
 }
 
+/**
+ * Ein Vorspann, der geoeffnet, aber auf dieser Zeile nicht geschlossen ist.
+ *
+ * CHANGELOG.md bricht bei rund 100 Zeichen um, und ein laengerer Vorspann
+ * schliesst sein `**` erst auf der zweiten Zeile (#2656). Solange das so ist,
+ * gehoert die naechste Zeile noch zum Vorspann und nicht zur Begruendung.
+ *
+ * @param {string} rawText
+ */
+function hasOpenLead(rawText) {
+  return rawText.startsWith('**') && !LEAD_PATTERN.test(rawText);
+}
+
 function parseReleaseBody(body) {
   const sections = [];
   for (const rawLine of String(body || '').split(/\r?\n/)) {
@@ -112,19 +126,31 @@ function parseReleaseBody(body) {
 
     const current = ensureSection(sections);
     if (bullet || current.entries.length === 0) {
-      current.entries.push(splitEntry(raw));
+      // `openLead` ist ein Arbeitsfeld dieser Schleife: der Rohtext eines
+      // Vorspanns, dessen `**` noch offen ist. Es verlaesst die Funktion nicht.
+      current.entries.push({ ...splitEntry(raw), openLead: hasOpenLead(raw) ? raw : null });
     } else {
-      // Fortsetzungszeile: sie gehoert zur BEGRUENDUNG, nie zum Vorspann - der
-      // ist genau ein Satz, und ihn waehrend des Lesens wachsen zu lassen
-      // wuerde die Kurzfassung wieder zur Textwand machen.
       const last = current.entries[current.entries.length - 1];
-      last.detail = `${last.detail} ${cleaned}`.trim();
+      if (last.openLead) {
+        // Der Vorspann laeuft ueber den Umbruch (#2656): Rohtext zusammenfuegen
+        // und neu teilen. Schliesst er nie, bleibt der ganze Eintrag Vorspann -
+        // wie bei jedem Eintrag ohne Vorspann, erfunden wird keiner.
+        const joined = `${last.openLead} ${raw}`;
+        Object.assign(last, splitEntry(joined), { openLead: hasOpenLead(joined) ? joined : null });
+      } else {
+        // Fortsetzungszeile: sie gehoert zur BEGRUENDUNG, nie zum Vorspann - der
+        // ist genau ein Satz, und ihn waehrend des Lesens wachsen zu lassen
+        // wuerde die Kurzfassung wieder zur Textwand machen.
+        last.detail = `${last.detail} ${cleaned}`.trim();
+      }
     }
   }
 
   return sections
     .map((section) => {
-      const entries = section.entries.filter((e) => e.lead || e.detail);
+      const entries = section.entries
+        .filter((e) => e.lead || e.detail)
+        .map((/** @type {{ lead: string, detail: string }} */ e) => ({ lead: e.lead, detail: e.detail }));
       return {
         title: section.title,
         entries,
@@ -259,7 +285,7 @@ export function buildRouter({
     return cachedLocal || null;
   }
 
-  router.get('/', async (_req, res) => {
+  router.get('/', validateRequest(), async (_req, res) => {
     const age = now() - cachedAt;
     if (cachedPayload && age >= 0 && age < CACHE_TTL_MS) {
       return res.json({ data: cachedPayload });

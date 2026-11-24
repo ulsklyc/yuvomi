@@ -3468,7 +3468,8 @@ async function openPantryTransfer(container) {
           shopping_item_id: Number(row.dataset.id),
           quantity: Number(row.querySelector('.pantry-transfer__qty').value) || 1,
           unit: row.querySelector('.pantry-transfer__unit').value,
-          location_id: row.querySelector('.pantry-transfer__loc')?.value || null,
+          // A number, not the option's digit text (#2810); '' (no place) is null.
+          location_id: Number(row.querySelector('.pantry-transfer__loc')?.value) || null,
         }));
 
         const modalContext = captureModalContext();
@@ -4926,6 +4927,8 @@ async function openCategoryManager(container, { fromDeepLink = false } = {}) {
       manager.addEventListener('category-manager-changed', onCategoriesChanged);
       manager.configure({
         basePath: '/shopping/categories',
+        // Die Reihenfolge als Zahlen (#2810), wie Vorrat und Inventar.
+        numericKeys: true,
         labelResolver: (item) => categoryLabel(item.name),
         titleKey: 'shopping.manageCategories',
         hintKey: 'settings.shoppingCategoriesHint',

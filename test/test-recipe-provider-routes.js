@@ -6,7 +6,7 @@
  *        FK-Kaskade mitnimmt, und dass POST /accounts einen fehlenden/ungültigen
  *        provider-Wert auf 'mealie' zurückfallen lässt (SUPPORTED_PROVIDERS-Guard,
  *        analog zu server/routes/dms.js).
- * Ausführen: node --experimental-sqlite --test test/test-recipe-provider-routes.js
+ * Ausführen: node --test test/test-recipe-provider-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -19,6 +19,8 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { default: recipeProvidersRouter } = await import('../server/routes/recipe-providers.js');
 const { _setAdapterFactory } = await import('../server/services/recipe-providers/index.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const ADMIN = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
@@ -27,6 +29,7 @@ const MEMBER = db.prepare(`INSERT INTO users (username, display_name, password_h
 let actor = { id: ADMIN, role: 'admin' };
 const app = express();
 app.use(express.json());
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
@@ -35,7 +38,11 @@ app.use((req, _res, next) => {
   req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
-app.use('/', recipeProvidersRouter);
+// At its real prefix, with the central error handler: validateRequest() reads
+// the operation from the mount and hands its 400 on (#2810).
+app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void} */ next) => { req.url = `/api/v1/recipe-providers${req.url}`; next(); });
+app.use('/api/v1/recipe-providers', recipeProvidersRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -89,7 +96,8 @@ test('POST /accounts: fehlende Felder → 400', async () => {
 test('POST /accounts: URL ohne http(s):// → 400', async () => {
   const r = await call('POST', '/accounts', { name: 'X', base_url: 'ftp://x', api_token: 't' });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /http/);
+  // The request check answers since #2810, with the same reason (was: "Base URL must start with http(s)://").
+  assert.deepEqual(r.body.fields, [{ path: 'body/base_url', rule: 'pattern', reason: 'recipe_providers_url_invalid' }]);
   // #1909: der Fall hat einen Namen - den Satz sagt die App.
   assert.equal(r.body.reason, 'recipe_providers_url_invalid');
 });
@@ -217,7 +225,8 @@ test('POST /accounts: external_url ohne http(s):// → 400', async () => {
     name: 'Blackhole', base_url: 'https://mealie2.example.com', external_url: 'ftp://x', api_token: 't',
   });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /External URL/);
+  // The request check answers since #2810, with the same reason (was: "External URL must start with http(s)://").
+  assert.deepEqual(r.body.fields, [{ path: 'body/external_url', rule: 'pattern', reason: 'recipe_providers_external_url_invalid' }]);
   assert.equal(r.body.reason, 'recipe_providers_external_url_invalid', '#1909');
 });
 
@@ -247,7 +256,7 @@ test('POST /accounts: Nicht-Admin → 403', async () => {
   assert.equal(r.status, 403);
 });
 
-test('POST /accounts: fehlendes oder ungültiges provider-Feld fällt auf \'mealie\' zurück', async () => {
+test('POST /accounts: fehlendes provider-Feld fällt auf \'mealie\' zurück, ein ungültiges ist 400 (#2810)', async () => {
   _setAdapterFactory(fakeAdapter());
 
   const missing = await call('POST', '/accounts', { name: 'OhneProvider', base_url: 'https://noprovider.example.com', api_token: 't' });
@@ -255,9 +264,11 @@ test('POST /accounts: fehlendes oder ungültiges provider-Feld fällt auf \'meal
   assert.equal(missing.body.data.provider, 'mealie');
   assert.equal(db.prepare('SELECT provider FROM recipe_provider_accounts WHERE id = ?').get(missing.body.data.id).provider, 'mealie');
 
+  // An unknown provider was stored as `mealie` silently; since #2810 the enum refuses it.
   const invalid = await call('POST', '/accounts', { name: 'UngueltigerProvider', base_url: 'https://invalidprovider.example.com', api_token: 't', provider: 'not-a-real-provider' });
-  assert.equal(invalid.status, 201);
-  assert.equal(invalid.body.data.provider, 'mealie');
+  assert.equal(invalid.status, 400);
+  assert.deepEqual(invalid.body.fields, [{ path: 'body/provider', rule: 'enum' }]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM recipe_provider_accounts WHERE name = 'UngueltigerProvider'").get().n, 0);
 });
 
 test('GET /accounts: listet ohne Token, mit has_token', async () => {

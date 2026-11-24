@@ -337,6 +337,8 @@ test('Konto der BEARBEITENDEN Person geloescht: die Ausgabe zaehlt weiter in den
   const edited = await M3.call('PUT', `/split-expenses/expenses/${eid}`, {
     title: 'Getraenke', amount: '12.00', currency: 'EUR', split_method: 'equal', payer_id: OWN.id,
     participants: [OWN.id, OTH.id], expense_date: '2026-09-02',
+    // Die ganze Ausgabe (#2810).
+    description: null, converted_amount: null, converted_currency: 'EUR', exchange_snapshot: null,
   });
   assert.equal(edited.status, 200);
   const afterEdit = await balances();

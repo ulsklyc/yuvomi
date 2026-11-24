@@ -1,12 +1,10 @@
-<!-- version: 2.86.0 -->
-This update remembers what you paid when shopping, lets households make late chores pay less, and gives each wall tablet its own night hours.
+<!-- version: 2.94.0 -->
+This update is mostly about the API. If you use it with your own scripts or integrations: shared expenses, backup, health, contacts, the meal plan, the shopping list, documents and the budget with its subscriptions now check every request against the published API description, like the modules before them. Input that was quietly accepted or reinterpreted before, such as an id like "1abc", a month 13, a number sent as text or an empty amount, is now refused with a 400 that names the field. The app itself sends nothing that is refused.
 
-Ticking off a shopping item with a price now records the purchase, and the item sheet shows what you paid last time. Households that use rewards can switch on late completion decay: a task finished after its due day earns one point less per day, never below one. Administrators set night hours, idle delay, clock and photo fill per wall tablet under Settings, Wall tablets. On phones, the kitchen search moves into the tab bar.
+Some requests could change data by accident and are refused now instead. Editing a document without its access list removed everyone it was shared with, saving the cycle settings with a field left out reset it, editing a shared expense with fields left out cleared its exchange rate and split it equally, and renaming a contact with only some name parts dropped the others. These requests now need the whole record.
 
-Calendar and reminder sync got several fixes. A new event in a synced calendar is uploaded when you save it, an event the provider cancels stops reminding, repeating reminders from iOS Reminders or Tasks.org arrive as a series and keep running there when ticked off here, and contacts from CardDAV no longer merge into one. Date pickers follow the household week start, CardDAV accepts long app passwords, and many settings pages now explain errors in your language instead of showing English server text.
+In the app, saving a contact keeps its middle name, title and suffix, and shared expenses converted into a currency with other decimal places show and accept the converted amount correctly.
 
-Every backup is now checked right after it is written, so a damaged one is discarded instead of handed out. Backup downloads are limited to ten per hour for each administrator.
+This update does not change the database. No action is needed from you.
 
-This update changes the database. The changes are applied automatically on the first start and need no action from you; as always, a backup before updating is a good idea.
-
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.86.0
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.94.0

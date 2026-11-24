@@ -30,7 +30,7 @@
  * `legacyKeyFor` muss dort Tag fuer Tag das `utcTagFuer` von main treffen.
  *
  * Neu erzeugen (nur mit Grund und nur auf dem Stand von main):
- *   OCCURRENCE_KEY_SNAPSHOT_WRITE=1 node --experimental-sqlite test/test-occurrence-key-legacy.js
+ *   OCCURRENCE_KEY_SNAPSHOT_WRITE=1 node test/test-occurrence-key-legacy.js
  *
  * Ausfuehren: npm run test:occurrence-key-legacy (TZ=UTC und America/Chicago)
  */

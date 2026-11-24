@@ -17,7 +17,7 @@
  *
  * Echtes tsdav gegen `test/caldav-fake-server.js`, wie test-caldav-http-refusals.js.
  *
- * Ausfuehren: node --experimental-sqlite --test test/test-caldav-writable-targets.js
+ * Ausfuehren: node --test test/test-caldav-writable-targets.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -25,7 +25,6 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { startFakeDavServer } from './caldav-fake-server.js';
 
 const dbmod = await import('../server/db.js');
@@ -34,7 +33,7 @@ const { createCalDAVClient, collectionWritable } = await import('../server/utils
 const caldavSync    = await import('../server/services/caldav-sync.js');
 const remindersSync = await import('../server/services/caldav-reminders-sync.js');
 const appleCalendar = await import('../server/services/apple-calendar.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: tasksRouter }    = await import('../server/routes/tasks.js');
 
 const userId = Number(db.prepare(
@@ -43,15 +42,17 @@ const userId = Number(db.prepare(
 
 const dav = await startFakeDavServer();
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = userId; req.authRole = 'admin'; next(); });
-app.use('/calendar', calendarRouter);
-app.use('/tasks', tasksRouter);
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  auth: (req, _res, next) => { req.authUserId = userId; req.authRole = 'admin'; next(); },
+  after: [['/api/v1/tasks', tasksRouter]],
+});
 const server = await new Promise((resolve) => {
   const s = app.listen(0, '127.0.0.1', () => resolve(s));
 });
-const base = `http://127.0.0.1:${server.address().port}`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1`;
 test.after(() => { server.close(); return dav.close(); });
 
 async function api(method, path, body) {

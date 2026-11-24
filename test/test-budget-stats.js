@@ -1,7 +1,7 @@
 /**
  * Modul: Budget-Statistik - Tests
  * Zweck: computeStatsRange (Zeitraum/Buckets) + computeStats (Aggregation) + /stats-Validierung.
- * Ausführen: node --experimental-sqlite test/test-budget-stats.js
+ * Ausführen: node test/test-budget-stats.js
  */
 import { computeStatsRange, computeStats, statsHandler, resolveExportRange } from '../server/routes/budget.js';
 import { DatabaseSync } from 'node:sqlite';

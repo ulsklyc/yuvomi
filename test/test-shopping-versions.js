@@ -16,7 +16,7 @@
  *        3. Die Quittung: die Artikel-Routen antworten mit
  *           `list_change: { list_id, before, after }`.
  *        Dazu der Backfill der Migration gegen eine Vor-v196-Datenbank.
- * Ausfuehren: node --experimental-sqlite --test test/test-shopping-versions.js
+ * Ausfuehren: node --test test/test-shopping-versions.js
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -21,7 +21,7 @@
  *        einen Gleichstand-Tiebreak (gleiche MM-DD → Name) und Cross-Checks
  *        (/upcoming = erste N von /) belegt; days_until/next_age werden gegen die
  *        importierten Service-Helfer als Orakel geprüft.
- * Ausführen: node --experimental-sqlite --test test/test-birthdays-routes.js
+ * Ausführen: node --test test/test-birthdays-routes.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
@@ -45,6 +45,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: birthdaysRouter } = await import('../server/routes/birthdays.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+
 const {
   daysUntilBirthday,
   BIRTHDAY_COLOR,
@@ -67,9 +69,11 @@ app.use((req, _res, next) => {
   req.session = { userId: actor.id, role: actor.role };
   next();
 });
-app.use('/', birthdaysRouter);
+app.use('/api/v1/birthdays', birthdaysRouter);
+// The central error handler of the app: validateRequest() hands its 400 on to it (#2810).
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/birthdays`)));
 test.after(() => server.close());
 
 async function call(method, path, body) {
@@ -85,13 +89,30 @@ async function call(method, path, body) {
 
 const VALID_PHOTO = 'data:image/png;base64,iVBORw0KGgo=';
 
+/**
+ * A 400 that names `field`: since #2810 the schema of the operation refuses
+ * what it describes before the handler (`reason: 'validation'`, `fields`), the
+ * handler still refuses the rest with its own sentence.
+ * @param {{ body: any }} r
+ * @param {string} field
+ * @param {RegExp} handlerSentence
+ * @param {string} [note]
+ */
+function assertNamesField(r, field, handlerSentence, note) {
+  if (r.body?.reason === 'validation') {
+    assert.ok(r.body.fields.some((/** @type {{ path: string }} */ f) => f.path === `body/${field}`), `${note ?? field}: ${JSON.stringify(r.body.fields)}`);
+  } else {
+    assert.match(r.body.error, handlerSentence, note);
+  }
+}
+
 // --------------------------------------------------------------------------
 // POST / (Validierung + Anlegen + Artefakt-Sync)
 // --------------------------------------------------------------------------
 test('POST /: fehlender Name → 400', async () => {
   const r = await call('POST', '/', { birth_date: '1990-01-01' });
   assert.equal(r.status, 400);
-  assert.match(r.body.error, /Name/);
+  assertNamesField(r, 'name', /Name/);
 });
 
 test('POST /: fehlendes/ungültiges Geburtsdatum → 400', async () => {
@@ -99,7 +120,7 @@ test('POST /: fehlendes/ungültiges Geburtsdatum → 400', async () => {
   assert.equal(missing.status, 400);
   const bad = await call('POST', '/', { name: 'Schlechtes Datum', birth_date: '01.01.1990' });
   assert.equal(bad.status, 400);
-  assert.match(bad.body.error, /Birth date/);
+  assertNamesField(bad, 'birth_date', /Birth date/);
 });
 
 test('POST /: ungültige Foto-Data-URL → 400', async () => {
@@ -157,7 +178,7 @@ test('POST /: rejects non-canonical and impossible name days', async () => {
       name_day: nameDay,
     });
     assert.equal(r.status, 400, `${nameDay} must be rejected`);
-    assert.match(r.body.error, /Name day/);
+    assertNamesField(r, 'name_day', /Name day/, nameDay);
   }
 });
 
@@ -198,27 +219,28 @@ const reminderRow = (id) => ({ ...db.prepare(
 ).get(id) });
 
 test('POST /: ungueltige Erinnerung → 400 mit Feldname, kein Datensatz', async () => {
+  /** @type {Array<[Record<string, unknown>, RegExp, string]>} */
   const cases = [
-    [{ reminder_offset: -60 }, /Reminder must be/],
-    [{ reminder_offset: '-60' }, /Reminder must be/],
-    [{ reminder_offset: 1.5 }, /Reminder must be/],
-    [{ reminder_offset: '1440.5' }, /Reminder must be/],
-    [{ reminder_offset: 'morgen' }, /Reminder must be/],
-    [{ reminder_offset: true }, /Reminder must be/],
-    [{ reminder_offset: 999 * 10080 + 1 }, /Reminder must be/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: 0 }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: 1000 }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: 2.5 }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: '-3' }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_amount: 'drei' }, /Custom reminder amount/],
-    [{ reminder_offset: 'custom', reminder_custom_unit: 'months' }, /Custom reminder unit/],
-    [{ reminder_offset: 'custom', reminder_custom_unit: 7 }, /Custom reminder unit/],
+    [{ reminder_offset: -60 }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: '-60' }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: 1.5 }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: '1440.5' }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: 'morgen' }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: true }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: 999 * 10080 + 1 }, /Reminder must be/, 'reminder_offset'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 0 }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 1000 }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 2.5 }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: '-3' }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_amount: 'drei' }, /Custom reminder amount/, 'reminder_custom_amount'],
+    [{ reminder_offset: 'custom', reminder_custom_unit: 'months' }, /Custom reminder unit/, 'reminder_custom_unit'],
+    [{ reminder_offset: 'custom', reminder_custom_unit: 7 }, /Custom reminder unit/, 'reminder_custom_unit'],
   ];
   const before = db.prepare('SELECT COUNT(*) AS n FROM birthdays').get().n;
-  for (const [fields, message] of cases) {
+  for (const [fields, message, field] of cases) {
     const r = await call('POST', '/', { name: 'Falsch', birth_date: '1990-01-01', ...fields });
     assert.equal(r.status, 400, `${JSON.stringify(fields)} muss abgewiesen werden`);
-    assert.match(r.body.error, message, JSON.stringify(fields));
+    assertNamesField(r, field, message, JSON.stringify(fields));
   }
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM birthdays').get().n, before);
 });
@@ -334,6 +356,59 @@ test('GET /: eine im Kalender gewaehlte Farbe uebersteht den Abgleich, bei jedem
   // Bearbeiten des Geburtstags selbst nimmt die Wahl ebenfalls nicht weg.
   await call('PUT', `/${a.body.data.id}`, { notes: 'neu' });
   assert.equal(colorOf(a.body.data.id), '#2563EB');
+});
+
+test('GET /: ein Abgleich ohne Aenderung schreibt keinen Kalendertermin', async () => {
+  // Der Abgleich haengt an jedem GET /birthdays, an jeder Erinnerungsabfrage und
+  // am Benachrichtigungslauf, der alle 60 Sekunden fuer jedes aktive Konto
+  // laeuft. Er schrieb jeden Geburtstagstermin bei jedem Lauf neu, auch wenn
+  // sich nichts geaendert hatte: jede Zeile bekam einen neuen `updated_at`
+  // (Trigger), und der Suchindex wurde je Zeile geloescht und neu eingetragen.
+  // Gezaehlt wird am Trigger, nicht an `updated_at`: die Spalte hat
+  // Sekundenaufloesung, zwei Laeufe in derselben Sekunde saehen gleich aus.
+  db.exec('CREATE TEMP TABLE IF NOT EXISTS event_update_log (id INTEGER)');
+  db.exec('CREATE TEMP TRIGGER IF NOT EXISTS trg_event_update_log AFTER UPDATE ON calendar_events BEGIN INSERT INTO event_update_log VALUES (NEW.id); END');
+  const updates = () => db.prepare('SELECT COUNT(*) AS n FROM event_update_log').get().n;
+  const reset = () => db.exec('DELETE FROM event_update_log');
+  try {
+    const created = await call('POST', '/', { name: 'Ruhe', birth_date: '1975-05-05', name_day: '06-06' });
+    assert.equal(created.status, 201);
+    const row = () => db.prepare('SELECT * FROM birthdays WHERE id = ?').get(created.body.data.id);
+    await call('GET', '/'); // einmal einschwingen
+    const events = db.prepare('SELECT COUNT(*) AS n FROM birthdays WHERE created_by = ? AND calendar_event_id IS NOT NULL').get(USER).n;
+    assert.ok(events >= 2, 'der Lauf hat mehrere Geburtstagstermine vor sich');
+
+    reset();
+    await call('GET', '/');
+    await call('GET', '/upcoming');
+    assert.equal(updates(), 0, 'zwei Abrufe ohne Aenderung schreiben keine Zeile in calendar_events');
+
+    // Eine echte Aenderung kommt weiter an: der Name steht im Titel des Termins.
+    reset();
+    db.prepare('UPDATE birthdays SET name = ? WHERE id = ?').run('Unruhe', created.body.data.id);
+    await call('GET', '/');
+    const title = db.prepare('SELECT title FROM calendar_events WHERE id = ?').get(row().calendar_event_id).title;
+    assert.match(title, /Unruhe/);
+    assert.ok(updates() >= 1, 'der geaenderte Termin wurde geschrieben');
+
+    // Der gespiegelte Zweig: ein Termin, den ein Provider traegt, wird ohne
+    // Aenderung ebenso wenig angefasst und nicht zum Senden vorgemerkt.
+    const eventId = row().calendar_event_id;
+    db.prepare("UPDATE calendar_events SET external_source = 'google', external_calendar_id = 'cal-1', end_datetime = start_datetime, outbound_dirty = 0 WHERE id = ?").run(eventId);
+    reset();
+    await call('GET', '/');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_update_log WHERE id = ?').get(eventId).n, 0, 'gespiegelter Termin ohne Aenderung bleibt unberuehrt');
+    assert.equal(db.prepare('SELECT outbound_dirty FROM calendar_events WHERE id = ?').get(eventId).outbound_dirty, 0);
+
+    db.prepare('UPDATE birthdays SET name = ? WHERE id = ?').run('Gespiegelt', created.body.data.id);
+    await call('GET', '/');
+    const mirrored = db.prepare('SELECT title, outbound_dirty FROM calendar_events WHERE id = ?').get(eventId);
+    assert.match(mirrored.title, /Gespiegelt/);
+    assert.equal(mirrored.outbound_dirty, 1, 'eine echte Aenderung wird weiter zum Senden vorgemerkt');
+  } finally {
+    db.exec('DROP TRIGGER IF EXISTS trg_event_update_log');
+    db.exec('DROP TABLE IF EXISTS event_update_log');
+  }
 });
 
 test('GET /?q=: filtert nach Name (LIKE)', async () => {
@@ -739,7 +814,7 @@ test('POST /: year_unknown nimmt 0/1 und lehnt anderes ab (#2095)', async () => 
   assert.equal(zero.body.data.year_unknown, 0);
   const bad = await call('POST', '/', { name: 'Falsch', birth_date: '1990-04-01', year_unknown: 'yes' });
   assert.equal(bad.status, 400);
-  assert.match(bad.body.error, /year_unknown/);
+  assertNamesField(bad, 'year_unknown', /year_unknown/);
 });
 
 test('PUT /:id: Jahr unbekannt setzen und mit echtem Jahr wieder abnehmen (#2095)', async () => {
@@ -772,7 +847,8 @@ test('OpenAPI beschreibt year_unknown an Geburtstag und Kontakt (#2095)', async 
   for (const name of ['BirthdayCreateInput', 'BirthdayUpdateInput']) {
     const prop = schemas[name].properties.year_unknown;
     assert.ok(prop, `${name} nennt year_unknown`);
-    assert.deepEqual(prop.oneOf.map((o) => o.type), ['boolean', 'integer'], 'true/false und 0/1 wie die Route');
+    // null zaehlt in der Route als false und steht seit #2810 im Schema.
+    assert.deepEqual(prop.oneOf.map((o) => o.type), ['boolean', 'integer', 'null'], 'true/false, 0/1 und null wie die Route');
   }
   const { contactsPaths } = await import('../server/openapi/paths/contacts.js');
   const paths = contactsPaths();

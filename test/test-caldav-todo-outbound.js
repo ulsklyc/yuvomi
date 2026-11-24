@@ -18,7 +18,7 @@
  *            überschreiben noch einen lokal gelöschten Eintrag wieder anlegen.
  *
  *        Netz-frei: der tsdav-Client ist eine Attrappe.
- * Ausführen: node --experimental-sqlite --test test/test-caldav-todo-outbound.js
+ * Ausführen: node --test test/test-caldav-todo-outbound.js
  */
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
