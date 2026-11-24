@@ -912,6 +912,8 @@ const REASONS_PASSED_THROUGH = new Map([
   // in B2 every caller reads `allowed` only, no route sends the reason.
   ['authorize/modules.ts: string | null', { sites: 1, at403: [], why: 'keine Antwort; Typ des Verdict von authorize()' }],
   ['authorize/modules.ts: null', { sites: 1, at403: [], why: 'keine Antwort; das erlaubte Verdict von authorize()' }],
+  // server/db/backup.ts (phase 2 F3): the type of restoreError()'s parameter, no response.
+  ['db/backup.ts: string', { sites: 1, at403: [], why: 'keine Antwort; Typ des Parameters von restoreError()' }],
   ['routes/tasks.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
     why: 'displayActingPerson: 400 ohne Grund oder 403 mit diesem' }],
   ['routes/rewards.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],

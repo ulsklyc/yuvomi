@@ -63,15 +63,26 @@ test('Gruende: Schluessel gefragt zeigt das Feld, bewiesener Schluessel behaelt 
 // `backup_local_failed` answers only the WebDAV routes (#2622).
 const NOT_RESTORE_REASONS = ['backup_verify_failed', 'backup_local_failed'];
 
+/**
+ * Der Text, in dem die Gruende des Servers stehen: server/db.js und die beiden
+ * Module, in die Backup und Restore aus ihr gezogen sind (server/db/).
+ */
+function serverReasonSources() {
+  return ['../server/db.js', '../server/db/backup.ts', '../server/db/restore.ts']
+    .map((file) => readFileSync(new URL(file, import.meta.url), 'utf8'))
+    .join('\n');
+}
+
 test('jeder Grund, den der Server kennt, hat im Dialog eine Regel', () => {
   // Die Liste steht im Server; faellt dort ein neuer Grund dazu, muss er hier
   // bewusst eingeordnet werden, statt still auf „reset" zu fallen.
-  const db = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
+  const db = serverReasonSources();
   const route = readFileSync(new URL('../server/routes/backup.js', import.meta.url), 'utf8');
   const reasons = new Set([...`${db}\n${route}`.matchAll(/'((?:backup|own|restore)_[a-z_]+)'/g)].map((m) => m[1]));
   for (const reason of NOT_RESTORE_REASONS) reasons.delete(reason);
   // Die Ausnahme haelt nur, solange der Restore kein Backup schreibt.
-  const restoreBody = db.slice(db.indexOf('async function restoreFromFile('), db.indexOf('\n}\n', db.indexOf('async function restoreFromFile(')));
+  const restore = readFileSync(new URL('../server/db/restore.ts', import.meta.url), 'utf8');
+  const restoreBody = restore.slice(restore.indexOf('async function restoreFromFile('), restore.indexOf('\n}\n', restore.indexOf('async function restoreFromFile(')));
   assert.ok(restoreBody.length > 100, 'restoreFromFile() gefunden');
   assert.doesNotMatch(restoreBody, /backupToFile/, 'restoreFromFile() schreibt ein Backup - backup_verify_failed erreicht dann den Dialog');
   const known = {
@@ -265,7 +276,7 @@ test('Fehlertext: jeder bekannte Grund hat einen eigenen Key, ein unbekannter de
       'settings.backupRestoreErrorGeneric', JSON.stringify(params));
   }
   // Jeder Grund aus dem Server steht in der Tabelle - dieselbe Quelle wie oben.
-  const db = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
+  const db = serverReasonSources();
   const route = readFileSync(new URL('../server/routes/backup.js', import.meta.url), 'utf8');
   const reasons = new Set([...`${db}\n${route}`.matchAll(/'((?:backup|own|restore)_[a-z_]+)'/g)].map((m) => m[1]));
   for (const reason of NOT_RESTORE_REASONS) reasons.delete(reason);

@@ -269,7 +269,9 @@ Understanding where things live helps you find the right place for your changes:
 ```
 server/
   index.js             # Express entry point, middleware chain
-  db.js                # SQLite connection + migration runner (append-only)
+  db.js                # SQLite connection, encryption key, get/transaction
+  db/                  # Migration runner, backup and restore (used through db.js)
+  migrations/          # One file per migration (append-only)
   auth.js              # Session auth + user management
   routes/              # API route handlers - one file per module
   services/            # Business logic (calendar sync, recurrence engine)
