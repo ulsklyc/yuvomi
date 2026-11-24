@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Leaving the title blank in a budget entry dialog no longer blocks saving.** The title field is
+  now optional. When you leave it empty, the dialog fills in the label of the subcategory (or
+  category if there is no subcategory) you selected, so the entry is never saved untitled. Editing
+  an entry and clearing the title leaves the stored title in place. API callers that omit the title
+  get the same localized label from the household language. (Refs #2403)
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation
@@ -508,11 +515,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   any other and is ignored: without `system_admin: true` the new account is a member.
 
 ### Fixed
-- **Leaving the title blank in a budget entry dialog no longer blocks saving.** The title field is
-  now optional. When you leave it empty, the dialog fills in the label of the subcategory (or
-  category if there is no subcategory) you selected, so the entry is never saved untitled. Editing
-  an entry and clearing the title leaves the stored title in place. API callers that omit the title
-  get the same localized label from the household language. (Refs #2403)
 - **Very long id lists no longer fail with an internal error.** A list of more than 32 765 ids
   in one request, such as `DELETE /shopping/{listId}/items/checked` with `{ ids }`, answered 500
   because SQLite takes at most 32 766 values per statement; the server now hands every such list
