@@ -1,4 +1,4 @@
-import { jsonBody, op } from '../helpers.js';
+import { jsonBody, op, withValidationRefusal } from '../helpers.js';
 
 export function availabilityPaths() {
   return {
@@ -30,7 +30,7 @@ export function availabilityPaths() {
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
-      put: op({
+      put: withValidationRefusal(op({
         summary: 'Set or update own availability status',
         tag: 'Family',
         stateChanging: true,
@@ -39,7 +39,7 @@ export function availabilityPaths() {
           + 'Only one status row exists per user (UPSERT). '
           + '`state` must be one of `available`, `busy`, `do_not_disturb`, `away`. '
           + '`note` is optional free text up to 200 characters. '
-          + '`expires_at` is a required ISO-8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`) that must be in the future.',
+          + '`expires_at` is a required ISO-8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`); the route itself refuses one not in the future or more than 30 days out.',
         responses: {
           200: {
             description: 'The stored status',
@@ -55,11 +55,10 @@ export function availabilityPaths() {
               },
             },
           },
-          400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
-      }),
+      })),
       delete: op({
         summary: 'Clear own availability status',
         tag: 'Family',

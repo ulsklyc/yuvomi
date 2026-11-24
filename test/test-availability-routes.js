@@ -19,6 +19,8 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { default: availabilityRouter } = await import('../server/routes/availability.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
+const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
 
 const USER_A = db.prepare(`INSERT INTO users (username, display_name, password_hash, role) VALUES ('alice','Alice','x','member')`).run().lastInsertRowid;
@@ -33,7 +35,10 @@ app.use((req, _res, next) => {
   req.session = { userId: actorId, role: 'member' };
   next();
 });
-app.use('/', availabilityRouter);
+const PREFIX = '/api/v1/availability';
+app.use(defaultEmptyBody);
+app.use(PREFIX, availabilityRouter);
+app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -45,7 +50,7 @@ function future(offsetSeconds = 3600) {
 
 async function call(method, path, body, asUser = USER_A) {
   actorId = asUser;
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}${PREFIX}${path === '/' ? '' : path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,

@@ -4,6 +4,11 @@
  *          their own state (available / busy / do_not_disturb / away) with an
  *          optional note and an expiry time. The status is visible to all
  *          household members via the family widget on the dashboard.
+ *          Every route carries validateRequest() (#2810, group 13 b): the
+ *          shape of state, note and expires_at is checked against
+ *          server/openapi/paths/availability.js. `expires_at` being in the
+ *          future and within 30 days is relative to the time of the request,
+ *          which the schema cannot express, so the handler checks it by hand.
  * Routes:
  *   GET  /api/v1/availability        → all current statuses for the household
  *   PUT  /api/v1/availability        → set / update own status
@@ -13,10 +18,9 @@
 import express from 'express';
 import * as db from '../db.js';
 import { householdMemberSql } from '../services/household-members.js';
+import { validateRequest } from '../api/validate-request.ts';
 
 const router = express.Router();
-
-const VALID_STATES = ['available', 'busy', 'do_not_disturb', 'away'];
 
 /** Alle aktuellen (noch nicht abgelaufenen) Verfuegbarkeitsstati im Haushalt. */
 function getAllStatuses() {
@@ -35,37 +39,21 @@ function getAllStatuses() {
 }
 
 /** GET /api/v1/availability — Haushaltsliste aller aktiven Stati. */
-router.get('/', (req, res) => {
+router.get('/', validateRequest(), (req, res) => {
   res.json({ data: getAllStatuses() });
 });
 
 /** PUT /api/v1/availability — eigenen Status setzen oder aktualisieren.
- *  Body: { state, note?, expires_at }
- *  - state: 'available' | 'busy' | 'do_not_disturb' | 'away'
- *  - note: optionaler Freitext (max 200 Zeichen)
- *  - expires_at: ISO-8601-UTC-Zeitstempel (muss in der Zukunft liegen)
+ *  Body: { state, note?, expires_at }, geprueft gegen das OpenAPI-Dokument.
+ *  Nur der Handler prueft, ob expires_at in der Zukunft und hoechstens 30
+ *  Tage entfernt liegt - relativ zur Anfragezeit, das kann das Schema nicht.
  */
-router.put('/', (req, res) => {
+router.put('/', validateRequest(), (req, res) => {
   const userId = req.authUserId;
-  const { state, note, expires_at } = req.body ?? {};
+  const { state, note, expires_at } = req.body;
 
-  if (!VALID_STATES.includes(state)) {
-    return res.status(400).json({
-      error: `state must be one of: ${VALID_STATES.join(', ')}.`,
-      code: 400,
-    });
-  }
-  if (note != null && (typeof note !== 'string' || note.length > 200)) {
-    return res.status(400).json({ error: 'note must be a string of at most 200 characters.', code: 400 });
-  }
-  if (!expires_at || typeof expires_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(expires_at)) {
-    return res.status(400).json({ error: 'expires_at must be an ISO-8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ).', code: 400 });
-  }
-  const parsedExpiry = new Date(expires_at);
-  if (isNaN(parsedExpiry.getTime())) {
-    return res.status(400).json({ error: 'expires_at must be a valid date.', code: 400 });
-  }
   const nowMs = Date.now();
+  const parsedExpiry = new Date(expires_at);
   if (parsedExpiry.getTime() <= nowMs) {
     return res.status(400).json({ error: 'expires_at must be in the future.', code: 400 });
   }
@@ -91,7 +79,7 @@ router.put('/', (req, res) => {
 });
 
 /** DELETE /api/v1/availability — eigenen Status loeschen. */
-router.delete('/', (req, res) => {
+router.delete('/', validateRequest(), (req, res) => {
   db.get().prepare('DELETE FROM user_availability WHERE user_id = ?').run(req.authUserId);
   res.json({ data: null });
 });
