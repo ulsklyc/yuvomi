@@ -81,57 +81,51 @@
  * `workflow_dispatch` auf einem Zweig, vergleicht die CI nur gegen den
  * vorletzten Commit. Eine Aenderung in einem frueheren Commit derselben Serie
  * sieht dann nur der pull_request-Lauf davor.
+ *
+ * ZWEI LAYOUTS SEIT ABSCHNITT F (24.11.2026). Die Migrationen ziehen aus dem
+ * Array in server/db.js in eine Datei je Migration (server/migrations/NNNN.ts,
+ * Reihenfolge in server/migrations/index.ts, Helfer in helpers.ts). Der Guard
+ * liest beide Layouts ueber test/helpers/migration-layout.js zu derselben
+ * Liste und vergleicht ueber die Grenze hinweg: der PR, der umzieht, hat eine
+ * Basis im alten und eine Arbeitskopie im neuen Layout, und genau dort muss
+ * jeder Eintrag byte-gleich ankommen. Verglichen wird je Migration der
+ * Quelltext ihres Objekts (Einrueckung eingeschlossen, im SQL ist sie Inhalt),
+ * nicht mehr der Block als Ganzes; die Laufreihenfolge ist im neuen Layout das
+ * Array in index.ts, und ihre Basis muss ein Praefix der Arbeitskopie sein.
+ * Neu ist Frage 4: ein HELFER, den eine bestehende Migration aufruft, ist so
+ * eingefroren wie die Migration selbst - aendert er sich, tut die alte
+ * Migration auf einer noch nicht migrierten Installation etwas anderes.
+ * Gefunden werden Helfer ueber die Bezeichner im Code (AST), nicht ueber Text:
+ * eine Textsuche las Namen aus Kommentaren und SQL.
+ *
+ * WARUM DIE FIXTURES UNTEN: das neue Layout gibt es auf main erst nach dem
+ * Umzug. Damit der Guard es vorher schon rot gesehen hat, baut der Test das
+ * neue Layout im Speicher aus dem echten server/db.js nach und faehrt jede
+ * Frage einmal gruen und einmal rot gegen eine gezielte Abweichung.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, realpathSync } from 'node:fs';
+import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import {
+  readOldLayout, readNewLayout, migrationFile, helpersUsedBy,
+  numberingFindings, prefixFindings, descriptionFindings, importFindings,
+} from './helpers/migration-layout.js';
 
-// Zeilenenden vereinheitlicht: `git show` liefert den Blob mit LF, ein Checkout mit
-// `core.autocrlf` (Git fuer Windows) liest `server/db.js` mit CRLF - ohne das waere der
-// Basis-Vergleich unten schon bei Version 1 rot, obwohl nichts geaendert ist.
-const source = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+const NEW_INDEX = 'server/migrations/index.ts';
 
-/**
- * `^\s*version:\s*(\d+),` und nicht irgendein `version:` - im `up`-SQL stehen
- * Spaltennamen und Kommentare, und eine Suche ohne Zeilenanfang liest sie mit.
- */
-const VERSION_LINE = /^[ \t]*version:\s*(\d+)\s*,/gm;
-
-/**
- * Anfang und Ende des MIGRATIONS-Rumpfs in `text`, ueber die Klammern begrenzt
- * statt per Regex. `where` nennt in der Meldung, WELCHE Fassung kaputt ist -
- * seit Frage 3 liest der Guard zwei.
- */
-function migrationsRange(text, where) {
-  const start = text.indexOf('const MIGRATIONS = [');
-  assert.notEqual(start, -1, `const MIGRATIONS = [ nicht in ${where} gefunden.`);
-  let depth = 0;
-  let index = text.indexOf('[', start);
-  const from = index;
-  while (index < text.length) {
-    if (text[index] === '[') depth += 1;
-    else if (text[index] === ']') {
-      depth -= 1;
-      if (depth === 0) return { from, to: index };
-    }
-    index += 1;
+/** Die Arbeitskopie, in dem Layout, in dem sie liegt. */
+function currentMigrations() {
+  if (existsSync(new URL(`../${NEW_INDEX}`, import.meta.url))) {
+    return readNewLayout((name) => {
+      const url = new URL(`../server/migrations/${name}`, import.meta.url);
+      return existsSync(url) ? readFileSync(url, 'utf8') : null;
+    });
   }
-  throw new Error(`Das MIGRATIONS-Array in ${where} ist nicht geschlossen.`);
-}
-
-/** Der Rumpf des MIGRATIONS-Arrays in der Arbeitskopie. */
-function migrationsBlock() {
-  const { from, to } = migrationsRange(source, 'server/db.js');
-  return source.slice(from, to);
-}
-
-/** Die Versionsnummern in ihrer QUELLREIHENFOLGE. */
-function declaredVersions(block = migrationsBlock()) {
-  return [...block.matchAll(VERSION_LINE)].map((m) => Number(m[1]));
+  return readOldLayout(readFileSync(new URL('../server/db.js', import.meta.url), 'utf8'));
 }
 
 /**
@@ -139,6 +133,7 @@ function declaredVersions(block = migrationsBlock()) {
  * ein Rot oder ein Skip wird, entscheidet der Aufrufer, und das haengt davon
  * ab, ob der Lauf in der CI steht.
  */
+/** @param {...string} args */
 function git(...args) {
   try {
     const out = execFileSync('git', args, {
@@ -149,7 +144,8 @@ function git(...args) {
     });
     return { ok: true, out };
   } catch (error) {
-    return { ok: false, out: '', err: String(error.stderr || error.message).trim() };
+    const failure = /** @type {{ stderr?: unknown, message?: string }} */ (error);
+    return { ok: false, out: '', err: String(failure.stderr || failure.message).trim() };
   }
 }
 
@@ -190,122 +186,61 @@ function resolveBase() {
   return { sha: mergeBase.out.trim(), label: 'merge-base HEAD origin/main' };
 }
 
-/** Die Zeile, in der `offset` liegt, und ihr Anfang im Text. */
-function lineAround(text, offset) {
-  const start = text.lastIndexOf('\n', offset - 1) + 1;
-  const end = text.indexOf('\n', offset);
-  return { start, text: text.slice(start, end === -1 ? text.length : end) };
+
+/** Die Basis, in dem Layout, in dem sie liegt. */
+function baseMigrations(/** @type {string} */ sha, /** @type {string} */ label) {
+  const short = sha.slice(0, 8);
+  const show = (/** @type {string} */ path) => {
+    const shown = git('show', `${sha}:${path}`);
+    return shown.ok ? shown.out : null;
+  };
+  if (show(NEW_INDEX) !== null) return readNewLayout((name) => show(`server/migrations/${name}`), `Basis ${label} (${short}): `);
+  const db = show('server/db.js');
+  assert.ok(db !== null, `server/db.js ist in der Basis ${label} (${short}) nicht lesbar.`);
+  return readOldLayout(/** @type {string} */ (db), `server/db.js der Basis ${label} (${short})`);
 }
 
+/** Ein Guard, der nichts gemessen hat, darf nicht urteilen. */
+function assertMeasured(/** @type {import('./helpers/migration-layout.js').Migrations} */ migrations, /** @type {string} */ where) {
+  assert.deepEqual(migrations.findings, [], `${where} ist nicht lesbar:\n  ${migrations.findings.join('\n  ')}`);
+  assert.ok(migrations.entries.length >= 100,
+    `Nur ${migrations.entries.length} Migrationen in ${where} gefunden - entweder hat sich das Layout geaendert, `
+    + 'dann gehoert test/helpers/migration-layout.js nachgezogen, oder die Liste ist kaputt.');
+}
+
+const RULE = 'Migrationen sind append-only (CLAUDE.md): neue werden ANGEHAENGT und bekommen die naechste freie Nummer; '
+  + 'bestehende werden nie geaendert, umsortiert oder neu nummeriert - eine Bestandsinstallation hat die alte Fassung '
+  + 'schon ausgefuehrt und bekommt die neue nie.';
+
 test('die Migrationen sind lueckenlos aufsteigend nummeriert', () => {
-  const versions = declaredVersions();
-
-  // Ein Guard, der nichts gemessen hat, darf nicht urteilen: eine geaenderte
-  // Schreibweise im Array wuerde sonst als „alles in Ordnung" durchgehen.
-  assert.ok(versions.length >= 100,
-    `Nur ${versions.length} Versionsnummern im MIGRATIONS-Array gefunden. Entweder ist die `
-    + 'Schreibweise `version: N,` entfallen - dann gehoert dieser Guard nachgezogen - oder '
-    + 'das Array ist kaputt.');
-
-  const findings = [];
-  versions.forEach((version, index) => {
-    if (index === 0) {
-      if (version !== 1) findings.push(`Der erste Eintrag traegt version ${version}, erwartet 1.`);
-      return;
-    }
-    const previous = versions[index - 1];
-    if (version === previous) {
-      findings.push(`version ${version} kommt zweimal vor (Eintrag ${index - 1} und ${index}) - `
-        + 'eine Bestandsinstallation haelt die zweite fuer erledigt und ueberspringt sie.');
-    } else if (version < previous) {
-      findings.push(`Eintrag ${index} traegt version ${version} nach ${previous} - das Array ist umsortiert.`);
-    } else if (version !== previous + 1) {
-      findings.push(`Zwischen ${previous} und ${version} fehlt mindestens eine Nummer (Eintrag ${index}) - `
-        + 'meist zwei Zweige, die parallel angehaengt haben.');
-    }
-  });
-
-  assert.deepEqual(findings, [],
-    'Das MIGRATIONS-Array in server/db.js ist append-only (CLAUDE.md). Neue Migrationen werden '
-    + 'ANGEHAENGT und bekommen die naechste freie Nummer; bestehende Eintraege werden nie '
-    + 'umsortiert und nie neu nummeriert.\n  ' + findings.join('\n  '));
+  const current = currentMigrations();
+  assertMeasured(current, 'der Arbeitskopie');
+  const findings = numberingFindings(current);
+  assert.deepEqual(findings, [], `${RULE}\n  ${findings.join('\n  ')}`);
 });
 
-test('bestehende Migrationen sind gegenueber der Basis unveraendert, neue nur angehaengt', (t) => {
+test('bestehende Migrationen und ihre Helfer sind gegenueber der Basis unveraendert, neue nur angehaengt', (t) => {
   const base = resolveBase();
   if (base.skip) return t.skip(base.skip);
   if (base.fail) assert.fail(base.fail);
-
-  const short = base.sha.slice(0, 8);
-  const shown = git('show', `${base.sha}:server/db.js`);
-  assert.ok(shown.ok, `server/db.js ist in der Basis ${base.label} (${short}) nicht lesbar: ${shown.err}`);
-  const baseSource = shown.out;
-  const baseRange = migrationsRange(baseSource, `server/db.js der Basis ${base.label} (${short})`);
-  const currentRange = migrationsRange(source, 'server/db.js');
-  const baseBlock = baseSource.slice(baseRange.from, baseRange.to);
-  const currentBlock = source.slice(currentRange.from, currentRange.to);
-
-  // Auch hier nicht urteilen, ohne gemessen zu haben: ein abgeschnittener
-  // Basis-Block waere ein Praefix von fast allem.
-  const baseCount = declaredVersions(baseBlock).length;
-  assert.ok(baseCount >= 100,
-    `Nur ${baseCount} Versionsnummern im MIGRATIONS-Array der Basis ${base.label} (${short}) - `
-    + 'der Vergleich haette nichts gemessen.');
-
-  // Das ENDE der Basis darf sich bewegen, sonst waere schon das Anhaengen rot:
-  // vor der schliessenden Klammer aendert sich der Leerraum, und ein letzter
-  // Eintrag ohne Komma bekommt beim Anhaengen eines.
-  const prefix = baseBlock.trimEnd().replace(/,$/, '');
-  if (currentBlock.startsWith(prefix)) return;
-
-  let at = 0;
-  while (at < prefix.length && at < currentBlock.length && prefix[at] === currentBlock[at]) at += 1;
-
-  // Der erste betroffene Eintrag ist der, dessen `version:`-Zeile vor der
-  // Abweichung BEGINNT - liegt sie in der Nummer selbst (Umsortierung), ist es
-  // der Eintrag der Basis an dieser Stelle.
-  const entry = [...baseBlock.matchAll(VERSION_LINE)].filter((m) => m.index <= at).pop();
-  const column = at - lineAround(baseBlock, at).start + 1;
-  // Die Zeile mit der ersten Differenz auf beiden Seiten, Leerraum per
-  // JSON.stringify sichtbar - ein fehlender Zeilenumbruch sieht sonst aus wie
-  // zwei gleiche Zeilen.
-  const side = (text, range, block) => {
-    if (at >= block.length) return '(hier endet das Array - Eintraege entfernt?)';
-    const line = lineAround(block, at);
-    const number = text.slice(0, range.from + line.start).split('\n').length;
-    return `server/db.js:${number}  ${JSON.stringify(line.text)}`;
-  };
-
-  assert.fail([
-    `Ein BESTEHENDER Eintrag im MIGRATIONS-Array weicht von der Basis ab - erster betroffener Eintrag: `
-      + `${entry ? `version ${entry[1]}` : 'vor version 1'} (Spalte ${column}).`,
-    'Bestehende Migrationen werden nie geaendert oder umsortiert, neue nur ANGEHAENGT (CLAUDE.md): '
-      + 'eine Bestandsinstallation hat die alte Fassung schon ausgefuehrt und bekommt die neue nie.',
-    `  Basis ${base.label} (${short}):  ${side(baseSource, baseRange, baseBlock)}`,
-    `  Arbeitskopie:  ${side(source, currentRange, currentBlock)}`,
-    `  Der ganze Unterschied: git diff ${short} -- server/db.js`,
-  ].join('\n'));
+  const sha = /** @type {string} */ (base.sha);
+  const before = baseMigrations(sha, /** @type {string} */ (base.label));
+  assertMeasured(before, `der Basis ${base.label}`);
+  const current = currentMigrations();
+  assertMeasured(current, 'der Arbeitskopie');
+  const findings = prefixFindings(before, current, `${base.label} ${sha.slice(0, 8)}`);
+  assert.deepEqual(findings, [], `${RULE}\n  ${findings.join('\n  ')}\n  Der ganze Unterschied: git diff ${sha.slice(0, 8)}`);
 });
 
 test('jede Migration nennt neben ihrer Version auch eine Beschreibung', () => {
   // Ein Eintrag ohne `description` ist beim naechsten Konflikt nicht
   // identifizierbar - `[DB] Migration 128 applied:` waere dann leer, und genau
   // diese Zeile ist beim Update eines Bestandsservers die einzige Spur.
-  const block = migrationsBlock();
-  const entries = block.split(/^[ \t]*version:\s*\d+\s*,/gm).slice(1);
-  const versions = declaredVersions();
-  const findings = [];
-  entries.forEach((entry, index) => {
-    // Nur bis zum naechsten Eintrag schauen; `up` steht dazwischen.
-    const head = entry.slice(0, entry.indexOf('up:') === -1 ? entry.length : entry.indexOf('up:'));
-    if (!/description:\s*['"`]\s*\S/.test(head)) {
-      findings.push(`version ${versions[index]}: keine description.`);
-    }
-  });
+  const findings = descriptionFindings(currentMigrations());
   assert.deepEqual(findings, [], findings.join('\n  '));
 });
 
-test('kein Migrationseintrag ruft Laufzeit-Code aus services/, routes/ oder server/authorize/', () => {
+test('keine Migration ruft Laufzeit-Code aus services/, routes/ oder server/authorize/', () => {
   // EINE MIGRATION TUT FUER IMMER DASSELBE. Ruft ein Eintrag eine geteilte
   // Laufzeitregel auf, aendert jede spaetere Aenderung an ihr rueckwirkend,
   // was die Migration auf einer noch nicht migrierten Installation tut - und
@@ -315,25 +250,127 @@ test('kein Migrationseintrag ruft Laufzeit-Code aus services/, routes/ oder serv
   // services/payment-task-audience.js auf; seitdem traegt sie eine
   // eingefrorene Kopie.
   //
-  // Erlaubt sind Plattform-Module und reine Hilfen aus ./utils/ und
-  // ./logger.js (Datumsrechnung, Telefonnummern, Entitaeten - wie bisher in
-  // aelteren Eintraegen). Alles andere, was db.js importiert, darf im
-  // MIGRATIONS-Block nicht vorkommen.
-  const header = source.slice(0, source.indexOf('const MIGRATIONS = ['));
-  const IMPORT = /^import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"];?/gm;
-  const pure = (spec) => spec.startsWith('node:') || ['path', 'os', 'fs', 'crypto'].includes(spec)
-    || spec.startsWith('./utils/') || spec === './logger.js';
-  const forbidden = [];
-  for (const [, clause, spec] of header.matchAll(IMPORT)) {
-    if (pure(spec)) continue;
-    const names = clause.replace(/[{}]/g, ' ').split(',')
-      .map((part) => part.trim().split(/\s+as\s+/).pop().trim())
-      .filter((name) => /^[A-Za-z_$][\w$]*$/.test(name));
-    for (const name of names) forbidden.push({ name, spec });
+  // Erlaubt sind Plattform-Module, reine Hilfen aus server/utils/, der Logger
+  // und die eingefrorenen Helfer der Migrationen.
+  const current = currentMigrations();
+  if (current.layout === 'new') {
+    const findings = importFindings(current);
+    assert.deepEqual(findings, [], findings.join('\n  '));
+    return;
   }
-  const block = migrationsBlock();
-  const findings = forbidden
-    .filter(({ name }) => new RegExp(`(^|[^\\w$.])${name.replace(/\$/g, '\\$')}\\b`).test(block))
-    .map(({ name, spec }) => `${name} (aus ${spec}) im MIGRATIONS-Block - die Regel als eingefrorene Kopie in den Eintrag schreiben.`);
+  // Altes Layout: was server/db.js importiert und nicht rein ist, darf im
+  // Code keiner Migration vorkommen.
+  const pure = (/** @type {string} */ spec) => spec.startsWith('node:') || ['path', 'os', 'fs', 'crypto'].includes(spec)
+    || spec.startsWith('./utils/') || spec === './logger.js';
+  const forbidden = new Map(current.imports.filter(({ spec }) => !pure(spec))
+    .flatMap(({ spec, names }) => names.map((name) => [name, spec])));
+  const findings = current.entries.flatMap((entry) => [...entry.refs].filter((name) => forbidden.has(name))
+    .map((name) => `version ${entry.version}: ${name} (aus ${forbidden.get(name)}) - die Regel als eingefrorene Kopie in den Eintrag schreiben.`));
   assert.deepEqual(findings, [], findings.join('\n  '));
+});
+
+// ---------------------------------------------------------------------------
+// Das neue Layout, bevor es auf main liegt: im Speicher aus dem echten db.js.
+// ---------------------------------------------------------------------------
+
+/**
+ * server/db.js im neuen Layout, so wie der Umzug es schreiben soll: jede
+ * Migration ihr Objekt wie im Array, die Helfer in helpers.ts.
+ * @param {import('./helpers/migration-layout.js').Migrations} old
+ * @param {{ entries?: (files: Map<string, string>) => void }} [edit]
+ */
+function asNewLayout(old, edit = {}) {
+  /** @type {Map<string, string>} */
+  const files = new Map();
+  const names = [];
+  for (const entry of old.entries) {
+    const file = migrationFile(/** @type {number} */ (entry.version));
+    const name = `m${file.slice(0, 4)}`;
+    names.push([name, file]);
+    const helpers = [...helpersUsedBy([entry], old.helpers)];
+    const imports = helpers.length ? `import { ${helpers.join(', ')} } from './helpers.ts';\n\n` : '';
+    files.set(file, `${imports}export default ${entry.text};\n`);
+  }
+  files.set('helpers.ts', [...old.helpers].filter(([name]) => helpersUsedBy(old.entries, old.helpers).has(name))
+    .map(([, helper]) => `export ${helper.text}\n`).join('\n'));
+  files.set('index.ts', names.map(([name, file]) => `import ${name} from './${file}';`).join('\n')
+    + `\n\nexport const MIGRATIONS = [\n${names.map(([name]) => `  ${name},`).join('\n')}\n];\n`);
+  edit.entries?.(files);
+  return files;
+}
+
+const oldLayout = readOldLayout(readFileSync(new URL('../server/db.js', import.meta.url), 'utf8'));
+const reader = (/** @type {Map<string, string>} */ files) => readNewLayout((name) => files.get(name) ?? null);
+
+/** Eine Stelle in einer Datei ersetzen, genau einmal. */
+function replaceOnce(/** @type {Map<string, string>} */ files, /** @type {string} */ file, /** @type {string} */ from, /** @type {string} */ to) {
+  const text = /** @type {string} */ (files.get(file));
+  assert.equal(text.split(from).length, 2, `Fixture: \`${from}\` steht nicht genau einmal in ${file}.`);
+  files.set(file, text.replace(from, to));
+}
+
+test('Fixture: der Umzug ins neue Layout ist gruen, wenn jede Migration byte-gleich ankommt', () => {
+  if (oldLayout.entries.length === 0) return; // schon umgezogen - dann prueft der Basis-Test oben den echten Umzug
+  const moved = reader(asNewLayout(oldLayout));
+  assert.deepEqual(moved.findings, []);
+  assert.equal(moved.entries.length, oldLayout.entries.length);
+  assert.deepEqual([...numberingFindings(moved), ...prefixFindings(oldLayout, moved, 'db.js'), ...descriptionFindings(moved), ...importFindings(moved)], []);
+});
+
+test('Fixture: ein geaenderter Eintrag ist rot, auch wenn sich nur die Einrueckung im SQL aendert', () => {
+  if (oldLayout.entries.length === 0) return;
+  const files = asNewLayout(oldLayout);
+  replaceOnce(files, '0001.ts', '\n      -- Benutzer\n', '\n    -- Benutzer\n');
+  const findings = prefixFindings(oldLayout, reader(files), 'db.js');
+  assert.equal(findings.length, 1, findings.join('\n'));
+  assert.match(findings[0], /^Migration 1 weicht von der Basis/);
+});
+
+test('Fixture: eine umsortierte Laufreihenfolge in index.ts ist rot', () => {
+  if (oldLayout.entries.length === 0) return;
+  const files = asNewLayout(oldLayout);
+  replaceOnce(files, 'index.ts', '  m0002,\n  m0003,\n', '  m0003,\n  m0002,\n');
+  const moved = reader(files);
+  assert.ok(moved.findings.some((f) => /anderer Reihenfolge als die Importe/.test(f)), moved.findings.join('\n'));
+  assert.ok(numberingFindings(moved).some((f) => /version 3 an Stelle 2/.test(f)));
+  assert.ok(prefixFindings(oldLayout, moved, 'db.js').some((f) => /^Migration 2 weicht/.test(f)));
+});
+
+test('Fixture: eine Datei, deren Name nicht ihre Version ist, ist rot', () => {
+  if (oldLayout.entries.length === 0) return;
+  const files = asNewLayout(oldLayout);
+  const last = oldLayout.entries.length;
+  replaceOnce(files, migrationFile(last), `version: ${last},`, `version: ${last + 1},`);
+  assert.ok(numberingFindings(reader(files)).some((f) => f.includes(`traegt version ${last + 1}`)));
+});
+
+test('Fixture: ein geaenderter Helfer einer bestehenden Migration ist rot', () => {
+  if (oldLayout.entries.length === 0) return;
+  const files = asNewLayout(oldLayout);
+  const helper = [...helpersUsedBy(oldLayout.entries, oldLayout.helpers)][0];
+  assert.ok(helper, 'Fixture: keine Migration nutzt einen Helfer - der Test misst nichts.');
+  replaceOnce(files, 'helpers.ts', `function ${helper}(`, `function ${helper}(/* anders */ `);
+  assert.ok(prefixFindings(oldLayout, reader(files), 'db.js').some((f) => f.includes(`Helfer ${helper}()`)));
+});
+
+test('Fixture: eine angehaengte Migration ist gruen, eine fehlende rot', () => {
+  if (oldLayout.entries.length === 0) return;
+  const files = asNewLayout(oldLayout);
+  const next = oldLayout.entries.length + 1;
+  const file = migrationFile(next);
+  files.set(file, `export default {\n    version: ${next},\n    description: 'fixture',\n    up: \`SELECT 1;\`,\n  };\n`);
+  replaceOnce(files, 'index.ts', '\n\nexport const MIGRATIONS = [\n', `\nimport m${file.slice(0, 4)} from './${file}';\n\nexport const MIGRATIONS = [\n`);
+  replaceOnce(files, 'index.ts', '\n];\n', `\n  m${file.slice(0, 4)},\n];\n`);
+  const grown = reader(files);
+  assert.deepEqual([...grown.findings, ...numberingFindings(grown), ...prefixFindings(oldLayout, grown, 'db.js')], []);
+  // Und umgekehrt: die Basis hat die neue Migration, die Arbeitskopie nicht mehr.
+  assert.ok(prefixFindings(grown, oldLayout, 'Basis').some((f) => f.includes(`Migration ${next} der Basis`)));
+});
+
+test('Fixture: eine Migration, die Laufzeit-Code importiert, ist rot', () => {
+  if (oldLayout.entries.length === 0) return;
+  const files = asNewLayout(oldLayout);
+  const text = /** @type {string} */ (files.get('0001.ts'));
+  files.set('0001.ts', `import { visibleWhere } from '../services/visibility.js';\n${text}`);
+  assert.ok(importFindings(reader(files)).some((f) => f.includes('../services/visibility.js')));
 });
