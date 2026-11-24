@@ -577,11 +577,12 @@ export const CHANGED = {
     now: {"status":400,"body":{"error":"attachment_data must be a base64 data URL.","code":400}},
     log: null,
   },
-  // parseAttachment() throws for a type it does not take.
+  // parseAttachment() threw for a type it does not take; it now returns the
+  // refusal for the checks of the route (#2810). No log line.
   "ev create attachment zip": {
     before: {"status":500,"body":{"error":"Internal error.","code":500}},
-    now: {"status":500,"body":{"error":"Internal server error.","code":500}},
-    log: 'Unhandled error: POST /api/v1/calendar/ -> 500',
+    now: {"status":400,"body":{"error":"attachment_data: this file type is not allowed.","code":400}},
+    log: null,
   },
   // An assignee id that is no user failed the foreign key of
   // `event_assignments`; now the same 400 as on create (#2810). No log line.

@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already use; `attachment_data` that is no base64 data URL (`xyz`, `data:image/png;base64,???`)
   answered 500 and now answers 400 `attachment_data must be a base64 data URL.`. Nothing is
   written in either case.
+- **Every calendar attachment the server cannot take is refused with 400.** This is about your
+  own API clients; the event form checks type and size before it sends. `POST /calendar`,
+  `PUT /calendar/{id}`, `PUT /calendar/{seriesId}/occurrences/{recurrenceId}` and its
+  `/following` answered 500 for an `attachment_data` with a type off the list, without bytes,
+  above the upload limit or with bytes that do not match the type, the two occurrence routes
+  also for text that is no base64 data URL. They now answer 400 with one sentence per case
+  (`attachment_data: this file type is not allowed.`, `attachment_data: the file is empty.`,
+  `attachment_data: the file may be at most 5 MB.`, `attachment_data: the content does not
+  match the declared file type.`, `attachment_data must be a base64 data URL.`), and nothing is
+  written or uploaded.
 - **An empty push `endpoint` is refused by the API description.** This is about your own API
   clients; the app always sends the endpoint of the browser's subscription. `POST
   /push/subscribe` and `POST /push/unsubscribe` with `endpoint: ""` still answer 400, now with

@@ -66,7 +66,6 @@ import {
   ASSIGNED_USERS_SQL,
   getUserId,
   eventIcon,
-  attachmentShape,
   parseAttachment,
   refuseUploadWithoutDocumentsWrite, storedAttachmentLocked,
   ATTACHMENT_CHANGE_REFUSAL,
@@ -587,8 +586,9 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
     // Eine Person ohne Konto lief bis in den Fremdschluessel von
     // `event_assignments` (500); dieselbe Pruefung wie an den Vorkommen (#2810).
     const vAssigned = validateOccurrenceAssignments(db.get(), req.body.assigned_to);
-    // Kein lesbarer Anhang: 400 statt des Wurfs aus parseAttachment (#2810).
-    const vAttachment = attachmentShape(req.body.attachment_data);
+    // Ein Anhang, den die Route nicht nehmen kann, ist eine 400 vor jedem
+    // Schreiben (#2810); bis dahin warf parseAttachment, und es wurde 500.
+    const vAttachment = parseAttachment(req.body.attachment_data);
     // Die Form (Text, bei Beschreibung und Ort auch null) prueft das Schema
     // davor (CalendarEventCreateInput, #2810); `str()` prueft den Inhalt.
     const checks = [vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar, vAssigned, vAttachment];
@@ -629,9 +629,8 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
     const userIds  = parseAssignedTo(req.body.assigned_to);
     const firstUid = userIds[0] ?? null;
 
-    const attachment = req.body.attachment_data
-      ? parseAttachment(req.body.attachment_data)
-      : { mime: null, size: null, buffer: null };
+    // Ein Befund ist oben schon eine 400 geworden.
+    const attachment = /** @type {import('./helpers.js').Attachment} */ (vAttachment.value);
     if (attachment.buffer) {
       stagedUpload = await stageDocumentUpload({
         buffer: attachment.buffer,
@@ -947,7 +946,8 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     if (vLocalCalendar) checks.push(vLocalCalendar);
     // Eine Person ohne Konto und ein unlesbarer Anhang endeten als 500 (#2810).
     if (req.body.assigned_to !== undefined) checks.push(validateOccurrenceAssignments(db.get(), req.body.assigned_to));
-    checks.push(attachmentShape(req.body.attachment_data));
+    const vAttachment = parseAttachment(req.body.attachment_data);
+    checks.push(vAttachment);
     if (collectErrors(checks).length) return sendValidationErrors(res, checks);
     const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : event.icon;
     if (!vIcon) return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
@@ -1058,8 +1058,9 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
         && storedAttachmentLocked(req, db.get(), event.attachment_document_id)) {
       return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
+    // Ein Befund ist oben schon eine 400 geworden.
     const attachment = replacementRequested
-      ? parseAttachment(req.body.attachment_data)
+      ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
       : null;
     if (attachment?.buffer) {
       stagedUpload = await stageDocumentUpload({
@@ -1462,7 +1463,11 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
     baseOccurrenceFor(master, req.params.recurrenceId, householdTimeZone(db.get()), { ambiguous: 'reject' });
 
     const mutation = validateOccurrenceMutationBody(db.get(), req.body, { master });
-    const { values: validated, errors } = mutation;
+    const { values: validated } = mutation;
+    // Ein Anhang, den die Route nicht nehmen kann, ist eine 400 vor jedem
+    // Hochladen und Schreiben (#2810); bis dahin warf parseAttachment (500).
+    const vAttachment = parseAttachment(req.body.attachment_data);
+    const errors = vAttachment.error ? [...mutation.errors, vAttachment.error] : mutation.errors;
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : undefined;
@@ -1496,8 +1501,9 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
         && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
       return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
+    // Ein Befund ist oben schon eine 400 geworden.
     const parsedAttachment = replacementRequested
-      ? parseAttachment(req.body.attachment_data)
+      ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
       : null;
     if (parsedAttachment?.buffer) {
       stagedUpload = await stageDocumentUpload({
@@ -1628,9 +1634,12 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
     const vCaldav = caldavProvided ? caldavTarget(req.body) : null;
     const vGoogle = googleProvided ? googleTarget(req.body) : null;
     const vOutlook = outlookProvided ? outlookTarget(req.body) : null;
+    // Ein Anhang, den die Route nicht nehmen kann, ist eine 400 vor jedem
+    // Hochladen und Schreiben (#2810); bis dahin warf parseAttachment (500).
+    const vAttachment = parseAttachment(req.body.attachment_data);
     const errors = [
       ...mutation.errors,
-      ...[vCaldav, vGoogle, vOutlook].filter(Boolean),
+      ...[vCaldav, vGoogle, vOutlook, vAttachment].filter(Boolean),
       // Ein NEUES Ziel muss angeboten sein; das der Serie kommt durch (#1860).
       ...(vCaldav && !vCaldav.error ? [caldavTargetOffered(db.get(), vCaldav.value, master)] : []),
     ].flatMap((result) => typeof result === 'string' ? [result] : (result.error ? [result.error] : []));
@@ -1679,8 +1688,9 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
         && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
       return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
+    // Ein Befund ist oben schon eine 400 geworden.
     const parsedAttachment = replacementRequested
-      ? parseAttachment(req.body.attachment_data)
+      ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
       : null;
     if (parsedAttachment?.buffer) {
       stagedUpload = await stageDocumentUpload({
