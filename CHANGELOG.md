@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.95.0] - 2026-11-24
+
 ### Changed
 - **Every list in a request body has a maximum number of entries.** This is about your own API
   clients; the app stays below every limit, and the shopping list now clears more than 1000
@@ -394,6 +396,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **After this version you cannot go back to an older one without every account that has signed
   in, been created or set a password since having to reset its password**: older versions do not
   know Argon2id and refuse those sign-ins.
+- **A request with broken JSON no longer writes part of its body into the server log.** The
+  log line of such a 400 quoted the parser's message, and that message quotes a slice of the
+  body: at `POST /auth/login` that could be part of the password. The log now names only the
+  kind of error. The response is unchanged.
 
 ## [2.94.0] - 2026-11-22
 
