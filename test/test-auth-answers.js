@@ -611,6 +611,17 @@ const STEPS = [
   ['2fa setup token', 'POST', '/2fa/setup', NO_BODY, { as: 'admintoken' }],
 
   // ══ Signed-in devices and pairing ═════════════════════════════════════════
+  // `GET /devices` sorts by `COALESCE(last_used_at, created_at)`, stamped by
+  // SQLite's own clock in whole seconds, which mock.timers does not stop. The
+  // rows below record two devices of `mem` created in the same second (a tie,
+  // listed in insertion order); when a second boundary fell between the two
+  // creations (a few ms apart, more on a loaded runner) the newer one came
+  // first and `devices mem` was red without any change. Starting the section
+  // at the beginning of a wall-clock second keeps the rows in one second.
+  async () => {
+    const wallMs = (performance.timeOrigin + performance.now()) % 1000;
+    if (wallMs > 100) await new Promise((resolve) => setTimeout(resolve, 1005 - wallMs));
+  },
   ['devices empty', 'GET', '/devices', NO_BODY, { as: 'mem' }],
   ['device token', 'POST', '/devices', DEVICE, { as: 'admintoken' }],
   ['device token invalid', 'POST', '/devices', {}, { as: 'admintoken' }],
