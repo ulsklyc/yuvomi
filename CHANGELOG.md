@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Deleting a calendar asks whether its events go with it or move** (#2570). The confirmation
+  now names the number of events and offers a choice: delete them too, or move them to another
+  calendar (the default calendar preselected). With no events, it stays the plain confirmation
+  it was before. Moving never pushes a synced event anywhere - a local calendar move isn't a
+  change to what the event looks like at Google, CalDAV or iCloud - and only deleting the events,
+  or moving them to a calendar other than the default, stops the "also uploads to iCloud" note
+  from applying. Existing API callers that send no body keep today's behavior unchanged.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation
@@ -1176,15 +1185,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them as never null. They now carry `null` in their type. Four sample values moved from `example` to
   `examples`, and two "one of these fields" rules are spelled so that a strict JSON Schema validator
   accepts them. The API itself did not change.
-
-### Added
-- **Deleting a calendar asks whether its events go with it or move** (#2570). The confirmation
-  now names the number of events and offers a choice: delete them too, or move them to another
-  calendar (the default calendar preselected). With no events, it stays the plain confirmation
-  it was before. Moving never pushes a synced event anywhere - a local calendar move isn't a
-  change to what the event looks like at Google, CalDAV or iCloud - and only deleting the events,
-  or moving them to a calendar other than the default, stops the "also uploads to iCloud" note
-  from applying. Existing API callers that send no body keep today's behavior unchanged.
 
 ## [2.91.1] - 2026-11-17
 
