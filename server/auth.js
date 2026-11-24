@@ -1982,12 +1982,12 @@ function passkeyAuthFailure(req, res, error, operation) {
   log.error('Passkey sign-in error', { ip: req.ip, reason: 'internal_error', operation, error: error instanceof Error ? error.message : undefined });
   return res.status(500).json({ error: 'Could not complete passkey authentication.', code: 500 });
 }
-router.get('/passkeys/config', (/** @type {PasskeyRequest} */ _req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
+router.get('/passkeys/config', validateRequest(), (/** @type {PasskeyRequest} */ _req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
   try {
     res.json({ data: { enabled: !!passkeys.configuration(), login_enabled: isPasswordLoginEnabled() || hasSplitExpenseGuests(db.get()) } });
   } catch (error) { next(error); }
 });
-router.get('/passkeys', requireAuth, (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
+router.get('/passkeys', requireAuth, validateRequest(), (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
   try {
     if (req.authMethod !== 'session') return res.status(403).json({ error: 'Use a browser session.', code: 403, reason: 'browser_session_required' });
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
@@ -2008,14 +2008,14 @@ function passkeyReauthUser(req, res) {
   }
   return user;
 }
-router.post('/passkeys/reauth/options', requireAuth, csrfMiddleware, passkeyBrowserSession, loginLimiter, passkeyOrigin, async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
+router.post('/passkeys/reauth/options', requireAuth, csrfMiddleware, passkeyBrowserSession, loginLimiter, passkeyOrigin, validateRequest(), async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
   try {
     const user = passkeyReauthUser(req, res);
     if (!user) return;
     res.json({ data: await passkeys.beginAuthentication(db.get(), req.sessionID, user.id) });
   } catch (error) { passkeyAuthFailure(req, res, error, 'reauth'); }
 });
-router.post('/passkeys/reauth/verify', requireAuth, csrfMiddleware, passkeyBrowserSession, loginLimiter, passkeyOrigin, async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
+router.post('/passkeys/reauth/verify', requireAuth, csrfMiddleware, passkeyBrowserSession, loginLimiter, passkeyOrigin, validateRequest(), async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
   try {
     const user = passkeyReauthUser(req, res);
     if (!user) return;
@@ -2040,14 +2040,14 @@ router.post('/passkeys/reauth/verify', requireAuth, csrfMiddleware, passkeyBrows
     res.json({ data: { ok: true } });
   } catch (error) { passkeyAuthFailure(req, res, error, 'reauth'); }
 });
-router.post('/passkeys/register/options', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
+router.post('/passkeys/register/options', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, validateRequest(), async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
   try {
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
     if (!user || !canSignIn(db.get(), user.id) || !nativePasskeysAllowed(user)) return res.status(403).json({ error: 'Native sign-in is not allowed for this account.', code: 403, reason: 'passkey_policy' });
     res.json({ data: await passkeys.beginRegistration(db.get(), user, req.sessionID) });
   } catch (error) { passkeyAuthFailure(req, res, error, 'registration'); }
 });
-router.post('/passkeys/register/verify', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
+router.post('/passkeys/register/verify', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, validateRequest(), async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
   try {
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(req.authUserId);
     if (!user || !canSignIn(db.get(), user.id) || !nativePasskeysAllowed(user)) return res.status(403).json({ error: 'Native sign-in is not allowed for this account.', code: 403, reason: 'passkey_policy' });
@@ -2060,7 +2060,7 @@ router.post('/passkeys/register/verify', requireAuth, csrfMiddleware, recentPass
     res.json({ data: { ok: true } });
   } catch (error) { passkeyAuthFailure(req, res, error, 'registration'); }
 });
-router.delete('/passkeys/:id', requireAuth, csrfMiddleware, recentPasskeySession, passkeyOrigin, (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
+router.delete('/passkeys/:id', requireAuth, csrfMiddleware, validateRequest(), recentPasskeySession, passkeyOrigin, (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res, /** @type {(error:unknown)=>void} */ next) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0 || !passkeys.remove(db.get(), req.authUserId, id)) return res.status(404).json({ error: 'Passkey not found.', code: 404 });
@@ -2068,7 +2068,7 @@ router.delete('/passkeys/:id', requireAuth, csrfMiddleware, recentPasskeySession
     res.json({ data: { ok: true, ended } });
   } catch (error) { next(error); }
 });
-router.post('/passkeys/login/options', passkeyOptionsLimiter, passkeyOrigin, async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
+router.post('/passkeys/login/options', passkeyOptionsLimiter, passkeyOrigin, validateRequest(), async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
   try {
     if (!isPasswordLoginEnabled() && !hasSplitExpenseGuests(db.get())) return res.status(403).json({ error: 'Native sign-in is disabled.', code: 403, reason: 'passkey_policy' });
     const options = await passkeys.beginAuthentication(db.get(), req.sessionID, null, req.ip);
@@ -2077,7 +2077,7 @@ router.post('/passkeys/login/options', passkeyOptionsLimiter, passkeyOrigin, asy
     res.json({ data: options });
   } catch (error) { passkeyAuthFailure(req, res, error, 'login'); }
 });
-router.post('/passkeys/login/verify', loginLimiter, passkeyOrigin, async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
+router.post('/passkeys/login/verify', loginLimiter, passkeyOrigin, validateRequest(), async (/** @type {PasskeyRequest} */ req, /** @type {PasskeyResponse} */ res) => {
   try {
     const { userId } = await passkeys.finishAuthentication(db.get(), req.sessionID, req.body?.credential);
     const user = db.get().prepare('SELECT * FROM users WHERE id = ?').get(userId);

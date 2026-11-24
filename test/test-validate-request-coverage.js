@@ -233,11 +233,11 @@ test('NOT_MIGRATED only shrinks: every entry exists and still has a route withou
   }
 });
 
-test('server/auth.js: all 47 routes of groups 12a and 12b carry validateRequest()', () => {
+test('server/auth.js: all 56 routes including native passkeys carry validateRequest()', () => {
   const routes = files.get('server/auth.js') ?? [];
   const validated = routes.filter((r) => r.validated).map((r) => r.route);
-  assert.equal(routes.length, 47, 'the auth router and its builders register 47 routes');
-  assert.equal(validated.length, 47, `${validated.length} routes of server/auth.js carry validateRequest()`);
+  assert.equal(routes.length, 56, 'the auth router and its builders register 56 routes');
+  assert.equal(validated.length, 56, `${validated.length} routes of server/auth.js carry validateRequest()`);
   assert.ok(MIGRATED.includes('server/auth.js') && !NOT_MIGRATED.includes('server/auth.js') && !('server/auth.js' in PARTIAL), 'server/auth.js is on MIGRATED only');
 });
 

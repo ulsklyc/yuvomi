@@ -56,7 +56,7 @@ export function authPaths() {
       delete: passkeyOp({ summary: "Remove your own passkey", tag: 'Auth', auth: true, stateChanging: true,
         params: [idParam()],
         description: "Requires CSRF and recent browser proof. Ends other browser sessions and native device credentials; keeps remaining passkeys. browser_session_required and passkey_reauth_required (403); passkey_unavailable (409).",
-        responses: { 200: { description: "data.ok and data.ended (other sessions/devices ended)" }, 401: { description: "Not signed in" }, 403: { description: "Origin, browser or recent proof refusal" }, 404: { description: "Passkey not found" }, 409: { description: "Passkeys unavailable" }, 500: { description: "Removal failed" } },
+        responses: { 200: { description: "data.ok and data.ended (other sessions/devices ended)" }, 400: { description: "Path ID does not match the request schema" }, 401: { description: "Not signed in" }, 403: { description: "Origin, browser or recent proof refusal" }, 404: { description: "Passkey not found" }, 409: { description: "Passkeys unavailable" }, 500: { description: "Removal failed" } },
       }),
     },
     '/api/v1/auth/passkeys/login/options': {
