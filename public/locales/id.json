@@ -127,7 +127,8 @@
         "transferUndone": "Dihapus dari daftar belanja.",
         "transferSkipped": "{{count}} sudah ada di sana.",
         "transferSkipped_one": "{{count}} sudah ada di sana.",
-        "transferAllPresent": "Semua bahan sudah ada di daftar."
+        "transferAllPresent": "Semua bahan sudah ada di daftar.",
+        "errorTransferTooLarge": "Itu terlalu banyak bahan sekaligus. Paling banyak {{limit}} bahan dapat dipindahkan, dan dibatalkan, bersamaan."
     },
     "nav": {
         "dashboard": "Ringkasan",

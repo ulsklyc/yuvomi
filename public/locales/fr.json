@@ -127,7 +127,8 @@
         "transferUndone": "Retiré de la liste de courses.",
         "transferSkipped": "{{count}} y figuraient déjà.",
         "transferSkipped_one": "{{count}} y figurait déjà.",
-        "transferAllPresent": "Tous les ingrédients sont déjà sur la liste."
+        "transferAllPresent": "Tous les ingrédients sont déjà sur la liste.",
+        "errorTransferTooLarge": "C’est trop d’ingrédients à la fois. Au plus {{limit}} peuvent être transférés, et annulés, ensemble."
     },
     "nav": {
         "dashboard": "Accueil",

@@ -585,30 +585,26 @@ test('DELETE /:listId/items/checked mit { ids }: nur die genannten, davon nur ab
   assert.deepEqual(names(other), ['X'], 'eine fremde ID loescht nichts in der anderen Liste');
 });
 
-test('DELETE /:listId/items/checked mit 40 000 ids: 200, genau diese geloescht (eine SQL-Variable, nicht eine je ID)', async () => {
+test('DELETE /:listId/items/checked: 40 000 ids sind 400 (maxItems), die Hoechstzahl geht als eine SQL-Variable durch', async () => {
   // SQLite nimmt hoechstens 32766 Host-Parameter je Anweisung; ein IN (?,?,...) je ID
-  // brach ab 32766 IDs mit 500 "too many SQL variables" ab. Die Liste geht jetzt als ein
-  // JSON-Parameter an json_each.
+  // brach ab 32766 IDs mit 500 "too many SQL variables" ab. Die Liste geht seit 5a als
+  // ein JSON-Parameter an json_each (test:sql-in-list haelt 40 000 Werte), und seit 5b
+  // nimmt das Schema hoechstens MAX_SHOPPING_ITEMS ids (#2810): mehr ist 400, und nichts
+  // geht verloren - die Seite teilt in Happen (test:shopping-ux).
+  const { MAX_SHOPPING_ITEMS } = await import('../server/openapi/array-limits.js');
   const list = await newList('Checked-Many');
   const keep = (await call('POST', `/${list}/items`, { name: 'Behalten' })).body.data;
   await call('PATCH', `/items/${keep.id}`, { is_checked: true });
-  // Die Suchindex-Trigger loeschen per entity_id in der FTS5-Tabelle (ein Scan je Zeile):
-  // 40 000 Zeilen anlegen und loeschen dauerte damit Minuten. Sie sind hier nicht Gegenstand
-  // und kommen danach unveraendert zurueck.
-  const searchTriggers = db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name IN ('trg_search_items_ai', 'trg_search_items_ad')").all();
-  assert.equal(searchTriggers.length, 2);
-  for (const { name } of searchTriggers) db.exec(`DROP TRIGGER ${name}`);
   // Mit eigenem Rang: der Rang-Trigger sucht sonst je Zeile das MAX der Kategorie.
   const insert = db.prepare("INSERT INTO shopping_items (list_id, name, is_checked, sort_order) VALUES (?, ?, 1, ?)");
-  const ids = db.transaction(() => Array.from({ length: 40000 }, (_v, i) => Number(insert.run(list, `Artikel ${i}`, i + 1).lastInsertRowid)))();
-  let r;
-  try {
-    r = await call('DELETE', `/${list}/items/checked`, { ids });
-  } finally {
-    for (const { sql } of searchTriggers) db.exec(sql);
-  }
+  const ids = db.transaction(() => Array.from({ length: MAX_SHOPPING_ITEMS }, (_v, i) => Number(insert.run(list, `Artikel ${i}`, i + 1).lastInsertRowid)))();
+  const tooMany = await call('DELETE', `/${list}/items/checked`, { ids: Array.from({ length: 40000 }, (_v, i) => i + 1) });
+  assert.equal(tooMany.status, 400);
+  assert.deepEqual(tooMany.body.fields, [{ path: 'body/ids', rule: 'maxItems' }]);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(list).c, MAX_SHOPPING_ITEMS + 1, 'nichts geloescht');
+  const r = await call('DELETE', `/${list}/items/checked`, { ids });
   assert.equal(r.status, 200);
-  assert.equal(r.body.deleted, 40000);
+  assert.equal(r.body.deleted, MAX_SHOPPING_ITEMS);
   assert.deepEqual(db.prepare('SELECT id FROM shopping_items WHERE list_id = ?').all(list).map((/** @type {{ id: number }} */ row) => row.id), [keep.id],
     'der nicht genannte abgehakte Artikel bleibt');
 });
@@ -719,6 +715,43 @@ test('POST /:listId/import-meal-plan: preview rechnet, ohne zu schreiben (Audit 
   assert.equal(items, 0, 'Vorschau legt keine Artikel an');
   const open = db.prepare('SELECT COUNT(*) c FROM meal_ingredients WHERE meal_id = ? AND on_shopping_list = 0').get(meal).c;
   assert.equal(open, 1, 'Zutat bleibt unmarkiert');
+});
+
+test('POST /:listId/import-meal-plan: was der Import antwortet, passt in EIN Rueckgaengig; mehr ist 400 vor dem Schreiben (#2810)', async () => {
+  // Der Client schickt `added_ids` und `ingredient_ids` unveraendert in EINER
+  // Anfrage an undo-transfer, das hoechstens MAX_SHOPPING_ITEMS je Liste nimmt.
+  const { MAX_SHOPPING_ITEMS } = await import('../server/openapi/array-limits.js');
+  const insMeal = db.prepare(`INSERT INTO meals (date, meal_type, title, created_by) VALUES (?, 'dinner', 'Gross', ?)`);
+  const insIng = db.prepare(`INSERT INTO meal_ingredients (meal_id, name, quantity, category) VALUES (?, ?, NULL, 'Sonstiges')`);
+  const plan = (/** @type {string} */ day, /** @type {number} */ n) => {
+    const meal = insMeal.run(day, U).lastInsertRowid;
+    db.transaction(() => { for (let i = 0; i < n; i++) insIng.run(meal, `Zutat ${day} ${i}`); })();
+    return meal;
+  };
+
+  // An der Grenze: Import 200, und sein Rueckgaengig geht durch.
+  const fits = await newList('Grenze-Import');
+  plan('2033-01-01', MAX_SHOPPING_ITEMS);
+  const imported = await call('POST', `/${fits}/import-meal-plan`, { from: '2033-01-01', to: '2033-01-01' });
+  assert.equal(imported.status, 200);
+  assert.equal(imported.body.data.added_ids.length, MAX_SHOPPING_ITEMS);
+  const undone = await call('POST', '/items/undo-transfer', { ids: imported.body.data.added_ids, ingredient_ids: imported.body.data.ingredient_ids });
+  assert.equal(undone.status, 200, JSON.stringify(undone.body));
+
+  // Eine Zutat mehr: Vorschau und Import sind 400 mit eigenem Grund, nichts ist geschrieben.
+  const tooBig = await newList('Zu-gross-Import');
+  const meal = plan('2033-02-01', MAX_SHOPPING_ITEMS + 1);
+  const expected = {
+    error: `A transfer takes at most ${MAX_SHOPPING_ITEMS} ingredients at a time.`, code: 400,
+    reason: 'kitchen_transfer_too_large', params: { limit: MAX_SHOPPING_ITEMS },
+  };
+  const preview = await call('POST', `/${tooBig}/import-meal-plan`, { from: '2033-02-01', to: '2033-02-01', preview: true });
+  assert.deepEqual([preview.status, preview.body], [400, expected], 'die Vorschau sagt es vor dem Import');
+  const refused = await call('POST', `/${tooBig}/import-meal-plan`, { from: '2033-02-01', to: '2033-02-01' });
+  assert.deepEqual([refused.status, refused.body], [400, expected]);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(tooBig).c, 0, 'kein Artikel');
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM meal_ingredients WHERE meal_id = ? AND on_shopping_list = 0').get(meal).c,
+    MAX_SHOPPING_ITEMS + 1, 'keine Zutat markiert');
 });
 
 // --------------------------------------------------------------------------

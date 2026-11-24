@@ -6,6 +6,10 @@ import { MAX_AVATAR_DATA_LENGTH } from '../utils/avatar-limits.js';
 import { ORIGIN_MODULE } from '../services/reminder-origins.js';
 import { wasteInputSchemas } from './waste-inputs.js';
 import {
+  MAX_ATTACHMENTS, MAX_BACKFILL_MOVES, MAX_KEYS, MAX_MEMBER_IDS, MAX_ORDER_ROWS, MAX_QUICK_LINK_ORDER, MAX_RAW_ENTRIES,
+  MAX_REMINDER_INSTANTS, MAX_SHOPPING_ITEMS, MAX_TOKEN_SCOPES,
+} from './array-limits.js';
+import {
   DMS_PROVIDERS, DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_UPLOAD_BACKENDS, DOCUMENT_VISIBILITIES,
 } from '../services/document-fields.js';
 import {
@@ -45,6 +49,7 @@ const notificationChannelInputProperties = {
   },
   clearSecrets: {
     type: 'array',
+    maxItems: MAX_KEYS,
     items: { type: 'string' },
     description: 'Explicit secret field names to clear.',
   },
@@ -254,6 +259,7 @@ const calendarOccurrenceMutationProperties = {
       { type: 'integer', minimum: 1 },
       {
         type: 'array',
+        maxItems: MAX_MEMBER_IDS,
         uniqueItems: true,
         items: { type: 'integer', minimum: 1 },
       },
@@ -430,7 +436,7 @@ const taskInputProperties = {
   tags: {
     description: 'A list, or one string with the tags separated by commas. At most 32 tags of 64 characters; more is cut off without an error, and tags differing only in case collapse. Omitted on update, the tags stay; an empty list removes them.',
     oneOf: [
-      { type: 'array', items: { type: 'string' } },
+      { type: 'array', maxItems: MAX_RAW_ENTRIES, items: { type: 'string' } },
       { type: 'string' },
       { type: 'null' },
     ],
@@ -469,7 +475,7 @@ const bulkTaskIds = (description) => ({
 /** Tags to add or remove in one go: a list, or one string with the tags separated by commas. */
 const tagChange = {
   oneOf: [
-    { type: 'array', items: { type: 'string' } },
+    { type: 'array', maxItems: MAX_RAW_ENTRIES, items: { type: 'string' } },
     { type: 'string' },
     { type: 'null' },
   ],
@@ -487,7 +493,7 @@ export const schemas = {
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Fallback event color for imported events without their own color.' },
             local_calendar_id: { type: 'integer', minimum: 1, description: 'Target local calendar. Omit to use the default calendar.' },
             assignee_user_ids: {
-              type: 'array', uniqueItems: true, items: { type: 'integer', minimum: 1 },
+              type: 'array', maxItems: MAX_MEMBER_IDS, uniqueItems: true, items: { type: 'integer', minimum: 1 },
               description: 'People for this run (#1940), household members only; not stored. Every new event of the run is assigned to them (the first one primary). An event the caller already imported with the same UID - in any local calendar - is not created again: the people are added to the ones already on it, nobody is removed and nothing else changes. Omit for the behaviour without people.',
             },
             assignee_user_id: { type: 'integer', minimum: 1, description: 'One person, the short form of `assignee_user_ids`.' },
@@ -505,7 +511,7 @@ export const schemas = {
         },
         LocalCalendarReorderInput: {
           type: 'object', required: ['order'], properties: {
-            order: { type: 'array', uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+            order: { type: 'array', maxItems: MAX_ORDER_ROWS, uniqueItems: true, items: { type: 'integer', minimum: 1 } },
           },
         },
         LocalCalendarUpdateInput: {
@@ -525,7 +531,7 @@ export const schemas = {
             url: { type: 'string', description: 'https:// or webcal:// (with ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK also http://).' },
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
             shared: { type: 'boolean', description: 'Visible to the whole household; otherwise only to its creator. Default false.' },
-            default_assignee_user_ids: { type: 'array', items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS, items: { type: 'integer', minimum: 1 } },
             default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
           },
         },
@@ -536,7 +542,7 @@ export const schemas = {
             name: { type: 'string', description: `Trimmed, 1 to ${ICS_SUBSCRIPTION_NAME_MAX} characters; otherwise 400 with \`reason: calendar_subscription_name_invalid\`.` },
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
             shared: { type: 'boolean' },
-            default_assignee_user_ids: { type: 'array', items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS, items: { type: 'integer', minimum: 1 } },
             default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
           },
         },
@@ -576,14 +582,14 @@ export const schemas = {
           // Each branch names its property (Ajv strictRequired); the full
           // schema of both stays under `properties`.
           anyOf: [
-            { properties: { default_assignee_user_ids: { type: 'array' } }, required: ['default_assignee_user_ids'] },
+            { properties: { default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS } }, required: ['default_assignee_user_ids'] },
             { properties: { default_assignee_user_id: { type: ['integer', 'null'] } }, required: ['default_assignee_user_id'] },
           ],
           description: 'The calendar by provider and its id there, and its default assignees: `default_assignee_user_ids` replaces the set, the earlier form `default_assignee_user_id` sets it to one person or none. One of the two is required; `[]` or `null` clears the set. An `external_id` that is blank after trimming answers 400 from the route; a calendar that is neither synced nor offered by its account answers 404.',
           properties: {
             source: { type: 'string', enum: [...EXTERNAL_CALENDAR_SOURCES] },
             external_id: { type: 'string', description: 'Google calendar id, CalDAV calendar URL or Apple calendar id.' },
-            default_assignee_user_ids: { type: 'array', items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS, items: { type: 'integer', minimum: 1 } },
             default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
           },
         },
@@ -596,6 +602,7 @@ export const schemas = {
             expected_token: { type: ['string', 'null'], pattern: '^[0-9a-f]{64}$', description: 'The `token` of the count. Without it only the count is compared.' },
             moves: {
               type: ['array', 'null'],
+              maxItems: MAX_BACKFILL_MOVES,
               items: {
                 type: 'object',
                 required: ['event_id'],
@@ -658,7 +665,7 @@ export const schemas = {
             listUrl: { type: 'string', description: 'The `listUrl` from `GET /calendar/caldav/accounts/{id}/reminder-lists`.' },
             enabled: { type: 'boolean' },
             targetModule: { type: 'string', enum: [...REMINDER_LIST_TARGETS] },
-            defaultAssigneeUserIds: { type: 'array', items: { type: 'integer', minimum: 1 } },
+            defaultAssigneeUserIds: { type: 'array', maxItems: MAX_MEMBER_IDS, items: { type: 'integer', minimum: 1 } },
             defaultAssigneeUserId: { type: ['integer', 'null'], minimum: 1 },
           },
         },
@@ -800,7 +807,7 @@ export const schemas = {
           type: 'object',
           required: ['ids'],
           properties: {
-            ids: { type: 'array', items: { type: 'integer' }, description: 'The complete new order. Ids the caller cannot see are ignored.' },
+            ids: { type: 'array', maxItems: MAX_QUICK_LINK_ORDER, items: { type: 'integer' }, description: 'The complete new order. Ids the caller cannot see are ignored.' },
           },
         },
         ReminderCreateInput: {
@@ -826,6 +833,7 @@ export const schemas = {
           properties: {
             remind_ats: {
               type: 'array',
+              maxItems: MAX_REMINDER_INSTANTS,
               items: reminderTime,
               description: 'The complete new set; an empty list removes every reminder of the entity. At most 5 different instants after conversion to UTC, repeated entries count once.',
             },
@@ -863,7 +871,7 @@ export const schemas = {
             // (public/components/category-manager.js) schickt ihre Schluessel als Text.
             order: {
               type: 'array',
-              maxItems: 100,
+              maxItems: MAX_ORDER_ROWS,
               uniqueItems: true,
               items: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' }] },
               description: 'Category ids as numbers or digit strings.',
@@ -1552,6 +1560,7 @@ export const schemas = {
           properties: {
             order: {
               type: 'array',
+              maxItems: MAX_ORDER_ROWS,
               items: { type: 'string' },
               description: 'Category keys in the wanted order. An unknown key changes nothing; an empty list leaves the order as it is.',
             },
@@ -1640,6 +1649,7 @@ export const schemas = {
           properties: {
             document_ids: {
               type: 'array',
+              maxItems: MAX_ATTACHMENTS,
               items: { type: 'integer', minimum: 1 },
               description: 'The documents to link, replacing the visible links. Required; an empty list removes them. Ids the caller cannot see are left out.',
             },
@@ -2250,6 +2260,7 @@ export const schemas = {
             ids: {
               type: 'array',
               minItems: 1,
+              maxItems: MAX_SHOPPING_ITEMS,
               items: { type: 'integer', minimum: 1 },
               description: 'Leaving the field out means every checked item. An empty array is refused with 400, not read as "all of them".',
             },
@@ -2396,6 +2407,7 @@ export const schemas = {
             order: {
               type: 'array',
               minItems: 1,
+              maxItems: MAX_MEMBER_IDS,
               uniqueItems: true,
               'x-reason': { uniqueItems: 'duplicate_member', default: 'invalid_order' },
               items: { type: 'integer', minimum: 1, 'x-reason': 'invalid_order' },
@@ -2711,6 +2723,7 @@ export const schemas = {
             subject_user_id: { type: 'integer', minimum: 1, description: 'Optional family-member subject. Defaults to the administrator creating the token. Split-expense guests and wall displays are not eligible - neither can sign in, so neither may carry a credential beside its own.' },
             scopes: {
               type: ['array', 'null'],
+              maxItems: MAX_TOKEN_SCOPES,
               items: { type: 'string' },
               description: 'Optional permission allow-list of "module:read"/"module:write" entries (e.g. ["calendar:write","tasks:read"]). Omit or null for a full-access token. When set, must be non-empty and only contain known scopes. Enforced on both REST and MCP; write implies read.',
             },

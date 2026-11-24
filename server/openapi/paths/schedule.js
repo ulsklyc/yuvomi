@@ -5,6 +5,7 @@ import {
   MAX_CUSTOM_FIELD_NAME, MAX_CYCLE_LENGTH, MAX_FIELD_VALUE_LENGTH, MAX_ICON_NAME_LENGTH, MAX_PATTERN_DAY_ROWS,
   MAX_REMINDER_OFFSET_MINUTES, MAX_SCHEDULE_NOTE, MAX_SHORT_CODE, MAX_WEEKLY_HOURS, MIN_CYCLE_LENGTH, MIN_WEEKLY_HOURS,
 } from '../../services/schedule-fields.js';
+import { MAX_SHIFT_FIELDS } from '../array-limits.js';
 
 /**
  * Schichtplan (#786).
@@ -225,6 +226,7 @@ function shiftTypePaths() {
           properties: {
             fields: {
               type: 'array',
+              maxItems: MAX_SHIFT_FIELDS,
               items: {
                 type: 'object',
                 required: ['custom_field_id', 'position'],

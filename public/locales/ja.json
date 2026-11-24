@@ -127,7 +127,8 @@
         "transferUndone": "買い物リストから削除しました。",
         "transferSkipped": "{{count}}件はすでに載っていました。",
         "transferSkipped_one": "{{count}}件はすでに載っていました。",
-        "transferAllPresent": "すべての材料はすでにリストにあります。"
+        "transferAllPresent": "すべての材料はすでにリストにあります。",
+        "errorTransferTooLarge": "一度に扱う材料が多すぎます。まとめて移して元に戻せるのは最大 {{limit}} 件です。"
     },
     "nav": {
         "dashboard": "ダッシュボード",

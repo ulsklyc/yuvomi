@@ -139,7 +139,8 @@
         "transferSkipped": "{{count}} уже були в ньому.",
         "transferSkipped_one": "{{count}} уже був у ньому.",
         "transferSkipped_many": "{{count}} уже були в ньому.",
-        "transferAllPresent": "Усі інгредієнти вже у списку."
+        "transferAllPresent": "Усі інгредієнти вже у списку.",
+        "errorTransferTooLarge": "Забагато інгредієнтів за раз. Разом можна перенести й скасувати щонайбільше {{limit}}."
     },
     "nav": {
         "dashboard": "Огляд",

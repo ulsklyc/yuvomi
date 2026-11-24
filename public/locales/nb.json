@@ -127,7 +127,8 @@
         "transferUndone": "Fjernet fra handlelisten.",
         "transferSkipped": "{{count}} var allerede på det.",
         "transferSkipped_one": "{{count}} var allerede på den.",
-        "transferAllPresent": "Alle ingredienser er allerede på listen."
+        "transferAllPresent": "Alle ingredienser er allerede på listen.",
+        "errorTransferTooLarge": "Det er for mange ingredienser på en gang. Høyst {{limit}} kan overføres, og angres, samlet."
     },
     "nav": {
         "dashboard": "Oversikt",

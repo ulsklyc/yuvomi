@@ -5,6 +5,7 @@ import {
   BUDGET_SCOPES, STATS_RANGES, ENTRY_VISIBILITIES, OBJECT_VISIBILITIES, BILLING_CYCLES, END_TYPES,
   SUBSCRIPTION_STATUSES,
 } from '../../services/budget-fields.js';
+import { MAX_ATTACHMENTS, MAX_MEMBER_IDS, MAX_ORDER_ROWS } from '../array-limits.js';
 
 // ---------------------------------------------------------------------------
 // Bausteine der Anfrage-Schemata (#2810, Gruppe 9). Das Schema traegt Typ und
@@ -125,9 +126,9 @@ const ENTRY_FIELDS = {
   recurrence_virtual: FLAG,
   recurrence_confirm: FLAG,
   account_id: { ...ROW_ID_OR_NULL, description: '`null` books the entry without an account.' },
-  responsible_user_ids: { ...ROW_IDS, description: 'Household members responsible for the entry.' },
+  responsible_user_ids: { ...ROW_IDS, maxItems: MAX_MEMBER_IDS, description: 'Household members responsible for the entry.' },
   visibility: ENTRY_VISIBILITY,
-  attachment_document_ids: { ...ROW_IDS, description: 'Receipts from the documents module.' },
+  attachment_document_ids: { ...ROW_IDS, maxItems: MAX_ATTACHMENTS, description: 'Receipts from the documents module.' },
 };
 // Datum und Belege gehoeren der einzelnen Buchung, nicht der Serie.
 const { date: _date, attachment_document_ids: _receipts, ...SERIES_BASE } = ENTRY_FIELDS;
@@ -210,8 +211,8 @@ const SUBSCRIPTION_FIELDS = {
 };
 
 const NAME_BODY = body({ name: TEXT });
-const ORDER_KEYS = { type: 'array', minItems: 1, items: KEY, description: 'The keys in their new order. An unknown key changes nothing.' };
-const META_ORDER_IDS = { type: 'array', items: ROW_ID, description: 'Row ids in their new order.' };
+const ORDER_KEYS = { type: 'array', minItems: 1, maxItems: MAX_ORDER_ROWS, items: KEY, description: 'The keys in their new order. An unknown key changes nothing.' };
+const META_ORDER_IDS = { type: 'array', maxItems: MAX_ORDER_ROWS, items: ROW_ID, description: 'Row ids in their new order.' };
 
 export function budgetPaths() {
   return withCaseReasons('budget', CASE_REASONS, {

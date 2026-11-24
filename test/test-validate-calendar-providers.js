@@ -62,6 +62,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import rateLimit from 'express-rate-limit';
 import { createCalendarApp } from './calendar-app.js';
+import { assertArrayLimit } from './array-limit-cases.js';
+import { MAX_BACKFILL_MOVES, MAX_MEMBER_IDS } from '../server/openapi/array-limits.js';
 
 const dbmod = await import('../server/db.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
@@ -104,6 +106,8 @@ const app = await createCalendarApp({
   // server/index.js puts the general API limiter in front; a generous one here.
   before: [['/api/v1', rateLimit({ windowMs: 60_000, limit: 100_000, standardHeaders: false, legacyHeaders: false })]],
   mount: ['calendar'],
+  // As BODY_LIMIT in server/index.js: 5000 backfill moves do not fit express' default 100 kB.
+  jsonLimit: '10mb',
 });
 const server = app.listen(0, '127.0.0.1');
 /** @type {string} */
@@ -565,7 +569,7 @@ test('the document: 38 provider operations, each with its answers', () => {
   // Step (c) of decision 17: one of the two assignee fields, the rest as before.
   assert.deepEqual(spec.components.schemas.ExternalCalendarAssigneesInput.required, ['source', 'external_id']);
   assert.deepEqual(spec.components.schemas.ExternalCalendarAssigneesInput.anyOf, [
-    { properties: { default_assignee_user_ids: { type: 'array' } }, required: ['default_assignee_user_ids'] },
+    { properties: { default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS } }, required: ['default_assignee_user_ids'] },
     { properties: { default_assignee_user_id: { type: ['integer', 'null'] } }, required: ['default_assignee_user_id'] },
   ]);
 });
@@ -632,4 +636,20 @@ test('only guard: the types, lists and bounds the provider handlers no longer ch
     const param = spec.paths[path][method].parameters.find((/** @type {any} */ p) => p.name === 'id' && p.in === 'path');
     assert.deepEqual(param.schema, ID, `${method} ${path} id`);
   }
+});
+
+test('array limits: backfill moves and default assignees, at the limit and one above (#2810)', async () => {
+  const { movedCandidatesLimit } = await import('../server/services/sync-assignment.js');
+  assert.equal(MAX_BACKFILL_MOVES, movedCandidatesLimit.max, 'one confirmation takes one preview page');
+  const moves = (/** @type {number} */ n) => ({
+    expected_count: 0,
+    moves: Array.from({ length: n }, (_, i) => ({ event_id: 900000 + i, from_user_ids: [MEM], to_user_ids: [MEM] })),
+  });
+  await assertArrayLimit((body) => call('POST', '/calendar/external-calendars/default-assignee-backfill', { json: body }),
+    moves, MAX_BACKFILL_MOVES, 'body/moves');
+  const assignees = (/** @type {number} */ n) => ({
+    source: 'google', external_id: 'g-1', default_assignee_user_ids: Array.from({ length: n }, (_, i) => 900000 + i),
+  });
+  await assertArrayLimit((body) => call('PATCH', '/calendar/external-calendars', { json: body }),
+    assignees, MAX_MEMBER_IDS, 'body/default_assignee_user_ids');
 });

@@ -34,6 +34,30 @@
 
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { aggregateMealIngredients } from './shopping-import.js';
+import { MAX_SHOPPING_ITEMS } from '../openapi/array-limits.js';
+
+/**
+ * THE UNDO HAS TO FIT (#2810, follow-up 5b). Every handover answers `added_ids`
+ * (and the meal paths `ingredient_ids`), and the client sends them back
+ * unchanged, in ONE request, to `POST /shopping/items/undo-transfer` - one
+ * request so the undo stays atomic. That operation takes at most
+ * MAX_SHOPPING_ITEMS ids per list. A handover that could answer more is
+ * therefore refused before it writes anything: `added_ids` is at most the
+ * number of rows, `ingredient_ids` at most the number of source ingredients,
+ * and the rows come from the ingredients, so the source count bounds both.
+ */
+export const MAX_HANDOVER_INGREDIENTS = MAX_SHOPPING_ITEMS;
+
+/** @param {number} count source ingredients of one handover */
+export const handoverTooLarge = (count) => count > MAX_HANDOVER_INGREDIENTS;
+
+/** The 400 of a handover whose undo would not fit (`kitchen_transfer_too_large`). */
+export const handoverTooLargeAnswer = () => ({
+  error: `A transfer takes at most ${MAX_HANDOVER_INGREDIENTS} ingredients at a time.`,
+  code: 400,
+  reason: 'kitchen_transfer_too_large',
+  params: { limit: MAX_HANDOVER_INGREDIENTS },
+});
 
 /** The key a shopping item is compared under; '' when nothing is left. */
 export const shoppingNameKey = (name) => ingredientMatchKey(name);

@@ -127,7 +127,8 @@
         "transferUndone": "Đã xóa khỏi danh sách mua sắm.",
         "transferSkipped": "{{count}} món đã có sẵn.",
         "transferSkipped_one": "{{count}} món đã có sẵn.",
-        "transferAllPresent": "Tất cả nguyên liệu đã có trong danh sách."
+        "transferAllPresent": "Tất cả nguyên liệu đã có trong danh sách.",
+        "errorTransferTooLarge": "Quá nhiều nguyên liệu cùng lúc. Chỉ có thể chuyển, và hoàn tác, tối đa {{limit}} nguyên liệu cùng nhau."
     },
     "nav": {
         "dashboard": "Tổng quan",

@@ -14,7 +14,7 @@ import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
-import { handOverToShoppingList } from '../services/kitchen-handover.js';
+import { handOverToShoppingList, handoverTooLarge, handoverTooLargeAnswer } from '../services/kitchen-handover.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
 
@@ -603,6 +603,9 @@ router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (r
     quantities.forEach((q, i) => { ingredients[i].quantity = q?.trim() || null; });
   }
   if (!ingredients.length) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [] } });
+  // Das Rueckgaengig schickt `added_ids` in EINER Anfrage zurueck; passt das
+  // nicht, 400 vor dem Schreiben (#2810, Folge 5b, services/kitchen-handover.js).
+  if (handoverTooLarge(ingredients.length)) return res.status(400).json(handoverTooLargeAnswer());
 
   // Die Regel ist die der ganzen Kueche (services/kitchen-handover.js, R23 D2):
   // dieser Weg hatte sie als einziger schon, die drei anderen nicht.

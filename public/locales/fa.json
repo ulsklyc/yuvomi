@@ -127,7 +127,8 @@
         "transferUndone": "از فهرست خرید حذف شد.",
         "transferSkipped": "{{count}} از قبل در آن بود.",
         "transferSkipped_one": "{{count}} از قبل در آن بود.",
-        "transferAllPresent": "همه مواد از قبل در فهرست هستند."
+        "transferAllPresent": "همه مواد از قبل در فهرست هستند.",
+        "errorTransferTooLarge": "این تعداد مواد اولیه برای یک بار زیاد است. حداکثر {{limit}} مورد را می‌توان با هم منتقل و دوباره لغو کرد."
     },
     "nav": {
         "dashboard": "نمای کلی",

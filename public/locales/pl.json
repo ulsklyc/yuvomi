@@ -139,7 +139,8 @@
         "transferSkipped": "{{count}} już się na niej znajdowało.",
         "transferSkipped_one": "{{count}} już się na niej znajdował.",
         "transferSkipped_many": "{{count}} już się na niej znajdowało.",
-        "transferAllPresent": "Wszystkie składniki są już na liście."
+        "transferAllPresent": "Wszystkie składniki są już na liście.",
+        "errorTransferTooLarge": "To za dużo składników naraz. Razem można przenieść i cofnąć najwyżej {{limit}}."
     },
     "nav": {
         "dashboard": "Pulpit",

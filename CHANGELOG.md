@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Every list in a request body has a maximum number of entries.** This is about your own API
+  clients; the app stays below every limit, and the shopping list now clears more than 1000
+  checked items in several requests. A list longer than its limit (for example more than 1000
+  ids in `DELETE /shopping/{listId}/items/checked`, more than 100 assignees, more than 200
+  ingredients) was accepted and worked through entry by entry; it is now a 400 with
+  `reason: validation` and `fields` naming the list and the rule `maxItems`. Each list carries
+  its limit as `maxItems` in the API description; the limits and their reasons are listed under
+  "Limits of lists in a request" in the API section of `docs/SPEC.md`. Because the undo of a
+  transfer to the shopping list sends back everything the transfer added in one request, a
+  transfer of more than 1000 ingredients (a meal-plan import over a long period, a meal or
+  recipe with that many ingredients) is now refused before anything is written, with
+  `reason: kitchen_transfer_too_large`; the import dialog says so in its preview.
 - **A calendar event with an assignee who has no account, or with an unreadable attachment, is
   refused with 400.** This is about your own API clients; the app sends neither. `POST /calendar`
   and `PUT /calendar/{id}` with an `assigned_to` id that belongs to no account answered 500 and
@@ -336,7 +348,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in one request, such as `DELETE /shopping/{listId}/items/checked` with `{ ids }`, answered 500
   because SQLite takes at most 32 766 values per statement; the server now hands every such list
   to the database as one value. A synced address book entry with that many phone numbers,
-  e-mail addresses or postal addresses is stored as well.
+  e-mail addresses or postal addresses is stored as well. Lists in a request body now have a
+  much lower limit of their own (see "Every list in a request body has a maximum number of
+  entries" above), so such a request is answered 400.
 - **Tasks: `updated_at` moves again when a task is actually changed.** Every database from
   migration v4 on had silently lost the trigger that keeps `tasks.updated_at` current: the table
   rebuilds (v4, v25, v114) dropped the table together with its triggers, and the last rebuild

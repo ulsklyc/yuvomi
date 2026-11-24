@@ -50,6 +50,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import rateLimit from 'express-rate-limit';
 import { AUTH_PREFIX, createAuthApp } from './auth-app.js';
+import { assertArrayLimit } from './array-limit-cases.js';
+import { MAX_TOKEN_SCOPES } from '../server/openapi/array-limits.js';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, sessionMiddleware } = await import('../server/auth.js');
@@ -630,4 +632,12 @@ test('only guard: the rules the administration handlers no longer check themselv
     const id = spec.paths[`${AUTH_PREFIX}${path}`][method].parameters.find((/** @type {any} */ p) => p.in === 'path' && p.name === 'id');
     assert.deepEqual(id.schema, { type: 'integer', maximum: Number.MAX_SAFE_INTEGER }, `${method} ${path}`);
   }
+});
+
+test('array limits: token scopes, at the limit and one above (#2810)', async () => {
+  const admin = sessions.aadmin;
+  const scopes = (/** @type {number} */ n) => ({ name: 'Grenze', scopes: Array.from({ length: n }, (_, i) => (i % 2 ? 'tasks:read' : 'calendar:write')) });
+  const at = await assertArrayLimit((json) => call('POST', '/api-tokens', { session: admin, json }), scopes, MAX_TOKEN_SCOPES, 'body/scopes');
+  // Past the schema the route refuses doubles itself; the bound leaves room for extension modules.
+  assert.deepEqual(at.body, { error: 'scopes contains unknown or duplicate entries.', code: 400 });
 });

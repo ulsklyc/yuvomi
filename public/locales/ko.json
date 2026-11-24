@@ -127,7 +127,8 @@
         "transferUndone": "쇼핑 목록에서 삭제했습니다.",
         "transferSkipped": "{{count}}개는 이미 있었습니다.",
         "transferSkipped_one": "{{count}}개는 이미 있었습니다.",
-        "transferAllPresent": "모든 재료가 이미 목록에 있습니다."
+        "transferAllPresent": "모든 재료가 이미 목록에 있습니다.",
+        "errorTransferTooLarge": "한 번에 옮기기에는 재료가 너무 많습니다. 한꺼번에 옮기고 되돌릴 수 있는 것은 최대 {{limit}}개입니다."
     },
     "nav": {
         "dashboard": "개요",

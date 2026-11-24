@@ -779,6 +779,26 @@ test('POST /:id/to-shopping-list: überträgt nur offene, markiert sie, idempote
   assert.deepEqual(r2.body.data.added_ids, []);
 });
 
+test('POST /:id/to-shopping-list und /week-to-shopping-list: mehr Zutaten, als ein Rueckgaengig fasst, sind 400 vor dem Schreiben (#2810)', async () => {
+  // Gespeicherte Altdaten koennen mehr Zutaten tragen als das Schema heute nimmt.
+  const { MAX_SHOPPING_ITEMS } = await import('../server/openapi/array-limits.js');
+  const meal = Number(db.prepare(`INSERT INTO meals (date, meal_type, title, created_by) VALUES ('2034-03-01', 'dinner', 'Riesig', ?)`).run(U).lastInsertRowid);
+  const ins = db.prepare(`INSERT INTO meal_ingredients (meal_id, name, quantity, category) VALUES (?, ?, NULL, 'Sonstiges')`);
+  db.transaction(() => { for (let i = 0; i <= MAX_SHOPPING_ITEMS; i++) ins.run(meal, `Zutat ${i}`); })();
+  const before = db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(LIST).c;
+  const expected = {
+    error: `A transfer takes at most ${MAX_SHOPPING_ITEMS} ingredients at a time.`, code: 400,
+    reason: 'kitchen_transfer_too_large', params: { limit: MAX_SHOPPING_ITEMS },
+  };
+  const one = await call('POST', `/${meal}/to-shopping-list`, { listId: LIST });
+  assert.deepEqual([one.status, one.body], [400, expected]);
+  const week = await call('POST', '/week-to-shopping-list', { listId: LIST, week: '2034-03-01' });
+  assert.deepEqual([week.status, week.body], [400, expected]);
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(LIST).c, before, 'kein Artikel');
+  assert.equal(db.prepare('SELECT COUNT(*) c FROM meal_ingredients WHERE meal_id = ? AND on_shopping_list = 1').get(meal).c, 0, 'keine Zutat markiert');
+  db.prepare('DELETE FROM meals WHERE id = ?').run(meal);
+});
+
 /**
  * Beim Mahlzeit-Pfad gehört das `on_shopping_list`-Flag zum Übertrag.
  *

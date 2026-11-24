@@ -1,5 +1,6 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
+import { HANDOVER_LIMIT_NOTE, MAX_INGREDIENTS, MAX_KEYS } from '../array-limits.js';
 
 // Dieselbe Form wie in paths/family.js.
 const apiError = (description) => ({
@@ -63,7 +64,7 @@ function recipeInput({ replace }) {
             // Strict mode refuses a union type with `items`: one branch per shape.
             meal_types: {
               anyOf: [
-                { type: 'array', items: { type: 'string' } },
+                { type: 'array', maxItems: MAX_KEYS, items: { type: 'string' } },
                 { type: 'string' },
                 { type: 'null' },
               ],
@@ -83,6 +84,7 @@ function recipeInput({ replace }) {
             },
             ingredients: {
               type: 'array',
+              maxItems: MAX_INGREDIENTS,
               items: {
                 type: 'object',
                 properties: {
@@ -133,7 +135,7 @@ export function recipesPaths() {
       post: op({
         summary: 'Transfer recipe ingredients to shopping list',
         tag: 'Recipes',
-        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). ' + 'An optional `quantities` array - one text (or `null`) per ingredient - replaces the stored quantities for this transfer, so a recipe viewed for another number of servings hands over the scaled amounts; names and categories stay the recipe\'s. With `quantities`, `ingredientIds` is required: the `id` of each ingredient as `GET /recipes` returned it, one per quantity in the same order; a missing or malformed list answers 400. Saving a recipe or syncing it from a provider recreates its ingredient rows, so when the ids no longer match the recipe as it is now, nothing is transferred and the answer is 409 `recipes_ingredients_changed` with the current recipe in `recipe`, instead of putting amounts on the wrong ingredients. Without `quantities` the stored amounts are used and `ingredientIds` is ignored (when sent it must still be a list of whole numbers from 1). ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` (which owns `/recipes`) - a credential scoped to the recipes alone is refused with 403, for any body. Then the body is checked against the schema (`listId` a whole number, `quantities` a list of texts or null, `ingredientIds` a list of whole numbers), before the recipe and the list are looked up.',
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). ' + 'An optional `quantities` array - one text (or `null`) per ingredient - replaces the stored quantities for this transfer, so a recipe viewed for another number of servings hands over the scaled amounts; names and categories stay the recipe\'s. With `quantities`, `ingredientIds` is required: the `id` of each ingredient as `GET /recipes` returned it, one per quantity in the same order; a missing or malformed list answers 400. Saving a recipe or syncing it from a provider recreates its ingredient rows, so when the ids no longer match the recipe as it is now, nothing is transferred and the answer is 409 `recipes_ingredients_changed` with the current recipe in `recipe`, instead of putting amounts on the wrong ingredients. Without `quantities` the stored amounts are used and `ingredientIds` is ignored (when sent it must still be a list of whole numbers from 1). ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` (which owns `/recipes`) - a credential scoped to the recipes alone is refused with 403, for any body. Then the body is checked against the schema (`listId` a whole number, `quantities` a list of texts or null, `ingredientIds` a list of whole numbers), before the recipe and the list are looked up.' + HANDOVER_LIMIT_NOTE,
         params: [idParam('id', RECIPE_ID)],
         stateChanging: true,
         requestBody: {
@@ -148,11 +150,13 @@ export function recipesPaths() {
                   listId: { type: 'integer', description: 'The shopping list to add to.' },
                   quantities: {
                     type: 'array',
+                    maxItems: MAX_INGREDIENTS,
                     items: { type: ['string', 'null'], maxLength: MAX_SHORT },
                     description: `One text (at most ${MAX_SHORT} characters) or \`null\` per ingredient, in the order of \`ingredientIds\`.`,
                   },
                   ingredientIds: {
                     type: 'array',
+                    maxItems: MAX_INGREDIENTS,
                     items: { type: 'integer', minimum: 1 },
                     description: 'The ingredient row ids the quantities belong to; required with `quantities`, ignored without.',
                   },

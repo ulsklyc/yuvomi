@@ -6823,6 +6823,48 @@ coerced nor stripped: an unknown field is ignored as before, except in the few s
 forbid one (`additionalProperties: false`). `test:validate-request-coverage` holds
 that no route is left out, `test:openapi-ajv` that every schema of the document compiles.
 
+**Limits of lists in a request (#2810).** Every array in a request body carries `maxItems`; a
+longer one is a 400 with `reason: validation` and the rule `maxItems`. The body limit caps bytes,
+not the work per entry (a loop turn, a query or a write each), and OWASP API4:2023 names a missing
+maximum number of array elements as the weakness. A limit comes from use, not from one flat
+number: what the own clients send at most and how many rows the set behind it can hold, generous
+but finite; a reorder takes the whole set. The constants live in `server/openapi/array-limits.js`,
+`test:openapi-structure` refuses an array without `maxItems`, and each class has a boundary case
+(limit passes, limit + 1 is refused) in the `test:validate-*` suite of its module.
+
+| Class | Limit | Lists |
+|---|---|---|
+| Members of a household or split group | 100 | assignees, responsible people, allowed readers, caregivers, participants and splits, default assignees, the member reorder |
+| Reorder of a category-like set | 500 | categories (note categories too, which took 100 before), subcategories, locations, local calendars, budget meta rows |
+| Shopping item ids | 1000 | checked clean-up, item reorder, undo of a transfer, both hand-overs between shopping list and pantry; 1000 ids stay below the 64 KiB a browser allows for a `keepalive` body, and the shopping page splits a larger clean-up |
+| Ingredients | 200 | ingredients of a recipe or meal, `ingredientIds` and `quantities` of a recipe transfer |
+| Planned meals | 500 | `assignments` of `POST /meals/apply-plan` |
+| Attached documents | 100 | `attachment_document_ids`, `document_ids` |
+| Keys from a small fixed set | 50 | weekdays, feelings, meal types, secret field names (doubles are tolerated) |
+| Token scopes | 100 | `scopes` of an API token (core and extension modules) |
+| Raw entries the route dedupes and caps itself | 100 | task tags (32 distinct), cycle symptoms (40 distinct) |
+| Contact entries per kind | 50 | `phones`, `emails`, `addresses`; the route's own cap of 20 answers first with `params.limit` |
+| Reminder instants | 50 | `remind_ats`; the route's own cap of 5 distinct instants answers first |
+| Lab results | 200 | `results` of a lab report |
+| Shift-type fields | 100 | `fields` of a shift type |
+| Waste types | 100 | `type_ids` of a mapping or the feed selection |
+| Waste label mappings | 200 | `mappings` of an import, re-import or profile (`MAX_DISTINCT_LABELS`) |
+| Acknowledged waste events | 5000 | `skip_event_keys` (`MAX_CANDIDATE_INSTANCES`) |
+| Default-assignee backfill moves | 5000 | `moves`, one preview page |
+| Quick-link order | 100 | `ids`; creation stops at 24 |
+
+**What an answer hands out has to fit the request it goes back in.** The undo of a kitchen
+transfer to the shopping list sends the transfer's `added_ids` and `ingredient_ids` unchanged in
+one `POST /shopping/items/undo-transfer` (one request, so the undo stays atomic). The transfers
+therefore refuse more than 1000 source ingredients before writing anything: the meal-plan import
+(its preview too, so the dialog says it first), a meal, a week of meals and a recipe answer 400
+`kitchen_transfer_too_large` with `params.limit` (`server/services/kitchen-handover.js`). The
+pantry hand-over needs no check of its own: its `items` already carry the same limit.
+
+Lists that had their limit before keep it: bulk task ids 500, rotation pool 10, note categories 50
+per note, birthday import 500, tracked dates 10, reminder offsets 5, medication
+schedules 48, schedule pattern days, a backfill move's people 100.
+
 Authentication options for external integrations:
 - **Session cookie:** standard browser session after login, sliding for 90 days (see [Session lifetime](#session-lifetime-1356)). The session stores the account id only: **role and module permissions are read from `users` on every request (#2611)**, so a demotion or a changed permission applies to every signed-in device at once, including a sign-in or SSO link that was still in flight. The "at least one administrator must remain" check and the demotion happen in one statement (#2612): of two administrators demoting each other at the same moment, one is refused.
 - **Bearer token:** `Authorization: Bearer <token>` - tokens created via Settings → Household → API access (admin only)

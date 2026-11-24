@@ -127,7 +127,8 @@
         "transferUndone": "Αφαιρέθηκε από τη λίστα αγορών.",
         "transferSkipped": "{{count}} υπήρχαν ήδη.",
         "transferSkipped_one": "{{count}} υπήρχε ήδη.",
-        "transferAllPresent": "Όλα τα υλικά είναι ήδη στη λίστα."
+        "transferAllPresent": "Όλα τα υλικά είναι ήδη στη λίστα.",
+        "errorTransferTooLarge": "Αυτά είναι πάρα πολλά υλικά μαζί. Το πολύ {{limit}} μπορούν να μεταφερθούν και να αναιρεθούν μαζί."
     },
     "nav": {
         "dashboard": "Επισκόπηση",

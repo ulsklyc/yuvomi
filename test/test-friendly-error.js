@@ -300,6 +300,10 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // A WebDAV backup route failed on this server (#2622); the real answer
     // measures test:backup-routes.
     '../server/routes/backup.js',
+    // A kitchen handover whose undo would not fit into one request (#2810,
+    // follow-up 5b): the answer is built in the service; the real answers
+    // measure test:shopping-routes, test:meals-routes and test:recipes-routes.
+    '../server/services/kitchen-handover.js',
   ].map(read).join('\n').replace(/NoteCategoryInputError\([^)]*?,\s*\d+,\s*'([a-z_]+)'\)/g, "reason: '$1'")
     // A reason the request schema names (`x-reason`, #2810): since group 2A
     // step (b) the address checks of the recipe providers stand only there.
