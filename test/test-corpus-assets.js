@@ -8,19 +8,21 @@
  *          - no corpus database at all is red;
  *          - the newest release must have one when its schema differs from the
  *            newest corpus database (the gap the drill reports);
- *          - the schema version of a tag is the highest `version: N,` in its
- *            server/db.js, the same number the restored database reports.
+ *          - the schema version of a tag is its highest migration, the same
+ *            number the restored database reports: the highest `./NNNN.ts` in
+ *            server/migrations/index.ts, and for older tags without that file
+ *            the highest `version: N,` in server/db.js.
  * Ausführen: npm run test:corpus-assets
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from './tmp-dir.js';
-import { checkGap, compareTags, planCorpus, schemaFromDbSource } from '../scripts/corpus-assets.mjs';
+import { checkGap, compareTags, planCorpus, schemaFromDbSource, schemaFromMigrationIndex, schemaOfTree } from '../scripts/corpus-assets.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../scripts/corpus-assets.mjs', import.meta.url));
 
@@ -36,13 +38,32 @@ test('tags compare as versions, not as text', () => {
   assert.equal(compareTags('v2.88.0', 'v2.88.0'), 0);
 });
 
-test('the schema version of a tag is the highest migration in its server/db.js', () => {
-  const head = readFileSync(new URL('../server/db.js', import.meta.url), 'utf8');
-  const versions = [...head.matchAll(/^ {4}version: (\d+),$/gm)].map((m) => Number(m[1]));
-  assert.ok(versions.length > 100, 'the pattern still finds the migrations');
-  assert.equal(schemaFromDbSource(head), Math.max(...versions));
-  assert.equal(schemaFromDbSource('const MIGRATIONS = [\n  {\n    version: 7,\n  },\n  {\n    version: 12,\n  },\n];'), 12);
+// An old tag (server/db.js with the array) in the format every tag up to the
+// move wrote; a new tag (server/migrations/index.ts) like this tree.
+const OLD_DB_JS = 'const MIGRATIONS = [\n  {\n    version: 7,\n  },\n  {\n    version: 12,\n  },\n];';
+const NEW_INDEX = "import m0001 from './0001.ts';\nimport m0002 from './0002.ts';\n\nexport const MIGRATIONS = [\n  m0001,\n  m0002,\n];\n";
+
+test('the schema version of a tag in the old layout is the highest version in its server/db.js', () => {
+  assert.equal(schemaFromDbSource(OLD_DB_JS), 12);
   assert.throws(() => schemaFromDbSource('export const x = 1;'), /no migration/);
+});
+
+test('the schema version of a tag in the new layout is the highest migration file its index.ts imports', () => {
+  const head = readFileSync(new URL('../server/migrations/index.ts', import.meta.url), 'utf8');
+  const files = readdirSync(new URL('../server/migrations/', import.meta.url)).filter((f) => /^\d{4}\.ts$/.test(f));
+  assert.ok(files.length > 100, 'the migrations are one file each');
+  assert.equal(schemaFromMigrationIndex(head), Math.max(...files.map((f) => Number(f.slice(0, 4)))));
+  assert.equal(schemaFromMigrationIndex(NEW_INDEX), 2);
+  assert.throws(() => schemaFromMigrationIndex("import x from './helpers.ts';\n"), /no migration/);
+});
+
+test('a tree is read in the layout it has: index.ts first, server/db.js only without it', async () => {
+  /** @param {Record<string, string>} files */
+  const tree = (files) => async (/** @type {string} */ path) => files[path] ?? null;
+  assert.equal(await schemaOfTree(tree({ 'server/db.js': OLD_DB_JS })), 12);
+  // A new tree still has a server/db.js, without migrations: index.ts decides.
+  assert.equal(await schemaOfTree(tree({ 'server/migrations/index.ts': NEW_INDEX, 'server/db.js': 'export const x = 1;' })), 2);
+  await assert.rejects(schemaOfTree(tree({})), /neither server\/migrations\/index\.ts nor server\/db\.js/);
 });
 
 test('the plan lists every complete pair, newest first, and nothing else', () => {

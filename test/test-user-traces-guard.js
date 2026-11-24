@@ -455,7 +455,8 @@ test('was beim Deaktivieren als "ended" gilt, ist danach wirklich weg', () => {
 const COLUMN_HOMES = new Map([
   ['server/services/account-state.js', null],
   ['server/services/user-removal.js', null],
-  ['server/db.js', null],
+  // Die Migrationen, eine Datei je Version: zaehlen als EIN Zuhause.
+  ['server/migrations/', null],
   ['server/db-schema-test.js', null],
   // publicUser(): `deactivated_at: row.deactivated_at ?? null` - das Feld der Antwort.
   ['server/auth.js', 2],
@@ -479,10 +480,11 @@ function sourceFiles(dir) {
 test('users.deactivated_at wird unter server/ nur an den benannten Stellen geschrieben', () => {
   const seen = new Map();
   for (const file of sourceFiles(join(ROOT, 'server'))) {
-    const rel = relative(ROOT, file).split(sep).join('/');
+    const path = relative(ROOT, file).split(sep).join('/');
+    const rel = path.startsWith('server/migrations/') ? 'server/migrations/' : path;
     const code = withoutCommentsKeepingLines(readFileSync(file, 'utf8'));
     const hits = code.match(/deactivated_at/g)?.length ?? 0;
-    if (hits) seen.set(rel, hits);
+    if (hits) seen.set(rel, (seen.get(rel) ?? 0) + hits);
   }
   for (const [file, hits] of seen) {
     assert.ok(COLUMN_HOMES.has(file),

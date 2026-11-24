@@ -512,12 +512,13 @@ test('server/ gets the whole base rule plus the sender, rights and SQL list sele
 });
 
 // Where the rights rules are the rule itself (phase 2, B5, B8c): the permission module and
-// the API documentation; the schema and its test mirror (migrations write visibility values,
-// compare a row's level while they move data, and keep their SQL as it was applied) have an
-// exception of their own that drops the rights and the SQL list selectors (Refs #2810).
+// the API documentation; the schema, its migrations (server/migrations/, one file each) and
+// its test mirror (migrations write visibility values, compare a row's level while they move
+// data, and keep their SQL as it was applied) have an exception of their own that drops the
+// rights and the SQL list selectors (Refs #2810).
 const RIGHTS_TAGS = ['RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW'];
 const RIGHTS_HOME = ['server/authorize/**', 'server/openapi/**'];
-const SCHEMA_HOME = ['server/db.js', 'server/db-schema-test.js'];
+const SCHEMA_HOME = ['server/db.js', 'server/db-schema-test.js', 'server/migrations/**'];
 
 test('the rights exception covers exactly the permission module and the API docs, and drops only the rights selectors', () => {
   const [severity, ...selectors] = serverSelectors();

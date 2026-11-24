@@ -436,10 +436,11 @@ test('Waechter: der Detektor erkennt Schreiber und laesst Leser in Ruhe', () => 
 });
 
 test('Waechter: jede Anweisung, die tasks.status schreibt, laeuft ueber syncTaskCompletion (#1836)', () => {
-  // db.js ist ausgenommen: dort stehen nur Migrationen, die eingefroren sind und
-  // einmal laufen (eine Migration bucht bewusst keinen Verlauf nach).
+  // Die Migrationen sind ausgenommen (server/migrations/ und ihr Testspiegel
+  // db-schema-test.js): eingefroren, sie laufen einmal (eine Migration bucht
+  // bewusst keinen Verlauf nach). server/db.js traegt seit F2 keine mehr.
   const files = serverFiles(join(ROOT, 'server'))
-    .filter((p) => !/server[\\/](db|db-schema-test)\.js$/.test(p));
+    .filter((p) => !/server[\\/]db-schema-test\.js$/.test(p) && !/server[\\/]migrations[\\/]/.test(p));
   const bypass = [];
   let found = 0;
   for (const file of files) {

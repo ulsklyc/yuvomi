@@ -9,8 +9,8 @@
  *          server does at start (BetterSQLiteStore). A CREATE TABLE outside the migrations
  *          that this suite does not execute would leave its table out, so one block finds
  *          every `CREATE ... TABLE` under server/ (also with the keywords split by quotes or
- *          `+`), sets off the statements of the MIGRATIONS entries in server/db.js against
- *          the imported array, and demands of each other one a table name in plain text
+ *          `+`), sets off the statements of the migrations (server/migrations/, one file
+ *          each) against the imported array, and demands of each other one a table name in plain text
  *          that is in the schema built here; a name it cannot read (interpolated, quoted,
  *          bracketed, concatenated) is red with file and line. A temp-schema table such as
  *          temp.search_vocab holds no data and is skipped. Blind spot: SQL assembled
@@ -161,11 +161,12 @@ test('every table created outside the migrations is in the schema built here', (
   // server/db-schema-test.js is the test mirror of the migrations: no server code runs it,
   // its tables are the migrated ones under a second spelling.
   const scanned = files.filter((f) => f !== 'server/db-schema-test.js');
-  // Inside server/db.js the statements of the MIGRATIONS entries are the migrated schema
-  // (a migration may create a table a later one drops). They are taken from the imported
-  // array, as text of each `up` string and of each `up`/`afterUp` function, and one
-  // statement in db.js is set off against one equal statement there. Everything else in
-  // db.js - migrate()'s schema_migrations, any later helper - follows the rule for all files.
+  // The statements of the migrations are the migrated schema (a migration may create a
+  // table a later one drops). They are taken from the imported array, as text of each `up`
+  // string and of each `up`/`afterUp` function, and one statement in server/migrations/
+  // (one file per migration, helpers.ts) is set off against one equal statement there.
+  // Everything else - migrate()'s schema_migrations in server/db.js, any later helper -
+  // follows the rule for all files.
   /** @type {Map<string, number>} */
   const migrated = new Map();
   for (const m of db.MIGRATIONS) {
@@ -182,7 +183,7 @@ test('every table created outside the migrations is in the schema built here', (
     const text = readFileSync(join(REPO, file), 'utf8');
     for (const c of createStatements(text)) {
       seen += 1;
-      if (file === 'server/db.js' && (migrated.get(c.snippet) ?? 0) > 0) {
+      if (file.startsWith('server/migrations/') && (migrated.get(c.snippet) ?? 0) > 0) {
         migrated.set(c.snippet, /** @type {number} */ (migrated.get(c.snippet)) - 1);
         continue;
       }
