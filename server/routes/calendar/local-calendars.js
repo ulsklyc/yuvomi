@@ -22,6 +22,7 @@ import { uploadsLocalEvents } from '../../services/apple-calendar.js';
 import { calendarSources } from '../../services/calendar-selection.js';
 import { queueEventDeletion, flushOutbound } from '../../services/calendar-outbound.js';
 import { createLogger } from '../../logger.js';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 import { feedUrl, getUserId } from './helpers.js';
 
 const router = express.Router();
@@ -246,10 +247,9 @@ router.delete('/calendars/:id', requireCalendarWrite, validateRequest(), (req, r
     if (deleteEvents) {
       if (events.length) {
         for (const event of events) queued = queueEventDeletion(event, database) || queued;
-        const ids = events.map((e) => e.id);
-        const placeholders = ids.map(() => '?').join(',');
-        database.prepare(`DELETE FROM reminders WHERE entity_type = 'event' AND entity_id IN (${placeholders})`).run(...ids);
-        database.prepare(`DELETE FROM calendar_events WHERE id IN (${placeholders})`).run(...ids);
+        const idList = sqlInList(events.map((e) => e.id));
+        database.prepare(`DELETE FROM reminders WHERE entity_type = 'event' AND entity_id IN (${idList.sql})`).run(idList.param);
+        database.prepare(`DELETE FROM calendar_events WHERE id IN (${idList.sql})`).run(idList.param);
       }
     } else if (events.length) {
       // NULL statt der Kennung des Standardkalenders: dieselbe Zeile, die
@@ -257,9 +257,8 @@ router.delete('/calendars/:id', requireCalendarWrite, validateRequest(), (req, r
       // und bestehende Aufrufer ohne target_calendar_id sehen die exakt
       // gleiche Spalte wie vor dieser Aenderung.
       const value = targetId === defaultCalendarId(database) ? null : targetId;
-      const ids = events.map((e) => e.id);
-      const placeholders = ids.map(() => '?').join(',');
-      database.prepare(`UPDATE calendar_events SET local_calendar_id = ? WHERE id IN (${placeholders})`).run(value, ...ids);
+      const idList = sqlInList(events.map((e) => e.id));
+      database.prepare(`UPDATE calendar_events SET local_calendar_id = ? WHERE id IN (${idList.sql})`).run(value, idList.param);
     }
     database.prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
     restoreInheritedImportColors(database);
