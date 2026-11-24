@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Sign in with Home Assistant.** Home Assistant speaks OAuth but not OpenID Connect, so it could
+  not be used as an SSO provider. With `HOMEASSISTANT_URL` set, the sign-in button reads "Sign in
+  with Home Assistant", and everything that applies to SSO applies here too: linking under
+  Settings > Account, `OIDC_ALLOW_SIGNUP`, SSO-only accounts and `AUTH_ALLOW_PASSWORD_LOGIN`.
+  Yuvomi only asks Home Assistant who signed in and revokes the token right away. A configured
+  OIDC provider still takes precedence. Home Assistant sends no email address, so an administrator
+  can bind a member to a Home Assistant user ID in the member dialog, also for an account without a
+  password. New accounts take the Home Assistant display name as username and always start as
+  members: a Home Assistant administrator is not automatically a household administrator.
+
 ### Changed
 - **A calendar event with an assignee who has no account, or with an unreadable attachment, is
   refused with 400.** This is about your own API clients; the app sends neither. `POST /calendar`
@@ -352,6 +363,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replaced.
 - **Refreshing the calendars of an Outlook account answers an expired sign-in with 409
   `outlook_reauth_required` and a refusal of Microsoft with 502 and its class, instead of a 500.**
+- **SSO no longer creates the first account.** Before setup, an SSO sign-in that would create an
+  account goes to the setup page instead. Before, an SSO member could become the first account,
+  which locked setup and left the household without an administrator.
 
 ### Security
 - **Passwords are hashed with Argon2id, and a password over 72 bytes counts in full.** New and

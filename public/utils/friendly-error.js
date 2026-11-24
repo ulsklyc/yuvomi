@@ -429,6 +429,12 @@ export const CASE_MESSAGES = new Map([
   ['members_member_not_found', 'settings.memberErrorGone'],
   ['members_sso_email_required', 'settings.memberErrorSsoEmailRequired'],
   ['members_sso_email_ambiguous', 'settings.memberErrorSsoEmailAmbiguous'],
+  // Home-Assistant-Bindung im Mitglieder-Dialog: die ID hat nicht 32 Hex-
+  // Zeichen, gehoert schon einem anderen Mitglied, oder das Loesen nimmt einem
+  // Konto ohne Passwort den einzigen Zugang.
+  ['members_ha_user_id_invalid', 'settings.memberHomeAssistantUserIdInvalid'],
+  ['members_ha_user_id_taken', 'settings.memberHomeAssistantUserIdTaken'],
+  ['members_ha_unlink_no_password', 'settings.memberHomeAssistantUnlinkNoPassword'],
   // SSO-Verknuepfung im Konto-Blatt (#1909). Den letzten per SSO verknuepften
   // Administrator haelt `last_sso_admin` oben auch hier. Den Rest erreicht nur
   // ein veralteter Stand (ein zweiter Tab hat schon verknuepft oder geloest,

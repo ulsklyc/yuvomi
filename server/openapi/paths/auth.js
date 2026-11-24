@@ -228,6 +228,7 @@ export function authPaths() {
           + 'Two or more matching accounts redirect to /login?error=oidc_email_ambiguous; a single matching member account that has a password redirects to /login?error=oidc_link_required, and that member links SSO while signed in (POST /api/v1/auth/oidc/link/start). '
           + 'Neither case creates or links an account, whatever OIDC_ALLOW_SIGNUP says. '
           + 'With OIDC_ALLOW_SIGNUP=false an identity that matches no existing account is redirected to /login?error=oidc_signup_disabled instead of being provisioned. '
+          + 'Before setup (no account exists yet) no account is provisioned either, and the callback redirects to /setup, so the first account stays the administrator created there. '
           + 'A link run started while signed in (POST /api/v1/auth/oidc/link/start) redirects to /settings/personal/account?oidc_linked=1, or on refusal to /settings/personal/account?oidc_link_error=<reason>: `user_gone` (the account no longer exists or can no longer sign in), `already_linked` (the account is linked to another identity), `sub_taken` (the identity is linked to another account).',
         responses: {
           302: { description: 'Redirect to app or login error page' },
@@ -900,6 +901,8 @@ export function authPaths() {
 // #2267: die Gruende, die die Anmelde- und Kontorouten neben `error` senden.
 const INVALID_CODE = '`invalid_code` (400, the code is wrong or expired)';
 const NOT_ENABLED = '`not_enabled` (409, two-factor authentication is not turned on)';
+const HA_REASONS = '`members_ha_user_id_invalid` (400, a Home Assistant user ID is 32 hexadecimal characters), '
+  + '`members_ha_user_id_taken` (409, this Home Assistant user is already bound to another member)';
 const DEACTIVATED_SUBJECT = '`account_deactivated` (400, the chosen account is deactivated)';
 const USERNAME_INVALID = '`members_username_invalid` (400, 3-64 letters, numbers, dots, hyphens or underscores)';
 const USERNAME_TAKEN = '`members_username_taken` (409, another account has this username)';
@@ -921,13 +924,16 @@ const CASE_REASONS = {
   '/api/v1/auth/setup': { post: '`setup_completed` (403, setup has already been completed)' },
   // #1909: was ein Admin beim Anlegen, Bearbeiten und Einladen eines Mitglieds erreicht.
   '/api/v1/auth/invites': { post: `${USERNAME_INVALID}, ${USERNAME_TAKEN}` },
-  '/api/v1/auth/users': { post: `${USERNAME_INVALID}, ${USERNAME_TAKEN}, ${SSO_ONLY_REASONS}` },
+  '/api/v1/auth/users': { post: `${USERNAME_INVALID}, ${USERNAME_TAKEN}, ${SSO_ONLY_REASONS}, ${HA_REASONS}` },
   '/api/v1/auth/users/{id}': {
     patch: '`account_deactivated` (400, a deactivated account cannot become an administrator), '
       + '`members_member_not_found` (404, the member no longer exists), '
-      + `${USERNAME_INVALID}, ${USERNAME_TAKEN}, ${SSO_ONLY_REASONS}, `
+      + `${USERNAME_INVALID}, ${USERNAME_TAKEN}, ${SSO_ONLY_REASONS}, ${HA_REASONS}, `
+      + '`members_ha_unlink_no_password` (400, removing the Home Assistant binding would leave an account without a '
+      + 'password with no way in), '
       + '`last_admin` (400, at least one system admin must remain), '
-      + '`last_sso_admin` (400, the last administrator linked to SSO cannot be demoted while password login is off)',
+      + '`last_sso_admin` (400, the last administrator linked to SSO cannot be demoted, or lose its Home Assistant '
+      + 'binding, while password login is off)',
   },
   // #1909: dazu, was das Formular der Seite API-Zugriff erreicht.
   '/api/v1/auth/api-tokens': {

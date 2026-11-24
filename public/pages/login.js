@@ -37,6 +37,8 @@ export async function render(container) {
   // Passwort-Login nie blockiert – dann wird ohne SSO gerendert.
   const oidc = await fetchOidcConfig();
   const ssoEnabled = oidc?.enabled === true;
+  // Steht Home Assistant hinter dem SSO-Ablauf, sagt der Knopf das auch.
+  const ssoLabel = oidc?.provider === 'homeassistant' ? t('login.loginWithHomeAssistant') : t('login.loginWithSso');
   // SSO als einziger Weg hinein (#847). Bewusst an `ssoEnabled` gekoppelt: eine
   // Anmeldeseite ganz ohne Weg hinein waere schlimmer als eine mit einem zu
   // viel. Der Server haelt dieselbe Regel, hier ist sie nur die Anzeige davon -
@@ -57,7 +59,7 @@ export async function render(container) {
         ${!passwordLoginEnabled ? `
         <div class="auth-form" id="sso-only-block">
           <p class="auth-form__sso-only">${esc(t('login.ssoOnlyHint'))}</p>
-          <a href="/api/v1/auth/oidc/start" class="btn btn--primary auth-form__submit">${esc(t('login.loginWithSso'))}</a>
+          <a href="/api/v1/auth/oidc/start" class="btn btn--primary auth-form__submit">${esc(ssoLabel)}</a>
           ${guestPasswordLoginEnabled ? `
           <p class="auth-form__forgot">
             <button type="button" class="auth-linkish" id="show-password-form">${esc(t('login.guestPasswordLogin'))}</button>
@@ -103,7 +105,7 @@ export async function render(container) {
           </button>
           ${ssoEnabled && passwordLoginEnabled ? `
           <div class="auth-divider">${esc(t('login.orDivider'))}</div>
-          <a href="/api/v1/auth/oidc/start" class="btn btn--secondary auth-form__submit">${esc(t('login.loginWithSso'))}</a>
+          <a href="/api/v1/auth/oidc/start" class="btn btn--secondary auth-form__submit">${esc(ssoLabel)}</a>
           ` : ''}
           <p class="auth-form__forgot" hidden>
             <a href="/forgot-password" data-link>${esc(t('login.forgotPassword'))}</a>
