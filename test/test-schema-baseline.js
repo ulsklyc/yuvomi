@@ -221,6 +221,15 @@ for (const driver of DRIVERS) {
 /** Eine Zeile `CREATE INDEX ...;` und eine Vorgabezeile, an denen die Mutanten ansetzen. */
 const AN_INDEX = shipped.sql.split('\n').find((line) => /^CREATE INDEX \S+ ON \S+\([^()]*\);$/.test(line));
 const A_ROW = shipped.sql.split('\n').find((line) => line.startsWith('INSERT INTO "task_categories" '));
+/**
+ * Eine Spaltenzeile, deren Name im ganzen Skript genau einmal steht: kein
+ * Index, kein Trigger und keine Vorgabezeile nennt sie. Fehlt sie, laeuft das
+ * Skript ohne Fehler durch - nur der Fingerabdruck kann es merken.
+ */
+const A_COLUMN = shipped.sql.split('\n').find((line) => {
+  const name = /^\s+([a-z_]+)\s+(TEXT|INTEGER),$/.exec(line)?.[1];
+  return name !== undefined && shipped.sql.split(name).length - 1 === 1;
+});
 
 /**
  * Eine Baseline in einer Transaktion einspielen, wie migrate() es tut.
@@ -242,12 +251,13 @@ test('eine Baseline ohne einen Index faellt am Fingerabdruck auf und schreibt ni
   }
 });
 
-test('eine Baseline ohne eine Spalte faellt am Fingerabdruck auf', () => {
+test('eine Baseline ohne eine Spalte faellt am Fingerabdruck auf und schreibt nichts', () => {
+  assert.ok(A_COLUMN, 'die Baseline traegt eine Spalte, die sonst nirgends genannt wird');
   const database = cipher();
   try {
-    const column = "\n      description TEXT    NOT NULL,";
-    const broken = { ...shipped, sql: mutate(shipped.sql, column, '') };
-    assert.throws(() => applyInTransaction(database, broken), /produced schema|no column named description/);
+    const broken = { ...shipped, sql: mutate(shipped.sql, `${A_COLUMN}\n`, '') };
+    // Nur der Fingerabdruck: das Skript selbst laeuft ohne diese Spalte durch.
+    assert.throws(() => applyInTransaction(database, broken), /produced schema [0-9a-f]{64}, expected/);
     assert.ok(isPristine(database), 'zurueckgerollt');
   } finally {
     database.close();
@@ -375,6 +385,27 @@ test('eine unbrauchbare Baseline: der Start faehrt alle Migrationen, endet im se
     }
   } finally {
     replayed.close();
+  }
+});
+
+test('ein Fehler der Umgebung nimmt nicht den Ersatzweg: er fliegt weiter, wie er ist', (t) => {
+  const log = logged(t);
+  const file = path.join(tempDir('yuvomi-baseline-'), 'readonly.db');
+  // Eine leere, aber vollstaendige Datenbankdatei, wie createDatabaseFile() sie hinterlaesst.
+  const writer = cipher(file);
+  writer.pragma('user_version = 0');
+  writer.close();
+  const readonly = /** @type {CipherDatabase} */ (new Database(file, { readonly: true }));
+  try {
+    assert.ok(isPristine(readonly));
+    assert.throws(
+      () => migrate(readonly, MIGRATIONS, () => shipped),
+      (err) => /** @type {{ code?: unknown }} */ (err).code === 'SQLITE_READONLY',
+    );
+    // Nicht "die Baseline ist unbrauchbar": sie ist in Ordnung, die Datei ist nicht beschreibbar.
+    assert.deepEqual(log, { warn: [], error: [] });
+  } finally {
+    readonly.close();
   }
 });
 

@@ -172,8 +172,23 @@ function sleepSync(ms: number): void {
  *   schon immer galt. Das steht als Fehler im Log, weil es auf ein
  *   beschaedigtes Paket zeigt; test:schema-baseline haelt, dass die
  *   ausgelieferte Baseline diesen Zweig nie nimmt.
- * Nur SQLITE_BUSY nach dem letzten Versuch fliegt weiter, wie bei einer Migration.
+ * Alles andere fliegt weiter: SQLITE_BUSY nach dem letzten Versuch, wie bei
+ * einer Migration, und jeder Fehler, der nicht an der Baseline liegt (Platte
+ * voll, nur lesbar, E/A, beschaedigte Datei) - dort waere "die Baseline ist
+ * unbrauchbar" die falsche Spur, und die Migrationen scheiterten am selben.
  */
+/**
+ * Liegt dieser Fehler an der Baseline selbst? Dann ist der Ersatzweg richtig.
+ * Ohne SQLite-Code kommt er aus dem eigenen Code (falscher Fingerabdruck); mit
+ * SQLITE_ERROR (SQL, das nicht laeuft) oder SQLITE_CONSTRAINT* (eine Zeile, die
+ * eine Regel verletzt) aus dem Skript. Jeder andere Code meldet die Umgebung.
+ */
+function isBaselineFault(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (typeof code !== 'string' || !code.startsWith('SQLITE_')) return true;
+  return code === 'SQLITE_ERROR' || code.startsWith('SQLITE_CONSTRAINT');
+}
+
 function startFromBaseline(database: SqliteDatabase, load: () => Baseline): number | null {
   if (!isPristine(database)) return null;
 
@@ -192,7 +207,14 @@ function startFromBaseline(database: SqliteDatabase, load: () => Baseline): numb
       log.info(`Schema baseline applied: migrations 1 to ${baseline.version}`);
       return baseline.version;
     } catch (err) {
-      if (!isPristine(database)) {
+      let pristine: boolean;
+      try {
+        pristine = isPristine(database);
+      } catch {
+        // Die Datei laesst sich nicht einmal mehr lesen: der erste Fehler ist die Nachricht.
+        throw err;
+      }
+      if (!pristine) {
         log.warn('The database was no longer empty when this run wanted to apply the schema baseline - another process was faster (#1331).');
         return null;
       }
@@ -205,6 +227,7 @@ function startFromBaseline(database: SqliteDatabase, load: () => Baseline): numb
         sleepSync(MIGRATION_BUSY_BACKOFF_MS * attempt);
         continue;
       }
+      if (!isBaselineFault(err)) throw err;
       log.error(`Schema baseline v${baseline.version} could not be applied, running every migration instead: ${(err as Error)?.message}`);
       return null;
     }

@@ -36,8 +36,14 @@ export type Baseline = { version: number; schemaHash: string; sql: string };
 export type SchemaObject = { type: string; name: string; tbl_name: string; sql: string | null };
 
 /**
- * Alle Objekte aus sqlite_master in der Reihenfolge ihrer Entstehung, Trigger
- * getrennt.
+ * Die Objekte, die die Migrationen angelegt haben, in der Reihenfolge ihrer
+ * Entstehung, Trigger getrennt.
+ *
+ * Was SQLite von sich aus dazulegt, fehlt: die Schattentabellen einer
+ * virtuellen Tabelle (FTS5) und alles mit dem reservierten Praefix `sqlite_`
+ * (sqlite_sequence, Auto-Indizes). Es folgt vollstaendig aus den eigenen
+ * Objekten, und sein Wortlaut gehoert der SQLite-Version: ein Treiber-Update
+ * duerfte sonst den Fingerabdruck einer unveraenderten Baseline brechen.
  *
  * Die Reihenfolge ist Teil des Schemas, nicht Beiwerk: mehrere Trigger auf
  * derselben Tabelle feuern in umgekehrter Reihenfolge ihrer Entstehung, und
@@ -48,7 +54,11 @@ export type SchemaObject = { type: string; name: string; tbl_name: string; sql: 
  */
 export function schemaObjects(database: BaselineDatabase): { objects: SchemaObject[]; triggers: SchemaObject[] } {
   const all = database
-    .prepare('SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY rowid')
+    .prepare(`
+      SELECT type, name, tbl_name, sql FROM sqlite_master
+      WHERE name NOT LIKE 'sqlite~_%' ESCAPE '~'
+        AND name NOT IN (SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'shadow')
+      ORDER BY rowid`)
     .all()
     .map((row) => {
       const { type, name, tbl_name, sql } = row as SchemaObject;
@@ -61,8 +71,9 @@ export function schemaObjects(database: BaselineDatabase): { objects: SchemaObje
 }
 
 /**
- * Fingerabdruck des Schemas: SHA-256 ueber Art, Name, Tabelle und SQL-Text aller
- * Objekte in Entstehungsfolge (Trigger als eigene Folge, siehe schemaObjects).
+ * Fingerabdruck des Schemas: SHA-256 ueber Art, Name, Tabelle und SQL-Text der
+ * eigenen Objekte in Entstehungsfolge (Trigger als eigene Folge, siehe
+ * schemaObjects).
  */
 export function schemaFingerprint(database: BaselineDatabase): string {
   const { objects, triggers } = schemaObjects(database);

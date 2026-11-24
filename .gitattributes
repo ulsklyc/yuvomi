@@ -3,3 +3,8 @@
 
 # Default: normalize all text files to LF in the repo
 * text=auto
+
+# The schema baseline is compared byte for byte with its generator, and SQLite
+# stores each CREATE statement with the line endings it was given: a CRLF
+# checkout would change the schema fingerprint (server/db/baseline.ts).
+server/migrations/baseline.sql text eol=lf
