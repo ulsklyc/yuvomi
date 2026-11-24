@@ -5,7 +5,8 @@
  *            - a 4xx the thrower marked as safe to show (`expose: true`)
  *              keeps its status; its sentence and `reason` only from an
  *              HttpError, a library's 4xx gets a fixed sentence (body-parser
- *              wraps zlib's text that way);
+ *              wraps zlib's text that way), and its text stays out of the
+ *              log (body-parser quotes the body of broken JSON);
  *            - a path parameter that does not decode is a 400, its raw
  *              segment (maybe a token) stays out of the log;
  *            - everything else is a 500 with the fixed sentence, the raw text
@@ -80,6 +81,9 @@ function appWith(log) {
   router.get('/plain-conflict', () => {
     throw Object.assign(new Error('Taken.'), { statusCode: 409, expose: true });
   });
+  router.get('/foreign-caused', () => {
+    throw Object.assign(new Error('Refused.', { cause: new Error('upstream said: password=geheim12x') }), { status: 400, expose: true, type: 'some.library.thing' });
+  });
   router.get('/hidden-404', async () => {
     throw Object.assign(new Error('SQLITE_ERROR: no such table: secret_table'), { status: 404 });
   });
@@ -153,7 +157,65 @@ test('an exposed 4xx that is not an HttpError keeps its status (statusCode count
   const { status, body, log } = await get('/api/v1/things/plain-conflict');
   assert.equal(status, 409);
   assert.deepEqual(body, { error: 'The request was refused (Conflict).', code: 409 });
-  assert.ok(log.join(' | ').includes('Taken.'), 'the text of the error stays in the log');
+  const line = log.join(' | ');
+  assert.ok(line.includes('GET /api/v1/things/plain-conflict -> 409'), line);
+  assert.ok(!line.includes('Taken.'), `the text of a foreign error is not ours to log: ${line}`);
+});
+
+/**
+ * A login route that parses its own body, as `express.json()` in the server
+ * does for every route: the parser runs inside the route, so the log can
+ * name its pattern.
+ * @param {RecordingLog} log
+ */
+function loginApp(log) {
+  const router = express.Router();
+  router.post('/login', express.json({ limit: '1kb' }), /** @type {Handler} */ ((req, res) => res.json({ ok: true })));
+  const app = express();
+  app.use('/api/v1/auth', router);
+  app.use(createErrorHandler(log));
+  return app;
+}
+
+/**
+ * @param {Record<string, string>} headers
+ * @param {string} body
+ */
+async function postLogin(headers, body) {
+  const log = recordingLog();
+  const server = loginApp(log).listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/auth/login`, { method: 'POST', headers, body });
+    return { status: res.status, body: await res.json(), line: log.lines.join(' | ') };
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+}
+
+test('broken JSON is logged with route and status, never with the text of the body', async () => {
+  const SECRET = 'geheim12x-password';
+  const { status, body, line } = await postLogin({ 'content-type': 'application/json' }, `{"username":"a","password":${SECRET}}`);
+  assert.equal(status, 400);
+  assert.deepEqual(body, { error: 'The request was refused (Bad Request).', code: 400 });
+  assert.ok(line.includes('POST /api/v1/auth/login -> 400: the body is not valid JSON'), line);
+  assert.ok(!line.includes('geheim12x'), `the body must not reach the log: ${line}`);
+});
+
+test('an unknown foreign 4xx names its type, never its text or the text of its cause', async () => {
+  const { status, log } = await get('/api/v1/things/foreign-caused');
+  assert.equal(status, 400);
+  const line = log.join(' | ');
+  assert.ok(line.includes('GET /api/v1/things/foreign-caused -> 400: a library refused the request (type some.library.thing)'), line);
+  assert.ok(!line.includes('geheim12x') && !line.includes('Refused.'), line);
+});
+
+test('a foreign 4xx is logged by its type, not by its text', async () => {
+  const { status, line } = await postLogin({ 'content-type': 'application/json; charset=geheim12x' }, '{}');
+  assert.equal(status, 415);
+  assert.ok(line.includes('POST /api/v1/auth/login -> 415: the body has an unsupported charset'), line);
+  assert.ok(!line.toLowerCase().includes('geheim12x'), `the header value must not reach the log: ${line}`);
 });
 
 test('a corrupt gzip body is a 400 without the text of zlib', async () => {
