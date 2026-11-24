@@ -1241,6 +1241,73 @@ test('call_api_operation: ein `reason` der Route hängt an Meldung und Fehler (#
   }
 });
 
+test('call_api_operation: refused `fields` name path and rule, never a value (#2810)', async () => {
+  installFetchMock(() => jsonResponse({
+    error: 'The request does not match the schema.', code: 400, reason: 'validation',
+    fields: [
+      { path: 'body/title', rule: 'type', value: 'SECRET-VALUE', params: { type: 'string', got: 'SECRET-PARAM' } },
+      { path: 'body/priority', rule: 'enum', reason: 'tasks_priority_invalid' },
+    ],
+  }, { ok: false, status: 400 }));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'post_tasks', payload: { title: 5 } },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.isError, true);
+    assert.equal(
+      res.result.content[0].text,
+      'The request does not match the schema. [reason: validation] [fields: type at body/title, enum at body/priority]',
+    );
+    assert.doesNotMatch(res.result.content[0].text, /SECRET/);
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('call_api_operation: more than 10 refused `fields` are cut with "and N more" (#2810)', async () => {
+  const fields = Array.from({ length: 13 }, (_, i) => ({ path: `body/f${i}`, rule: 'type' }));
+  installFetchMock(() => jsonResponse(
+    { error: 'Invalid.', code: 400, reason: 'validation', fields }, { ok: false, status: 400 },
+  ));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'post_tasks', payload: { title: 'x' } },
+      { authorization: 'Bearer test-token' },
+    );
+    const text = res.result.content[0].text;
+    assert.match(text, /type at body\/f9, and 3 more\]$/);
+    assert.doesNotMatch(text, /body\/f10/);
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('call_api_operation: without `fields` the text stays as before (#2810)', async () => {
+  installFetchMock(() => jsonResponse(
+    { error: 'Invalid.', code: 400, reason: 'validation', fields: [] }, { ok: false, status: 400 },
+  ));
+  try {
+    const res = await toolCallWithHeaders(
+      'call_api_operation',
+      { operation_key: 'post_tasks', payload: { title: 'x' } },
+      { authorization: 'Bearer test-token' },
+    );
+    assert.equal(res.result.content[0].text, 'Invalid. [reason: validation]');
+  } finally {
+    global.fetch = realFetch;
+  }
+});
+
+test('tools/call create_task: the real route names the refused field (#2810)', async () => {
+  const res = await toolCall('create_task', { title: 'X', priority: 'sofort' });
+  assert.equal(res.result.isError, true);
+  assert.match(res.result.content[0].text, /\[fields: [a-z]+ at body\/priority\]/);
+  assert.doesNotMatch(res.result.content[0].text, /sofort/);
+});
+
 test('call_api_operation: kleine Binärantwort wird als base64 durchgereicht', async () => {
   installFetchMock(() => binaryResponse(Buffer.from('PDFDATA'), { contentLength: 7 }));
   try {

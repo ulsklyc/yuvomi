@@ -51,10 +51,11 @@ const VALID_PRIORITIES = TASK_PRIORITIES;
 /**
  * Fehler mit für den aufrufenden Client (LLM) sichtbarer Nachricht.
  *
- * Kommt er aus einer Routenantwort (`internalApiRequest`), tragen die drei
+ * Kommt er aus einer Routenantwort (`internalApiRequest`), tragen die vier
  * Felder deren Angaben - nur für Aufrufer im Prozess und Tests (#2616). Ein
  * MCP-Client sieht sie nie: `protocol.js` gibt nur `message` hinaus, `reason`
- * steht dort als `[reason: ...]` im Text.
+ * steht dort als `[reason: ...]` im Text, Pfad und Regel der `fields` als
+ * `[fields: ...]` (#2810).
  */
 class ToolError extends Error {
   /** @type {number|null} HTTP-Status der Routenantwort, sonst null. */
@@ -63,6 +64,38 @@ class ToolError extends Error {
   code = null;
   /** @type {string|null} `reason` der Routenantwort, sonst null. */
   reason = null;
+  /** @type {{ path: string, rule: string }[]|null} Pfad und Regel der abgewiesenen `fields`, sonst null. */
+  fields = null;
+}
+
+/** So viele abgewiesene Felder nennt die Meldung, der Rest steht als "and N more". */
+const MAX_NAMED_FIELDS = 10;
+
+/**
+ * Pfad und Regel je abgewiesenem Feld der Routenantwort (#2810), sonst null.
+ * NUR diese zwei: kein `reason`, kein `value`, keine Ajv-`params` - nichts,
+ * was Nutzdaten tragen kann, wandert in die Meldung.
+ * @param {any} body
+ * @returns {{ path: string, rule: string }[]|null}
+ */
+function refusedFields(body) {
+  if (!body || !Array.isArray(body.fields)) return null;
+  const fields = body.fields
+    .filter((/** @type {any} */ f) => f && typeof f.path === 'string' && typeof f.rule === 'string')
+    .map((/** @type {{ path: string, rule: string }} */ f) => ({ path: f.path, rule: f.rule }));
+  return fields.length > 0 ? fields : null;
+}
+
+/**
+ * ` [fields: <rule> at <path>, ...]` fuer die Meldung, hoechstens
+ * MAX_NAMED_FIELDS Eintraege plus ", and N more"; ohne Felder ''.
+ * @param {{ path: string, rule: string }[]|null} fields
+ */
+function fieldsNote(fields) {
+  if (!fields) return '';
+  const named = fields.slice(0, MAX_NAMED_FIELDS).map((f) => `${f.rule} at ${f.path}`);
+  const more = fields.length - named.length;
+  return ` [fields: ${named.join(', ')}${more > 0 ? `, and ${more} more` : ''}]`;
 }
 
 // --------------------------------------------------------
@@ -614,7 +647,7 @@ const EXTRA_REQUEST_HEADERS = new Set(['idempotency-key']);
  * @param {string} path
  * @param {{ query?: object, payload?: any, contentData?: string, contentType?: string, headers?: object }} [options]
  * @returns {Promise<any>} der geparste Antwortrumpf
- * @throws {ToolError} bei `!response.ok`, mit `status`, `code` und `reason`
+ * @throws {ToolError} bei `!response.ok`, mit `status`, `code`, `reason` und `fields`
  */
 async function internalApiRequest(ctx, method, path, {
   query, payload, contentData, contentType, headers: extraHeaders,
@@ -708,10 +741,12 @@ async function internalApiRequest(ctx, method, path, {
     // einer in der Antwort, haengt er sichtbar an der Meldung; ohne ihn bleibt
     // der Text Zeichen fuer Zeichen der von vorher.
     const reason = body && typeof body.reason === 'string' ? body.reason : null;
-    const error = new ToolError(reason ? `${message} [reason: ${reason}]` : `${message}`);
+    const fields = refusedFields(body);
+    const error = new ToolError(`${reason ? `${message} [reason: ${reason}]` : `${message}`}${fieldsNote(fields)}`);
     error.status = response.status;
     error.code = body && body.code !== undefined ? body.code : null;
     error.reason = reason;
+    error.fields = fields;
     throw error;
   }
   return data;
