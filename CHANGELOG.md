@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Family members can share their own availability** (#1591). Tap your row on the family
+  tile to set a status - available, busy, do not disturb or away - with an optional note and
+  an expiry (1 hour, 4 hours, until midnight, until tomorrow 8am, or 1 week). Everyone in the
+  household sees the status and note on your row instead of your next appointment or shift
+  while it is active; it clears itself once it expires, no manual reset needed. Only your own
+  status is editable from your own row. New endpoints: `GET/PUT/DELETE /api/v1/availability`.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation
@@ -500,6 +508,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for its content, the tool's error now ends with the path and rule of each refused field, for
   example `[fields: type at body/title]` - at most ten, then "and N more". Values are never
   named. Errors without such fields read as before.
+- **The availability routes check every request against the published API description.** This
+  is about your own API clients; the app sends nothing that is refused now. Under
+  `/api/v1/availability`, `PUT` with a `state` outside `available`/`busy`/`do_not_disturb`/`away`,
+  a `note` longer than 200 characters or not text, or an `expires_at` missing or not an
+  ISO-8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`) still answers 400, now with `reason: validation`
+  and `fields` instead of its own sentence. `expires_at` being in the future and within 30 days is
+  still checked by the route itself and keeps its own sentence (`"expires_at must be in the
+  future."`, `"expires_at must be within 30 days from now."`), since that depends on when the
+  request is made, not on its shape.
 
 ### Removed
 - **`role: "admin"` no longer makes an administrator at `POST /auth/users`.** This is about your
@@ -830,14 +847,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a missing record or a conflict of waste collection, the 502 of a subscribed address without
   calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
   and the own schedule settings answered this way already.
-
-### Added
-- **Family members can share their own availability** (#1591). Tap your row on the family
-  tile to set a status - available, busy, do not disturb or away - with an optional note and
-  an expiry (1 hour, 4 hours, until midnight, until tomorrow 8am, or 1 week). Everyone in the
-  household sees the status and note on your row instead of your next appointment or shift
-  while it is active; it clears itself once it expires, no manual reset needed. Only your own
-  status is editable from your own row. New endpoints: `GET/PUT/DELETE /api/v1/availability`.
 
 ### Fixed
 - **Saving a contact in the app keeps its middle name, title and suffix.** A contact imported
@@ -1308,6 +1317,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   try again. And "Active" is green only while nothing on the card asks for attention: after a
   failed run or with an overdue backup the word stays, since the schedule is still running, but
   without the green that would say all is well next to a red line.
+
 ### Fixed
 - **A wall display or a split-expense guest account no longer receives medication reminders or
   calendar feeds.** Reminders, pushes and the subscription feeds are sent without a request, and
