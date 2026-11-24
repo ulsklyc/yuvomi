@@ -6670,7 +6670,8 @@
         "previousMonth": "Предыдущий месяц",
         "nextMonth": "Следующий месяц",
         "today": "Сегодня",
-        "clear": "Очистить"
+        "clear": "Очистить",
+        "typeIn": "Ввести"
     },
     "pantry": {
         "badgeExpiredDays_one": "Просрочено {{count}} день назад",
