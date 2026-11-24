@@ -133,7 +133,8 @@
         "transferSkipped_few": "{{count}} už na něm byly.",
         "transferSkipped": "{{count}} tam už bylo.",
         "transferSkipped_one": "{{count}} tam už byla.",
-        "transferAllPresent": "Všechny suroviny už na seznamu jsou."
+        "transferAllPresent": "Všechny suroviny už na seznamu jsou.",
+        "errorTransferTooLarge": "To je najednou příliš mnoho surovin. Najednou lze převést a zase vrátit nejvýše {{limit}}."
     },
     "nav": {
         "dashboard": "Přehled",

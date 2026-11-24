@@ -37,6 +37,16 @@ export const MAX_ORDER_ROWS = 500;
  */
 export const MAX_SHOPPING_ITEMS = 1000;
 
+/**
+ * The sentence every kitchen handover to a shopping list carries: its
+ * `added_ids` (and `ingredient_ids`) go back unchanged in one undo request,
+ * so a handover of more source ingredients than that request takes is
+ * refused before anything is written (server/services/kitchen-handover.js).
+ */
+export const HANDOVER_LIMIT_NOTE = ` A transfer of more than ${MAX_SHOPPING_ITEMS} source ingredients is refused with 400 `
+  + `\`kitchen_transfer_too_large\` (\`params.limit\`) before anything is written, so that its \`added_ids\` and `
+  + '`ingredient_ids` fit into one POST /api/v1/shopping/items/undo-transfer.';
+
 /** Ingredients of one recipe or meal, and the ingredient ids of one recipe. */
 export const MAX_INGREDIENTS = 200;
 

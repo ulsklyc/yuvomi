@@ -3868,8 +3868,10 @@ function openMealPlanImport(container) {
           }
           if (skipped) parts.push(t(added ? 'shopping.importMealsPreviewSkipped' : 'kitchen.transferAllPresent', { count: skipped }));
           previewEl.textContent = transferred ? parts.join(' ') : t('shopping.importMealsEmpty');
-        } catch {
-          previewEl.textContent = '';
+        } catch (err) {
+          // Ein Zeitraum mit mehr Zutaten, als ein Rueckgaengig fasst (#2810,
+          // Folge 5b): die Vorschau sagt es, bevor der Import es ablehnt.
+          previewEl.textContent = /** @type {any} */ (err)?.data?.reason === 'kitchen_transfer_too_large' ? errorSentence(err) : '';
         }
       }
       updatePreview();

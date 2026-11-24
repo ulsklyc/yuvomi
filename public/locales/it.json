@@ -127,7 +127,8 @@
         "transferUndone": "Rimosso dalla lista della spesa.",
         "transferSkipped": "{{count}} erano già presenti.",
         "transferSkipped_one": "{{count}} era già presente.",
-        "transferAllPresent": "Tutti gli ingredienti sono già nella lista."
+        "transferAllPresent": "Tutti gli ingredienti sono già nella lista.",
+        "errorTransferTooLarge": "Sono troppi ingredienti in una volta. Se ne possono trasferire, e annullare, al massimo {{limit}} insieme."
     },
     "nav": {
         "dashboard": "Panoramica",

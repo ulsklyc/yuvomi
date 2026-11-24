@@ -127,7 +127,8 @@
         "transferUndone": "已從購物清單中移除。",
         "transferSkipped": "{{count}} 件已在清單中。",
         "transferSkipped_one": "{{count}} 件已在清單中。",
-        "transferAllPresent": "所有食材都已在清單中。"
+        "transferAllPresent": "所有食材都已在清單中。",
+        "errorTransferTooLarge": "一次的食材太多了。最多只能一起轉移並復原 {{limit}} 項。"
     },
     "nav": {
         "dashboard": "概覽",

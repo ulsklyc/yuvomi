@@ -145,7 +145,8 @@
         "transferSkipped_one": "{{count}} كان موجودًا بالفعل.",
         "transferSkipped_two": "{{count}} كانا موجودين بالفعل.",
         "transferSkipped_many": "{{count}} كانت موجودة بالفعل.",
-        "transferAllPresent": "جميع المكونات موجودة بالفعل في القائمة."
+        "transferAllPresent": "جميع المكونات موجودة بالفعل في القائمة.",
+        "errorTransferTooLarge": "هذه مكونات كثيرة جدًا دفعة واحدة. يمكن نقل {{limit}} مكونًا كحد أقصى معًا والتراجع عنها."
     },
     "nav": {
         "dashboard": "لوحة التحكم",

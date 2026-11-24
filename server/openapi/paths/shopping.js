@@ -1,6 +1,6 @@
 import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 import { DATE_PATTERN } from '../../utils/datetime-pattern.js';
-import { MAX_ORDER_ROWS, MAX_SHOPPING_ITEMS } from '../array-limits.js';
+import { HANDOVER_LIMIT_NOTE, MAX_ORDER_ROWS, MAX_SHOPPING_ITEMS } from '../array-limits.js';
 
 const schema = (name) => ({ 'application/json': { schema: { $ref: `#/components/schemas/${name}` } } });
 const apiError = (description) => ({ description, content: schema('ApiError') });
@@ -363,7 +363,7 @@ export function shoppingPaths() {
           to: DAY,
           preview: { type: 'boolean', description: 'With `true` nothing is written. Up to v2.93 the text `"true"` ran the real import; it is a 400 now.' },
         }, ['from', 'to']),
-        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). Meals planned from a recipe are included. ' + 'Body: { from, to, preview? }. With `preview: true` nothing is written - it only counts (`added` new items, `skipped` already on the list), for the "X ingredients from Y meals" line in the import dialog; meals planned from a recipe are read from it there instead of being copied. The import answers `added_ids` and `ingredient_ids` for POST /api/v1/shopping/items/undo-transfer. Marks the imported ingredients as transferred, which is meal-plan data, so it requires write access to the `meals` module in addition to `shopping` - a credential scoped to the shopping list alone is refused with 403, for the preview as well.',
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). Meals planned from a recipe are included. ' + 'Body: { from, to, preview? }. With `preview: true` nothing is written - it only counts (`added` new items, `skipped` already on the list), for the "X ingredients from Y meals" line in the import dialog; meals planned from a recipe are read from it there instead of being copied. The import answers `added_ids` and `ingredient_ids` for POST /api/v1/shopping/items/undo-transfer. Marks the imported ingredients as transferred, which is meal-plan data, so it requires write access to the `meals` module in addition to `shopping` - a credential scoped to the shopping list alone is refused with 403, for the preview as well.' + HANDOVER_LIMIT_NOTE,
         responses: answers({ 200: { description: 'Successful response' }, 403: { $ref: '#/components/responses/Forbidden' }, 404: LIST_NOT_FOUND }),
       }),
     },

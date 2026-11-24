@@ -56,6 +56,10 @@ export const CASE_MESSAGES = new Map([
   ['shopping_list_not_found', 'shopping.errorListGone'],
   ['shopping_item_not_found', 'shopping.errorItemGone'],
   ['shopping_store_not_found', 'shopping.errorStoreGone'],
+  // Ein Kuechenweg zur Liste, dessen Rueckgaengig nicht in eine Anfrage passt
+  // (#2810, Folge 5b, server/services/kitchen-handover.js). Die Grenze traegt
+  // ihre Zahl (CASE_PARAMS).
+  ['kitchen_transfer_too_large', 'kitchen.errorTransferTooLarge'],
   ['shopping_store_exists', 'shopping.errorStoreExists'],
   ['shopping_category_not_found', 'shopping.errorCategoryGone'],
   // Dieselben Gruende liest der Kategorie-Manager selbst (mit Zaehler, wo es
@@ -517,6 +521,7 @@ export const CASE_PARAMS = new Map([
   ['health_cycle_import_too_many_rows', ['limit']],
   ['documents_folder_too_deep', ['limit']],
   ['quick_links_limit_reached', ['limit']],
+  ['kitchen_transfer_too_large', ['limit']],
   ['contacts_name_too_long', ['limit']],
   ['contacts_phone_too_long', ['limit']],
   ['contacts_email_too_long', ['limit']],

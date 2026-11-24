@@ -10,7 +10,7 @@ import { str, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } fro
 import { addDays, mealWeekday, datesForTemplateInRange } from '../services/meal-recurrence.js';
 import { todayKey } from '../utils/timezone.js';
 import { mayWriteModule } from '../authorize/index.ts';
-import { handOverToShoppingList, mealPlanSource } from '../services/kitchen-handover.js';
+import { handOverToShoppingList, handoverTooLarge, handoverTooLargeAnswer, mealPlanSource } from '../services/kitchen-handover.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL, cookField, cookForNewOccurrence, cookRefusal } from '../services/meal-cook.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
@@ -961,7 +961,11 @@ router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (r
 
   // Rezept-Mahlzeiten bekommen beim ersten Transfer ihre Rezeptzutaten als
   // echte meal_ingredients (materializeRecipeIngredients, dort begruendet) -
-  // seit R23 derselbe Weg wie im Wochen- und im Listenimport.
+  // seit R23 derselbe Weg wie im Wochen- und im Listenimport. Passt das
+  // Rueckgaengig nicht in eine Anfrage, 400 vor dem Schreiben (#2810, Folge 5b).
+  if (handoverTooLarge(mealPlanSource(db.get(), /** @type {any} */ ({ mealId }), { materialize: false }).ingredients.length)) {
+    return res.status(400).json(handoverTooLargeAnswer());
+  }
   const result = db.transaction(() => {
     const { rows } = mealPlanSource(db.get(), { mealId });
     if (!rows.length) return null;
@@ -1001,6 +1005,10 @@ router.post('/week-to-shopping-list', requireShoppingWrite, validateRequest(), (
   const from = weekStart(week);
   const to   = weekEnd(week);
 
+  // Wie beim Einzel-Transfer: das Rueckgaengig muss in eine Anfrage passen (#2810, Folge 5b).
+  if (handoverTooLarge(mealPlanSource(db.get(), { from, to }, { materialize: false }).ingredients.length)) {
+    return res.status(400).json(handoverTooLargeAnswer());
+  }
   const result = db.transaction(() => {
     const { rows } = mealPlanSource(db.get(), { from, to });
     if (!rows.length) return null;

@@ -127,7 +127,8 @@
         "transferUndone": "Alışveriş listesinden kaldırıldı.",
         "transferSkipped": "{{count}} zaten listedeydi.",
         "transferSkipped_one": "{{count}} zaten listedeydi.",
-        "transferAllPresent": "Tüm malzemeler zaten listede."
+        "transferAllPresent": "Tüm malzemeler zaten listede.",
+        "errorTransferTooLarge": "Bir seferde çok fazla malzeme var. En fazla {{limit}} malzeme birlikte aktarılıp geri alınabilir."
     },
     "nav": {
         "dashboard": "Genel Bakış",

@@ -127,7 +127,8 @@
         "transferUndone": "Inalis sa listahan ng pamimili.",
         "transferSkipped": "{{count}} ang nandoon na.",
         "transferSkipped_one": "{{count}} ang nandoon na.",
-        "transferAllPresent": "Nasa listahan na ang lahat ng sangkap."
+        "transferAllPresent": "Nasa listahan na ang lahat ng sangkap.",
+        "errorTransferTooLarge": "Masyadong maraming sangkap nang sabay-sabay. Hanggang {{limit}} lang ang maililipat, at maa-undo, nang magkakasama."
     },
     "nav": {
         "dashboard": "Pangkalahatang-tanaw",

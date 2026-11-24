@@ -127,7 +127,8 @@
         "transferUndone": "Eltávolítva a bevásárlólistáról.",
         "transferSkipped": "{{count}} már rajta volt.",
         "transferSkipped_one": "{{count}} már rajta volt.",
-        "transferAllPresent": "Minden hozzávaló már a listán van."
+        "transferAllPresent": "Minden hozzávaló már a listán van.",
+        "errorTransferTooLarge": "Ez egyszerre túl sok hozzávaló. Egyszerre legfeljebb {{limit}} vihető át és vonható vissza."
     },
     "nav": {
         "dashboard": "Áttekintés",

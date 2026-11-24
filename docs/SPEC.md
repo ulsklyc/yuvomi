@@ -6853,6 +6853,14 @@ but finite; a reorder takes the whole set. The constants live in `server/openapi
 | Default-assignee backfill moves | 5000 | `moves`, one preview page |
 | Quick-link order | 100 | `ids`; creation stops at 24 |
 
+**What an answer hands out has to fit the request it goes back in.** The undo of a kitchen
+transfer to the shopping list sends the transfer's `added_ids` and `ingredient_ids` unchanged in
+one `POST /shopping/items/undo-transfer` (one request, so the undo stays atomic). The transfers
+therefore refuse more than 1000 source ingredients before writing anything: the meal-plan import
+(its preview too, so the dialog says it first), a meal, a week of meals and a recipe answer 400
+`kitchen_transfer_too_large` with `params.limit` (`server/services/kitchen-handover.js`). The
+pantry hand-over needs no check of its own: its `items` already carry the same limit.
+
 Lists that had their limit before keep it: bulk task ids 500, rotation pool 10, note categories 50
 and their reorder 100, birthday import 500, tracked dates 10, reminder offsets 5, medication
 schedules 48, schedule pattern days, a backfill move's people 100.

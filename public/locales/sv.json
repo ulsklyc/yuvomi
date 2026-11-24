@@ -127,7 +127,8 @@
         "transferUndone": "Borttagen från inköpslistan.",
         "transferSkipped": "{{count}} fanns redan där.",
         "transferSkipped_one": "{{count}} fanns redan där.",
-        "transferAllPresent": "Alla ingredienser finns redan på listan."
+        "transferAllPresent": "Alla ingredienser finns redan på listan.",
+        "errorTransferTooLarge": "Det är för många ingredienser på en gång. Högst {{limit}} kan överföras, och ångras, tillsammans."
     },
     "nav": {
         "dashboard": "Översikt",

@@ -1,7 +1,7 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 import { OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
 import { MEAL_DELETE_SCOPES, MEAL_TYPES, MEAL_UPDATE_SCOPES } from '../../services/meals-fields.js';
-import { MAX_INGREDIENTS, MAX_MEAL_ASSIGNMENTS } from '../array-limits.js';
+import { HANDOVER_LIMIT_NOTE, MAX_INGREDIENTS, MAX_MEAL_ASSIGNMENTS } from '../array-limits.js';
 
 // ---------------------------------------------------------------------------
 // Bausteine der Anfrage-Schemata (#2810, Gruppe 7). Die Wertelisten kommen aus
@@ -203,7 +203,7 @@ export function mealsPaths() {
       post: op({
         summary: 'Transfer meal ingredients to shopping list',
         tag: 'Meals',
-        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). A meal planned from a recipe gets the recipe ingredients as its own on the first transfer. The response carries `added_ids` and `ingredient_ids` for POST /api/v1/shopping/items/undo-transfer. ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` - a credential scoped to the meal plan alone is refused with 403. ' + TRANSFER_ORDER,
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). A meal planned from a recipe gets the recipe ingredients as its own on the first transfer. The response carries `added_ids` and `ingredient_ids` for POST /api/v1/shopping/items/undo-transfer. ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` - a credential scoped to the meal plan alone is refused with 403. ' + TRANSFER_ORDER + HANDOVER_LIMIT_NOTE,
         params: [mealId()],
         stateChanging: true,
         requestBody: body({ required: ['listId'], properties: { listId: LIST_ID } }),
@@ -214,7 +214,7 @@ export function mealsPaths() {
       post: op({
         summary: 'Transfer weekly meal ingredients to shopping list',
         tag: 'Meals',
-        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). Meals planned from a recipe are included (their recipe ingredients become their own). ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` - a credential scoped to the meal plan alone is refused with 403. ' + TRANSFER_ORDER,
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). Meals planned from a recipe are included (their recipe ingredients become their own). ' + 'Creates shopping items, so it requires write access to the `shopping` module in addition to `meals` - a credential scoped to the meal plan alone is refused with 403. ' + TRANSFER_ORDER + HANDOVER_LIMIT_NOTE,
         stateChanging: true,
         requestBody: body({
           required: ['listId', 'week'],

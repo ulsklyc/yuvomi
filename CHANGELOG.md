@@ -15,7 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ingredients) was accepted and worked through entry by entry; it is now a 400 with
   `reason: validation` and `fields` naming the list and the rule `maxItems`. Each list carries
   its limit as `maxItems` in the API description; the limits and their reasons are listed under
-  "Limits of lists in a request" in the API section of `docs/SPEC.md`.
+  "Limits of lists in a request" in the API section of `docs/SPEC.md`. Because the undo of a
+  transfer to the shopping list sends back everything the transfer added in one request, a
+  transfer of more than 1000 ingredients (a meal-plan import over a long period, a meal or
+  recipe with that many ingredients) is now refused before anything is written, with
+  `reason: kitchen_transfer_too_large`; the import dialog says so in its preview.
 - **A calendar event with an assignee who has no account, or with an unreadable attachment, is
   refused with 400.** This is about your own API clients; the app sends neither. `POST /calendar`
   and `PUT /calendar/{id}` with an `assigned_to` id that belongs to no account answered 500 and

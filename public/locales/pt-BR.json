@@ -127,7 +127,8 @@
         "transferUndone": "Removido da lista de compras.",
         "transferSkipped": "{{count}} já estavam na lista.",
         "transferSkipped_one": "{{count}} já estava na lista.",
-        "transferAllPresent": "Todos os ingredientes já estão na lista."
+        "transferAllPresent": "Todos os ingredientes já estão na lista.",
+        "errorTransferTooLarge": "São ingredientes demais de uma vez. No máximo {{limit}} podem ser transferidos, e desfeitos, juntos."
     },
     "nav": {
         "dashboard": "Painel",

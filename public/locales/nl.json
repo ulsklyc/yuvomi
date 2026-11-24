@@ -127,7 +127,8 @@
         "transferUndone": "Van de boodschappenlijst verwijderd.",
         "transferSkipped": "{{count}} stonden er al op.",
         "transferSkipped_one": "{{count}} stond er al op.",
-        "transferAllPresent": "Alle ingrediënten staan al op de lijst."
+        "transferAllPresent": "Alle ingrediënten staan al op de lijst.",
+        "errorTransferTooLarge": "Dat zijn te veel ingrediënten tegelijk. Er kunnen er hoogstens {{limit}} samen worden overgezet en ongedaan gemaakt."
     },
     "nav": {
         "dashboard": "Overzicht",

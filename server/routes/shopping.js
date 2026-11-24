@@ -11,7 +11,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import { str, oneOf, url, date, textShape, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../api/formats.ts';
-import { handOverToShoppingList, mealPlanSource, previewHandover } from '../services/kitchen-handover.js';
+import { handOverToShoppingList, handoverTooLarge, handoverTooLargeAnswer, mealPlanSource, previewHandover } from '../services/kitchen-handover.js';
 import { loadItemTagsFor } from '../utils/task-tags.js';
 import {
   flushOutbound, markTodoOutbound, queueTodoDeletions, moveShoppingMirror,
@@ -1390,8 +1390,16 @@ router.post('/:listId/import-meal-plan', requireMealsWrite, validateRequest(), (
   // Schreib-Transaktion - Rezept-Mahlzeiten werden dafuer aus dem Rezept
   // gelesen statt kopiert. Der Client zeigt "X Zutaten aus Y Mahlzeiten",
   // und seit R23 auch, wie viele davon schon auf der Liste stehen.
+  //
+  // Die Vorschau zaehlt ohne zu schreiben; dieselbe Zahl entscheidet vor dem
+  // Import, ob sein Rueckgaengig in EINE Anfrage passt (#2810, Folge 5b,
+  // services/kitchen-handover.js): sonst 400, bevor etwas geschrieben ist -
+  // auch die Vorschau, damit der Dialog es vor dem Import sagt. Synchron, also
+  // aendert sich zwischen Zaehlen und Schreiben nichts.
+  const counted = mealPlanSource(db.get(), range, { materialize: false });
+  if (handoverTooLarge(counted.ingredients.length)) return res.status(400).json(handoverTooLargeAnswer());
   if (req.body.preview === true) {
-    const { ingredients, rows, meals } = mealPlanSource(db.get(), range, { materialize: false });
+    const { ingredients, rows, meals } = counted;
     if (!ingredients.length) return res.json({ data: { ...empty, preview: true } });
     const { added, skipped } = previewHandover(db.get(), listId, rows);
     return res.json({ data: { transferred: ingredients.length, added, skipped, meals, preview: true } });

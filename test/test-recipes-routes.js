@@ -322,6 +322,21 @@ test('POST /:id/to-shopping-list: überträgt Zutaten mit Menge und Kategorie', 
   assert.equal(items[1].category, 'Sonstiges'); // Default greift
 });
 
+test('POST /:id/to-shopping-list: mehr Zutaten, als ein Rueckgaengig fasst, sind 400 vor dem Schreiben (#2810)', async () => {
+  // Ein gespeichertes Altrezept kann mehr Zutaten tragen, als das Schema heute nimmt.
+  const { MAX_SHOPPING_ITEMS } = await import('../server/openapi/array-limits.js');
+  const listId = newList('Transfer zu gross');
+  const recipe = db.prepare(`INSERT INTO recipes (title, created_by) VALUES ('Riesenrezept', ?)`).run(OWNER).lastInsertRowid;
+  const ins = db.prepare(`INSERT INTO recipe_ingredients (recipe_id, name, quantity, category) VALUES (?, ?, NULL, 'Sonstiges')`);
+  db.transaction(() => { for (let i = 0; i <= MAX_SHOPPING_ITEMS; i++) ins.run(recipe, `Zutat ${i}`); })();
+  const r = await call('POST', `/${recipe}/to-shopping-list`, { listId });
+  assert.deepEqual([r.status, r.body], [400, {
+    error: `A transfer takes at most ${MAX_SHOPPING_ITEMS} ingredients at a time.`, code: 400,
+    reason: 'kitchen_transfer_too_large', params: { limit: MAX_SHOPPING_ITEMS },
+  }]);
+  assert.equal(shoppingItems(listId).length, 0, 'kein Artikel');
+});
+
 test('POST /:id/to-shopping-list: überspringt, was unabgehakt schon auf der Liste liegt', async () => {
   const listId = newList('Transfer B');
   const created = await call('POST', '/', {
