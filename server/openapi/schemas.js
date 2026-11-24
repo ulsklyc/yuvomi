@@ -871,7 +871,7 @@ export const schemas = {
             // (public/components/category-manager.js) schickt ihre Schluessel als Text.
             order: {
               type: 'array',
-              maxItems: 100,
+              maxItems: MAX_ORDER_ROWS,
               uniqueItems: true,
               items: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' }] },
               description: 'Category ids as numbers or digit strings.',

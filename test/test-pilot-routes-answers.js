@@ -159,7 +159,7 @@ const STEPS = [
   ['cat reorder empty', 'PATCH', '/notes/categories/reorder', { order: [] }],
   ['cat reorder not a list', 'PATCH', '/notes/categories/reorder', { order: 'x' }],
   ['cat reorder missing', 'PATCH', '/notes/categories/reorder', {}],
-  ['cat reorder too long', 'PATCH', '/notes/categories/reorder', { order: Array.from({ length: 101 }, (_, i) => i + 1) }],
+  ['cat reorder too long', 'PATCH', '/notes/categories/reorder', { order: Array.from({ length: 501 }, (_, i) => i + 1) }],
   ['cat reorder zero', 'PATCH', '/notes/categories/reorder', { order: [0] }],
   ['cat reorder negative', 'PATCH', '/notes/categories/reorder', { order: [-1] }],
   ['cat reorder float', 'PATCH', '/notes/categories/reorder', { order: [1.5] }],

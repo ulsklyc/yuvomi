@@ -6835,7 +6835,7 @@ but finite; a reorder takes the whole set. The constants live in `server/openapi
 | Class | Limit | Lists |
 |---|---|---|
 | Members of a household or split group | 100 | assignees, responsible people, allowed readers, caregivers, participants and splits, default assignees, the member reorder |
-| Reorder of a category-like set | 500 | categories, subcategories, locations, local calendars, budget meta rows |
+| Reorder of a category-like set | 500 | categories (note categories too, which took 100 before), subcategories, locations, local calendars, budget meta rows |
 | Shopping item ids | 1000 | checked clean-up, item reorder, undo of a transfer, both hand-overs between shopping list and pantry; 1000 ids stay below the 64 KiB a browser allows for a `keepalive` body, and the shopping page splits a larger clean-up |
 | Ingredients | 200 | ingredients of a recipe or meal, `ingredientIds` and `quantities` of a recipe transfer |
 | Planned meals | 500 | `assignments` of `POST /meals/apply-plan` |
@@ -6862,7 +6862,7 @@ therefore refuse more than 1000 source ingredients before writing anything: the 
 pantry hand-over needs no check of its own: its `items` already carry the same limit.
 
 Lists that had their limit before keep it: bulk task ids 500, rotation pool 10, note categories 50
-and their reorder 100, birthday import 500, tracked dates 10, reminder offsets 5, medication
+per note, birthday import 500, tracked dates 10, reminder offsets 5, medication
 schedules 48, schedule pattern days, a backfill move's people 100.
 
 Authentication options for external integrations:
