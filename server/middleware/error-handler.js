@@ -10,6 +10,9 @@
  *            write ourselves. The HTTP libraries mark their own errors exposed
  *            too, and body-parser wraps Node's zlib text ("incorrect header
  *            check") that way; such a 4xx gets a fixed sentence per status.
+ *            Its text stays out of the log too: body-parser's JSON error
+ *            quotes the body (a password at the login), so the log names
+ *            its `type` instead, and no cause.
  *          - A path parameter that does not decode (`%ZZ`) is a 400 with a
  *            fixed sentence. The router writes the raw segment into its
  *            message, and that segment can be a feed token, so the message is
@@ -52,6 +55,39 @@ function exposedStatus(err) {
  */
 function sentenceFor(status) {
   return `The request was refused (${STATUS_CODES[status] ?? `HTTP ${status}`}).`;
+}
+
+/**
+ * What the log says about a 4xx a library threw, by its `type`. The text of
+ * such an error is not ours: body-parser's JSON error quotes the body V8 could
+ * not parse (a password at the login), the charset and encoding errors quote a
+ * request header. Measured against body-parser 2.4 / raw-body 3.0.
+ * @type {Readonly<Record<string, string>>}
+ */
+const FOREIGN_TYPE_NOTES = Object.freeze({
+  'entity.parse.failed': 'the body is not valid JSON',
+  'entity.too.large': 'the body is too large',
+  'entity.verify.failed': 'the body failed its verification',
+  'charset.unsupported': 'the body has an unsupported charset',
+  'encoding.unsupported': 'the body has an unsupported content encoding',
+  'parameters.too.many': 'the form body has too many parameters',
+  'querystring.parse.rangeError': 'the form body nests too deep',
+  'request.aborted': 'the client aborted the body',
+  'request.size.invalid': 'the body length does not match its Content-Length',
+});
+
+/**
+ * The log text of an exposed 4xx: our own sentence for an HttpError, a fixed
+ * note per `type` for anything else, never the foreign message.
+ * @param {any} err
+ * @returns {string}
+ */
+function refusalNote(err) {
+  if (err instanceof HttpError) return err.message;
+  const type = err?.type;
+  if (typeof type !== 'string') return 'a library refused the request';
+  if (Object.hasOwn(FOREIGN_TYPE_NOTES, type)) return FOREIGN_TYPE_NOTES[type];
+  return /^[a-z][a-zA-Z]*(\.[a-zA-Z]+)*$/.test(type) ? `a library refused the request (type ${type})` : 'a library refused the request';
 }
 
 /**
@@ -133,9 +169,10 @@ export function createErrorHandler(log) {
     const status = exposedStatus(err);
     if (status !== null) {
       const fields = fieldsOf(err);
-      log.warn(`Request refused: ${where} -> ${status}: ${err.message}${fieldsNote(fields)}${causeNote(err)}`);
+      const ours = err instanceof HttpError;
+      log.warn(`Request refused: ${where} -> ${status}: ${refusalNote(err)}${fieldsNote(fields)}${ours ? causeNote(err) : ''}`);
       if (res.headersSent) return next(err);
-      if (!(err instanceof HttpError)) return res.status(status).json({ error: sentenceFor(status), code: status });
+      if (!ours) return res.status(status).json({ error: sentenceFor(status), code: status });
       const withReason = typeof err.reason === 'string' && err.reason !== '';
       return res.status(status).json({
         error: err.message, code: status, ...(withReason ? { reason: err.reason } : {}), ...(fields ? { fields } : {}),
