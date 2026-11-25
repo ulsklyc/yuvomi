@@ -609,7 +609,7 @@ router.get('/price-history', validateRequest(), (req, res) => {
 // zentralen Error-Handler durchfallen (LOG-PLUS-500), nicht hier geloggt und
 // beantwortet werden - beide Handler sind synchron, Express faengt den Wurf.
 
-router.get('/webhook',
+router.get('/webhook', validateRequest(),
   /**
    * @param {{ body: any }} req
    * @param {{ status(code: number): { json(body: unknown): unknown }, json(body: unknown): unknown }} res
@@ -619,7 +619,7 @@ router.get('/webhook',
     res.json({ data: { url: cfgGet('shopping_webhook_url') || null } });
   });
 
-router.put('/webhook',
+router.put('/webhook', validateRequest(),
   /**
    * @param {{ body: any }} req
    * @param {{ status(code: number): { json(body: unknown): unknown }, json(body: unknown): unknown }} res
@@ -1426,7 +1426,7 @@ function requirePantryRead(req, res, next) {
 // Payload: { list: { id, name }, items: [{name, quantity, category}], sentAt }
 // Response: { data: { sent: true, items: count } }
 // --------------------------------------------------------
-router.post('/:listId/send-webhook', sendListLimiter, async (req, res) => {
+router.post('/:listId/send-webhook', sendListLimiter, validateRequest(), async (req, res) => {
   try {
     const list = db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(req.params.listId);
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404, reason: 'shopping_list_not_found' });
