@@ -130,7 +130,8 @@ jobs:
             --rawfile user "$RUNNER_TEMP/nutzer.txt" \
             '{model: $model,
               temperature: 0.2,
-              max_tokens: 8192,
+              reasoning_effort: "high",
+              max_tokens: 32000,
               messages: [
                 {role: "system", content: $system},
                 {role: "user", content: $user}
@@ -141,7 +142,16 @@ jobs:
             -d @"$RUNNER_TEMP/anfrage.json" \
             https://api.mistral.ai/v1/chat/completions \
             -o "$RUNNER_TEMP/antwort.json"
-          text=$(jq -er '.choices[0].message.content' "$RUNNER_TEMP/antwort.json")
+          # Mit Reasoning ist content eine Liste aus "thinking"- und
+          # "text"-Teilen, ohne ein String; gepostet wird nur die Antwort,
+          # nie die Denkspur. Reicht max_tokens nicht, endet der Lauf mit
+          # finish_reason "length" und einer halben oder fehlenden Antwort.
+          grund=$(jq -r '.choices[0].finish_reason // ""' "$RUNNER_TEMP/antwort.json")
+          if [ "$grund" = "length" ]; then
+            echo "::error::Die Mistral-Antwort brach an max_tokens ab (finish_reason length)."
+            exit 1
+          fi
+          text=$(jq -r '.choices[0].message.content | if type == "string" then . else [.[]? | select(.type == "text") | .text] | join("") end' "$RUNNER_TEMP/antwort.json")
           if [ -z "$text" ]; then
             echo "::error::Die Mistral API lieferte keinen Review-Text."
             exit 1
