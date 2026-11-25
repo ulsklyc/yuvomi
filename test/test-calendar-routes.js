@@ -1978,10 +1978,14 @@ test('PUT /:id — partielles Update lässt andere Felder unberührt', async () 
 // ist der Drive-Client: sein `files.create` haelt, bis der Test ihn loslaesst,
 // dazwischen laeuft die zweite Anfrage. Keine Wartezeit als Taktgeber.
 /**
+ * Jeder weitere Upload bekommt eine eigene Datei-ID (`<fileId>-2`, ...). Mit
+ * `holdDeletes` haelt auch `files.delete`, bis der Test `releaseDeletes` ruft
+ * (#2956: die Antwort nach dem Aufraeumen).
  * @param {string} fileId
- * @param {(held: { started: Promise<unknown>, release: () => void, deleted: string[] }) => Promise<void>} probe
+ * @param {(held: { started: Promise<unknown>, release: () => void, deleted: string[], deleteStarted: Promise<unknown>, releaseDeletes: () => void }) => Promise<void>} probe
+ * @param {{ holdDeletes?: boolean }} [options]
  */
-async function withHeldDriveUpload(fileId, probe) {
+async function withHeldDriveUpload(fileId, probe, { holdDeletes = false } = {}) {
   const driveStorage = await import('../server/services/google-drive-storage.js');
   const configKeys = [
     'document_storage_selected_backend',
@@ -2003,6 +2007,13 @@ async function withHeldDriveUpload(fileId, probe) {
   const started = new Promise((resolve) => { uploadStarted = () => resolve(undefined); });
   let release = () => {};
   const gate = new Promise((resolve) => { release = () => resolve(undefined); });
+  let deleteBegan = () => {};
+  const deleteStarted = new Promise((resolve) => { deleteBegan = () => resolve(undefined); });
+  let releaseDeletes = () => {};
+  const deleteGate = holdDeletes
+    ? new Promise((resolve) => { releaseDeletes = () => resolve(undefined); })
+    : Promise.resolve();
+  let uploads = 0;
   /** @type {string[]} */
   const deleted = [];
   try {
@@ -2025,20 +2036,25 @@ async function withHeldDriveUpload(fileId, probe) {
             data: { id, name: 'Documents', mimeType: 'application/vnd.google-apps.folder', trashed: false },
           }),
           create: async () => {
+            uploads += 1;
+            const id = uploads === 1 ? fileId : `${fileId}-${uploads}`;
             uploadStarted();
             await gate;
-            return { data: { id: fileId } };
+            return { data: { id } };
           },
           delete: async (/** @type {{ fileId: string }} */ { fileId: id }) => {
+            deleteBegan();
+            await deleteGate;
             deleted.push(id);
             return { data: {} };
           },
         },
       }),
     });
-    await probe({ started, release, deleted });
+    await probe({ started, release, deleted, deleteStarted, releaseDeletes });
   } finally {
     release();
+    releaseDeletes();
     driveStorage.__setGoogleApiFactoryForTests();
     db.prepare(`DELETE FROM sync_config WHERE key IN (${configKeys.map(() => '?').join(', ')})`).run(...configKeys);
     for (const [key, value] of previousConfig) {
@@ -2227,6 +2243,141 @@ test('PUT /:id - an event made private during the upload answers 404 to the othe
   assert.equal(row.visibility, 'private');
   assert.equal(row.attachment_name, null);
   assert.deepEqual(uploadsDeleted, ['drive-2940-private'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+// DER WEG NACH DER KOPIE (#2956). Braucht eine verknuepfte Ausnahme beim
+// Speichern eine eigene Kopie des Anhangs, liest und laedt PUT /:id sie hoch
+// (await) und speichert dann ein zweites Mal. Weg und Kopien gelten fuer die
+// Zeile, die dieses zweite Speichern vorfindet. Die Naht ist wieder der
+// Drive-Client: das Hochladen der Kopie haelt, dazwischen aendert eine zweite
+// Anfrage die Serie.
+/**
+ * Eine Serie mit Anhang ab einem Mittwoch und eine Ausnahme am Freitag, die
+ * den Anhang erbt; die Quelle liegt im lokalen Speicher.
+ * @param {string} title
+ */
+async function seriesWithInheritingOverride(title) {
+  const previousEnabled = process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  const previousBackend = db.prepare("SELECT value FROM sync_config WHERE key = 'document_storage_selected_backend'").get()?.value;
+  try {
+    process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'false';
+    db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('document_storage_selected_backend', 'local')").run();
+    const created = await call('POST', '/', /** @type {any} */ ({ body: {
+      title, start_datetime: '2059-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY',
+      attachment_name: `${title}.txt`,
+      attachment_data: `data:text/plain;base64,${Buffer.from(title).toString('base64')}`,
+    } }));
+    assert.equal(created.status, 201);
+    const seriesId = Number(created.body.data.id);
+    const child = await call('PUT', `/${seriesId}/occurrences/2059-01-03`, /** @type {any} */ ({ body: { title: `${title} Freitag` } }));
+    assert.equal(child.status, 200);
+    return { seriesId, childId: Number(child.body.data.id) };
+  } finally {
+    if (previousEnabled === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    else process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = previousEnabled;
+    db.prepare("DELETE FROM sync_config WHERE key = 'document_storage_selected_backend'").run();
+    if (previousBackend !== undefined) {
+      db.prepare("INSERT INTO sync_config (key, value) VALUES ('document_storage_selected_backend', ?)").run(previousBackend);
+    }
+  }
+}
+
+test('PUT /:id - the save path follows the row found after the attachment copy (#2956)', async () => {
+  const { seriesId } = await seriesWithInheritingOverride('PUT-CLONE-PATH');
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2956-path', async ({ started, release, deleted }) => {
+    // Montags statt taeglich: die Freitags-Ausnahme verwaist und braucht ihre Kopie.
+    const first = call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+    await started;
+    // Waehrenddessen: die Ausnahme geht, die Serie wird ein einfacher Termin.
+    assert.equal((await call('DELETE', `/${seriesId}/occurrences/2059-01-03`)).status, 204);
+    assert.equal((await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: { recurrence_rule: null } }))).status, 200);
+    release();
+    saved = await first;
+    uploadsDeleted = deleted;
+  });
+  // Ohne Pause speichert dieselbe Anfrage einen einfachen Termin als Serie.
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=WEEKLY;BYDAY=MO');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = 'drive-2956-path'").get().n, 0,
+    'keine Kopie fuer eine Ausnahme, die es nicht mehr gibt');
+  assert.deepEqual(uploadsDeleted, ['drive-2956-path'], 'die unbenutzte Kopie wird wieder entfernt');
+});
+
+test('PUT /:id - the copies follow the overrides found after the attachment copy (#2956)', async () => {
+  const { seriesId, childId } = await seriesWithInheritingOverride('PUT-CLONE-PLAN');
+  /** @type {any} */
+  let saved;
+  /** @type {any} */
+  let replacementId;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2956-plan', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+    await started;
+    // Waehrenddessen: statt der Freitags-Ausnahme steht eine am Samstag.
+    assert.equal((await call('DELETE', `/${seriesId}/occurrences/2059-01-03`)).status, 204);
+    const replacement = await call('PUT', `/${seriesId}/occurrences/2059-01-04`, /** @type {any} */ ({ body: { title: 'Samstag' } }));
+    assert.equal(replacement.status, 200);
+    replacementId = Number(replacement.body.data.id);
+    release();
+    saved = await first;
+    uploadsDeleted = deleted;
+  });
+  assert.notEqual(replacementId, childId);
+  // Ohne Pause bekaeme die Samstags-Ausnahme ihre Kopie, und die Serie ist woechentlich.
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const series = db.prepare('SELECT recurrence_rule AS r, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(seriesId);
+  assert.equal(series.r, 'FREQ=WEEKLY;BYDAY=MO');
+  const detached = db.prepare('SELECT recurrence_parent_id AS p, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(replacementId);
+  assert.equal(detached.p, null, 'die Samstags-Ausnahme ist abgeloest');
+  assert.ok(detached.d && detached.d !== series.d, 'mit eigener Kopie des Anhangs');
+  const copy = db.prepare('SELECT storage_key AS k FROM family_documents WHERE id = ?').get(detached.d);
+  assert.ok(String(copy.k).startsWith('drive-2956-plan'));
+  assert.equal(uploadsDeleted.length, 0, 'die bereitgestellte Kopie wird benutzt, nicht weggeraeumt');
+});
+
+test('PUT /:id - a refusal after the upload answers from what the check read (#2956)', async () => {
+  const seriesId = insertEvent({ title: 'PUT-REFUSAL-SERIES', start_datetime: '2059-02-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const id = insertEvent({ title: 'PUT-REFUSAL-EVENT', start_datetime: '2059-02-03T09:00' });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('absage').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2956-refusal', async ({ started, release, deleted, deleteStarted, releaseDeletes }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      description: 'mit Anhang', attachment_data: dataUrl, attachment_name: 'absage.txt',
+    } }));
+    await started;
+    // Waehrend des Uploads wird der Termin ein verknuepftes Vorkommen der Serie
+    // (keine Route macht das; es ist der Stand, den die Pruefung beim Schreiben sieht).
+    db.prepare("UPDATE calendar_events SET recurrence_parent_id = ?, recurrence_id = '2059-02-03', overridden_fields = '[\"title\"]' WHERE id = ?")
+      .run(seriesId, id);
+    release();
+    await deleteStarted;
+    // Waehrend des Aufraeumens verschwindet die Serie.
+    db.prepare('UPDATE calendar_events SET recurrence_parent_id = NULL WHERE id = ?').run(id);
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(seriesId);
+    releaseDeletes();
+    refused = await first;
+    uploadsDeleted = deleted;
+  }, { holdDeletes: true });
+  assert.equal(refused.status, 400, JSON.stringify(refused.body));
+  assert.deepEqual(refused.body, {
+    error: 'Use the occurrence endpoint to change a linked recurring occurrence.',
+    code: 400,
+    reason: 'calendar_occurrence_route_required',
+  });
+  assert.equal(db.prepare('SELECT description AS d FROM calendar_events WHERE id = ?').get(id).d, null);
+  assert.deepEqual(uploadsDeleted, ['drive-2956-refusal'], 'der hochgeladene Anhang wird wieder entfernt');
 });
 
 test('PUT /:id — Sichtbarkeit, Serie und Zuweisungen aktualisieren', async () => {

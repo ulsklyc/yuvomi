@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **Saving a series with an attachment no longer fails when the series changes at the same
+  moment.** When a change to a recurring event left single changed dates on their own, each of
+  them first got its own copy of the attachment, and only then was the series saved. If the
+  series was changed in the meantime - its repetition removed, or one changed date replaced by
+  another - the save could be refused with a wrong message or end in an error. Now the save
+  follows the series as it is after the copies, and a changed date that needs a copy gets one.
+  A save that is refused after an attachment upload now also says why with what was checked,
+  not with what happened while the upload was being removed.
 - **Changing the document storage no longer cuts off documents stored at the same moment.** The
   WebDAV settings and the Google Drive connection check that existing documents stay reachable,
   but they checked before testing the new connection over the network and saved afterwards. A
