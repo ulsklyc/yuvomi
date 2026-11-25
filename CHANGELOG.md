@@ -18,15 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Changes made while the app waits for a server or an upload are no longer lost or
   overruled.** Several actions check something, wait for a server or a file upload, and only then
-  save; a change made in that moment was not seen. A document shared with someone who leaves the
-  household during the upload is now refused like before the upload, and nothing is stored. A
-  calendar import from a link no longer assigns people who left the household while the feed was
-  loading. Refreshing the calendars, reminder lists or address books of an account that is
+  save; a change made in that moment was not seen. A document shared with someone, or about
+  someone, who leaves the household during the upload is now refused like before the upload, and
+  nothing is stored. A calendar import from a link no longer assigns people who left the household
+  while the feed was loading, and if the chosen calendar is deleted meanwhile, the import says so
+  (`400`, reason `calendar_selected_calendar_not_found`) instead of claiming the feed could not be
+  fetched. Refreshing the calendars, reminder lists or address books of an account that is
   deleted meanwhile now answers "not found" instead of an error, and an account moved to another
   server meanwhile keeps nothing from the old one. Changing the server or user of a CalDAV
   account checks again against the account as it is after the connection test, so a password
   saved for another server in the meantime is never sent to the old one. A task or shopping item
   is no longer uploaded to a reminder list that was switched off while the list was fetched.
+  Rights now count at the moment of saving, not only when the request arrived: an administrator
+  demoted while a new member's or housekeeper's password is being prepared gets "admin access
+  required" and no account is created, and whoever loses write access to documents while an
+  event attachment uploads gets the refusal for attachments, with no attachment, copy or change
+  to the document's sharing left behind.
 - **Saving a series with an attachment no longer fails when the series changes at the same
   moment.** When a change to a recurring event left single changed dates on their own, each of
   them first got its own copy of the attachment, and only then was the series saved. If the

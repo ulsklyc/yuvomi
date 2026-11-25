@@ -419,6 +419,20 @@ test('password change: a change that overlaps another one in the hashing is refu
   assert.equal(me.status, 200, 'a refused change ends no session');
 });
 
+test('create member: an admin demoted while the new password is hashed creates no account and gets the admin refusal (#2947)', async () => {
+  account('demoted-2947', await hashPassword('admin-password-1'));
+  const session = await signIn('demoted-2947', 'admin-password-1');
+  const body = { username: 'created-2947', display_name: 'Neu', password: 'longenough1' };
+  const demote = () => db.prepare("UPDATE users SET role = 'member' WHERE username = 'demoted-2947'").run();
+  const { calls, result } = await countArgon2(() => asSession(session, 'POST', '/users', body), demote);
+  assert.equal(calls, 1, 'the hash of the new password');
+  const direct = await asSession(session, 'POST', '/users', body);
+  assert.equal(direct.status, 403, JSON.stringify(direct.body));
+  const answer = /** @type {any} */ (result);
+  assert.deepEqual([answer.status, answer.body], [403, direct.body], 'the answer requireAdmin gives after the demotion');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE username = 'created-2947'").get().n, 0, 'no account');
+});
+
 test('login: an SSO-only and an unknown account answer as before, a wrong password too', async () => {
   account('sso', OIDC_PASSWORD_SENTINEL);
   account('argon', await hashPassword('correct-horse-1'));

@@ -26,6 +26,7 @@ import { runSerialized } from '../utils/sync-lock.js';
 import { calendarDisplayName } from '../utils/calendar-meta.js';
 import { readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
 import { REMINDER_LIST_TARGETS } from './calendar-fields.js';
+import { accountGoneError, sameConnection } from '../utils/caldav-account-check.js';
 
 /** Standard-Personen fuer eine Liste, die nicht auf Aufgaben zeigt (#1221): die Route antwortet 400. */
 export class ReminderListAssigneeError extends Error {}
@@ -132,27 +133,6 @@ const createClient = createCalDAVClient;
 // --------------------------------------------------------
 // Reminder-List Discovery & Selection
 // --------------------------------------------------------
-
-/**
- * Das Konto verschwand, waehrend der Server gefragt wurde (#2947). Die Route
- * antwortet darauf wie auf ein unbekanntes Konto vor der Abfrage.
- * @param {number} accountId
- */
-function accountGoneError(accountId) {
-  const err = new Error(`Account ${accountId} not found.`);
-  /** @type {any} */ (err).code = 'caldav_account_gone';
-  return err;
-}
-
-/**
- * Zeigt die Zeile noch auf denselben Server mit denselben Zugangsdaten?
- * @param {{ caldav_url: string, username: string, password: string }} current
- * @param {{ caldav_url: string, username: string, password: string }} read
- */
-function sameConnection(current, read) {
-  return current.caldav_url === read.caldav_url && current.username === read.username
-    && current.password === read.password;
-}
 
 async function getReminderLists(accountId, { refresh = false, createClient: makeClient } = {}) {
   const account = getAccountById(accountId);

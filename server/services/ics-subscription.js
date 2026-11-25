@@ -431,15 +431,17 @@ function toLocalRRule(raw) {
 }
 
 /**
- * Die Personen eines Imports kommen nach dem Laden des Feeds nicht mehr in
- * Frage (#2947): dieselbe Absage, die die Route vor dem Laden gegeben haette.
+ * Der Kalender oder die Personen eines Imports kommen nach dem Laden des Feeds
+ * nicht mehr in Frage (#2947): dieselbe Absage, die die Route vor dem Laden
+ * gegeben haette. Ein TypeError wie die Kalender-Absage davor: Aufrufer, die
+ * den Dienst direkt rufen, sehen dieselbe Art Fehler.
  */
-class ImportAssigneesRefused extends Error {
-  /** @param {string} error @param {string} reason */
+class ImportRefusedAfterFeed extends TypeError {
+  /** @param {string} error @param {string | undefined} reason */
   constructor(error, reason) {
     super(error);
-    this.name = 'ImportAssigneesRefused';
-    /** The 400 the route gives for these people before the feed was loaded. */
+    this.name = 'ImportRefusedAfterFeed';
+    /** The 400 the route gives for this before the feed was loaded. */
     this.answer = { error, reason };
   }
 }
@@ -480,14 +482,19 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   }
   const database = db.get();
   const calendarCheck = validateCalendarId(database, localCalendarId);
-  if (calendarCheck.error) throw new TypeError(calendarCheck.error);
+  // Der Kalender wurde waehrend des Ladens geloescht (#2947): dieselbe 400 wie
+  // davor, mit dem Grund nur fuer "gibt es nicht mehr" - wie die Route.
+  if (calendarCheck.error) {
+    throw new ImportRefusedAfterFeed(calendarCheck.error,
+      calendarCheck.reason === 'calendar_selected_calendar_not_found' ? calendarCheck.reason : undefined);
+  }
   // Ebenso die Personen (#2947): die Route hat sie vor dem Laden des Feeds
   // geprueft; wer seitdem aus dem Haushalt fiel, bekommt keinen Termin.
   if (assigneeIds?.length) {
     const assigneeCheck = validateAssigneeIds(database, { assignee_user_ids: assigneeIds }, {
       listField: 'assignee_user_ids', singleField: 'assignee_user_id',
     });
-    if ('error' in assigneeCheck && assigneeCheck.error) throw new ImportAssigneesRefused(assigneeCheck.error, assigneeCheck.reason);
+    if ('error' in assigneeCheck && assigneeCheck.error) throw new ImportRefusedAfterFeed(assigneeCheck.error, assigneeCheck.reason);
   }
   // RECURRENCE-ID-Overrides zusammenführen: Master behält die Serie, geänderte
   // Einzel-Vorkommen werden eigenständige Termine statt die Serie zu killen (#549).
@@ -660,4 +667,4 @@ function remove(userId, subId, isAdmin) {
   return true;
 }
 
-export { sync, getAll, getOne, create, update, remove, importToLocal, ImportAssigneesRefused, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };
+export { sync, getAll, getOne, create, update, remove, importToLocal, ImportRefusedAfterFeed, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };

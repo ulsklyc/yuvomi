@@ -354,10 +354,17 @@ function attachmentUploadRefused(req) {
  * @param {() => void} next
  */
 export function refuseUploadWithoutDocumentsWrite(req, res, next) {
-  if (attachmentUploadRefused(req)) {
-    return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
-  }
+  if (attachmentUploadRefused(req)) return sendAttachmentUploadRefused(res);
   return next();
+}
+
+/**
+ * Die Absage von `refuseUploadWithoutDocumentsWrite`, auch fuer den Fall, dass
+ * das Schreibrecht erst waehrend des Uploads verloren ging (#2947).
+ * @param {any} res
+ */
+export function sendAttachmentUploadRefused(res) {
+  return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
 }
 
 /* WER DEN GESPEICHERTEN ANHANG NICHT SIEHT, LOEST IHN NICHT AB (#1358).

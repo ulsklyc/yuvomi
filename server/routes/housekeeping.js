@@ -12,7 +12,7 @@ import { withTx } from '../db/tx.ts';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
 import { collectErrors, color, date, datetime, num, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
-import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin, requireAdmin, stillAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
 import { MAX_WORKER_NAME, MAX_WORKER_USERNAME } from '../services/housekeeping-fields.js';
@@ -865,10 +865,17 @@ const MASKED_RECEIPTS = Object.freeze({
   }),
 });
 
-async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
+/**
+ * @param {{ username: string | null | undefined, displayName: string | null, avatarColor: string, avatarData: any,
+ *   actorUserId: number, stillAllowed: () => boolean }} worker
+ */
+async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId, stillAllowed }) {
   const finalUsername = username || `housekeeper_${Date.now()}`;
   const password = crypto.randomBytes(24).toString('base64url');
   const hash = await hashPassword(password);
+  // Das Recht gilt am Schreiben, nicht am Eingang (#2947): wer waehrend des
+  // Hashens die Administratorrolle verlor, legt kein Konto mehr an.
+  if (!stillAllowed()) return null;
   const result = db.get().prepare(`
     INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
     VALUES (?, ?, ?, ?, ?, 'member', 'other')
@@ -988,7 +995,9 @@ router.post('/worker', requireAdmin, validateRequest(), async (req, res) => {
       avatarColor,
       avatarData,
       actorUserId: actorId,
+      stillAllowed: () => stillAdmin(db.get(), req),
     });
+    if (targetUserId === null) return refuseAdmin(req, res);
 
     withTx(db.get(), () => {
       db.get().prepare(`

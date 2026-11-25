@@ -62,7 +62,7 @@ import {
   applyChildStartPermissions, INVITE_PRESET_DEFAULT,
   userForRequest,
 } from './authorize/index.ts';
-import { isAdminRequest, requireAdmin } from './middleware/require-admin.js';
+import { isAdminRequest, refuseAdmin, requireAdmin, stillAdmin } from './middleware/require-admin.js';
 import { resolveRequestModuleAccess } from './authorize/index.ts';
 import { actorForAccount, authorize } from './authorize/index.ts';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
@@ -3930,7 +3930,10 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest
 
     const hash = ssoOnly ? OIDC_PASSWORD_SENTINEL : await hashPassword(password);
 
+    // Das Recht gilt am Schreiben, nicht am Eingang (#2947): wer waehrend des
+    // Hashens die Administratorrolle verlor, legt kein Konto mehr an.
     const result = withTx(db.get(), () => {
+      if (!stillAdmin(db.get(), req)) return null;
       const created = db.get()
         .prepare(`
           INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
@@ -3953,6 +3956,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest
       });
       return created;
     });
+    if (!result) return refuseAdmin(req, res);
 
     const createdUser = adminUserRow(result.lastInsertRowid);
 

@@ -19,7 +19,7 @@
  * requireAdmin unchanged - existing imports stay valid.
  */
 
-import { actorFromRequest, authorize } from '../authorize/index.ts';
+import { actorFromRequest, authorize, requestAsOfNow } from '../authorize/index.ts';
 
 /**
  * The admin verdict of a request. Call it only after requireAuth: the actor is
@@ -57,6 +57,24 @@ export function refuseAdmin(req, res) {
     return res.status(403).json({ error: 'This is not available on a signed-in device.', code: 403, reason: 'device_credential' });
   }
   return res.status(403).json({ error: 'Admin access required.', code: 403, reason: 'admin_required' });
+}
+
+/**
+ * Is the request's account an admin NOW (#2947)? For a write that follows an
+ * await (a password hash): requireAdmin answered for the role the request
+ * arrived with. Both must hold, the verdict at entry and the one from the
+ * account as it is now - re-reading only narrows. Asked in the same
+ * synchronous step as the write; on `false`
+ * the route sends refuseAdmin(), the answer requireAdmin would have given.
+ * The connection is handed in: this module loads no database.
+ * @param {any} database
+ * @param {object} req
+ * @returns {boolean}
+ */
+export function stillAdmin(database, req) {
+  if (!manageVerdict(req).allowed) return false;
+  const now = requestAsOfNow(database, req);
+  return now !== null && manageVerdict(now).allowed;
 }
 
 /**

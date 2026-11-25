@@ -906,9 +906,9 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/calendar/google.js: checked.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['routes/calendar/caldav.js: checked.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['routes/calendar/subscriptions.js: assignees.reason', { sites: 3, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
-  // Dieselbe Pruefung nach dem Laden des Feeds (#2947, ImportAssigneesRefused
+  // Dieselben Pruefungen nach dem Laden des Feeds (#2947, ImportRefusedAfterFeed
   // in services/ics-subscription.js): dieselbe feste 400.
-  ['routes/calendar/subscriptions.js: err.answer.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
+  ['routes/calendar/subscriptions.js: err.answer.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*, calendar_selected_calendar_not_found)' }],
   ['services/calendar-occurrence-overrides.js: eligible ? null : \'ineligible_series\'', { sites: 1, at403: [],
     why: 'keine Antwort; wird zu error.code und reist mit 400' }],
   // authorize() (phase 2 B2): the Verdict type and the allowed verdict. No response:

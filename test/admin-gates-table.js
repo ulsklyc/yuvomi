@@ -337,7 +337,15 @@ export const ROWS = [
  * Gates the suite cannot reach, with the reason. Each still counts as a site.
  * @type {{ form: string, file: string, key: string, reason: string }[]}
  */
-export const EXCEPTIONS = [];
+export const EXCEPTIONS = [
+  // The same admin gate asked a second time, after the password hash (#2947):
+  // a member never gets there (the requireAdmin row of the route answers
+  // first); only an admin demoted during the hash does.
+  { form: 'inline', file: 'server/auth.js', key: 'POST /users',
+    reason: 'requireAdmin asked again after the password hash, stillAdmin() (test:password-hash, #2947)' },
+  { form: 'inline', file: 'server/routes/housekeeping.js', key: 'POST /worker',
+    reason: 'requireAdmin asked again after the password hash, stillAdmin() (test:housekeeping-routes, #2947)' },
+];
 
 /**
  * 403s behind an admin question that are NOT admin gates: "own row or admin".

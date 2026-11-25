@@ -24,6 +24,7 @@ import * as outbound from './calendar-outbound.js';
 import { dropUploadAttemptsOf } from './caldav-upload-attempts.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount, ObjectIndex } from './caldav-outbound.js';
 import { detachAccountRows } from './caldav-todo-outbound.js';
+import { accountGoneError, sameConnection } from '../utils/caldav-account-check.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { toICSDatetime, escapeICSText } from '../utils/ics-format.js';
 import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
@@ -544,44 +545,45 @@ function listAccounts() {
  * auf demselben Server bleibt ohne Passwort moeglich.
  */
 async function updateAccount(accountId, { name, caldavUrl, username, password, createClient }) {
-  const account = getAccountById(accountId);
+  let account = getAccountById(accountId);
   if (!account) {
     throw new Error(`Account ${accountId} not found.`);
   }
 
-  if (!password
-      && ((caldavUrl && !sameCredentialOrigin(caldavUrl, account.caldav_url))
-        || (username && username !== account.username))) {
-    const err = new Error('A new server or username needs the password again.');
-    err.code = 'password_required';
-    throw err;
-  }
-
-  // If credentials changed, test connection
-  const credentialsChanged =
-    (caldavUrl && caldavUrl !== account.caldav_url) ||
-    (username && username !== account.username) ||
-    (password && password !== account.password);
-
   /** @type {any[] | null} */
   let calendars = null;
-  if (credentialsChanged) {
+  // NACH DEM AWAIT NOCH EINMAL (#2947): "Passwort noetig", "anderer Server"
+  // und der Verbindungstest beruhen auf der gelesenen Zeile. Hat ein anderes
+  // Aendern sie waehrend des Tests umgestellt, faellt alles noch einmal gegen
+  // die Zeile von jetzt - sonst ginge ein Passwort, das fuer den anderen
+  // Server gespeichert wurde, mit dieser Adresse an den alten. Eine Runde mehr
+  // gibt es nur, wenn dazwischen wirklich ein anderes Schreiben lag.
+  for (;;) {
+    if (!password
+        && ((caldavUrl && !sameCredentialOrigin(caldavUrl, account.caldav_url))
+          || (username && username !== account.username))) {
+      const err = new Error('A new server or username needs the password again.');
+      err.code = 'password_required';
+      throw err;
+    }
+
+    // If credentials changed, test connection
+    const credentialsChanged =
+      (caldavUrl && caldavUrl !== account.caldav_url) ||
+      (username && username !== account.username) ||
+      (password && password !== account.password);
+    if (!credentialsChanged) break;
+
     const testUrl = caldavUrl || account.caldav_url;
     const testUser = username || account.username;
     const testPwd = password || account.password;
-
     ({ calendars } = await testConnection(testUrl, testUser, testPwd, { createClient }));
 
-    // NACH DEM AWAIT NOCH EINMAL (#2947): "Passwort noetig", "anderer Server"
-    // und der Verbindungstest beruhen auf der Zeile von oben. Hat ein anderes
-    // Aendern sie inzwischen umgestellt, faellt alles noch einmal gegen die
-    // aktuelle Zeile - sonst ginge ein Passwort, das fuer den anderen Server
-    // gespeichert wurde, mit dieser Adresse an den alten.
     const current = getAccountById(accountId);
     if (!current) throw accountGoneError(accountId);
-    if (!sameConnection(current, account)) {
-      return updateAccount(accountId, { name, caldavUrl, username, password, createClient });
-    }
+    if (sameConnection(current, account)) break;
+    account = current;
+    calendars = null;
   }
 
   // Update account
@@ -739,27 +741,6 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
 // --------------------------------------------------------
 // Calendar Selection
 // --------------------------------------------------------
-
-/**
- * Das Konto verschwand, waehrend der Server gefragt wurde (#2947). Die Route
- * antwortet darauf wie auf ein unbekanntes Konto vor der Abfrage.
- * @param {number} accountId
- */
-function accountGoneError(accountId) {
-  const err = new Error(`Account ${accountId} not found.`);
-  /** @type {any} */ (err).code = 'caldav_account_gone';
-  return err;
-}
-
-/**
- * Zeigt die Zeile noch auf denselben Server mit denselben Zugangsdaten?
- * @param {{ caldav_url: string, username: string, password: string }} current
- * @param {{ caldav_url: string, username: string, password: string }} read
- */
-function sameConnection(current, read) {
-  return current.caldav_url === read.caldav_url && current.username === read.username
-    && current.password === read.password;
-}
 
 async function getCalendars(accountId, { refresh = false, createClient } = {}) {
   const account = getAccountById(accountId);

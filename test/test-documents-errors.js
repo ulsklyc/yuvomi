@@ -222,6 +222,43 @@ test('Server: eine freigegebene Person faellt WAEHREND des Hochladens aus dem Ha
   assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
 });
 
+test('Server: die Person, um die es geht, faellt WAEHREND des Hochladens aus dem Haushalt - dieselbe 400 wie vorher, kein Dokument, keine Datei (#2947)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const { removeUser } = await import('../server/services/user-removal.js');
+  db.exec('CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired_at INTEGER NOT NULL)');
+  const member = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('cem-2947', 'Cem', '$2b$12$x', 'member')`).run().lastInsertRowid;
+  db.prepare(`INSERT INTO calendar_events (title, start_datetime, created_by)
+    VALUES ('Spur 2947 Person', '2059-01-01T09:00', ?)`).run(member);
+  const body = upload({ name: 'Ausweis 2947', subject_user_id: member });
+  const files = () => readdirSync(storageRoot, { recursive: true }).filter((name) => String(name).endsWith('.pdf'));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  const before = files().length;
+  /** @type {any} */
+  let answer;
+  _setStageUploadForTest(async (/** @type {any} */ args) => {
+    const staged = await stageDocumentUpload(args);
+    assert.equal(removeUser(db, member).outcome, 'deactivated');
+    return staged;
+  });
+  try {
+    answer = await call('POST', '', body);
+  } finally {
+    _setStageUploadForTest(null);
+  }
+  /** @type {any} */
+  let direct;
+  try {
+    direct = await call('POST', '', body);
+  } finally {
+    delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  }
+  assert.equal(direct.status, 400, JSON.stringify(direct.body));
+  assert.deepEqual([answer.status, answer.body], [400, direct.body], 'dieselbe Absage wie ohne Hochladen dazwischen');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE name = 'Ausweis 2947'").get().n, 0, 'kein Dokument');
+  assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
+});
+
 test('Server: ein Name, den es unter den Geschwistern schon gibt - anlegen, umbenennen und verschieben nennen den Fall', async () => {
   const parent = await folder('Eltern');
   await folder('Doppelt', parent);

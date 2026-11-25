@@ -75,7 +75,10 @@ class DmsDocumentUnavailableError extends Error {}
 
 /** Der Zielordner verschwand, waehrend die Datei abgelegt wurde (#1909). */
 class SelectedFolderGoneError extends Error {}
-/** Wer in der Freigabeliste nach dem Ablegen der Datei nicht mehr in Frage kommt (#2947). */
+/**
+ * Wer nach dem Ablegen der Datei nicht mehr in Frage kommt (#2947): in der
+ * Freigabeliste oder als Person, um die es geht. Dieselbe 400 wie davor.
+ */
 class AccessStrangersError extends Error {
   /** @param {number[]} strangers */
   constructor(strangers) { super('access strangers'); this.strangers = strangers; }
@@ -1385,6 +1388,10 @@ router.post('/', validateRequest(), async (req, res) => {
       // Haushalt fiel, bekommt keinen Zugriff, sondern dieselbe 400 wie vorher.
       const strangersNow = accessStrangers(allowedIds);
       if (strangersNow.length) throw new AccessStrangersError(strangersNow);
+      // Ebenso die Person, um die es geht: dieselbe Pruefung wie vSubjectUserId().
+      if (vSubjectField.value != null && !isHouseholdMember(vSubjectField.value)) {
+        throw new AccessStrangersError([vSubjectField.value]);
+      }
       const folderId = selectedFolderId ?? ensureFolder(folderKey, vFolderName.value, userId(req));
       const expiresAt = vExpiresAtField.value ?? null;
       const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
