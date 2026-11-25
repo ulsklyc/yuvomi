@@ -1585,6 +1585,29 @@ test('#2944: ein während des abgelehnten Anlegens gewähltes Ziel überlebt das
   assert.equal(reload(event.id).outbound_move_to, CAL3_URL, 'der zuletzt gewählte Kalender steht weiter an');
 });
 
+test('#2944: ein während der abgelehnten Quelllöschung gewähltes Ziel überlebt das Aufgeben', async () => {
+  // Die Kopie steht im Ziel, die Quelle lehnt ihr Löschen ab (400), und für das
+  // Objekt wartet schon der Auftrag eines anderen Kontos: der Umzug bleibt nicht
+  // vorgemerkt, sondern wird nach dem 400 aufgegeben. Während des DELETE hat der
+  // Nutzer CAL3 gewählt - das ist ein neuer Umzug.
+  reset();
+  const CAL3_URL = 'https://dav.example/cal/school/';
+  const event = seedMoved('race6@t');
+  const other = Number(db.prepare(`INSERT INTO caldav_accounts (name, caldav_url, username, password)
+              VALUES ('Andere', 'https://dav.example/', 'v', 'p')`).run().lastInsertRowid);
+  db.prepare(`INSERT INTO calendar_pending_deletions
+                (source, calendar_external_id, event_external_id, object_url, caldav_account_id)
+              VALUES ('caldav', ?, 'race6@t', ?, ?)`).run(CAL_URL, `${CAL_URL}race6@t.ics`, other);
+
+  const client = fakeClient({ onDelete: () => { retarget(event.id, CAL3_URL); throw httpError(400); } });
+  const calendars = new Map([[CAL2_URL, { url: CAL2_URL, displayName: 'Arbeit' }]]);
+  await processPendingUpdates(client, 'caldav', indexFor('race6@t'), calendars);
+
+  assert.equal(client.creates.length, 1, 'Vorbedingung: die Kopie im Ziel steht');
+  assert.equal(client.deletes.length, 1, 'Vorbedingung: das Löschen in der Quelle wurde abgelehnt');
+  assert.equal(reload(event.id).outbound_move_to, CAL3_URL, 'der zuletzt gewählte Kalender steht weiter an');
+});
+
 test('wird der Quellkalender während des Umzugs aufgeräumt, bleibt die Kopie im Ziel stehen', async () => {
   // Abwählen mit "Termine löschen" entfernt die Zeilen lokal und fasst den Anbieter
   // ausdrücklich nicht an (calendar-prune.js). Eine fehlende Zeile ist deshalb kein
