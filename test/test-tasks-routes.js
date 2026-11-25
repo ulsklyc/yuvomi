@@ -371,8 +371,8 @@ test('Schema: trg_tasks_updated_at existiert in der Migration-Kette (nicht nur i
   // Migration 1 legt den Trigger an; die Tabelle-Rebuilds (v4/v25/v114)
   // droppten ihn mit, weil `DROP TABLE` die daran hängenden Trigger mitnimmt,
   // und Migration 283 stellt ihn wieder her. Die Prüfung läuft gegen die echte
-  // Migration-Kette - der Testspiegel (db-schema-test.js) hatte den Trigger
-  // weiter, was den Verlust deshalb unentdeckt ließ.
+  // Migration-Kette - der fruehere handgepflegte Testspiegel hatte den
+  // Trigger weiter, was den Verlust deshalb unentdeckt ließ.
   const trigger = db.prepare(
     "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_tasks_updated_at'"
   ).get();

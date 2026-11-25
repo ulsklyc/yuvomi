@@ -6,7 +6,7 @@
  *        Eine Suite, die einen Altzustand braucht, faehrt die ECHTEN
  *        Migrationen bis Version K von Null, legt ihre alten Zeilen an und
  *        faehrt dann mit migrateTo() weiter. Eine Handkopie des Schemas gibt
- *        es nicht mehr (frueher server/db-schema-test.js).
+ *        es nicht mehr.
  *
  * Gedeckt durch test:schema-baseline (Treiber-Matrix: dieselbe Funktion
  * migrateOnNodeSqlite faehrt dort alle Migrationen von Null und die Baseline

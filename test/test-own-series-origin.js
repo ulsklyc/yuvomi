@@ -839,7 +839,7 @@ test('jedes INSERT in calendar_events nennt series_authored oder ist ein Abruf',
   const root = new URL('../server/', import.meta.url);
   const files = readdirSync(root, { recursive: true }).map(String)
     // .ts too: phase 2 puts server code in TypeScript (server/authorize/, server/table-owners.ts).
-    .filter((name) => /\.(js|ts)$/.test(name) && !/^db(-schema-test)?\.js$/.test(name));
+    .filter((name) => /\.(js|ts)$/.test(name) && !/^db\.js$/.test(name));
   const sites = [];
   for (const name of files) {
     const source = readFileSync(new URL(name, root), 'utf8');

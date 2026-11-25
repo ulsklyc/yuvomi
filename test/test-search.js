@@ -99,7 +99,8 @@ db.prepare(`INSERT INTO waste_types (name, color, archived) VALUES ('Cake-day or
 test('search_index und die Such-Trigger jeder durchsuchten Tabelle stehen', () => {
   const tbl = db.prepare(`SELECT name FROM sqlite_master WHERE name = 'search_index'`).get();
   assert(tbl, 'search_index sollte existieren');
-  const triggers = db.prepare(`SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_search_%'`).all();
+  const triggers = /** @type {{ name: string, tbl_name: string }[]} */ (
+    db.prepare(`SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_search_%'`).all());
   /** @type {Record<string, string[]>} */
   const kinds = {};
   for (const t of triggers) (kinds[t.tbl_name] ??= []).push(t.name.slice(t.name.lastIndexOf('_') + 1));
@@ -575,9 +576,8 @@ test('Wortteil ist gedeckelt: hoechstens INFIX_TERM_CAP zusaetzliche Woerter je 
 
 // --------------------------------------------------------------------------
 // TREFFERARTEN OHNE FTS-INDEX (runTableSearch): Rezepte, Vorrat, Inventar,
-// Dokumente, Geburtstage, Budget. Gegen das ECHTE Schema (alle Migrationen),
-// nicht gegen den Auszug in db-schema-test.js - die Sichtbarkeitsspalten von
-// Dokumenten und Budget kamen spaet und stehen dort nicht.
+// Dokumente, Geburtstage, Budget. Alle Migrationen von Null auf dem
+// Cipher-Treiber wie in Produktion.
 // --------------------------------------------------------------------------
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'search-test-secret';

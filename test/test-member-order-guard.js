@@ -74,8 +74,8 @@ export function nameOrderings(source) {
   return hits;
 }
 
-// Migrationen und ihr Testspiegel sind Geschichte, die OpenAPI-Texte Prosa.
-const SKIP = new Set(['server/db.js', 'server/db-schema-test.js']);
+// Migrationen sind Geschichte, die OpenAPI-Texte Prosa.
+const SKIP = new Set(['server/db.js']);
 
 test('self-test: the reader finds a name ordering, on one line and continued over two', () => {
   assert.equal(nameOrderings('SELECT 1 FROM users u\n ORDER BY u.display_name COLLATE NOCASE ASC').length, 1);

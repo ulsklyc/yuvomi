@@ -130,7 +130,11 @@ function createDatabase() {
   return database;
 }
 
-/** An Outlook account with the columns the schema requires (tokens are placeholders). */
+/**
+ * An Outlook account with the columns the schema requires (tokens are placeholders).
+ * @param {import('node:sqlite').DatabaseSync} database
+ * @param {{ id: number, autoSyncCalendarId?: string | null, ownerUserId?: number | null }} account
+ */
 function insertOutlookAccount(database, { id, autoSyncCalendarId = null, ownerUserId = null }) {
   database.prepare(`
     INSERT INTO outlook_accounts
