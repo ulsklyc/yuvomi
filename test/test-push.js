@@ -538,6 +538,39 @@ test('scheduler pushes only due, undismissed, unpushed reminders and marks them'
   assert.equal(webpush.calls.length, 1);
 });
 
+test('a scheduler tick while a run is still going does not start a second run (#2942)', async (t) => {
+  // Der Lauf wartet auf einen langsamen Push-Dienst laenger als ein Intervall;
+  // der naechste Tick findet ihn noch laufend und tut nichts.
+  const { startScheduler } = await import('../server/services/push-scheduler.js');
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  /** @type {Array<{ resolve: (value: unknown) => void, reject: (err: Error) => void }>} */
+  const pending = [];
+  const job = () => new Promise((resolve, reject) => { pending.push({ resolve, reject }); });
+  // Den Abschluss eines Laufs (runExternalJob, catch, Riegel loesen) durchlaufen lassen.
+  const settle = async () => { for (let i = 0; i < 10; i += 1) await Promise.resolve(); };
+  startScheduler({ job });
+
+  t.mock.timers.tick(10_000);
+  assert.equal(pending.length, 1, 'the first tick starts a run');
+  t.mock.timers.tick(60_000);
+  t.mock.timers.tick(60_000);
+  assert.equal(pending.length, 1, 'ticks during a run start nothing');
+
+  pending[0].resolve({ sent: 0 });
+  await settle();
+  t.mock.timers.tick(60_000);
+  assert.equal(pending.length, 2, 'the next tick after the run ends starts a new one');
+
+  // Ein Lauf, der scheitert, gibt den Scheduler ebenso wieder frei.
+  pending[1].reject(new Error('push service down'));
+  await settle();
+  t.mock.timers.tick(60_000);
+  assert.equal(pending.length, 3, 'a failed run does not block the next tick');
+  pending[2].resolve({ sent: 0 });
+  await settle();
+  t.mock.timers.reset();
+});
+
 test('scheduler marks pushed_at even when user has no subscriptions', async () => {
   const db = makeDb();
   const webpush = makeWebpushMock();

@@ -14,12 +14,20 @@ export async function processDuePushes(options = {}) {
   return { ...result, pushed: result.sent + result.skipped };
 }
 
-export function startScheduler() {
+/** @param {{ job?: () => Promise<unknown> }} [opts] - `job` is for tests. */
+export function startScheduler({ job = () => processDuePushes() } = {}) {
   // Versendet nach aussen und vermerkt es danach: waehrend eines Restores
   // beginnt kein Lauf, ein laufender wird abgewartet (Codex-Befund in #1431).
+  // Ein Lauf zur Zeit (#2942): dauert einer laenger als das Intervall (ein
+  // langsamer Push-Dienst oder Kanal), laesst der naechste Tick ihn zu Ende
+  // laufen, statt dieselben Zustellungen noch einmal anzufangen.
+  let running = false;
   const run = () => {
-    runExternalJob(() => processDuePushes())
-      .catch((err) => log.error('Push scheduler run failed:', err?.message || err));
+    if (running) return;
+    running = true;
+    runExternalJob(job)
+      .catch((err) => log.error('Push scheduler run failed:', err?.message || err))
+      .finally(() => { running = false; });
   };
   setTimeout(run, 10_000).unref();
   setInterval(run, 60_000).unref();

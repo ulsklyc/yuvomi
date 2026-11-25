@@ -765,6 +765,207 @@ test('notification processor fans out and deduplicates reminder deliveries', asy
   assert.deepEqual(calls, { webpush: 1, gotify: 1, ntfy: 1 });
 });
 
+test('a second run while a delivery is still sending does not send it again (#2942)', async () => {
+  // Lauf A wartet auf den Push-Dienst; Lauf B startet in dieser Zeit (der
+  // naechste Scheduler-Tick oder ein zweiter Aufrufer), liest dieselbe noch
+  // offene Zustellung und darf sie nicht ein zweites Mal senden.
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Müll rausbringen', 1)").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (1, 'https://push/ok', 'p', 'a')").run();
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1)")
+    .run(pastIso());
+  /** @type {Array<(sent: number) => void>} */
+  const pending = [];
+  /** @type {any} */
+  const pushService = {
+    sendPushToUser: () => new Promise((resolve) => { pending.push(resolve); }),
+  };
+  /** @type {any} */
+  const providers = {};
+
+  const runA = processDueNotifications({ database: db, channelStore: store, pushService, providers, now: new Date() });
+  const runB = processDueNotifications({ database: db, channelStore: store, pushService, providers, now: new Date() });
+  const sendsWhileOpen = pending.length;
+  for (const resolve of pending) resolve(1);
+  const [a, b] = await Promise.all([runA, runB]);
+
+  assert.equal(sendsWhileOpen, 1, 'the second run must not send the delivery the first one is sending');
+  assert.equal(a.sent + b.sent, 1);
+  const rows = db.prepare('SELECT status, attempt_count FROM notification_deliveries WHERE reminder_id = 1').all();
+  assert.deepEqual(rows.map((row) => ({ ...row })), [{ status: 'sent', attempt_count: 1 }]);
+  assert.notEqual(db.prepare('SELECT pushed_at FROM reminders WHERE id = 1').get()?.pushed_at, null);
+});
+
+// WAS SICH WAEHREND DES SENDENS AENDERT, GILT (#2942). Der Push-Dienst haelt
+// den ersten Versand offen; in der Zeit aendert `whileSending` die Datenbank,
+// danach laeuft der Lauf weiter. Kein Timer: der Test loest das Promise selbst.
+/**
+ * @param {any} db @param {any} store @param {() => void} whileSending
+ * @param {{ providers?: any }} [opts]
+ */
+async function runWhileSending(db, store, whileSending, { providers = {} } = {}) {
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  /** @type {Array<(sent: number) => void>} */
+  const pending = [];
+  /** @type {number[]} */
+  const pushes = [];
+  /** @type {any} */
+  const pushService = {
+    sendPushToUser: (/** @type {number} */ userId) => {
+      pushes.push(userId);
+      if (pushes.length > 1) return Promise.resolve(1);
+      return new Promise((resolve) => { pending.push(resolve); });
+    },
+  };
+  const run = processDueNotifications({ database: db, channelStore: store, pushService, providers, now: new Date() });
+  assert.equal(pending.length, 1, 'the run waits on its first push');
+  whileSending();
+  pending[0](1);
+  await run;
+  return { pushes };
+}
+
+function channelCounter() {
+  /** @type {string[]} */
+  const heard = [];
+  /** @type {any} */
+  const providers = {
+    ntfy: { id: 'ntfy', send: async (/** @type {any} */ { channel }) => { heard.push(channel.name); return { ok: true, status: 200 }; } },
+  };
+  return { heard, providers };
+}
+
+// Vor pastIso(): legt die Reihenfolge zweier faelliger Zeilen fest.
+const earlierIso = () => new Date(Date.now() - 120_000).toISOString();
+/** @param {any} db @param {number} reminderId */
+const deliveryRows = (db, reminderId) => db.prepare(
+  'SELECT provider, status FROM notification_deliveries WHERE reminder_id = ? ORDER BY provider',
+).all(reminderId).map((/** @type {any} */ row) => ({ ...row }));
+/** @param {any} db @param {number} reminderId */
+const pushedAt = (db, reminderId) => db.prepare('SELECT pushed_at FROM reminders WHERE id = ?').get(reminderId)?.pushed_at ?? null;
+
+test('a reminder deleted while an earlier one is sending is not sent (#2942)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Eins', 1), (2, 'Zwei', 2)").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (1, 'https://push/a', 'p', 'a'), (2, 'https://push/b', 'p', 'a')").run();
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1), (2, 'task', 2, ?, 2)")
+    .run(earlierIso(), pastIso());
+
+  const { pushes } = await runWhileSending(db, store, () => {
+    db.prepare('DELETE FROM reminders WHERE id = 2').run();
+  });
+
+  assert.deepEqual(pushes, [1], 'only the first reminder goes out');
+  assert.deepEqual(deliveryRows(db, 2), []);
+  assert.notEqual(pushedAt(db, 1), null);
+});
+
+test('a reminder moved to later while an earlier one is sending keeps waiting (#2942)', async () => {
+  // Die zweite Zeile hat kein Ziel: ohne neue Frage vermerkte der Lauf sie als
+  // erledigt, und der neue Zeitpunkt meldete sich nie.
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Eins', 1), (2, 'Zwei', 2)").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (1, 'https://push/a', 'p', 'a')").run();
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1), (2, 'task', 2, ?, 2)")
+    .run(earlierIso(), pastIso());
+
+  await runWhileSending(db, store, () => {
+    db.prepare('UPDATE reminders SET remind_at = ? WHERE id = 2').run(futureIso());
+  });
+
+  assert.equal(pushedAt(db, 2), null);
+  assert.notEqual(pushedAt(db, 1), null);
+});
+
+test('a module revoked while a reminder is sending stops its remaining targets (#2942)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const channel = store.createChannel({ provider: 'ntfy', name: 'Bob', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'bob' }, secrets: {} });
+  db.prepare("UPDATE notification_channels SET scope = 'user', user_id = 2 WHERE id = ?").run(channel.id);
+  db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Eins', 2)").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (2, 'https://push/b', 'p', 'a')").run();
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 2)").run(pastIso());
+  const { heard, providers } = channelCounter();
+
+  await runWhileSending(db, store, () => {
+    db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+      VALUES ('user', '2', 'module', 'tasks', 'none')`).run();
+  }, { providers });
+
+  assert.deepEqual(heard, [], 'the channel does not hear a reminder its module was revoked for');
+  assert.deepEqual(deliveryRows(db, 1), [{ provider: 'webpush', status: 'sent' }]);
+  assert.equal(pushedAt(db, 1), null, 'the row stays pending until the module is back');
+});
+
+test('a channel switched off between two targets of a reminder does not hear it (#2942)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const channel = store.createChannel({ provider: 'ntfy', name: 'Familie', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
+  db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Eins', 1)").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (1, 'https://push/a', 'p', 'a')").run();
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1)").run(pastIso());
+  const { heard, providers } = channelCounter();
+
+  await runWhileSending(db, store, () => {
+    db.prepare('UPDATE notification_channels SET enabled = 0 WHERE id = ?').run(channel.id);
+  }, { providers });
+
+  assert.deepEqual(heard, []);
+  assert.deepEqual(deliveryRows(db, 1), [{ provider: 'webpush', status: 'sent' }]);
+  assert.notEqual(pushedAt(db, 1), null, 'a channel that is gone does not keep the row pending');
+});
+
+test('a personal channel turned into a household one does not hear a private reminder (#2942)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const channel = store.createChannel({ provider: 'ntfy', name: 'Bob', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'bob' }, secrets: {} });
+  db.prepare("UPDATE notification_channels SET scope = 'user', user_id = 2 WHERE id = ?").run(channel.id);
+  db.prepare("INSERT INTO tasks (id, title, created_by, visibility) VALUES (1, 'Privat', 2, 'private')").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (2, 'https://push/b', 'p', 'a')").run();
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 2)").run(pastIso());
+  const { heard, providers } = channelCounter();
+
+  await runWhileSending(db, store, () => {
+    db.prepare("UPDATE notification_channels SET scope = 'household', user_id = NULL WHERE id = ?").run(channel.id);
+  }, { providers });
+
+  assert.deepEqual(heard, []);
+  assert.deepEqual(deliveryRows(db, 1), [{ provider: 'webpush', status: 'sent' }]);
+});
+
+test('a household channel that heard the same event through a sibling row meanwhile stays quiet (#2942)', async () => {
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  const channel = store.createChannel({ provider: 'ntfy', name: 'Familie', enabled: true, config: { baseUrl: 'https://ntfy.test', topic: 'family' }, secrets: {} });
+  db.prepare("INSERT INTO calendar_events (id, title, created_by) VALUES (1, 'Elternabend', 1)").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (1, 'https://push/a', 'p', 'a')").run();
+  const remindAt = pastIso();
+  // Zeile 1 ist die von Alice; Zeile 2 die Geschwisterzeile von Bob, schon erledigt.
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'event', 1, ?, 1)").run(remindAt);
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by, pushed_at) VALUES (2, 'event', 1, ?, 2, ?)")
+    .run(remindAt, remindAt);
+  const { heard, providers } = channelCounter();
+
+  await runWhileSending(db, store, () => {
+    db.prepare(`INSERT INTO notification_deliveries (reminder_id, provider, channel_id, target_key, status, created_at, updated_at)
+      VALUES (2, 'ntfy', ?, ?, 'sent', ?, ?)`).run(channel.id, `channel:${channel.id}`, remindAt, remindAt);
+  }, { providers });
+
+  assert.deepEqual(heard, [], 'the household heard this event once already');
+  assert.deepEqual(deliveryRows(db, 1), [{ provider: 'webpush', status: 'sent' }]);
+});
+
 test('subscription reminders carry name, amount and renewal date as body (#581)', async () => {
   const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
   const { processDueNotifications } = await import('../server/services/notifications.js');
