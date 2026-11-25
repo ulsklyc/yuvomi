@@ -1060,7 +1060,7 @@ test('the DOC-CONTENT fixture gives exactly its marked lines, migrations and tes
     // template string is reported there, not at its end).
     const marked = files.flatMap((file) => readFileSync(join(dir, file), 'utf8').split('\n')
       .flatMap((line, i) => (/(\/\/|\/\*) doc-\d+/.test(line) ? [`${file}:${i + 1} DOC-CONTENT`] : []))).sort();
-    assert.equal(marked.length, 5, 'the fixture marks five spellings');
+    assert.equal(marked.length, 14, 'the fixture marks fourteen spellings');
     const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
     const found = JSON.parse(r.stdout).diagnostics
       .filter((/** @type {{ code: string }} */ d) => d.code.includes('no-restricted-syntax'))
