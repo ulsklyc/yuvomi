@@ -195,7 +195,44 @@ test('ein zu grosser Diff wird an einer Zeilengrenze gekuerzt, nie mitten in ein
   assert.ok(rest.length <= 200_000 && rest.length > 0);
   assert.equal(rest.at(-1), 0x0a, 'endet nicht auf einer Zeilengrenze');
   assert.equal(new TextDecoder('utf-8', { fatal: true }).decode(rest), `${'x'.repeat(199_950)}\n`);
+  // Eine einzige riesige Zeile (minifizierte Datei): kein leerer Diff,
+  // sondern Schnitt an der letzten vollstaendigen Zeichengrenze.
+  const lang = kuerze(`+${'ä'.repeat(100_010)}`);
+  assert.equal(lang.marke, 'yes');
+  assert.ok(lang.rest.length > 199_990 && lang.rest.length <= 200_000, `Rest ${lang.rest.length} Byte`);
+  assert.equal(new TextDecoder('utf-8', { fatal: true }).decode(lang.rest), `+${'ä'.repeat(99_999)}`);
   const klein = kuerze('+a\n');
   assert.equal(klein.marke, 'no');
   assert.equal(klein.rest.toString(), '+a\n');
+});
+
+test('gepostet wird nur eine vollstaendige Antwort (finish_reason stop)', (t) => {
+  // Mistral-Review #2965: nur "length" brach ab; "model_length" oder "error"
+  // haetten einen halben Text gepostet. Die API kennt stop, length,
+  // model_length, error und tool_calls; vollstaendig ist nur stop.
+  const pruefung = workflow.match(/# ANTWORT-ANFANG\n([\s\S]*?)\n\s*# ANTWORT-ENDE/)?.[1];
+  assert.ok(pruefung, 'Antwortpruefung nicht gefunden');
+  try {
+    execFileSync('bash', ['--version'], { stdio: 'ignore' });
+    execFileSync('jq', ['--version'], { stdio: 'ignore' });
+  } catch {
+    t.skip('bash oder jq ist nicht installiert');
+    return;
+  }
+  const dir = tempDir('yuvomi-mistral-antwort-');
+  /** @param {string} grund @param {unknown} content */
+  const laeuft = (grund, content) => {
+    writeFileSync(join(dir, 'antwort.json'), JSON.stringify({ choices: [{ finish_reason: grund, message: { content } }] }));
+    try {
+      execFileSync('bash', ['-euo', 'pipefail', '-c', pruefung], { env: { ...process.env, RUNNER_TEMP: dir }, stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  assert.equal(laeuft('stop', 'Befund A'), true);
+  for (const grund of ['length', 'model_length', 'error', 'tool_calls', '']) {
+    assert.equal(laeuft(grund, 'halber Befu'), false, `finish_reason "${grund}" wurde gepostet`);
+  }
+  assert.equal(laeuft('stop', ''), false, 'leere Antwort wurde gepostet');
 });

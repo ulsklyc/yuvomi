@@ -57,12 +57,20 @@ jobs:
             > "$RUNNER_TEMP/pr.json"
           gh pr diff "$PR" --repo "$REPO" > "$RUNNER_TEMP/diff.patch"
           # Riesige Diffs (Lockfiles) werden abgeschnitten; der Prompt sagt es.
-          # Geschnitten wird an der letzten vollen Zeile: ein Schnitt mitten im
-          # Byte-Strom teilt ein Mehrbyte-Zeichen, und jq bekaeme ungueltiges UTF-8.
+          # Geschnitten wird an der letzten vollen Zeile, bei einer einzigen
+          # riesigen Zeile (minifizierte Datei) an der letzten vollen
+          # Zeichengrenze: ein Schnitt mitten im Byte-Strom teilt ein
+          # Mehrbyte-Zeichen, und jq bekaeme ungueltiges UTF-8.
           # KUERZUNG-ANFANG
           abgeschnitten=no
           if [ "$(wc -c < "$RUNNER_TEMP/diff.patch")" -gt 200000 ]; then
-            head -c 200000 "$RUNNER_TEMP/diff.patch" | LC_ALL=C sed '$d' > "$RUNNER_TEMP/diff-kurz.patch"
+            head -c 200000 "$RUNNER_TEMP/diff.patch" | python3 -I -c '
+          import sys
+          d = sys.stdin.buffer.read()
+          i = d.rfind(b"\n")
+          d = d[: i + 1] if i >= 0 else d
+          sys.stdout.buffer.write(d.decode("utf-8", "ignore").encode("utf-8"))
+          ' > "$RUNNER_TEMP/diff-kurz.patch"
             mv "$RUNNER_TEMP/diff-kurz.patch" "$RUNNER_TEMP/diff.patch"
             abgeschnitten=yes
           fi
@@ -167,11 +175,13 @@ jobs:
             -o "$RUNNER_TEMP/antwort.json"
           # Mit Reasoning ist content eine Liste aus "thinking"- und
           # "text"-Teilen, ohne ein String; gepostet wird nur die Antwort,
-          # nie die Denkspur. Reicht max_tokens nicht, endet der Lauf mit
-          # finish_reason "length" und einer halben oder fehlenden Antwort.
+          # nie die Denkspur. Vollstaendig ist eine Antwort nur mit
+          # finish_reason "stop"; length, model_length, error und tool_calls
+          # hinterlassen eine halbe oder fehlende Antwort.
+          # ANTWORT-ANFANG
           grund=$(jq -r '.choices[0].finish_reason // ""' "$RUNNER_TEMP/antwort.json")
-          if [ "$grund" = "length" ]; then
-            echo "::error::Die Mistral-Antwort brach an max_tokens ab (finish_reason length)."
+          if [ "$grund" != "stop" ]; then
+            echo "::error::Die Mistral-Antwort ist unvollstaendig (finish_reason ${grund:-fehlt})."
             exit 1
           fi
           text=$(jq -r '.choices[0].message.content | if type == "string" then . else [.[]? | select(.type == "text") | .text] | join("") end' "$RUNNER_TEMP/antwort.json")
@@ -179,6 +189,7 @@ jobs:
             echo "::error::Die Mistral API lieferte keinen Review-Text."
             exit 1
           fi
+          # ANTWORT-ENDE
           kopf=$(jq -r '.headRefOid // ""' "$RUNNER_TEMP/pr.json")
           {
             echo "#### Mistral Code Review ($MISTRAL_MODELL, Commit \`${kopf:0:12}\`)"
