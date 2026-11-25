@@ -15,7 +15,8 @@
  *
  * Dependencies: server/db.js, ./recipe-providers/index.js, ./household-modules.js
  */
-import { runExternalJob } from '../utils/restore-state.js';
+import { runExternalJob, SKIPPED_FOR_RESTORE } from '../utils/restore-state.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { withTx } from '../db/tx.ts';
@@ -37,6 +38,21 @@ function getEnabledAccounts() {
 
 function getAccountById(id) {
   return db.get().prepare('SELECT * FROM recipe_provider_accounts WHERE id = ?').get(id);
+}
+
+/**
+ * Was ein Lauf meldet, dessen Konto nicht mehr da ist (#2945): geloescht, waehrend
+ * er am Riegel wartete oder waehrend der Detailabrufe, oder fuer den Lauf aller
+ * Konten inzwischen abgeschaltet. Er hat nichts geschrieben.
+ */
+const ACCOUNT_GONE = Object.freeze({ gone: true });
+
+/** Der Fehler von syncOne(), wenn das Konto fehlt; die Route antwortet darauf 404. */
+export class RecipeProviderAccountGoneError extends Error {
+  constructor() {
+    super('Recipe provider account not found.');
+    this.name = 'RecipeProviderAccountGoneError';
+  }
 }
 
 /**
@@ -190,7 +206,13 @@ async function syncAccount(account) {
   let imported = 0;
   let updated = 0;
 
-  withTx(conn, () => {
+  // Das Konto kann waehrend der Detailabrufe geloescht worden sein (#2945): dann
+  // nimmt die Kaskade seine Rezepte mit, und ein Insert wuerde am Fremdschluessel
+  // werfen und den Lauf aller Konten abbrechen. Geprueft im selben synchronen
+  // Abschnitt wie das Schreiben.
+  const accountExists = conn.prepare('SELECT 1 FROM recipe_provider_accounts WHERE id = ?');
+  const written = withTx(conn, () => {
+    if (!accountExists.get(account.id)) return false;
     for (const { current, detail, recipeUrl } of toUpsert) {
       const hasImage = detail.hasImage ? 1 : 0;
       // Portionen der Quelle (#2558, #2355); der Adapter liefert nur 1-99 oder null.
@@ -214,9 +236,43 @@ async function syncAccount(account) {
     }
     for (const r of urlRefresh) updUrl.run(r.recipeUrl, r.id);
     for (const r of stale) delRecipe.run(r.id);
+    return true;
   });
+  if (!written) return ACCOUNT_GONE;
 
   return { imported, updated, deleted: stale.length, failed: false };
+}
+
+/**
+ * Ein Lauf je Konto, nie zwei gleichzeitig (#2945). syncAccount entscheidet
+ * ueber Anlegen und Loeschen auf der Liste und den Zeilen, die es VOR den
+ * Detailabrufen gelesen hat. Laeuft dazwischen ein zweiter Lauf fuer dasselbe
+ * Konto (Stundenlauf und "Jetzt synchronisieren"), loescht der erste ein
+ * Rezept, das der zweite gerade importiert hat, oder legt es ein zweites Mal
+ * an und scheitert am eindeutigen Index. Ein Aufruf waehrend eines Laufs
+ * wartet auf genau einen Nachlauf (server/utils/sync-lock.js).
+ *
+ * Der Schluessel ist das Konto: der Stundenlauf haelt ihn nur fuer das eine
+ * Konto, das er gerade abarbeitet, nie zwei auf einmal.
+ *
+ * Das Konto wird erst gelesen, wenn der Lauf dran ist: was ein Admin in der
+ * Wartezeit aendert (URL, Token, abschalten, loeschen), gilt. Der Lauf aller
+ * Konten nimmt nur ein noch eingeschaltetes, "Jetzt synchronisieren" jedes
+ * vorhandene; fehlt es, liefert der Lauf ACCOUNT_GONE. Getrennte Arten, damit
+ * der eine Aufrufer nie den Nachlauf des anderen mit dessen Regel bekommt.
+ *
+ * Beginnt ein Restore, waehrend der Lauf wartet, liefert er SKIPPED_FOR_RESTORE
+ * statt eines Ergebnisses; die Aufrufer schreiben dann nichts auf das Konto.
+ *
+ * @param {number} accountId
+ * @param {{ enabledOnly: boolean }} options
+ */
+function syncAccountSerialized(accountId, { enabledOnly }) {
+  return runSerialized(`recipe-provider:${accountId}`, enabledOnly ? 'sync-enabled' : 'sync-one', () => {
+    const account = getAccountById(accountId);
+    if (!account || (enabledOnly && !account.enabled)) return ACCOUNT_GONE;
+    return syncAccount(account);
+  });
 }
 
 /**
@@ -336,7 +392,8 @@ async function syncUntracked() {
   let successfulAccounts = 0;
 
   for (const account of accounts) {
-    const result = await syncAccount(account);
+    const result = await syncAccountSerialized(account.id, { enabledOnly: true });
+    if (result === SKIPPED_FOR_RESTORE || result === ACCOUNT_GONE) continue;
     if (recordAccountResult(account, result)) successfulAccounts++;
     totalImported += result.imported;
     totalUpdated += result.updated;
@@ -357,11 +414,10 @@ export function syncOne(accountId) {
 }
 
 async function syncOneUntracked(accountId) {
-  const account = getAccountById(accountId);
-  if (!account) throw new Error('Recipe provider account not found.');
-
-  const result = await syncAccount(account);
-  recordAccountResult(account, result);
+  const result = await syncAccountSerialized(accountId, { enabledOnly: false });
+  if (result === SKIPPED_FOR_RESTORE) return result;
+  if (result === ACCOUNT_GONE) throw new RecipeProviderAccountGoneError();
+  recordAccountResult({ id: accountId }, result);
   return result;
 }
 

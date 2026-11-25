@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **A recipe provider sync no longer deletes a recipe another sync just imported.** When the
+  hourly sync and "Sync now" ran for the same Mealie or Tandoor account at the same time, one of
+  them could delete a recipe the other had just imported, so the meal plan lost its link to it,
+  or both tried to add the same recipe and the sync ended with an error, skipping the remaining
+  accounts. Now only one sync runs per account at a time; a second one waits for it and then
+  runs once, with the account's address and token as they are when it starts. An account that
+  is deleted meanwhile is skipped and the other accounts are still synced ("Sync now" answers
+  that the account was not found); an account switched off meanwhile is left out of the sync of
+  all accounts.
 - **A calendar chosen for an event while its changes are being sent is kept.** When several
   events waited to go out to Google Calendar or a CalDAV server, a calendar picked for one of
   them while an earlier one was still being sent could be dropped, and the event stayed where it

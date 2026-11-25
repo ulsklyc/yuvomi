@@ -464,3 +464,42 @@ test('DELETE /accounts/:id: unbekannter Account → 404', async () => {
   assert.equal(r.status, 404);
   assert.equal(r.body.reason, 'recipe_providers_account_not_found', '#1909');
 });
+
+// Ein Konto, das geloescht wird, waehrend sein Sync am Riegel wartet, antwortet
+// wie ein Konto, das schon vorher fehlte - nicht 500 (#2945). Der Handler wird
+// direkt gerufen: er laeuft synchron bis in die Warteschlange, die Loeschung
+// liegt damit sicher zwischen seinem Lesen und seinem Lauf.
+test('POST /accounts/:id/sync: Konto in der Wartezeit geloescht -> 404 wie vorher (#2945)', async () => {
+  const { syncOne } = await import('../server/services/recipe-provider-sync.js');
+  const id = db.prepare(`
+    INSERT INTO recipe_provider_accounts (name, base_url, api_token, provider, created_by, enabled) VALUES ('Weg', 'https://weg.example.com', 'tok', 'mealie', ?, 0)
+  `).run(ADMIN).lastInsertRowid;
+  /** @type {(err: Error) => void} */
+  let failList = () => {};
+  const firstList = new Promise((_resolve, reject) => { failList = reject; });
+  let n = 0;
+  const later = fakeAdapter({ recipes: /** @type {any} */ ([{ id: 'r', ref: 'r', updatedAt: 't1', slug: 'r', title: 'R', notes: null, hasImage: false, ingredients: [] }]) });
+  _setAdapterFactory(() => {
+    const adapter = later();
+    return n++ === 0 ? { ...adapter, listRecipeSummaries: () => firstList } : adapter;
+  });
+
+  const layer = /** @type {any} */ (recipeProvidersRouter).stack.find((/** @type {any} */ l) => l.route?.path === '/accounts/:id/sync' && l.route.methods.post);
+  const handler = layer.route.stack.at(-1).handle;
+  /** @type {{ statusCode: number, body: any, status: (c: number) => any, json: (b: any) => any }} */
+  const res = {
+    statusCode: 200, body: null,
+    status(c) { this.statusCode = c; return this; },
+    json(b) { this.body = b; return this; },
+  };
+
+  const runA = syncOne(Number(id));
+  const pending = handler({ params: { id: String(id) } }, res);
+  db.prepare('DELETE FROM recipe_provider_accounts WHERE id = ?').run(id);
+  failList(new Error('network down'));
+  await runA;
+  await pending;
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.reason, 'recipe_providers_account_not_found');
+});
