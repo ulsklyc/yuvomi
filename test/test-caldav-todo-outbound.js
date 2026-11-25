@@ -813,6 +813,68 @@ test('Der Inbound legt einen lokal gelöschten Eintrag nicht wieder an', async (
   assert.strictEqual(pendingDeletions(accountId, 'tasks').length, 0);
 });
 
+/**
+ * Attrappe, deren Abruf der Test selbst freigibt (#2941): `started` löst sich,
+ * sobald der Lauf auf die Objekte wartet; bis `release()` kann der Test eine
+ * lokale Änderung dazwischen schieben, wie ein Request während des Abrufs.
+ */
+function gatedClient(/** @type {any} */ objects) {
+  const client = fakeClient({ objects });
+  /** @type {() => void} */
+  let markStarted = () => {};
+  /** @type {() => void} */
+  let release = () => {};
+  const started = new Promise((resolve) => { markStarted = () => resolve(undefined); });
+  const gate = new Promise((resolve) => { release = () => resolve(undefined); });
+  const fetch = client.fetchCalendarObjects;
+  client.fetchCalendarObjects = async (args) => {
+    markStarted();
+    await gate;
+    return fetch(args);
+  };
+  return { client, started, release };
+}
+
+// Typisiert für die beiden Fälle darunter; der Import liefert `sync` ohne Signatur.
+const syncWith = /** @type {(opts: { createClient: () => Promise<any> }) => Promise<any>} */ (sync);
+const seedTask = (/** @type {number} */ accountId) => insertTask(/** @type {any} */ ({ accountId }));
+
+test('Eine Bearbeitung während des Abrufs überschreibt der Inbound nicht (#2941)', async () => {
+  const accountId = reset();
+  enableList(accountId, 'tasks');
+  const task = seedTask(accountId);
+
+  const { client, started, release } = gatedClient([{ url: OBJ_URL, etag: 'e1', data: serverTodo() }]);
+  const running = syncWith({ createClient: async () => client });
+  await started;
+  // Der Lauf hat die wartenden Aufträge schon gelesen; jetzt bearbeitet jemand.
+  db.prepare("UPDATE tasks SET title = 'Hafermilch kaufen', outbound_dirty = 1 WHERE id = ?").run(task.id);
+  release();
+  await running;
+
+  assert.strictEqual(reloadTask(task.id).title, 'Hafermilch kaufen', 'der alte Serverstand darf nicht zurückschlagen');
+  const pushed = /** @type {Array<{ data: string }>} */ (client.calls.updated);
+  assert.ok(pushed.length === 1 && pushed[0].data.includes('SUMMARY:Hafermilch kaufen'),
+    'hinauf geht die Bearbeitung, nicht der überschriebene Stand');
+});
+
+test('Eine Löschung während des Abrufs legt der Inbound nicht wieder an (#2941)', async () => {
+  const accountId = reset();
+  enableList(accountId, 'tasks');
+  const task = seedTask(accountId);
+
+  const { client, started, release } = gatedClient([{ url: OBJ_URL, etag: 'e1', data: serverTodo() }]);
+  const running = syncWith({ createClient: async () => client });
+  await started;
+  queueTodoDeletion('tasks', task);
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(task.id);
+  release();
+  await running;
+
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS n FROM tasks').get().n, 0, 'kein Wiedergänger');
+  assert.strictEqual(client.calls.deleted.length, 1, 'stattdessen geht die Löschung raus');
+});
+
 test('Der Inbound trägt die Objekt-URL nach, ohne sie je zu entwerten', async () => {
   const accountId = reset();
   enableList(accountId, 'tasks');

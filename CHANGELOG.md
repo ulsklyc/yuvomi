@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **A sync no longer undoes a change made while it runs.** A task or shopping item edited
+  while the CalDAV reminders sync was fetching from the server got the server's old state back,
+  and that old state was then sent to the server; one deleted in that moment came back. The same
+  held for a calendar event deleted during an iCloud or CalDAV sync, and for a CalDAV calendar
+  that was deselected with its events during a sync: its events were read in once more. A sync
+  now asks for each entry whether a local change is waiting at the moment it writes it.
 - **Replacing a calendar attachment no longer undoes a change made in the meantime.** While a
   new attachment was still uploading (WebDAV or a cloud storage can take seconds), a second save
   of the same event could change its description, location or end, and the attachment save then

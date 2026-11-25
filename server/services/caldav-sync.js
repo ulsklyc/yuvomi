@@ -1374,7 +1374,16 @@ async function runSync({ createClient } = {}) {
       // unter derselben UID führt. Und je OBJEKT, nicht je UID (#1861): nach
       // einem Umzug, dessen Quelle ihr Objekt nicht hergibt, liegt dieselbe
       // UID in zwei Kalendern, und gemeint ist nur das Objekt in der Quelle.
-      const awaitsDeletion = outbound.pendingDeletionGuard('caldav', { accountId: account.id });
+      // Neu gelesen nach jedem await der Schleife (#2941): eine Löschung
+      // während des Abrufs zählt mit, bis zum Schreiben liegt kein await.
+      const readDeletionGuard = () => outbound.pendingDeletionGuard('caldav', { accountId: account.id });
+      let awaitsDeletion = readDeletionGuard();
+      // Ist der Kalender noch eingeschaltet (#2941)? Die Auswahl oben ist vor
+      // dem Abruf gelesen; wer ihn währenddessen abwählt (womöglich samt
+      // seiner Termine), bekommt sie nicht durch diesen Lauf zurück.
+      const isStillSelected = conn.prepare(`
+        SELECT 1 FROM caldav_calendar_selection WHERE account_id = ? AND calendar_url = ? AND enabled = 1
+      `);
 
       for (const selCal of enabledCalendars) {
         // Find matching calendar from server
@@ -1420,6 +1429,13 @@ async function runSync({ createClient } = {}) {
           fetchedEveryCalendar = false;
           continue;
         }
+        // Während des Abrufs abgewählt: wie ein nicht gelesener Kalender.
+        if (!isStillSelected.get(account.id, selCal.calendar_url)) {
+          log.info(`Calendar ${selCal.calendar_name} was deselected during the sync, skipping it.`);
+          fetchedEveryCalendar = false;
+          continue;
+        }
+        awaitsDeletion = readDeletionGuard();
         ownCalendarUrls.add(selCal.calendar_url);
 
         // Upsert external calendar metadata
@@ -1632,6 +1648,7 @@ async function runSync({ createClient } = {}) {
           // Kalender die App während des Syncs nicht einfriert (#519).
           if (++processedObjects % YIELD_EVERY === 0) {
             await new Promise((resolve) => setImmediate(resolve));
+            awaitsDeletion = readDeletionGuard();
           }
         }
       }

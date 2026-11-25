@@ -904,19 +904,6 @@ async function runSync({ createClient: makeClient } = {}) {
       // (#1700), wird zum Löschen am Server - vor dem Lesen der Aufträge.
       todoOutbound.releaseStrandedShoppingMoves(account.id);
 
-      // Ausstehende Rückrichtung einmal je Lauf und Modul (#617): eine lokal
-      // gelöschte Aufgabe darf der Inbound nicht wieder anlegen, eine lokal
-      // bearbeitete nicht mit dem alten Serverstand überschreiben.
-      const pendingByModule = {
-        tasks: {
-          deleted: todoOutbound.pendingDeletionUids(account.id, 'tasks'),
-          dirty:   todoOutbound.pendingUpdateUids(account.id, 'tasks'),
-        },
-        shopping: {
-          deleted: todoOutbound.pendingDeletionUids(account.id, 'shopping'),
-          dirty:   todoOutbound.pendingUpdateUids(account.id, 'shopping'),
-        },
-      };
       // UID → Kalenderobjekt dieses Laufs. Ausgehende Löschungen brauchen dessen
       // URL, Änderungen zusätzlich seinen Originalinhalt zum Patchen.
       const objectsByModule = { tasks: new Map(), shopping: new Map() };
@@ -945,6 +932,16 @@ async function runSync({ createClient: makeClient } = {}) {
           incompleteModules.add(module);
           continue;
         }
+
+        // Ausstehende Rückrichtung (#617): eine lokal gelöschte Aufgabe darf
+        // der Inbound nicht wieder anlegen, eine lokal bearbeitete nicht mit
+        // dem alten Serverstand überschreiben. Gelesen NACH dem Abruf, je
+        // Liste (#2941): was während des Abrufs bearbeitet oder gelöscht
+        // wurde, zählt mit. Bis zum Schreiben unten liegt kein await mehr.
+        const pending = {
+          deleted: todoOutbound.pendingDeletionUids(account.id, module),
+          dirty:   todoOutbound.pendingUpdateUids(account.id, module),
+        };
 
         for (const obj of objects) {
           const todos = parseVTODO(obj.data || '');
@@ -1005,10 +1002,10 @@ async function runSync({ createClient: makeClient } = {}) {
 
               // Lokal gelöscht und noch nicht auf dem Server: nicht wieder
               // anlegen, sonst kehrt der Eintrag bei jedem Sync zurück.
-              if (pendingByModule[module].deleted.has(todo.uid)) continue;
+              if (pending.deleted.has(todo.uid)) continue;
               // Lokale Bearbeitung wartet auf ihren Push: der alte Serverstand
               // darf sie nicht überschreiben.
-              if (pendingByModule[module].dirty.has(todo.uid)) continue;
+              if (pending.dirty.has(todo.uid)) continue;
 
               if (adoptOwn()) {
                 totalItems++;
