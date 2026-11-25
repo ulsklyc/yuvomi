@@ -9,7 +9,9 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tempDir } from './tmp-dir.js';
 import { execFileSync } from 'node:child_process';
 
 const workflow = readFileSync(
@@ -55,7 +57,7 @@ test('ausgeloest wird nur von pull_request, nicht von push oder pull_request_tar
 
 test('der Job laeuft nur fuer eigene PRs aus diesem Repo und nicht fuer Entwuerfe', () => {
   assert.match(ohneKommentare, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(ohneKommentare, /github\.event\.pull_request\.user\.login == 'ulsklyc'/);
+  assert.match(ohneKommentare, /github\.event\.pull_request\.user\.login == github\.repository_owner/);
   assert.match(ohneKommentare, /github\.event\.pull_request\.draft == false/);
 });
 
@@ -112,4 +114,39 @@ test('gepostet wird nur der Antworttext, nie die Denkspur des Reasoning', (t) =>
   assert.equal(antwort([{ type: 'thinking', thinking: [{ type: 'text', text: 'nur gedacht' }] }]), '');
   assert.match(ohneKommentare, /finish_reason/);
   assert.match(ohneKommentare, /reasoning_effort: "high"/);
+});
+
+test('der API-Schluessel steht nie im argv von curl', () => {
+  // Mistral-Review #2965: `-H "Authorization: Bearer $MISTRAL_API_KEY"`
+  // legt den Schluessel waehrend des Aufrufs ins Prozesslisting.
+  const curlAufruf = ohneKommentare.match(/curl (?:[^\\\n]|\\\n)*/)?.[0] ?? '';
+  assert.ok(curlAufruf, 'curl-Aufruf nicht gefunden');
+  assert.doesNotMatch(curlAufruf, /MISTRAL_API_KEY/);
+  assert.match(curlAufruf, /-H @"\$RUNNER_TEMP\/auth-header"/);
+  assert.match(ohneKommentare, /umask 077\n\s*printf 'Authorization: Bearer %s\\n' "\$MISTRAL_API_KEY" > "\$RUNNER_TEMP\/auth-header"/);
+});
+
+test('der Diff-Zaun ist laenger als jede Backtick-Folge im Diff', (t) => {
+  // Mistral-Review #2965: ein Diff mit ``` brach aus einer festen
+  // ```diff-Fence aus und stand als freier Text im Prompt.
+  const zaunSkript = workflow.match(/# ZAUN-ANFANG\n([\s\S]*?)\n\s*# ZAUN-ENDE/)?.[1];
+  assert.ok(zaunSkript, 'Zaun-Berechnung nicht gefunden');
+  try {
+    execFileSync('bash', ['--version'], { stdio: 'ignore' });
+  } catch {
+    t.skip('bash ist nicht installiert');
+    return;
+  }
+  const dir = tempDir('yuvomi-mistral-zaun-');
+  /** @param {string} diff */
+  const zaun = (diff) => {
+    writeFileSync(join(dir, 'diff.patch'), diff);
+    return execFileSync('bash', ['-euo', 'pipefail', '-c', `${zaunSkript}\nprintf '%s' "$zaun"`], {
+      env: { ...process.env, RUNNER_TEMP: dir },
+      encoding: 'utf8',
+    });
+  };
+  assert.equal(zaun('+const a = 1;\n'), '```');
+  assert.equal(zaun('+```js\n+x\n+```\n'), '````');
+  assert.equal(zaun('+``````\n'), '```````');
 });

@@ -27,7 +27,7 @@ jobs:
     name: Mistral Code Review
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.user.login == 'ulsklyc' &&
+      github.event.pull_request.user.login == github.repository_owner &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -115,9 +115,16 @@ jobs:
               echo "(Diff auf 200000 Bytes abgeschnitten - nur der Anfang ist sichtbar.)"
             fi
             echo
-            echo '```diff'
+            # Der Zaun ist laenger als jede Backtick-Folge im Diff: ein Diff,
+            # der selbst ``` enthaelt, bricht nicht aus dem Codeblock aus.
+            # ZAUN-ANFANG
+            laengste=$({ grep -o '`\+' "$RUNNER_TEMP/diff.patch" || true; } | awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }')
+            zaunlaenge=$(( laengste >= 3 ? laengste + 1 : 3 ))
+            zaun=$(printf '%*s' "$zaunlaenge" '' | tr ' ' '`')
+            # ZAUN-ENDE
+            echo "${zaun}diff"
             cat "$RUNNER_TEMP/diff.patch"
-            echo '```'
+            echo "$zaun"
           } > "$RUNNER_TEMP/nutzer.txt"
 
       - name: Mistral API aufrufen
@@ -136,8 +143,14 @@ jobs:
                 {role: "system", content: $system},
                 {role: "user", content: $user}
               ]}' > "$RUNNER_TEMP/anfrage.json"
+          # Der Schluessel geht ueber eine Datei mit Rechten 600 an curl, nie
+          # ueber argv (sonst im Prozesslisting sichtbar); printf ist ein
+          # Shell-Builtin und startet keinen Prozess.
+          umask 077
+          printf 'Authorization: Bearer %s\n' "$MISTRAL_API_KEY" > "$RUNNER_TEMP/auth-header"
+          trap 'rm -f "$RUNNER_TEMP/auth-header"' EXIT
           curl -sS --fail-with-body --max-time 300 --retry 2 \
-            -H "Authorization: Bearer $MISTRAL_API_KEY" \
+            -H @"$RUNNER_TEMP/auth-header" \
             -H "Content-Type: application/json" \
             -d @"$RUNNER_TEMP/anfrage.json" \
             https://api.mistral.ai/v1/chat/completions \
