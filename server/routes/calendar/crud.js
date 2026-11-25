@@ -29,6 +29,7 @@ import {
   isOccurrenceKey, occurrenceSlotOf, SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN,
 } from '../../services/calendar-events.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
+import { documentDeleteIsActive } from '../../services/document-deletion-lock.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
   mayChangeRecord,
@@ -209,9 +210,14 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
       // gestaged, `consume` liefert `null`. Die Zeile wird nach den awaits der
       // Anfragen davor gelesen; ein inzwischen geloeschtes Dokument ist wie
       // eine verweigerte Kopie, nicht ein Serverfehler (wie `fresh` in `consume`).
+      // Ebenso eines, dessen Loeschung laeuft: DELETE /documents/:id sperrt es,
+      // loescht erst die Datei (await) und dann die Zeile.
+      const sourceGone = () => !database.prepare('SELECT 1 FROM family_documents WHERE id = ?').get(sourceId)
+        || !mayClone(request.sourceDocumentId)
+        || documentDeleteIsActive(sourceId);
       const sourceDocument = database.prepare('SELECT * FROM family_documents WHERE id = ?')
         .get(request.sourceDocumentId);
-      if (!sourceDocument || !mayClone(request.sourceDocumentId)) {
+      if (!sourceDocument || sourceGone()) {
         prepared.push({ request, refused: true, used: false });
         continue;
       }
@@ -220,16 +226,26 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
         // Kategorie und Name bestimmen hier nur den Speicherpfad der Datei;
         // was die Kopie zeigt (Name, Kategorie, Dateiname, Typ, Groesse),
         // nimmt cloneAttachmentDocument aus der frisch gelesenen Zeile.
-        if (!contents.has(sourceId)) {
-          contents.set(sourceId, await readDocumentContent(sourceDocument));
+        let staged;
+        try {
+          if (!contents.has(sourceId)) {
+            contents.set(sourceId, await readDocumentContent(sourceDocument));
+          }
+          const content = contents.get(sourceId);
+          staged = await stageDocumentUpload({
+            buffer: content.buffer,
+            mime: content.mime,
+            category: sourceDocument.category,
+            originalName: sourceDocument.original_name,
+          });
+        } catch (error) {
+          // Ist die Quelle waehrend des Lesens oder Bereitstellens verschwunden
+          // (oder in Loeschung), ist das dieselbe verweigerte Kopie wie davor;
+          // gefragt synchron nach dem await. Sonst bleibt es der Speicherfehler.
+          if (!sourceGone()) throw error;
+          prepared.push({ request, refused: true, used: false });
+          continue;
         }
-        const content = contents.get(sourceId);
-        const staged = await stageDocumentUpload({
-          buffer: content.buffer,
-          mime: content.mime,
-          category: sourceDocument.category,
-          originalName: sourceDocument.original_name,
-        });
         stagedClones.push(staged);
         file = { sourceDocumentId: sourceId, staged };
         files.push(file);

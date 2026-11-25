@@ -1981,12 +1981,13 @@ test('PUT /:id — partielles Update lässt andere Felder unberührt', async () 
  * Jeder weitere Upload bekommt eine eigene Datei-ID (`<fileId>-2`, ...). Mit
  * `holdDeletes` haelt auch `files.delete`, bis der Test `releaseDeletes` ruft
  * (#2956: die Antwort nach dem Aufraeumen). Mit `eachUpload` laeuft statt des
- * Tors dieser Haken in jedem Upload, mit der laufenden Nummer.
+ * Tors dieser Haken in jedem Upload, mit der laufenden Nummer; `onGet` laeuft
+ * bei jedem `files.get` mit der Datei-ID und darf werfen.
  * @param {string} fileId
  * @param {(held: { started: Promise<unknown>, release: () => void, deleted: string[], deleteStarted: Promise<unknown>, releaseDeletes: () => void }) => Promise<void>} probe
- * @param {{ holdDeletes?: boolean, eachUpload?: (n: number) => unknown }} [options]
+ * @param {{ holdDeletes?: boolean, eachUpload?: (n: number) => unknown, onGet?: (fileId: string) => unknown }} [options]
  */
-async function withHeldDriveUpload(fileId, probe, { holdDeletes = false, eachUpload } = {}) {
+async function withHeldDriveUpload(fileId, probe, { holdDeletes = false, eachUpload, onGet } = {}) {
   const driveStorage = await import('../server/services/google-drive-storage.js');
   const configKeys = [
     'document_storage_selected_backend',
@@ -2033,9 +2034,11 @@ async function withHeldDriveUpload(fileId, probe, { holdDeletes = false, eachUpl
       createOAuth2: () => ({ setCredentials() {}, on() {} }),
       createDrive: () => ({
         files: {
-          get: async (/** @type {{ fileId: string }} */ { fileId: id }) => ({
-            data: { id, name: 'Documents', mimeType: 'application/vnd.google-apps.folder', trashed: false },
-          }),
+          get: async (/** @type {{ fileId: string }} */ { fileId: id }) => {
+            // Lesen einer Datei (#2956): der Haken darf werfen, wie Drive es tut.
+            if (onGet) await onGet(id);
+            return { data: { id, name: 'Documents', mimeType: 'application/vnd.google-apps.folder', trashed: false } };
+          },
           create: async () => {
             uploads += 1;
             const id = uploads === 1 ? fileId : `${fileId}-${uploads}`;
@@ -2470,6 +2473,75 @@ test('PUT /:id - a source document deleted during the copy upload leaves the ove
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE 'drive-2956-gone-source%'").get().n, 0,
     'kein Dokument fuer eine Kopie');
   assert.deepEqual(uploadsDeleted, ['drive-2956-gone-source'], 'die bereitgestellte Kopie wird wieder entfernt');
+});
+
+// DIE QUELLE WIRD WAEHREND DES LESENS GELOESCHT (#2956). Die Dokument-Route
+// sperrt das Dokument, loescht erst die Datei (await) und dann die Zeile
+// (routes/documents.js, DELETE /:id). Liest die Kopie die Quelle in diesem
+// Fenster, schlaegt das Lesen fehl, waehrend die Zeile noch steht. Dasselbe
+// Ergebnis wie eine vor dem Lesen geloeschte Quelle: keine Kopie, das
+// Speichern laeuft durch. Ein Lesefehler ohne Loeschung bleibt 502.
+/** @param {string} title */
+async function seriesWithDriveSource(title) {
+  const { seriesId, childId } = await seriesWithInheritingOverride(title);
+  const sourceId = Number(db.prepare('SELECT attachment_document_id AS d FROM calendar_events WHERE id = ?').get(seriesId).d);
+  const sourceKey = `drive-src-${title}`;
+  db.prepare("UPDATE family_documents SET storage_provider = 'external', storage_backend = 'google_drive', storage_key = ? WHERE id = ?").run(sourceKey, sourceId);
+  return { seriesId, childId, sourceId, sourceKey };
+}
+
+test('PUT /:id - a source document deleted while it is read leaves the override without a copy (#2956)', async () => {
+  const { seriesId, childId, sourceId, sourceKey } = await seriesWithDriveSource('PUT-CLONE-READ-GONE');
+  const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  try {
+    await withHeldDriveUpload('drive-2956-read-gone', async ({ deleted }) => {
+      saved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+        recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+      } }));
+      uploadsDeleted = deleted;
+    }, {
+      eachUpload: () => undefined,
+      onGet: (id) => {
+        if (id !== sourceKey) return;
+        // Wie DELETE /documents/:id: sperren, dann ist die Datei weg.
+        lockDocumentDeletes([sourceId]);
+        throw new Error('File not found.');
+      },
+    });
+  } finally {
+    // Der Rest der Loeschung: die Zeile, dann die Sperre.
+    db.prepare('DELETE FROM family_documents WHERE id = ?').run(sourceId);
+    unlockDocumentDeletes([sourceId]);
+  }
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=WEEKLY;BYDAY=MO');
+  const child = db.prepare('SELECT recurrence_parent_id AS p, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(childId);
+  assert.equal(child.p, null, 'die Ausnahme ist abgeloest');
+  assert.equal(child.d, null, 'ohne Kopie der geloeschten Quelle');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE 'drive-2956-read-gone%'").get().n, 0);
+  assert.deepEqual(uploadsDeleted, [], 'nichts hochgeladen, nichts verwaist');
+});
+
+test('PUT /:id - a read error of an existing source stays a storage error (#2956)', async () => {
+  const { seriesId, childId, sourceKey } = await seriesWithDriveSource('PUT-CLONE-READ-FAIL');
+  /** @type {any} */
+  let answer;
+  await withHeldDriveUpload('drive-2956-read-fail', async () => {
+    answer = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+  }, {
+    eachUpload: () => undefined,
+    onGet: (id) => { if (id === sourceKey) throw new Error('Drive is down.'); },
+  });
+  assert.equal(answer.status, 502, JSON.stringify(answer.body));
+  assert.equal(answer.body.storage_code, 'DOCUMENT_STORAGE_READ_FAILED');
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=DAILY');
+  assert.equal(db.prepare('SELECT recurrence_parent_id AS p FROM calendar_events WHERE id = ?').get(childId).p, seriesId);
 });
 
 test('PUT .../following - a series that changes once during the copies is saved in the second round (#2956)', async () => {
