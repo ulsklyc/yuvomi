@@ -765,6 +765,40 @@ test('notification processor fans out and deduplicates reminder deliveries', asy
   assert.deepEqual(calls, { webpush: 1, gotify: 1, ntfy: 1 });
 });
 
+test('a second run while a delivery is still sending does not send it again (#2942)', async () => {
+  // Lauf A wartet auf den Push-Dienst; Lauf B startet in dieser Zeit (der
+  // naechste Scheduler-Tick oder ein zweiter Aufrufer), liest dieselbe noch
+  // offene Zustellung und darf sie nicht ein zweites Mal senden.
+  const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+  const { processDueNotifications } = await import('../server/services/notifications.js');
+  const db = makeDb();
+  const store = createNotificationChannelStore({ db });
+  db.prepare("INSERT INTO tasks (id, title, created_by) VALUES (1, 'Müll rausbringen', 1)").run();
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (1, 'https://push/ok', 'p', 'a')").run();
+  db.prepare("INSERT INTO reminders (id, entity_type, entity_id, remind_at, created_by) VALUES (1, 'task', 1, ?, 1)")
+    .run(pastIso());
+  /** @type {Array<(sent: number) => void>} */
+  const pending = [];
+  /** @type {any} */
+  const pushService = {
+    sendPushToUser: () => new Promise((resolve) => { pending.push(resolve); }),
+  };
+  /** @type {any} */
+  const providers = {};
+
+  const runA = processDueNotifications({ database: db, channelStore: store, pushService, providers, now: new Date() });
+  const runB = processDueNotifications({ database: db, channelStore: store, pushService, providers, now: new Date() });
+  const sendsWhileOpen = pending.length;
+  for (const resolve of pending) resolve(1);
+  const [a, b] = await Promise.all([runA, runB]);
+
+  assert.equal(sendsWhileOpen, 1, 'the second run must not send the delivery the first one is sending');
+  assert.equal(a.sent + b.sent, 1);
+  const rows = db.prepare('SELECT status, attempt_count FROM notification_deliveries WHERE reminder_id = 1').all();
+  assert.deepEqual(rows.map((row) => ({ ...row })), [{ status: 'sent', attempt_count: 1 }]);
+  assert.notEqual(db.prepare('SELECT pushed_at FROM reminders WHERE id = 1').get()?.pushed_at, null);
+});
+
 test('subscription reminders carry name, amount and renewal date as body (#581)', async () => {
   const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
   const { processDueNotifications } = await import('../server/services/notifications.js');

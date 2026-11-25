@@ -325,6 +325,33 @@ function upsertPendingDelivery(database, { reminderId, provider, channelId = nul
   `).get(reminderId, provider, targetKey);
 }
 
+// ZUSTELLUNGEN, DIE GERADE GESENDET WERDEN (#2942). Ein Lauf liest eine offene
+// Zustellung, wartet auf den Push-Dienst oder den Kanal und vermerkt sie erst
+// danach. Ein zweiter Lauf in dieser Zeit (der naechste Scheduler-Tick oder ein
+// anderer Aufrufer) laese sie noch offen und sendete sie ein zweites Mal. Wer
+// sendet, haelt die Zustellung hier fest - vor dem ersten `await` genommen, erst
+// nach dem Vermerk geloest; ein Prozess (sync-lock.js), deshalb genuegt der
+// Speicher. Je Datenbank, damit ein Tausch beim Restore nichts verwechselt.
+/** @type {WeakMap<object, Set<number>>} */
+const sendingDeliveries = new WeakMap();
+
+/** @param {object} database @param {number} deliveryId */
+function claimDelivery(database, deliveryId) {
+  let claimed = sendingDeliveries.get(database);
+  if (!claimed) {
+    claimed = new Set();
+    sendingDeliveries.set(database, claimed);
+  }
+  if (claimed.has(deliveryId)) return false;
+  claimed.add(deliveryId);
+  return true;
+}
+
+/** @param {object} database @param {number} deliveryId */
+function releaseDelivery(database, deliveryId) {
+  sendingDeliveries.get(database)?.delete(deliveryId);
+}
+
 function shouldAttempt(delivery, nowIso) {
   if (!delivery) return true;
   if (delivery.status === 'sent' || delivery.status === 'skipped') return false;
@@ -734,6 +761,7 @@ export async function processDueNotifications({
         nowIso,
       });
       if (!shouldAttempt(delivery, nowIso)) continue;
+      if (!claimDelivery(activeDb, delivery.id)) continue;
 
       counters.attempted += 1;
       try {
@@ -756,6 +784,8 @@ export async function processDueNotifications({
         if (status === 'skipped') counters.skipped += 1;
         else counters.failed += 1;
         log.error(`Notification delivery failed for reminder ${reminder.id}:`, safeError(err));
+      } finally {
+        releaseDelivery(activeDb, delivery.id);
       }
     }
 

@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **A reminder is no longer sent twice when a push or a channel answers slowly.** Reminders go
+  out once a minute; when sending them took longer than that (a slow push service or an ntfy,
+  Gotify, webhook or e-mail channel that answers late), the next run started anyway and sent the
+  reminders the first one had not finished yet a second time. Now a new run starts only once the
+  previous one is done, and a reminder that is being sent is never sent again in the meantime.
 - **A recipe provider sync no longer deletes a recipe another sync just imported.** When the
   hourly sync and "Sync now" ran for the same Mealie or Tandoor account at the same time, one of
   them could delete a recipe the other had just imported, so the meal plan lost its link to it,
