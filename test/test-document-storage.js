@@ -1651,6 +1651,147 @@ test('a WebDAV target saved during a calendar attachment upload refuses the even
   assert.equal(moved.requests.length, 0);
 });
 
+// #2946 for Google Drive: another account connected while a document is
+// uploaded. The upload is refused and the file removed through the account
+// it went to; the old client never writes its token over the new account's.
+test('a Drive account connected during a document upload refuses the document and removes the file from the old account', async (t) => {
+  configureFakeDriveStorage();
+  get().prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('document_storage_selected_backend', 'google_drive')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run();
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  /** @type {Array<{ call: string, grant: string, fileId?: string }>} */
+  const calls = [];
+  /** @type {any[]} */
+  const clients = [];
+  const folder = { id: 'drive-folder', mimeType: 'application/vnd.google-apps.folder', trashed: false };
+  googleDriveStorage.__setGoogleApiFactoryForTests({
+    createOAuth2: () => {
+      const client = {
+        /** @type {any} */ credentials: null,
+        /** @type {Map<string, any>} */ listeners: new Map(),
+        setCredentials(/** @type {any} */ credentials) { this.credentials = credentials; },
+        on(/** @type {string} */ event, /** @type {any} */ listener) { this.listeners.set(event, listener); },
+      };
+      clients.push(client);
+      return client;
+    },
+    createDrive: (/** @type {any} */ client) => ({
+      files: {
+        async get() { return { data: folder }; },
+        async create() {
+          calls.push({ call: 'create', grant: client.credentials.refresh_token });
+          started.resolve();
+          await released.promise;
+          return { data: { id: 'uploaded-file' } };
+        },
+        async delete(/** @type {any} */ { fileId }) {
+          calls.push({ call: 'delete', grant: client.credentials.refresh_token, fileId });
+        },
+      },
+    }),
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const pending = routeCall(harness, 'POST', '/', uploadBody({
+    name: 'Uploaded during an account change',
+    bytes: 'drive bytes',
+  }));
+  await started.promise;
+  const setDrive = get().prepare(`
+    INSERT INTO sync_config (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `);
+  setDrive.run('document_storage_google_drive_refresh_token', 'refresh-b');
+  setDrive.run('document_storage_google_drive_access_token', 'access-b');
+  setDrive.run('document_storage_google_drive_account_id', 'account-b');
+  released.resolve();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_CHANGED');
+  assert.equal(get().prepare(
+    "SELECT COUNT(*) AS count FROM family_documents WHERE name = 'Uploaded during an account change'"
+  ).get().count, 0);
+  assert.deepEqual(calls, [
+    { call: 'create', grant: 'refresh' },
+    { call: 'delete', grant: 'refresh', fileId: 'uploaded-file' },
+  ]);
+  // A token refresh of the old client arrives after the new account is stored.
+  clients[0].listeners.get('tokens')?.({ access_token: 'access-a-refreshed', expiry_date: 1 });
+  assert.equal(get().prepare(
+    "SELECT value FROM sync_config WHERE key = 'document_storage_google_drive_access_token'"
+  ).get().value, 'access-b');
+});
+
+// #2946, the copy of an inherited attachment when a series is split: the copy
+// is uploaded before the write like a new attachment and checked the same way.
+test('a WebDAV target saved during the attachment copy of a split refuses the split and removes the copy', async (t) => {
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  let hold = false;
+  const old = await createWebdavServer(t, {
+    async handler(req) {
+      if (hold && req.method === 'PUT') {
+        started.resolve();
+        await released.promise;
+      }
+      return false;
+    },
+  });
+  const moved = await createWebdavServer(t);
+  setConfig({
+    enabled: '1',
+    url: old.url,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+  const series = await calendarRouteCall(harness, 'POST', '/', calendarEventBody({
+    start_datetime: '2026-11-19T08:00',
+    attachmentBytes: 'series attachment',
+    extra: { end_datetime: '2026-11-19T09:00', recurrence_rule: 'FREQ=DAILY;COUNT=5' },
+  }));
+  assert.equal(series.response.status, 201);
+  const seriesId = series.body.data.id;
+  const filesBefore = [...old.files.keys()];
+  assert.equal(filesBefore.length, 1);
+  const count = (/** @type {string} */ table) => get().prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count;
+  const eventsBefore = count('calendar_events');
+  const documentsBefore = count('family_documents');
+
+  hold = true;
+  const pending = calendarRouteCall(
+    harness,
+    'PUT',
+    `/${seriesId}/occurrences/2026-11-21T08:00:00/following`,
+    { title: 'Split during a move' }
+  );
+  await started.promise;
+  setConfig({ url: moved.url });
+  released.resolve();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_CHANGED');
+  assert.equal(count('calendar_events'), eventsBefore);
+  assert.equal(count('family_documents'), documentsBefore);
+  assert.deepEqual([...old.files.keys()], filesBefore);
+  assert.equal(old.requests.filter(({ method }) => method === 'DELETE').length, 1);
+  assert.equal(moved.requests.length, 0);
+});
+
 test('enabled WebDAV upload failures return a stable error and never create a local row', async (t) => {
   const webdav = await createWebdavServer(t, {
     handler(req, res) {

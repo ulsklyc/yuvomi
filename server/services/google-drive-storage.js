@@ -90,8 +90,16 @@ function createClient() {
   );
 }
 
-function attachTokenPersistence(client) {
-  client.on?.('tokens', (tokens) => {
+/**
+ * @param {any} client
+ * @param {string} refreshToken the grant this client was loaded with
+ */
+function attachTokenPersistence(client, refreshToken) {
+  client.on?.('tokens', (/** @type {any} */ tokens) => {
+    // A client kept from before another account was connected (the cleanup
+    // of a staged upload, #2946) must not write its access token over the
+    // new account's.
+    if (cfgGet('refresh_token') !== refreshToken) return;
     if (tokens.access_token) cfgSet('access_token', tokens.access_token);
     if (tokens.expiry_date) cfgSet('token_expiry', tokens.expiry_date);
   });
@@ -113,7 +121,7 @@ function loadAuthorizedClient() {
       ? Number.parseInt(cfgGet('token_expiry'), 10)
       : undefined,
   });
-  attachTokenPersistence(client);
+  attachTokenPersistence(client, refreshToken);
   return client;
 }
 
@@ -275,6 +283,17 @@ export function connectedAccountId() {
   return cfgGet('account_id');
 }
 
+/**
+ * The connection an upload goes through, opened in one synchronous step: the
+ * authorized client of the stored grant and the account it belongs to
+ * (#2946). The caller keeps it in memory for the request only, to stamp the
+ * upload and to remove the file again through the same account if the write
+ * is refused; it is never stored or logged.
+ */
+export function openUploadConnection() {
+  return { accountId: cfgGet('account_id'), drive: createDrive() };
+}
+
 export async function handleCallback(code) {
   const candidate = createClient();
   const { tokens } = await candidate.getToken(code);
@@ -376,9 +395,14 @@ export function getStatus() {
   };
 }
 
-export async function uploadFile({ buffer, mime = 'application/octet-stream', originalName } = {}) {
+/**
+ * @param {{ buffer?: any, mime?: string, originalName?: string,
+ *   connection?: { drive: any } }} [options] `connection` from
+ *   openUploadConnection(); without it the stored grant
+ */
+export async function uploadFile({ buffer, mime = 'application/octet-stream', originalName, connection } = {}) {
   const content = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || '');
-  const drive = createDrive();
+  const drive = connection?.drive ?? createDrive();
   const folder = await ensureAppFolder(drive);
   try {
     const response = await drive.files.create({
@@ -436,8 +460,13 @@ export async function readFile(fileId) {
   }
 }
 
-export async function deleteFile(fileId) {
-  const drive = createDrive();
+/**
+ * @param {string} fileId
+ * @param {{ connection?: { drive: any } }} [options] the connection the file
+ *   was uploaded through; without it the stored grant
+ */
+export async function deleteFile(fileId, { connection } = {}) {
+  const drive = connection?.drive ?? createDrive();
   try {
     await drive.files.delete({ fileId });
   } catch (error) {
