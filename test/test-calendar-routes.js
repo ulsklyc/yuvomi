@@ -2420,6 +2420,30 @@ async function seriesChangedDuringEveryCopy(title, uploads, send) {
   assert.equal(new Set(uploadsDeleted).size, uploads);
 }
 
+test('PUT /:id - a series that needs no copy after the last round is saved (#2956)', async () => {
+  const title = 'rounds-none';
+  const { seriesId, childId, documentIds } = await seriesWithInheritingOverride(title, 2);
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload(`drive-2956-${title}`, async ({ deleted }) => {
+    saved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+    uploadsDeleted = deleted;
+  }, {
+    eachUpload: (n) => {
+      // Runde 1 und 2: ein anderes Dokument; Runde 3: gar keins mehr.
+      db.prepare('UPDATE calendar_events SET attachment_document_id = ? WHERE id = ?').run(n < 3 ? documentIds[n - 1] : null, seriesId);
+    },
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(db.prepare('SELECT recurrence_parent_id AS p FROM calendar_events WHERE id = ?').get(childId).p, null);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE ?').get(`drive-2956-${title}%`).n, 0);
+  assert.equal(uploadsDeleted.length, 3, 'jede bereitgestellte Kopie wird wieder entfernt');
+});
+
 test('PUT /:id - a series that changes during every copy upload answers 409 after three rounds (#2956)', async () => {
   await seriesChangedDuringEveryCopy('rounds-put', 3, (seriesId) => call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
     recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
