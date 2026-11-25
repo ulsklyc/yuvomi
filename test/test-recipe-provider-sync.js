@@ -747,3 +747,135 @@ test('sync() und syncOne(): der Sync von Hand bleibt bei abgeschaltetem Modul of
     setDisabledModules([]);
   }
 });
+
+// --------------------------------------------------------------------------
+// Zwei Laeufe fuer dasselbe Konto (#2945)
+// --------------------------------------------------------------------------
+// syncAccount liest die Rezeptliste, liest die lokalen Zeilen, holt die Details
+// ueber das Netz und schreibt dann alles auf einmal. Laeuft ein zweiter Lauf
+// fuer dasselbe Konto dazwischen (Stundenlauf und "Jetzt synchronisieren"),
+// entscheidet der erste auf einer Liste, die aelter ist als das, was der zweite
+// geschrieben hat. Die Abfolge entsteht ohne Wartezeit: der erste Lauf haengt an
+// einem Promise, das der Test selbst aufloest.
+
+const { setRestoreRunning, SKIPPED_FOR_RESTORE } = await import('../server/utils/restore-state.js');
+
+/** @returns {{ promise: Promise<any>, resolve: (value?: any) => void, reject: (err: Error) => void }} */
+function deferred() {
+  /** @type {(value?: any) => void} */
+  let resolve = () => {};
+  /** @type {(err: Error) => void} */
+  let reject = () => {};
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+/** @param {string} ref */
+function recipeDetail(ref) {
+  return { id: `uuid-${ref}`, updatedAt: 't1', slug: ref, title: ref, notes: null, hasImage: false, ingredients: [] };
+}
+
+// Je Aufruf der Fabrik ein eigener Adapter aus `plans` (der erste fuer den
+// ersten Lauf, der zweite fuer den zweiten ...). `calls.n` zaehlt mit: die
+// Fabrik laeuft synchron am Anfang von syncAccount, ein zweiter Lauf, der ohne
+// Riegel sofort beginnt, ist also gleich nach seinem Aufruf daran zu erkennen.
+/**
+ * @param {Array<{ list: () => Promise<any>, detail: (ref: string) => Promise<any> }>} plans
+ * @param {{ n: number }} calls
+ */
+function plannedAdapters(plans, calls) {
+  return () => {
+    const plan = plans[calls.n++];
+    return {
+      testConnection: async () => ({ ok: true, status: 200, linkContext: { groupSlug: 'home' } }),
+      listRecipeSummaries: () => plan.list(),
+      getRecipe: (/** @type {string} */ ref) => plan.detail(ref),
+      recipeUrl: (/** @type {any} */ linkContext, /** @type {{ slug: string }} */ { slug }) => `https://mealie.example.com/g/${linkContext?.groupSlug}/r/${slug}`,
+    };
+  };
+}
+
+test('zwei Laeufe: ein Rezept, das ein paralleler Lauf importiert hat, bleibt stehen (#2945)', async () => {
+  const accountId = newAccount('Parallel');
+  const listA = deferred();
+  const calls = { n: 0 };
+  _setAdapterFactory(plannedAdapters([
+    // Lauf A (Stundenlauf): seine Liste kennt R noch nicht und kommt spaet an.
+    { list: () => listA.promise, detail: async (ref) => recipeDetail(ref) },
+    // Lauf B ("Jetzt synchronisieren"): listet spaeter, kennt R und importiert es.
+    { list: async () => [{ id: 'uuid-s', ref: 's', updatedAt: 't1' }, { id: 'uuid-r', ref: 'r', updatedAt: 't1' }], detail: async (ref) => recipeDetail(ref) },
+  ], calls));
+
+  const runA = sync.sync();
+  const runB = sync.syncOne(accountId);
+  // Beginnt B sofort (kein Riegel), laeuft er hier ganz durch, bevor A seine
+  // Liste bekommt - die Abfolge aus dem Issue.
+  if (calls.n === 2) await runB;
+  listA.resolve([{ id: 'uuid-s', ref: 's', updatedAt: 't1' }]);
+  await runA;
+  await runB;
+
+  assert.deepEqual(
+    mirroredRecipes(accountId).map((/** @type {any} */ r) => r.provider_recipe_id).sort(),
+    ['uuid-r', 'uuid-s'],
+    'R ist nicht als "verschwunden" geloescht',
+  );
+});
+
+test('zwei Laeufe: beide sehen ein Rezept als neu, es entsteht genau eine Zeile und kein Wurf (#2945)', async () => {
+  const accountId = newAccount('Doppelt');
+  const reachedA = deferred();
+  const detailA = deferred();
+  const calls = { n: 0 };
+  const listR = async () => [{ id: 'uuid-r', ref: 'r', updatedAt: 't1' }];
+  _setAdapterFactory(plannedAdapters([
+    // Lauf A ("Jetzt synchronisieren"): hat seine lokalen Zeilen gelesen (ohne R)
+    // und haengt am Detailabruf von R.
+    { list: listR, detail: () => { reachedA.resolve(); return detailA.promise; } },
+    // Lauf B (Stundenlauf): holt R sofort und legt es an.
+    { list: listR, detail: async (ref) => recipeDetail(ref) },
+  ], calls));
+
+  const runA = sync.syncOne(accountId);
+  await reachedA.promise;
+  const runB = sync.sync();
+  if (calls.n === 2) await runB;
+  detailA.resolve(recipeDetail('r'));
+
+  const resultA = await runA;
+  await runB;
+  assert.equal(resultA.failed, false, 'der Lauf meldet keinen Fehlschlag');
+  assert.deepEqual(mirroredRecipes(accountId).map((/** @type {any} */ r) => r.provider_recipe_id), ['uuid-r']);
+});
+
+// Ein wartender Lauf, vor dessen Beginn ein Restore anfaengt, laeuft nicht und
+// schreibt nichts auf das Konto - weder ueber "Jetzt synchronisieren" noch ueber
+// den Lauf aller Konten. Sonst raeumte sein Platzhalter-Ergebnis den
+// Fehlschlag des vorigen Laufs als Erfolg ab.
+test('zwei Laeufe: ein wartender Lauf, den ein Restore ueberholt, schreibt nichts auf das Konto (#2945)', async () => {
+  const accountId = newAccount('Restore');
+  const listA = deferred();
+  const calls = { n: 0 };
+  const ok = { list: async () => [{ id: 'uuid-r', ref: 'r', updatedAt: 't1' }], detail: async (/** @type {string} */ ref) => recipeDetail(ref) };
+  _setAdapterFactory(plannedAdapters([{ list: () => listA.promise, detail: ok.detail }, ok, ok], calls));
+
+  const runA = sync.syncOne(accountId);
+  const runB = sync.syncOne(accountId);
+  const runAll = sync.sync();
+  try {
+    setRestoreRunning(true);
+    listA.reject(new Error('network down'));
+    await runA;
+    const resultB = await runB;
+    const resultAll = await runAll;
+    assert.equal(resultB, SKIPPED_FOR_RESTORE);
+    assert.equal(resultAll.syncedAccounts, 0);
+    assert.equal(resultAll.imported, 0);
+  } finally {
+    setRestoreRunning(false);
+  }
+  const account = conn.prepare('SELECT last_sync, last_error FROM recipe_provider_accounts WHERE id = ?').get(accountId);
+  assert.equal(account.last_error, 'Fetching the recipes failed.', 'der Fehlschlag von A bleibt stehen');
+  assert.equal(account.last_sync, null);
+  assert.equal(mirroredRecipes(accountId).length, 0);
+});

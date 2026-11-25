@@ -15,7 +15,8 @@
  *
  * Dependencies: server/db.js, ./recipe-providers/index.js, ./household-modules.js
  */
-import { runExternalJob } from '../utils/restore-state.js';
+import { runExternalJob, SKIPPED_FOR_RESTORE } from '../utils/restore-state.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { withTx } from '../db/tx.ts';
@@ -220,6 +221,27 @@ async function syncAccount(account) {
 }
 
 /**
+ * Ein Lauf je Konto, nie zwei gleichzeitig (#2945). syncAccount entscheidet
+ * ueber Anlegen und Loeschen auf der Liste und den Zeilen, die es VOR den
+ * Detailabrufen gelesen hat. Laeuft dazwischen ein zweiter Lauf fuer dasselbe
+ * Konto (Stundenlauf und "Jetzt synchronisieren"), loescht der erste ein
+ * Rezept, das der zweite gerade importiert hat, oder legt es ein zweites Mal
+ * an und scheitert am eindeutigen Index. Ein Aufruf waehrend eines Laufs
+ * wartet auf genau einen Nachlauf (server/utils/sync-lock.js).
+ *
+ * Der Schluessel ist das Konto: der Stundenlauf haelt ihn nur fuer das eine
+ * Konto, das er gerade abarbeitet, nie zwei auf einmal.
+ *
+ * Beginnt ein Restore, waehrend der Lauf wartet, liefert er SKIPPED_FOR_RESTORE
+ * statt eines Ergebnisses; die Aufrufer schreiben dann nichts auf das Konto.
+ *
+ * @param {{ id: number }} account
+ */
+function syncAccountSerialized(account) {
+  return runSerialized(`recipe-provider:${account.id}`, 'sync', () => syncAccount(account));
+}
+
+/**
  * The text a failed sync stores as `last_error` and sends with the account list
  * (Phase 0 section H): the adapter's own sentences - a refused status ("Mealie
  * request failed (502)"), an unreadable answer - and the lookup hook's refusal
@@ -336,7 +358,8 @@ async function syncUntracked() {
   let successfulAccounts = 0;
 
   for (const account of accounts) {
-    const result = await syncAccount(account);
+    const result = await syncAccountSerialized(account);
+    if (result === SKIPPED_FOR_RESTORE) continue;
     if (recordAccountResult(account, result)) successfulAccounts++;
     totalImported += result.imported;
     totalUpdated += result.updated;
@@ -360,7 +383,8 @@ async function syncOneUntracked(accountId) {
   const account = getAccountById(accountId);
   if (!account) throw new Error('Recipe provider account not found.');
 
-  const result = await syncAccount(account);
+  const result = await syncAccountSerialized(account);
+  if (result === SKIPPED_FOR_RESTORE) return result;
   recordAccountResult(account, result);
   return result;
 }
