@@ -22,6 +22,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { FastingError, requireFastingCapability } from '../../services/fasting.js';
 import { log, viewerId, badRequest } from './helpers.js';
 import { FLAT_SCOPE_KEYS, SCOPE_KEY_PATTERN, VITAL_SCOPE_PREFIX } from '../../services/health-fields.js';
@@ -205,12 +206,12 @@ router.put('/visibility-defaults', refuseFastingWithoutCapability, validateReque
       visibility = excluded.visibility,
       updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
   `);
-  database.transaction(() => {
+  withTx(database, () => {
     for (const [key, visibility] of entries) {
       if (visibility === 'family') set.run(viewer, key, visibility);
       else del.run(viewer, key);
     }
-  })();
+  });
   const rows = database.prepare(
     'SELECT scope_key, visibility FROM health_visibility_defaults WHERE user_id = ?'
   ).all(viewer);

@@ -8,6 +8,7 @@
 
 import express from 'express';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { getBalance, isEnrolled, ledgerBalanceSql, postLedger, CATALOG_SELECT, activeCatalog } from '../services/rewards.js';
 import {
   closeFormerMoney, closeMoneyAccount, creditFits, ensureMoneyAccount, hasMoneyAccount, isFormerMoneyAccount,
@@ -475,7 +476,7 @@ router.post('/redemptions', validateRequest(), (req, res) => {
   // ist synchron; jedes `await` vor einem DB-Aufruf waere genau dieser
   // Aussetzer - deshalb steht in diesem Handler keines, und die Stueckzahl
   // wird IN der Transaktion gezaehlt statt davor.
-  const ausgang = d.transaction(() => {
+  const ausgang = withTx(d, () => {
     if (soldOut(d, item)) return { soldOut: true };
     const r = autoFulfill
       ? d.prepare(`
@@ -492,7 +493,7 @@ router.post('/redemptions', validateRequest(), (req, res) => {
       reason: item.name, redemptionId: r.lastInsertRowid, createdBy: me,
     });
     return { id: r.lastInsertRowid };
-  })();
+  });
 
   if (ausgang.soldOut) {
     return res.status(409).json({
@@ -555,7 +556,7 @@ function fileMoneyRequest(req, res, d, me) {
     throw err;
   }
 
-  const out = d.transaction(() => {
+  const out = withTx(d, () => {
     if (kind === 'withdrawal' && moneyBalance(d, targetId) < amount) return { insufficient: true };
     // `reward_name` ist NOT NULL und hat bei Geld nichts zu halten: dort steht
     // die Art der Anfrage als fester Marker, den die Oberflaeche uebersetzt.
@@ -564,7 +565,7 @@ function fileMoneyRequest(req, res, d, me) {
       VALUES (?, NULL, ?, ?, ?, NULL, ?, ?, ?)
     `).run(targetId, kind, currency, kind, amount, note, me);
     return { id: r.lastInsertRowid };
-  })();
+  });
   if (out.insufficient) {
     return res.status(400).json({ error: 'Insufficient funds.', code: 400, reason: 'insufficient_funds' });
   }
@@ -590,7 +591,7 @@ function fileMoneyRequest(req, res, d, me) {
  */
 function decideMoneyRequest(res, d, row, action, me) {
   const nextStatus = action === 'fulfill' ? 'fulfilled' : action === 'reject' ? 'rejected' : 'cancelled';
-  const refused = d.transaction(() => {
+  const refused = withTx(d, () => {
     if (action === 'fulfill') {
       // EIN EHEMALIGES KONTO WIRD NUR NOCH AUSGEZAHLT, und zwar von den Eltern
       // direkt. Eine Anfrage, die das Deaktivieren ueberlebt hat (aelter als
@@ -615,7 +616,7 @@ function decideMoneyRequest(res, d, row, action, me) {
       WHERE id = ?
     `).run(nextStatus, me, row.id);
     return null;
-  })();
+  });
   const updated = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(row.id);
   if (refused === 'insufficient_funds') {
     return res.status(409).json({
@@ -685,7 +686,7 @@ function reopenRedemption(req, res, d, row, me) {
   if (!Number.isFinite(decidedMs) || Date.now() - decidedMs > REOPEN_WINDOW_MINUTES * 60_000) {
     return res.status(409).json({ error: 'This decision can no longer be taken back.', code: 409, reason: 'rewards_reopen_expired' });
   }
-  const refused = d.transaction(() => {
+  const refused = withTx(d, () => {
     const money = row.kind !== 'reward';
     const settle = money
       ? (row.status === 'fulfilled' ? d.prepare(`SELECT id, delta FROM reward_ledger WHERE redemption_id = ? AND unit = 'money'`).all(row.id) : [])
@@ -704,7 +705,7 @@ function reopenRedemption(req, res, d, row, me) {
       WHERE id = ?
     `).run(row.id);
     return null;
-  })();
+  });
   if (refused === 'insufficient_funds') {
     return res.status(409).json({ error: 'The balance no longer allows taking this back.', code: 409, reason: 'insufficient_funds' });
   }
@@ -763,7 +764,7 @@ router.patch('/redemptions/:id', validateRequest(), (req, res) => {
   // findet. Gezaehlt wird wieder IN der Transaktion - zwei Eltern, die
   // gleichzeitig zwei Anfragen auf dieselbe letzte Einheit freigeben, duerfen
   // nicht beide durchkommen.
-  const vergriffen = d.transaction(() => {
+  const vergriffen = withTx(d, () => {
     const item = row.catalog_id != null
       ? d.prepare('SELECT id, quantity FROM reward_catalog WHERE id = ?').get(row.catalog_id)
       : null;
@@ -783,7 +784,7 @@ router.patch('/redemptions/:id', validateRequest(), (req, res) => {
       WHERE id = ?
     `).run(status, leer ? 'out_of_stock' : null, me, row.id);
     return leer;
-  })();
+  });
 
   const updated = d.prepare('SELECT * FROM reward_redemptions WHERE id = ?').get(row.id);
   if (vergriffen) {
@@ -880,7 +881,7 @@ router.post('/money/entries', requireAdmin, validateRequest(), (req, res) => {
   }
   if (direction === 'credit' && !creditFits(d, userId, amount))
     return res.status(400).json({ error: 'amount is too large.', code: 400 });
-  const insufficient = d.transaction(() => {
+  const insufficient = withTx(d, () => {
     if (direction === 'debit' && moneyBalance(d, userId) < amount) return true;
     // Die erste Gutschrift der Eltern eroeffnet das Konto mit.
     if (direction === 'credit') ensureMoneyAccount(d, userId, actingUser(req));
@@ -889,7 +890,7 @@ router.post('/money/entries', requireAdmin, validateRequest(), (req, res) => {
       reason, createdBy: actingUser(req), currency,
     });
     return false;
-  })();
+  });
   if (insufficient) return res.status(400).json({ error: 'Insufficient funds.', code: 400, reason: 'insufficient_funds' });
   res.status(201).json({ data: { user_id: userId, balance_minor: moneyBalance(d, userId), currency, minor_unit: minorUnit(currency) } });
 });
@@ -913,13 +914,13 @@ router.post('/money/accounts', requireAdmin, validateRequest(), (req, res) => {
   }
   let opened;
   try {
-    opened = d.transaction(() => {
+    opened = withTx(d, () => {
       const account = ensureMoneyAccount(d, userId, actingUser(req));
       // Ein mitgeschickter Code muss der des Kontos sein - bei einem neuen
       // also die Haushaltswaehrung. Sonst rollt die Transaktion zurueck.
       if (account.created) resolveMoneyCurrency(d, userId, req.body?.currency);
       return account;
-    })();
+    });
   } catch (err) {
     if (err?.name === 'SplitInputError') return moneyInputRefusal(res, err);
     throw err;

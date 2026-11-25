@@ -37,6 +37,7 @@
 import { mayReadModule, visibleWhere, filterVisible } from '../authorize/index.ts';
 import { assertDocumentsNotDeleting } from './document-deletion-lock.js';
 import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 
 /** Felder, die ein Beleg preisgibt. Bewusst ohne Dateiinhalt. */
 const DOCUMENT_COLUMNS = 'd.name, d.original_name, d.mime_type, d.file_size';
@@ -184,12 +185,12 @@ export function replaceDocumentLinks(database, { table, ownerColumn, ownerId, do
     `DELETE FROM ${table} WHERE ${ownerColumn} = ? AND document_id = ?`
   );
 
-  database.transaction(() => {
+  withTx(database, () => {
     for (const documentId of remove) drop.run(ownerId, documentId);
     for (const documentId of wanted) {
       insert.run(ownerId, documentId, viewer.userId, ...extraNames.map((name) => extraValues[name]));
     }
-  })();
+  });
 }
 
 /**

@@ -6,6 +6,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { str, oneOf, MAX_SHORT } from '../../api/formats.ts';
 import { CATEGORY_TYPES } from '../../services/budget-fields.js';
 import {
@@ -132,7 +133,7 @@ router.patch('/categories/reorder', validateRequest(), (req, res) => {
   const vType = oneOf(req.body.type || 'expense', CATEGORY_TYPES, 'Type');
   if (vType.error) return refuse(res, refusals('category_type_invalid', [vType]));
   const order = Array.isArray(req.body.order) ? req.body.order : [];
-  const tx = db.get().transaction((keys) => {
+  const tx = (keys) => withTx(db.get(), () => {
     keys.forEach((key, i) => {
       db.get().prepare('UPDATE budget_categories SET sort_order = ? WHERE key = ? AND type = ?').run(i, key, vType.value);
     });
@@ -204,7 +205,7 @@ router.delete('/categories/:key/subcategories/:subKey', validateRequest(), (req,
 
 router.patch('/categories/:key/subcategories/reorder', validateRequest(), (req, res) => {
   const order = Array.isArray(req.body.order) ? req.body.order : [];
-  const tx = db.get().transaction((keys) => {
+  const tx = (keys) => withTx(db.get(), () => {
     keys.forEach((key, i) => {
       db.get().prepare('UPDATE budget_subcategories SET sort_order = ? WHERE key = ? AND category_key = ?').run(i, key, req.params.key);
     });

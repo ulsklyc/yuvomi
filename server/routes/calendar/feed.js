@@ -5,6 +5,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import * as icsExport from '../../services/ics-export.js';
 import * as holidays from '../../services/holidays.js';
 import { getUserId, feedUrl } from './helpers.js';
@@ -27,12 +28,12 @@ router.put('/feed', validateRequest(), (req, res) => {
   const { showAssignees, includeBirthdays } = req.body;
   const database = db.get();
   const userId = getUserId(req);
-  const data = database.transaction(() => {
+  const data = withTx(database, () => {
     if (showAssignees !== undefined) icsExport.setFeedShowAssignees(database, userId, showAssignees);
     if (includeBirthdays !== undefined) icsExport.setFeedIncludeBirthdays(database, userId, includeBirthdays);
     return { showAssignees: icsExport.getFeedShowAssignees(database, userId),
       includeBirthdays: icsExport.getFeedIncludeBirthdays(database, userId) };
-  })();
+  });
   res.json({ data });
 });
 

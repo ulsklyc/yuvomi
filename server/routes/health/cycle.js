@@ -26,6 +26,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import * as v from '../../api/formats.ts';
 import { cycleToCsv } from '../../services/health-export.js';
 import { syncCycleRemindersForUser, isEligibleCyclePartner, eligibleCyclePartners } from '../../services/cycle-reminders.js';
@@ -357,7 +358,7 @@ router.post('/cycle/logs', validateRequest(), (req, res) => {
   const database = db.get();
   // Log-Zeile, ihre Symptome und ihre Gefühle zusammen, sonst könnte ein
   // Absturz dazwischen eine Teilmenge ohne die andere zurücklassen.
-  const dayLogId = database.transaction(() => {
+  const dayLogId = withTx(database, () => {
     database.prepare(`
       INSERT INTO cycle_day_logs (
         user_id, log_date, flow, note, visibility, basal_temp, basal_temp_unit,
@@ -379,7 +380,7 @@ router.post('/cycle/logs', validateRequest(), (req, res) => {
     replaceSymptoms(database, id, symptoms);
     if (feelingsProvided) replaceFeelings(database, id, feelings.keys);
     return id;
-  })();
+  });
 
   // Sofort wirksam statt erst beim naechsten periodischen Lauf: der
   // taegliche Eintrags-Hinweis (syncLogNudgeReminder) faellt weg, sobald
@@ -571,7 +572,7 @@ router.patch('/cycle/visibility', validateRequest(), (req, res) => {
   const visibility = req.body.visibility;
 
   const database = db.get();
-  const applyBulk = database.transaction((value) => {
+  const applyBulk = (value) => withTx(database, () => {
     const p = database.prepare('UPDATE cycle_periods  SET visibility = ? WHERE user_id = ?').run(value, viewer);
     const l = database.prepare('UPDATE cycle_day_logs SET visibility = ? WHERE user_id = ?').run(value, viewer);
     return { periods: p.changes, logs: l.changes };
@@ -768,7 +769,7 @@ router.post('/cycle/import', validateRequest(), (req, res) => {
   // Importdatei mit demselben start_date treffen dieselbe Regel: die erste
   // zaehlt, jede weitere gilt als "schon vorhanden" und wird ebenfalls
   // uebersprungen.
-  const { imported, skipped } = database.transaction(() => {
+  const { imported, skipped } = withTx(database, () => {
     const existingStarts = new Set(
       database.prepare('SELECT start_date FROM cycle_periods WHERE user_id = ?').all(viewer).map((r) => r.start_date)
     );
@@ -784,7 +785,7 @@ router.post('/cycle/import', validateRequest(), (req, res) => {
       importedCount++;
     }
     return { imported: importedCount, skipped: skippedCount };
-  })();
+  });
 
   // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
   // Erwartung wie nach jeder anderen Aenderung an cycle_periods in dieser

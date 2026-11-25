@@ -15,6 +15,7 @@
  */
 
 import type { Database } from './catalog.ts';
+import { withTx, type TxDatabase } from '../db/tx.ts';
 
 /** A WHERE fragment with its positional binds, in `params` order. */
 type Clause = { sql: string; params: unknown[] };
@@ -88,22 +89,22 @@ export function allCareGrants(database: Database): { subject_id: number; caregiv
   ).all() as { subject_id: number; caregiver_id: number }[];
 }
 
-/** A connection with better-sqlite3's transaction helper (the production driver). */
-type TransactionalDatabase = Database & { transaction<F extends () => void>(fn: F): F };
+/** A connection that reports its transaction state (server/db/tx.ts). */
+type TransactionalDatabase = Database & TxDatabase;
 
 /**
  * Sets the caregivers of `subjectId` to exactly `caregiverIds`, in one transaction:
  * the stored grants go, one row per id is written in the given order. The caller
  * checks the ids (known, active, not the subject herself); this only writes.
- * The transaction is better-sqlite3's db.transaction(), as in the route before B9
+ * The transaction is withTx() (server/db/tx.ts), as in the route before B9
  * (nested in an open transaction it becomes a savepoint).
  */
 export function replaceCaregivers(database: TransactionalDatabase, subjectId: unknown, caregiverIds: readonly unknown[]): void {
   const insert = database.prepare('INSERT INTO health_care_grants (subject_id, caregiver_id) VALUES (?, ?)');
-  database.transaction(() => {
+  withTx(database, () => {
     database.prepare('DELETE FROM health_care_grants WHERE subject_id = ?').run(subjectId);
     for (const id of caregiverIds) insert.run(subjectId, id);
-  })();
+  });
 }
 
 /**

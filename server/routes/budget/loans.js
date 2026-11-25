@@ -6,6 +6,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { str, num, date as validateDate, month as validateMonth, MAX_TITLE, MAX_SHORT } from '../../api/formats.ts';
 import { normalizeObjectVisibility } from '../../authorize/index.ts';
 import { computeLoanSchedule, MAX_LOAN_MONTHS } from '../../services/loan-amortization.js';
@@ -313,7 +314,7 @@ router.get('/loans', validateRequest(), (req, res) => {
 function seedPaidInstallments(loanId, count, userId) {
   const loan = loadLoan(loanId);
   const perInstallment = loan.installment_amount;
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     let booked = 0;
     for (let n = 1; n <= count; n++) {
       const remaining = cents(loan.total_amount - booked);
@@ -328,7 +329,7 @@ function seedPaidInstallments(loanId, count, userId) {
       `).run(loanId, n, amount, dueDateInMonth(month, loan.due_day) ?? `${month}-01`, userId);
       booked = cents(booked + amount);
     }
-  })();
+  });
   refreshLoanStatus(loanId);
 }
 
@@ -634,7 +635,7 @@ router.post('/loans/:id/payments', validateRequest(), (req, res) => {
   // negativer Betrag und eine expense-Kategorie. Beides muss zusammen wechseln,
   // sonst steht eine Ausgabe unter „Geschenke & Transfers" (income).
   const booking = bookingFor(loanRow.direction);
-  const tx = db.get().transaction(() => {
+  const paymentId = withTx(db.get(), () => {
     // Repayment-Eintrag erbt Eigentümer + Sichtbarkeit des Loans (#476/#505),
     // damit er im Budget derselben Person/desselben Topfs erscheint.
     // account_id kommt vom Darlehen: erst damit belastet eine Rate ein Konto (#638).
@@ -659,8 +660,6 @@ router.post('/loans/:id/payments', validateRequest(), (req, res) => {
     `).run(id, installmentNumber, paymentAmount, vDate.value, budgetResult.lastInsertRowid, req.authUserId || req.session.userId);
     return paymentResult.lastInsertRowid;
   });
-
-  const paymentId = tx();
   res.status(201).json({
     data: {
       payment: db.get().prepare('SELECT * FROM budget_loan_payments WHERE id = ?').get(paymentId),
@@ -679,13 +678,12 @@ router.delete('/loans/:id/payments/:paymentId', validateRequest(), (req, res) =>
   const loanRow = db.get().prepare('SELECT owner_id, visibility, created_by FROM budget_loans WHERE id = ?').get(id);
   if (!mayEdit(req, loanRow)) return res.status(403).json({ error: 'You cannot modify this loan.', code: 403 });
 
-  const tx = db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare('DELETE FROM budget_loan_payments WHERE id = ?').run(paymentId);
     if (payment.budget_entry_id) {
       db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(payment.budget_entry_id);
     }
   });
-  tx();
   refreshLoanStatus(id);
   res.status(204).end();
 });
@@ -697,7 +695,7 @@ router.delete('/loans/:id', validateRequest(), (req, res) => {
   if (!mayEdit(req, loan)) return res.status(403).json({ error: 'You cannot modify this loan.', code: 403 });
 
   const payments = db.get().prepare('SELECT budget_entry_id FROM budget_loan_payments WHERE loan_id = ?').all(id);
-  const tx = db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare('DELETE FROM budget_loans WHERE id = ?').run(id);
     for (const payment of payments) {
       if (payment.budget_entry_id) {
@@ -705,7 +703,6 @@ router.delete('/loans/:id', validateRequest(), (req, res) => {
       }
     }
   });
-  tx();
   res.status(204).end();
 });
 

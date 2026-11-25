@@ -92,6 +92,7 @@ import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 // The selectable currencies - one list for server and browser (#841, allowlist
 // in test/test-layer-boundary.js).
 import { CURRENCY_CODES } from '../../public/utils/currency-codes.js';
+import { withTx, type TxDatabase } from '../db/tx.ts';
 
 // --------------------------------------------------------------------------
 // The interface types
@@ -128,10 +129,8 @@ export type Refusal =
   | { kind: 'invalid'; message: string }
   | { kind: 'unauthenticated' };
 
-/** A connection that can nest a transaction (better-sqlite3). */
-export type SettingsDatabase = Database & {
-  transaction<T>(fn: () => T): () => T;
-};
+/** A connection that can nest a transaction (withTx, both drivers). */
+export type SettingsDatabase = Database & TxDatabase;
 
 export type Effects = Readonly<{
   /** The household zone was written: re-key the series' occurrences (#2034, F5). */
@@ -455,12 +454,12 @@ const ENTRIES: readonly Entry[] = [
       // zone (#1993): its start is the HOUSEHOLD's wall clock. Its exceptions and
       // single occurrences name the original start (#2034, format A) and are
       // re-keyed in the same transaction (F5).
-      ctx.db.transaction(() => {
+      withTx(ctx.db, () => {
         const zoneBefore = householdTimeZone(ctx.db);
         if (input === null || input === '') ctx.delete('household_timezone');
         else ctx.set('household_timezone', input);
         ctx.effects.householdZoneChanged(ctx.db, zoneBefore, householdTimeZone(ctx.db));
-      })();
+      });
       // Who writes the zone has decided - also with "automatic". Without the flag
       // a deliberate reset would look like "never set", and the hint would come
       // back for every admin.
@@ -675,10 +674,10 @@ const ENTRIES: readonly Entry[] = [
       const unique = [...new Set(input.filter((m) => typeof m === 'string' && TOGGLEABLE_MODULES.includes(m)))];
       const healthChanged = parseDisabledModules(ctx.get('disabled_modules')).includes('health')
         !== unique.includes('health');
-      ctx.db.transaction(() => {
+      withTx(ctx.db, () => {
         ctx.set('disabled_modules', JSON.stringify(unique));
         if (healthChanged) ctx.effects.healthModuleToggled(ctx.db);
-      })();
+      });
       return null;
     },
   },

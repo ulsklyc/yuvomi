@@ -18,6 +18,7 @@
  */
 
 import { newNonMembers, nonMemberMessage } from './household-members.js';
+import { withTx } from '../db/tx.ts';
 
 // Die drei Quellen und ihre Tabellen. Feste Bezeichner, nie aus einer Anfrage.
 const KINDS = Object.freeze({
@@ -75,7 +76,7 @@ export function readAllDefaultAssignees(d, kind) {
  * Ersetzt die Standard-Personen einer Quelle. Die Aufrufer haben die Ids
  * geprueft (normalizeAssigneeIds, Haushaltsmitglieder); Doppelte fallen hier
  * heraus, die erste Nennung zaehlt.
- * @param {object} d
+ * @param {import('../authorize/index.ts').Database & import('../db/tx.ts').TxDatabase} d
  * @param {'calendar'|'subscription'|'reminderList'} kind
  * @param {number} ownerId
  * @param {number[]} userIds
@@ -83,11 +84,11 @@ export function readAllDefaultAssignees(d, kind) {
 export function writeDefaultAssignees(d, kind, ownerId, userIds) {
   const { table, key } = kindOf(kind);
   const ids = [...new Set((userIds ?? []).map(Number))];
-  d.transaction(() => {
+  withTx(d, () => {
     d.prepare(`DELETE FROM ${table} WHERE ${key} = ?`).run(ownerId);
     const ins = d.prepare(`INSERT INTO ${table} (${key}, user_id, position) VALUES (?, ?, ?)`);
     ids.forEach((uid, position) => ins.run(ownerId, uid, position));
-  })();
+  });
 }
 
 /**

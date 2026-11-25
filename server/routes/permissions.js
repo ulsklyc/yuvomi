@@ -9,6 +9,7 @@
 
 import express from 'express';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { requireAdmin } from '../auth.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { listModules } from '../services/modules.js';
@@ -42,7 +43,7 @@ function syncFastingForUsers(database, userIds) {
 }
 
 function replacePermissionsAndSync(database, subjectType, subjectId, input, userIds) {
-  return database.transaction(() => {
+  return withTx(database, () => {
     writeSubjectPermissions(database, subjectType, subjectId, input);
     syncFastingForUsers(database, userIds);
     // Wer das Betragsrecht verliert, faellt aus seinen Zahlungsaufgaben. Ein
@@ -51,7 +52,7 @@ function replacePermissionsAndSync(database, subjectType, subjectId, input, user
     // einer Zahlungsaufgabe steht.
     revokePaymentTasksForUsers(database, subjectType === 'user' ? userIds : null);
     return getSubjectPermissions(database, subjectType, subjectId);
-  })();
+  });
 }
 
 // requireAuth + csrfMiddleware werden global in server/index.js angewandt.

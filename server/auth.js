@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as db from './db.js';
+import { withTx } from './db/tx.ts';
 import { generateToken, csrfMiddleware } from './middleware/csrf.js';
 import { refuseWhileRestoring } from './middleware/restore-gate.js';
 import { restoreInProgressError } from './utils/restore-messages.js';
@@ -1629,7 +1630,7 @@ export function findOrCreateOidcUser(database, claims) {
     : undefined;
 
   // oidc_provider = Issuer-URL (zukunftssicher für mehrere Provider)
-  const userId = database.transaction(() => {
+  const userId = withTx(database, () => {
     const result = database.prepare(`
       INSERT INTO users (username, display_name, password_hash, avatar_color, role, oidc_sub, oidc_provider)
       VALUES (?, ?, ?, ?, 'member', ?, ?)
@@ -1640,7 +1641,7 @@ export function findOrCreateOidcUser(database, claims) {
       actorUserId: result.lastInsertRowid,
     });
     return result.lastInsertRowid;
-  })();
+  });
 
   return database.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 }
@@ -2412,7 +2413,7 @@ export function buildInviteRoutes(targetRouter, {
 
       const ACCEPT_LOST = Symbol('accept_lost');
       try {
-        getDb().transaction(() => {
+        withTx(getDb(), () => {
           const created = getDb().prepare(`
             INSERT INTO users (username, display_name, password_hash, avatar_color, role, family_role)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -2454,7 +2455,7 @@ export function buildInviteRoutes(targetRouter, {
           // In derselben Transaktion: von zwei parallelen Einlösungen desselben
           // Tokens sieht nur eine changes === 1, die andere rollt zurück.
           if (inviteService.markAccepted(token, newUserId) === 0) throw ACCEPT_LOST;
-        })();
+        });
       } catch (txErr) {
         if (txErr === ACCEPT_LOST) {
           return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
@@ -2877,7 +2878,7 @@ router.post('/setup', loginLimiter, requireSetupOpen, validateRequest(), async (
     const SETUP_DONE = Symbol('setup_done');
     let result;
     try {
-      result = db.transaction(() => {
+      result = withTx(db.get(), () => {
         const { count: liveCount } = db.get().prepare('SELECT COUNT(*) as count FROM users').get();
         if (liveCount > 0) throw SETUP_DONE;
         const created = db.get()
@@ -3383,7 +3384,7 @@ router.post('/devices', requireAuth, csrfMiddleware, requireSignInSession('devic
   }
 
   let issued = null;
-  db.transaction(() => {
+  withTx(db.get(), () => {
     issued = issueDeviceCredential(req.authUserId, fields);
   });
 
@@ -3433,7 +3434,7 @@ router.post('/devices/pair/redeem', devicePairingLimiter, validateRequest(), (re
   if (fields.error) return res.status(400).json({ error: fields.error, code: 400 });
 
   let issued = null;
-  db.transaction(() => {
+  withTx(db.get(), () => {
     const userId = spendDevicePairingCode(db.get(), req.body?.code);
     if (userId == null || !mayHaveDevice(userId)) return;
     issued = issueDeviceCredential(userId, fields);
@@ -3918,7 +3919,7 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest
 
     const hash = ssoOnly ? OIDC_PASSWORD_SENTINEL : await hashPassword(password);
 
-    const result = db.transaction(() => {
+    const result = withTx(db.get(), () => {
       const created = db.get()
         .prepare(`
           INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
@@ -4085,7 +4086,7 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, validateRe
     // The last-admin checks run inside the same transaction as the write
     // (#2612). A better-sqlite3 transaction is synchronous and cannot hold an
     // `await`, so check and write can never be split again by a yield point.
-    const refusal = db.transaction(() => {
+    const refusal = withTx(db.get(), () => {
       // Dieselben Gruende wie beim Entfernen (#1909): die Verwaltung sagt den
       // Satz dazu, auch wenn ein Admin sich selbst herabstuft.
       const adminError = assertAdminWouldRemain(userId, nextRole);
@@ -4192,7 +4193,7 @@ router.patch('/me/profile', requireAuth, csrfMiddleware, validateRequest(), (req
     }
   }
 
-  db.transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare(`
       UPDATE users
       SET display_name = ?, avatar_color = ?, avatar_data = ?
@@ -4347,7 +4348,7 @@ export function buildGravatarRoute(targetRouter, { fetch = fetchGravatar, limite
     // Synchron: zwischen dem zweiten Blick und dem Schreiben liegt kein await.
     // Der Adressvergleich laeuft ueber emailMatchKey() - eine Aenderung nur
     // der Grossschreibung ergibt denselben Hash und ist kein Grund zur Absage.
-    const stored = db.transaction(() => {
+    const stored = withTx(db.get(), () => {
       const now = db.get().prepare('SELECT avatar_data FROM users WHERE id = ?').get(userId);
       if (!now
         || !isHouseholdMember(userId, { db: db.get() })

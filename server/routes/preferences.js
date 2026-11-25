@@ -234,7 +234,7 @@ router.put('/', validateRequest(), (req, res) => {
     // Handler), und die Präferenzen sind geschrieben. Der nächste PUT
     // versucht es erneut - der Lauf ist idempotent.
     try {
-      db.transaction(() => retitleBirthdayEvents(db.get()));
+      withTx(db.get(), () => retitleBirthdayEvents(db.get()));
     } catch (err) {
       log.error('PUT / - Geburtstags-Termine konnten nicht umbenannt werden', err);
     }

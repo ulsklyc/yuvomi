@@ -48,7 +48,8 @@ const shipped = loadBaseline();
 /**
  * @typedef {import('../server/db/baseline.ts').Baseline} Baseline
  * @typedef {import('../server/db/baseline.ts').BaselineDatabase & { close(): void }} AnyDatabase
- * @typedef {import('../server/db/handle.ts').SqliteDatabase} CipherDatabase
+ * @typedef {import('../server/db/handle.ts').SqliteDatabase} ServerDatabase
+ * @typedef {ServerDatabase & { transaction<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R }} CipherDatabase
  * @typedef {{ schema: ReturnType<typeof schemaObjects>, rows: Record<string, unknown[]> }} State
  */
 
@@ -418,7 +419,7 @@ test('ein anderer Prozess war schneller: der Nachzuegler endet im selben Zustand
 
 /**
  * @param {string} file @param {number} busyFor wie viele Versuche auf die gehaltene Sperre treffen
- * @returns {{ database: CipherDatabase, waiting: CipherDatabase, holder: CipherDatabase, attempts: () => number }}
+ * @returns {{ database: ServerDatabase, waiting: CipherDatabase, holder: CipherDatabase, attempts: () => number }}
  */
 function contended(file, busyFor) {
   const holder = cipher(file);
@@ -426,25 +427,26 @@ function contended(file, busyFor) {
   const waiting = cipher(file);
   waiting.pragma('busy_timeout = 0');
   let attempts = 0;
-  /** @type {CipherDatabase} */
+  /** @type {ServerDatabase} */
   const database = {
     prepare: (sql) => waiting.prepare(sql),
-    exec: (sql) => waiting.exec(sql),
+    // migrate() faehrt seine Transaktionen mit withTx(): jedes aeusserste BEGIN ist
+    // ein Versuch.
+    exec: (sql) => {
+      if (sql !== 'BEGIN') return waiting.exec(sql);
+      attempts += 1;
+      if (attempts > busyFor) return waiting.exec(sql);
+      // Die andere Verbindung schreibt (und haelt damit die Sperre), dann der
+      // Versuch: sein erstes Schreiben scheitert mit SQLITE_BUSY, der Treiber rollt
+      // ihn zurueck, und sein Fehler rollt auch die andere zurueck.
+      return holder.transaction(() => {
+        holder.exec('CREATE TABLE held_by_the_other_process (id INTEGER)');
+        waiting.transaction(() => waiting.exec('CREATE TABLE attempt_at_the_lock (id INTEGER)'))();
+      })();
+    },
+    get inTransaction() { return waiting.inTransaction; },
     pragma: (source, options) => waiting.pragma(source, options),
     close: () => waiting.close(),
-    transaction(fn) {
-      const run = waiting.transaction(fn);
-      return (...args) => {
-        attempts += 1;
-        if (attempts > busyFor) return run(...args);
-        // Die andere Verbindung schreibt (und haelt damit die Sperre), dann der
-        // Versuch; sein Fehler rollt auch die andere zurueck.
-        return holder.transaction(() => {
-          holder.exec('CREATE TABLE held_by_the_other_process (id INTEGER)');
-          return run(...args);
-        })();
-      };
-    },
   };
   return { database, waiting, holder, attempts: () => attempts };
 }

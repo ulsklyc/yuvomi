@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { google } from 'googleapis';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { createLogger } from '../logger.js';
 import { MAX_UPLOAD_BYTES } from '../utils/upload-limit.js';
 
@@ -295,7 +296,7 @@ export async function handleCallback(code) {
   }
 
   const folder = await ensureAppFolder(drive, { persist: false });
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     if (tokens.access_token) cfgSet('access_token', tokens.access_token);
     else cfgDel('access_token');
     cfgSet('refresh_token', tokens.refresh_token);
@@ -309,7 +310,7 @@ export async function handleCallback(code) {
     if (account.displayName) cfgSet('account_name', account.displayName);
     else cfgDel('account_name');
     cfgDel('last_error');
-  })();
+  });
   log.info('Google Drive OAuth connection saved.');
   return getStatus();
 }

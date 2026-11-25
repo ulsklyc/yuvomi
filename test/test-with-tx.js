@@ -212,6 +212,30 @@ onBothDrivers('die Folge der Anweisungen: eine innere Ebene laesst keinen Savepo
   assert.deepEqual(statements, ['BEGIN', 'ROLLBACK']);
 });
 
+onBothDrivers('{ immediate: true }: BEGIN IMMEDIATE aussen, SAVEPOINT innen, ohne Option BEGIN', (db) => {
+  // Wie .immediate() des Treibers: die Art gilt nur fuer die aeusserste Ebene,
+  // verschachtelt bleibt es ein Savepoint.
+  const { spy, statements } = recording(db);
+  withTx(spy, () => {
+    withTx(spy, () => write(db, 'inner'), { immediate: true });
+  }, { immediate: true });
+  assert.deepEqual(statements, [
+    'BEGIN IMMEDIATE',
+    'SAVEPOINT yuvomi_tx', 'RELEASE yuvomi_tx',
+    'COMMIT',
+  ]);
+  assert.deepEqual(labels(db), ['inner']);
+
+  statements.length = 0;
+  assert.throws(() => withTx(spy, () => { throw new Error('outer'); }, { immediate: true }), /outer/);
+  assert.deepEqual(statements, ['BEGIN IMMEDIATE', 'ROLLBACK']);
+
+  statements.length = 0;
+  withTx(spy, () => write(db, 'plain'), { immediate: false });
+  withTx(spy, () => write(db, 'default'));
+  assert.deepEqual(statements, ['BEGIN', 'COMMIT', 'BEGIN', 'COMMIT']);
+});
+
 // --------------------------------------------------------
 // Thenable als Rueckgabe: fn muss synchron sein
 // --------------------------------------------------------

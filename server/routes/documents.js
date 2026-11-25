@@ -7,6 +7,7 @@
 import express from 'express';
 import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { createLogger } from '../logger.js';
 import { str, date as validateDate, num, collectErrors, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
@@ -1314,7 +1315,7 @@ router.post('/', validateRequest(), async (req, res) => {
       originalName: vOriginalName.value,
     });
     const database = db.get();
-    const row = database.transaction(() => {
+    const row = withTx(database, () => {
       // NOCHMAL, OHNE YIELD DAZWISCHEN: die Pruefung oben lag vor dem await des
       // Ablegens, und dort kann ein anderes Loeschen den Ordner nehmen (Review
       // zu #1994). Erst hier ist das Ergebnis bis zum INSERT verbindlich.
@@ -1360,7 +1361,7 @@ router.post('/', validateRequest(), async (req, res) => {
         WHERE d.id = ?
         GROUP BY d.id
       `).get(result.lastInsertRowid);
-    })();
+    });
     res.status(201).json({ data: normalizeDocument(row) });
   } catch (err) {
     if (err instanceof StorageError) {

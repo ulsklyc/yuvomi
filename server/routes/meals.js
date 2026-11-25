@@ -6,6 +6,7 @@
 
 import express from 'express';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { str, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../api/formats.ts';
 import { addDays, mealWeekday, datesForTemplateInRange } from '../services/meal-recurrence.js';
 import { todayKey } from '../utils/timezone.js';
@@ -212,7 +213,7 @@ function materializeRecurringMeals(from, to) {
   const pending = pendingOccurrences(from, to);
   if (!pending.length) return;
 
-  const createMeals = db.get().transaction(() => {
+  withTx(db.get(), () => {
     const templateIngredients = db.get().prepare(`
       SELECT name, quantity, category
       FROM meal_recurrence_ingredients
@@ -253,8 +254,6 @@ function materializeRecurringMeals(from, to) {
       insertMealIngredients(result.lastInsertRowid, ingredientsByTemplate.get(template.id));
     }
   });
-
-  createMeals();
 }
 
 // --------------------------------------------------------
@@ -440,7 +439,7 @@ router.post('/', validateRequest(), (req, res) => {
   const cookError = cookRefusal(vCook.value);
   if (cookError) return res.status(400).json({ error: cookError, code: 400 });
 
-  const meal = db.transaction(() => {
+  const meal = withTx(db.get(), () => {
     const cleanIngredients = sanitizedIngredients(ingredients);
     let recurrenceTemplateId = null;
 
@@ -555,7 +554,7 @@ router.post('/apply-plan', validateRequest(), (req, res) => {
   }
 
   const skipped = [];
-  const created = db.transaction(() => {
+  const created = withTx(db.get(), () => {
     const actorId = req.authUserId || req.session.userId;
     if (skipOccupied) {
       // "Besetzt" zaehlt gegen den Stand VOR dem Aufruf: erst alle Slots
@@ -667,7 +666,7 @@ router.put('/:id', validateRequest(), (req, res) => {
       nEndDate = vRepeatUntil.value;
     }
 
-    db.transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare(`
         UPDATE meal_recurrence_templates
         SET meal_type = ?, title = ?, notes = ?, recipe_url = ?, recipe_id = ?, end_date = ?
@@ -777,7 +776,7 @@ router.delete('/:id', validateRequest(), (req, res) => {
   // dem Template explizit gelöscht werden, sonst blieben sie als Einzel-Mahlzeiten zurück.
   if (req.query.scope === 'series' && meal.recurrence_template_id) {
     const templateId = meal.recurrence_template_id;
-    db.transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ?').run(templateId);
       db.get().prepare('DELETE FROM meal_recurrence_templates WHERE id = ?').run(templateId);
     });
@@ -794,7 +793,7 @@ router.delete('/:id', validateRequest(), (req, res) => {
     const tpl = db.get().prepare('SELECT start_date FROM meal_recurrence_templates WHERE id = ?').get(templateId);
     const newEnd = addDays(meal.date, -1);
 
-    db.transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ? AND date >= ?')
         .run(templateId, meal.date);
 
@@ -966,7 +965,7 @@ router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (r
   if (handoverTooLarge(mealPlanSource(db.get(), /** @type {any} */ ({ mealId }), { materialize: false }).ingredients.length)) {
     return res.status(400).json(handoverTooLargeAnswer());
   }
-  const result = db.transaction(() => {
+  const result = withTx(db.get(), () => {
     const { rows } = mealPlanSource(db.get(), { mealId });
     if (!rows.length) return null;
     return handOverToShoppingList(db.get(), listId, rows);
@@ -1009,7 +1008,7 @@ router.post('/week-to-shopping-list', requireShoppingWrite, validateRequest(), (
   if (handoverTooLarge(mealPlanSource(db.get(), { from, to }, { materialize: false }).ingredients.length)) {
     return res.status(400).json(handoverTooLargeAnswer());
   }
-  const result = db.transaction(() => {
+  const result = withTx(db.get(), () => {
     const { rows } = mealPlanSource(db.get(), { from, to });
     if (!rows.length) return null;
     return handOverToShoppingList(db.get(), listId, rows);

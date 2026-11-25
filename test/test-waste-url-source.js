@@ -791,13 +791,14 @@ test('commitImport: a writer that lands between the version check and the write 
     const real = get();
     const racing = new Proxy(real, {
       get(target, prop) {
-        if (prop === 'transaction') {
-          return (fn) => {
-            const run = target.transaction(fn);
-            return (...args) => {
+        // withTx() opens its transaction with exec('BEGIN') (a savepoint when nested):
+        // the rival writes right before that.
+        if (prop === 'exec') {
+          return (sql) => {
+            if (/^(BEGIN|SAVEPOINT)\b/.test(sql)) {
               target.prepare('UPDATE waste_sources SET version = version + 1 WHERE id = ?').run(sourceId);
-              return run(...args);
-            };
+            }
+            return target.exec(sql);
           };
         }
         const value = target[prop];

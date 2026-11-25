@@ -3,6 +3,7 @@ import { summarizeFastingRows, fastingStreaks, weeklyFastingSeries } from './fas
 import { fastingDateKeyFactory, parseFastingDateRange, rowMatchesFastingDateRange } from './fasting-dates.js';
 import { householdTimeZone, shiftDateKey, todayKey } from '../utils/timezone.js';
 import { syncFastingRemindersForUser } from './fasting-reminders.js';
+import { withTx } from '../db/tx.ts';
 
 export class FastingError extends Error {
   constructor(status, reason, message, current = undefined) {
@@ -323,7 +324,7 @@ function overlap(database, subjectId, startAt, endAt, excludeId = null) {
 }
 
 function immediate(database, operation) {
-  return database.transaction(operation).immediate();
+  return withTx(database, operation, { immediate: true });
 }
 
 function createFastInTransaction(database, actor, input = {}) {

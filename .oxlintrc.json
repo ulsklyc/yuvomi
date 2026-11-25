@@ -242,6 +242,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           }
         ]
       }
@@ -392,6 +396,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           }
         ]
       }
@@ -543,6 +551,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           }
         ]
       }
@@ -665,6 +677,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           },
           {
             "selector": ":function[async=true]",
@@ -803,6 +819,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           }
         ]
       }
@@ -894,6 +914,10 @@
           {
             "selector": "CallExpression:matches([callee.property.name='sendNotification'], [callee.property.value='sendNotification'], [callee.name='sendNotification'])",
             "message": "PUSH-SEND: web-push is called only in server/services/push.js, which checks isActiveAccount first."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           },
           {
             "selector": ":function[async=true]",
@@ -1062,6 +1086,10 @@
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
           },
           {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
             "selector": ":function[async=true]",
             "message": "SYNC-ONLY: the database driver is synchronous and every await is a yield point between a read and its write; server/authorize/, server/migrations/, server/db/ (backup.ts and restore.ts apart), server/db.js and the read slices server/services/*-slices.ts stay without async/await."
           },
@@ -1228,6 +1256,10 @@
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
           },
           {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
             "selector": "CallExpression[arguments.length=0][callee.type='MemberExpression'][callee.computed=false][callee.property.name='get'][callee.object.type='Identifier'][callee.object.name=/^(db|dbModule)$/]",
             "message": "DB-SINGLETON: a service reads the module-wide connection with db.get(); take the connection as the first parameter (resolvePermissions(db, ...), withTx(db, fn)) and leave db.get() to routes and entry points. The baseline only sinks."
           }
@@ -1364,6 +1396,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           },
           {
             "selector": "CallExpression[arguments.length=0][callee.type='MemberExpression'][callee.computed=false][callee.property.name='get'][callee.object.type='Identifier'][callee.object.name=/^(db|dbModule)$/]",
@@ -1521,6 +1557,10 @@
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
           },
           {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
             "selector": "CallExpression[arguments.length=0][callee.type='MemberExpression'][callee.computed=false][callee.property.name='get'][callee.object.type='Identifier'][callee.object.name=/^(db|dbModule)$/]",
             "message": "DB-SINGLETON: a service reads the module-wide connection with db.get(); take the connection as the first parameter (resolvePermissions(db, ...), withTx(db, fn)) and leave db.get() to routes and entry points. The baseline only sinks."
           }
@@ -1669,6 +1709,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           },
           {
             "selector": "CallExpression[arguments.length=0][callee.type='MemberExpression'][callee.computed=false][callee.property.name='get'][callee.object.type='Identifier'][callee.object.name=/^(db|dbModule)$/]",
@@ -1828,6 +1872,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           }
         ]
       }
@@ -1982,6 +2030,10 @@
           {
             "selector": "CallExpression[callee.property.name='join'][arguments.0.value=/^[\\s(]*\\?[\\s?,()]*$/]",
             "message": "SQL-IN-LIST: one SQL placeholder per value breaks at 32766 host parameters with a 500; pass the list as one parameter with sqlInList() (server/utils/sql-in-list.ts). A fixed column list stands in lint-baseline-reasons.json with its reason."
+          },
+          {
+            "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
+            "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           },
           {
             "selector": ":function[async=true]",

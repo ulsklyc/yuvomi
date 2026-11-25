@@ -46,6 +46,7 @@
 
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { davFailureAction, createRefusalStop, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
 import { patchICSTodo, unfoldICS } from '../utils/ics-patch.js';
 import {
@@ -1866,7 +1867,7 @@ async function confirmCarriedCopy(attempt, client, accountId, clientFor) {
   const copy = await inspectObjectAt(other, place, row.external_object_url, row.external_uid);
   if (copy.own) return true;
 
-  return db.get().transaction(() => {
+  return withTx(db.get(), () => {
     const now = reloadRow('shopping', attempt.row_id);
     if (!mirrorElsewhere(now) || now.external_object_url !== row.external_object_url
         || now.external_account_id !== row.external_account_id) return false;
@@ -1881,7 +1882,7 @@ async function confirmCarriedCopy(attempt, client, accountId, clientFor) {
       + `the one at ${attempt.object_url} is kept and the item follows it.`
     );
     return false;
-  })();
+  });
 }
 
 /**
@@ -2134,7 +2135,7 @@ export function releaseStrandedShoppingMoves(accountId) {
   let released = 0;
   for (const row of rows) {
     if (shoppingMappingsOf(row.list_id).length) continue;
-    db.get().transaction(() => releaseShoppingMirror(row))();
+    withTx(db.get(), () => releaseShoppingMirror(row));
     released++;
     log.info(`Shopping item ${row.id} was moved to a list that is no longer mirrored; its entry on the server is removed and the item stays in Yuvomi.`);
   }
@@ -2278,7 +2279,7 @@ export function endWaitingShoppingMoves(accountId, listedUrls) {
     const from = collectionUrlOf(row.external_object_url);
     if (!from) continue;
     if (listed.length > 0 && !listed.some((url) => sameCollection(url, from))) {
-      db.get().transaction(() => releaseShoppingMirror(row))();
+      withTx(db.get(), () => releaseShoppingMirror(row));
       released++;
       log.warn(
         `The reminder list that shopping item "${row.name}" (${row.id}) was moved away from no longer exists on the server. `
@@ -2358,7 +2359,7 @@ function returnShoppingMove(row, reason) {
   // `row` ist die eben gelesene Zeile: zwischen dem Lesen beim Aufrufer und
   // hier liegt kein await.
   const now = row;
-  return db.get().transaction(() => {
+  return withTx(db.get(), () => {
     // Frisch gelesen: der Aufrufer kann eine Zeile ohne die Spalte halten.
     const movedBy = db.get().prepare('SELECT outbound_move_by FROM shopping_items WHERE id = ?').get(now.id)?.outbound_move_by ?? null;
     clearShoppingMove(now.id);
@@ -2371,7 +2372,7 @@ function returnShoppingMove(row, reason) {
       ), 0) + 1 WHERE id = ?
     `).run(home.target_list_id, home.target_list_id, now.category, now.id, now.id);
     return home.target_list_id;
-  })();
+  });
 }
 
 /**
@@ -2416,7 +2417,7 @@ function carriedContent(row, originalData) {
  * @returns {'carried'|'deleted'|'unchanged'|'released'}
  */
 function bookShoppingCarry(sent, { accountId, collectionUrl, objectUrl }) {
-  return db.get().transaction(() => {
+  return withTx(db.get(), () => {
     const now = reloadRow('shopping', sent.id);
     if (!now) return 'deleted';
     if (now.external_source !== 'caldav' || now.external_uid !== sent.external_uid
@@ -2444,7 +2445,7 @@ function bookShoppingCarry(sent, { accountId, collectionUrl, objectUrl }) {
       uid: now.external_uid, objectUrl: sent.external_object_url,
     });
     return 'carried';
-  })();
+  });
 }
 
 /**

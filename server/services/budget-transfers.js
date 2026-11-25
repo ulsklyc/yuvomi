@@ -1,4 +1,7 @@
 /** Account transfers are facts written in pairs, never by a mirroring trigger. */
+
+import { withTx } from '../db/tx.ts';
+
 export const TRANSFER_INCOME_CATEGORY = 'Geschenke & Transfers';
 export const TRANSFER_SAVING_CATEGORY = 'financial_other';
 export const TRANSFER_SAVING_SUBCATEGORY = 'saving';
@@ -22,7 +25,7 @@ export function linkTransfer(database, firstId, secondId) {
 }
 
 export function createTransfer(database, values) {
-  return database.transaction(() => {
+  return withTx(database, () => {
     const insert = database.prepare(`
       INSERT INTO budget_entries (title, amount, category, subcategory, date, account_id,
         is_recurring, recurrence_interval, recurrence_interval_count, recurrence_confirm,
@@ -36,7 +39,7 @@ export function createTransfer(database, values) {
       category: transferIncomeCategory(database), subcategory: '' }).lastInsertRowid;
     linkTransfer(database, outgoing, incoming);
     return database.prepare('SELECT * FROM budget_entries WHERE id = ?').get(outgoing);
-  })();
+  });
 }
 
 /** Runs inside the transaction that changed the entry, including confirmation. */
@@ -49,7 +52,7 @@ export function mirrorTransfer(database, id) {
 }
 
 export function deleteTransfer(database, entry) {
-  return database.transaction(() => {
+  return withTx(database, () => {
     const partner = transferPair(database, entry);
     for (const row of [entry, partner]) {
       if (row.recurrence_parent_id) database.prepare(`
@@ -61,5 +64,5 @@ export function deleteTransfer(database, entry) {
       DELETE FROM budget_entries WHERE recurrence_parent_id IN (?, ?)
     `).run(entry.id, partner.id);
     database.prepare('DELETE FROM budget_entries WHERE id = ?').run(entry.id);
-  })();
+  });
 }

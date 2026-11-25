@@ -52,6 +52,7 @@ import { deleteBirthdayArtifacts } from './birthdays.js';
 import { closeFormerMoney } from './reward-money.js';
 import { endDevicePairingCodes } from './device-pairing.js';
 import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 
 /**
  * Spalten, die auf `users(id)` zeigen und trotzdem keine Spur in geteilten
@@ -416,7 +417,7 @@ function hardDelete(database, userId) {
  * @throws {RemovalRefused}
  */
 export function removeUser(database, userId, { refuse } = {}) {
-  return database.transaction(() => {
+  return withTx(database, () => {
     if (!database.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) {
       return { outcome: 'not_found', traces: [] };
     }
@@ -427,5 +428,5 @@ export function removeUser(database, userId, { refuse } = {}) {
     if (outcome === 'deactivated') deactivate(database, userId);
     else hardDelete(database, userId);
     return { outcome, traces };
-  })();
+  });
 }

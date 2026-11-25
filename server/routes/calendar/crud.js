@@ -9,6 +9,7 @@ import { validateRequest } from '../../api/validate-request.ts';
 import { sqlInList } from '../../utils/sql-in-list.ts';
 import { MAX_REMINDER_OFFSETS } from '../../services/calendar-fields.js';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../api/formats.ts';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
@@ -646,7 +647,7 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
       return sendValidationErrors(res, [calendarCheck]);
     }
     const rights = attachmentRights(req);
-    const eventId = db.get().transaction(() => {
+    const eventId = withTx(db.get(), () => {
       const documentId = rights.createAttachmentDocument(
         db.get(),
         attachment,
@@ -690,7 +691,7 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
         previous: null, // neuer Termin: das Dokument bekommt seine Rechte hier
       });
       return result.lastInsertRowid;
-    })();
+    });
 
     const event = db.get().prepare(`
       SELECT e.*,
@@ -1332,7 +1333,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
         { mayClone: rights.mayCloneAttachment },
       );
     } else {
-      db.get().transaction(() => {
+      withTx(db.get(), () => {
         applyUpdate();
         // Ausnahmen tragen den Originalstart (#2034, Format A): aendert sich
         // die Uhr der Serie, wandern sie in derselben Transaktion mit.
@@ -1340,7 +1341,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
           const after = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
           rekeySeriesAfterUpdate(db.get(), event, after, householdTimeZone(db.get()));
         }
-      })();
+      });
     }
     stagedUpload = null;
 
@@ -1896,7 +1897,7 @@ router.post('/:id/reset', validateRequest(), (req, res) => {
 
   // `color_modified` geht mit: Zurücksetzen heisst "der Feed führt diesen
   // Termin wieder", und das schliesst seine Farbe ein (#899).
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     if (feed) {
       // Titel und Start sind NOT NULL: fehlt der Wert im Feed-Stand, bleibt der aktuelle.
       const startDt = feed.start_datetime ?? event.start_datetime;
@@ -1916,7 +1917,7 @@ router.post('/:id/reset', validateRequest(), (req, res) => {
     } else {
       db.get().prepare('UPDATE calendar_events SET user_modified = 0, color_modified = 0 WHERE id = ?').run(id);
     }
-  })();
+  });
   res.json({ data: { reset: true, restored: feed !== null } });
 });
 
@@ -2002,7 +2003,7 @@ router.delete('/:id', validateRequest(), (req, res) => {
   // der sie entsteht; die Regel selbst darf nur nicht in dieser Route WOHNEN
   // (Google-/ICS-/CalDAV-Sync und calendar-prune.js loeschen Termine ohne je
   // hier vorbeizukommen).
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     const ownedIds = db.get().prepare(`
       SELECT id FROM calendar_events
       WHERE id = ? OR recurrence_parent_id = ?
@@ -2016,7 +2017,7 @@ router.delete('/:id', validateRequest(), (req, res) => {
       `).run(ownedList.param);
     }
     return db.get().prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
-  })();
+  });
   if (result.changes === 0) return sendEventGone(res);
 
   res.status(204).end();

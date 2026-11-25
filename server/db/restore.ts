@@ -28,6 +28,7 @@ import { schemaVersion } from './migrate.ts';
 import { restoreError, validateBackupFile, unlinkIfExists } from './backup.ts';
 import type { ReasonedError } from './backup.ts';
 import type { DbHandle, SqliteDatabase } from './handle.ts';
+import { withTx } from './tx.ts';
 
 const log = createLogger('DB');
 
@@ -622,13 +623,13 @@ function writeBackupStatus(database: SqliteDatabase, carried: Record<string, str
                                      updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
     `);
     const remove = database.prepare('DELETE FROM sync_config WHERE key = ?');
-    database.transaction(() => {
+    withTx(database, () => {
       for (const key of Object.values(BACKUP_STATUS_KEYS)) {
         const value = carried?.[key] ?? null;
         if (value === null) remove.run(key);
         else upsert.run(key, value);
       }
-    })();
+    });
   } catch (err) {
     log.warn(`Could not carry the backup status into the restored database: ${(err as { code?: unknown } | null)?.code ?? 'unknown error'}`);
   }

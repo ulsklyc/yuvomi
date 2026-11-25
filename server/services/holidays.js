@@ -9,6 +9,7 @@
 import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { resolveHouseholdLocale } from '../utils/i18n.js';
 import { sqlInList } from '../utils/sql-in-list.ts';
 
@@ -703,7 +704,7 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const insertAll = db.get().transaction((rows) => {
+  const insertAll = (rows) => withTx(db.get(), () => {
     for (const h of rows) {
       const name = typeof h.name === 'string'
         ? h.name

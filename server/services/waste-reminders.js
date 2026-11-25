@@ -26,6 +26,7 @@ import { createLogger } from '../logger.js';
 import { householdDisabledModules } from './household-modules.js';
 import { listTypes, getOccurrences } from './waste-store.js';
 import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 
 const log = createLogger('Waste');
 
@@ -97,7 +98,7 @@ export const __test = { pickupReminderAt };
  * as much to a half-applied reminder sync.
  */
 export function syncWasteRemindersForUser(database, userId, now = new Date()) {
-  database.transaction(() => syncWasteRemindersForUserUnsafe(database, userId, now))();
+  withTx(database, () => syncWasteRemindersForUserUnsafe(database, userId, now));
 }
 
 function syncWasteRemindersForUserUnsafe(database, userId, now) {

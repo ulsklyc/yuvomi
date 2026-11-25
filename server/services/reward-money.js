@@ -33,6 +33,7 @@ import { householdCurrency } from '../utils/household-currency.js';
 import { householdTimeZone, todayKey, utcToWall } from '../utils/timezone.js';
 import { personAvatarUrlSql } from './person-avatar.js';
 import { ALLOWANCE_FREQUENCIES, MONEY_KINDS } from './reward-fields.js';
+import { withTx } from '../db/tx.ts';
 
 // Die Listen stehen in reward-fields.js, die auch das OpenAPI-Dokument liest (#2810).
 export { ALLOWANCE_FREQUENCIES, MONEY_KINDS };
@@ -190,12 +191,12 @@ export function ensureMoneyAccount(d, userId, actorId = null) {
  * @returns {'closed'|'not_found'|'not_empty'}
  */
 export function closeMoneyAccount(d, userId) {
-  return d.transaction(() => {
+  return withTx(d, () => {
     if (!accountCurrency(d, userId)) return 'not_found';
     if (!isMoneyAccountEmpty(d, userId)) return 'not_empty';
     d.prepare('DELETE FROM reward_money_accounts WHERE user_id = ?').run(userId);
     return 'closed';
-  })();
+  });
 }
 
 /** Waehrung und Nachkommastellen, in denen DIESES Konto rechnet (gibt es noch keines: die des Haushalts, in der es eroeffnet wuerde). */
@@ -527,9 +528,11 @@ export function readPlanInput(d, userId, body) {
  *
  * Faellt der erste Termin des neuen Plans auf heute, wird er in derselben
  * Transaktion gebucht - idempotent wie der Lauf.
+ * @returns {any} wie vor dem Umzug auf withTx: der Plan steht nach dem Schreiben
+ *   fest, planView() traegt aber den Null-Zweig des Lesens mit.
  */
 export function savePlan(d, userId, input, { actorId = null, today = todayKey(d) } = {}) {
-  return d.transaction(() => {
+  return withTx(d, () => {
     const before = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
     if (before && before.paused_at == null && before.next_run_date <= today) creditPlan(d, before, today);
     const existing = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
@@ -565,7 +568,7 @@ export function savePlan(d, userId, input, { actorId = null, today = todayKey(d)
     const saved = d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId);
     if (saved.paused_at == null && saved.next_run_date <= today) creditPlan(d, saved, today);
     return planView(d.prepare('SELECT * FROM reward_allowances WHERE user_id = ?').get(userId));
-  })();
+  });
 }
 
 // --------------------------------------------------------
@@ -685,7 +688,7 @@ export function creditDueAllowances(d, { now = new Date(), today = todayKey(d, n
   `).all();
   for (const row of stranded) {
     try {
-      d.transaction(() => closeFormerMoney(d, row.user_id, { today }))();
+      withTx(/** @type {import('../db/tx.ts').TxDatabase} */ (d), () => closeFormerMoney(d, row.user_id, { today }));
     } catch (err) {
       result.failed += 1;
       onError?.({ id: null, user_id: row.user_id }, err);
@@ -693,7 +696,7 @@ export function creditDueAllowances(d, { now = new Date(), today = todayKey(d, n
   }
   for (const plan of due) {
     try {
-      const out = d.transaction(() => creditPlan(d, plan, today))();
+      const out = withTx(/** @type {import('../db/tx.ts').TxDatabase} */ (d), () => creditPlan(d, plan, today));
       result.credited += out.credited;
       if (out.paused) result.paused += 1;
       // Ein Plan in fremder Waehrung ist pausiert und wird gemeldet - einmal,

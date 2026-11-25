@@ -7,6 +7,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import * as v from '../../api/formats.ts';
 import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
@@ -213,7 +214,7 @@ router.post('/medications', validateRequest(), (req, res) => {
   const owner = resolveOwner(req, viewer);
   if (owner.error) return res.status(owner.status).json({ error: owner.error, code: owner.status });
 
-  const medId = db.get().transaction(() => {
+  const medId = withTx(db.get(), () => {
     const result = db.get().prepare(`
       INSERT INTO medications (user_id, name, dosage_text, form, active, prn, stock_qty, stock_unit, refill_threshold, note, visibility,
                                min_interval_hours, prn_dose_qty)
@@ -225,7 +226,7 @@ router.post('/medications', validateRequest(), (req, res) => {
            b.min_interval_hours ?? null, b.prn_dose_qty ?? null);
     for (const sched of schedules) insertSchedule(result.lastInsertRowid, sched);
     return result.lastInsertRowid;
-  })();
+  });
 
   const row = db.get().prepare('SELECT * FROM medications WHERE id = ?').get(medId);
   // Die angelegten Zeitfenster nur, wenn welche mitkamen: ohne `schedules`
@@ -449,7 +450,7 @@ router.post('/medications/:id/logs', validateRequest(), (req, res) => {
   // dieselbe Regel, nach der der Scheduler selbst nur einmal anlegt. Abgezogen
   // wird dann nur beim Wechsel nach `taken`, sonst zoege ein wiederholter Tipp
   // die Dosis zweimal vom Bestand.
-  const { row, created, deducted } = db.get().transaction(() => {
+  const { row, created, deducted } = withTx(db.get(), () => {
     const existing = scheduleId && scheduledAt.value
       ? db.get().prepare(
         'SELECT * FROM medication_logs WHERE medication_id = ? AND schedule_id = ? AND scheduled_at = ?',
@@ -476,7 +477,7 @@ router.post('/medications/:id/logs', validateRequest(), (req, res) => {
     `).run(medId, scheduleId, scheduledAt.value, nextStatus, nextTakenAt, dose, note.value);
     const deducted = nextStatus === 'taken' ? deductStock(medId, b.stock_deduct) : 0;
     return { row: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(result.lastInsertRowid), created: true, deducted };
-  })();
+  });
   res.status(created ? 201 : 200).json({ data: row, stock_deducted: deducted });
 });
 
@@ -499,10 +500,10 @@ function updateLogStatus(req, res, newStatus) {
     // genommener Eintrag zieht nicht ein zweites Mal ab: ein wiederholtes
     // /take (Doppelklick, Wiederholung nach einem Netzfehler) bucht sonst die
     // Dosis doppelt vom Bestand.
-    const deducted = db.get().transaction(() => {
+    const deducted = withTx(db.get(), () => {
       db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = ? WHERE id = ?').run('taken', when, id);
       return logRow.status !== 'taken' ? deductStock(logRow.medication_id, b.stock_deduct) : 0;
-    })();
+    });
     return res.json({ data: db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(id), stock_deducted: deducted });
   }
   db.get().prepare('UPDATE medication_logs SET status = ?, taken_at = NULL WHERE id = ?').run('skipped', id);
@@ -647,7 +648,7 @@ router.post('/logs/:id/undo', validateRequest(), (req, res) => {
     : null;
   const cap = Number(logRow.dose_qty ?? planned ?? 0) || 0;
   const credited = logRow.status === 'taken' && credit > 0 ? Math.min(credit, cap) : 0;
-  const removed = db.get().transaction(() => {
+  const removed = withTx(db.get(), () => {
     if (credited > 0) {
       db.get().prepare('UPDATE medications SET stock_qty = stock_qty + ? WHERE id = ? AND stock_qty IS NOT NULL')
         .run(credited, logRow.medication_id);
@@ -658,7 +659,7 @@ router.post('/logs/:id/undo', validateRequest(), (req, res) => {
     }
     db.get().prepare("UPDATE medication_logs SET status = 'pending', taken_at = NULL WHERE id = ?").run(id);
     return false;
-  })();
+  });
   res.json({ data: removed ? { id, removed: true } : db.get().prepare('SELECT * FROM medication_logs WHERE id = ?').get(id) });
 });
 

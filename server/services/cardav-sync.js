@@ -9,6 +9,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('CardDAV');
 
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { mayChangeContactEmails } from './contact-identity.js';
@@ -1474,7 +1475,7 @@ function updateContactMultiValues(contactId, vcard) {
     return;
   }
 
-  const transaction = conn.transaction(() => {
+  withTx(conn, () => {
     // Delete non-primary entries
     conn.prepare('DELETE FROM contact_phones WHERE contact_id = ? AND is_primary = 0').run(contactId);
     if (!emailsLocked) conn.prepare('DELETE FROM contact_emails WHERE contact_id = ? AND is_primary = 0').run(contactId);
@@ -1483,8 +1484,6 @@ function updateContactMultiValues(contactId, vcard) {
     // Insert new entries from vCard
     insertContactMultiValues(contactId, emailsLocked ? { ...incoming, emails: [] } : incoming);
   });
-
-  transaction();
 }
 
 /**

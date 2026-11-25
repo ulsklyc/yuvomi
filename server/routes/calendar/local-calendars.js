@@ -1,6 +1,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { isAdminRequest, requireAdmin } from '../../middleware/require-admin.js';
 import { mayWriteModule, readerVisibleWhere, rowReader } from '../../authorize/index.ts';
 import {
@@ -124,14 +125,13 @@ router.patch('/calendars/reorder', requireCalendarWrite, validateRequest(), (req
   // nur ein Aufrufer an der Oberflaeche vorbei.
   const wellFormed = Array.isArray(order) && order.every(id => Number.isSafeInteger(id))
     && new Set(order).size === order.length;
-  const reorder = database.transaction(() => {
+  if (!withTx(database, () => {
     const ids = database.prepare('SELECT id FROM local_calendars').all().map(row => row.id);
     if (!wellFormed || order.length !== ids.length || !order.every(id => ids.includes(id))) return false;
     const update = database.prepare('UPDATE local_calendars SET sort_order = ? WHERE id = ?');
     order.forEach((id, index) => update.run(index, id));
     return true;
-  });
-  if (!reorder()) {
+  })) {
     return res.status(400).json({
       error: 'Order: list every calendar exactly once.',
       code: 400,
@@ -197,10 +197,10 @@ router.delete('/calendars/:id', requireCalendarWrite, validateRequest(), (req, r
   if (row.feed_token && !isAdminRequest(req)) {
     return res.status(403).json({ error: 'Admin access required.', code: 403, reason: 'calendar_feed_admin_only' });
   }
-  database.transaction(() => {
+  withTx(database, () => {
     database.prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
     restoreInheritedImportColors(database);
-  })();
+  });
   res.status(204).end();
 });
 

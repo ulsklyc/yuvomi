@@ -7,6 +7,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import * as v from '../api/formats.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import { syncAllBirthdayReminders } from '../services/birthdays.js';
@@ -656,7 +657,7 @@ router.put('/', validateRequest(), (req, res) => {
   // und eine gelesene, vergangene Erinnerung meldete sich nach jedem
   // Speichern derselben Menge erneut. Geerbte Zeilen (`assigned_from`)
   // weichen wie bisher der eigenen Menge.
-  const replace = db.get().transaction((values) => {
+  const replace = (values) => withTx(db.get(), () => {
     const existing = db.get().prepare(`
       SELECT id, remind_at, assigned_from FROM reminders
       WHERE entity_type = ? AND entity_id = ? AND created_by = ?

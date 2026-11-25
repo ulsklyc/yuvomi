@@ -18,6 +18,7 @@
 import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { getAdapter } from './recipe-providers/index.js';
 import { householdDisabledModules } from './household-modules.js';
 import { isPrivateNetworkRefusal, withPrivateNetworkHint } from './recipe-providers/private-network.js';
@@ -189,7 +190,7 @@ async function syncAccount(account) {
   let imported = 0;
   let updated = 0;
 
-  db.transaction(() => {
+  withTx(conn, () => {
     for (const { current, detail, recipeUrl } of toUpsert) {
       const hasImage = detail.hasImage ? 1 : 0;
       // Portionen der Quelle (#2558, #2355); der Adapter liefert nur 1-99 oder null.

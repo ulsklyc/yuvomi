@@ -10,6 +10,7 @@
 import { householdMemberSql } from './household-members.js';
 import { seriesRootOf } from './task-completions.js';
 import { householdTimeZone, todayKey, utcToWall, daysBetweenDateKeys } from '../utils/timezone.js';
+import { withTx } from '../db/tx.ts';
 
 const REWARD_TX = `
   INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, redemption_id, created_by, unit, currency)
@@ -312,7 +313,7 @@ export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null,
   if (!task || !Number.isInteger(task.points) || task.points <= 0) return;
   const targets = rewardTargets(d, taskId, actingUserId, doneByUserId);
   if (!targets.length) return;
-  d.transaction(() => {
+  withTx(d, () => {
     const net = d.prepare(TASK_NET);
     const seriesEarns = d.prepare(SERIES_EARNS_SINCE);
     const ins = d.prepare(`INSERT INTO reward_ledger (user_id, delta, type, reason, task_id, created_by, created_at, series_id, decay_days, base_points)
@@ -329,7 +330,7 @@ export function awardForCompletion(d, taskId, actingUserId, doneByUserId = null,
       if (paidToday) continue;
       ins.run(uid, decay.awarded, task.title || null, taskId, actingUserId || null, ledgerTimestamp(now), series, decay.days, decay.base);
     }
-  })();
+  });
 }
 
 /**
@@ -347,7 +348,7 @@ export function reverseTaskEarnings(d, taskId, actingUserId = null) {
   // "Zuständige" oder "handelnde Person" ließe genau die Buchung stehen, die
   // das Zurücknehmen auflösen soll. `task_id` trifft sie alle, unabhängig
   // davon, wer sie erhalten hat.
-  d.transaction(() => {
+  withTx(d, () => {
     // Die Gegenbuchung ZEIGT AUF IHRE GUTSCHRIFT (`reverses_id`). Über die
     // Aufgabe ließen sich die beiden nur finden, solange es sie gibt: wird sie
     // gelöscht, verlieren beide Zeilen ihre task_id, und niemand wüsste mehr,
@@ -367,7 +368,7 @@ export function reverseTaskEarnings(d, taskId, actingUserId = null) {
     for (const row of open) {
       ins.run(row.user_id, -row.net, reason.get(row.earn_id)?.reason ?? null, taskId, actingUserId || null, row.earn_id);
     }
-  })();
+  });
 }
 
 /**

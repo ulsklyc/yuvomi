@@ -8,6 +8,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import { createHash } from 'node:crypto';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { str, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../api/formats.ts';
 import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.js';
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
@@ -220,7 +221,7 @@ router.post('/', validateRequest(), (req, res) => {
   const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage]);
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-  const recipeId = db.transaction(() => {
+  const recipeId = withTx(db.get(), () => {
     const result = db.get().prepare(`
       INSERT INTO recipes (title, notes, recipe_url, meal_types, image_data, servings, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -282,7 +283,7 @@ router.put('/:id', validateRequest(), (req, res) => {
   const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage]);
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-  db.transaction(() => {
+  withTx(db.get(), () => {
     // COALESCE fuer das Bild: ein nicht mitgeschicktes Feld (undefined -> NULL
     // als Bindung) laesst das gespeicherte stehen. Geloescht wird nur mit
     // ausdruecklichem null/'' - dann traegt vImage.value ebenfalls null, und
@@ -609,7 +610,7 @@ router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (r
 
   // Die Regel ist die der ganzen Kueche (services/kitchen-handover.js, R23 D2):
   // dieser Weg hatte sie als einziger schon, die drei anderen nicht.
-  const result = db.transaction(() => {
+  const result = withTx(db.get(), () => {
     const { added_ids: addedIds, skipped } = handOverToShoppingList(db.get(), listId, ingredients.map(({ name, quantity, category }) => ({ name, quantity, category })));
     return { transferred: addedIds.length, skipped, added_ids: addedIds };
   });
