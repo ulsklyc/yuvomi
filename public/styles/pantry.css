@@ -13,12 +13,34 @@
    * zusätzlich ab (siehe .has-kitchen-tabs in kitchen-tabs.css). */
   height: 100%;
   overflow: hidden;
+  container: pantry-surface / inline-size;
 }
 
 @media (min-width: 1024px) {
   .pantry-page {
     height: 100%;
   }
+}
+
+.pantry-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--page-inline-pad) 0;
+}
+
+.pantry-title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  line-height: var(--line-height-tight);
+}
+
+.pantry-heading__summary {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Der Kopf ist der kanonische .page-toolbar in der Variante --in-group
@@ -47,6 +69,134 @@
    * Gruppen-Abstands des Ports (--space-5, .list-scroller in list-row.css)
    * steht unter ihr nur ihr eigenes Polster plus --space-2. */
   margin-block-end: calc(var(--space-2) - var(--space-5));
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  overflow: visible;
+  align-items: center;
+}
+
+.pantry-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 1;
+}
+
+.pantry-filters .filter-chip__count {
+  min-width: 2ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.pantry-location-filter {
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--space-2);
+  margin-inline-start: var(--space-2);
+}
+
+.pantry-location-filter > .icon-md {
+  flex-shrink: 0;
+}
+
+.pantry-location-filter__label {
+  min-width: 0;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pantry-location-sheet {
+  --module-accent: var(--module-kitchen);
+}
+
+.pantry-location-options {
+  padding-block-end: var(--space-3);
+}
+
+.pantry-location-search {
+  display: block;
+  margin-block-end: var(--space-3);
+}
+
+.pantry-location-options .filter-chip {
+  max-width: 100%;
+  white-space: normal;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.pantry-location-no-results {
+  color: var(--color-text-secondary);
+  padding-block: var(--space-3);
+}
+
+@container pantry-surface (max-width: 43.99rem) {
+  .pantry-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .pantry-filter-group > .filter-chip {
+    min-height: var(--target-base);
+    justify-content: center;
+    padding-inline: var(--space-2);
+    white-space: normal;
+  }
+
+  .pantry-filter-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .pantry-filter-group .filter-chip > span:not(.filter-chip__count) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .pantry-filter-group .filter-chip__count {
+    flex-shrink: 0;
+  }
+
+  .pantry-location-filter {
+    margin-inline-start: 0;
+    min-height: var(--target-lg);
+    width: 100%;
+  }
+
+  .pantry-location-filter__label {
+    flex: 1;
+    max-width: none;
+    text-align: start;
+  }
+}
+
+@media (max-height: 499px) {
+  @container pantry-surface (min-width: 36rem) {
+    .pantry-filters {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    .pantry-filter-group {
+      display: flex;
+    }
+
+    .pantry-location-filter {
+      width: auto;
+      min-height: var(--target-base);
+    }
+
+    .pantry-location-filter__label {
+      max-width: 24ch;
+    }
+  }
 }
 
 /* Mit Chipreihe traegt die Reihe das obere Polster des Ports selbst - sonst
@@ -63,22 +213,79 @@
  * `.pantry-bulkbar-slot`, der ihr die Content-Spalte gab - der letzte Rest
  * eines Wohnorts im Inhalt. */
 
-/* Scroller, Lesemaß, FAB-Auslauf, Gruppen-Abstand: .list-scroller
- * (styles/list-row.css), im Markup neben .pantry-list.
- *
- * Hier bleibt nur der Träger der Content-Spalte: im Vorrat ist die Liste selbst
- * der Träger (im Einkauf ist es #list-content darüber). Genau deshalb setzt
- * .list-scroller KEIN padding-inline - es würde sich in einem der beiden Tabs
- * addieren. */
+/* The full-width scrollport carries category cards; its own padding lines up
+ * with the heading above. */
 .pantry-list {
   padding-inline: var(--page-inline-pad);
-  padding-top: var(--space-4);
+  padding-top: var(--space-2);
 }
 
-/* KEINE SEITENSPALTE (R24, E2). Ab 60rem stand hier das Nebenpanel „Im
- * Blick" neben der Liste - dieselben Artikel wie Chip und Zeilen-Etikett.
- * Die Liste steht jetzt in jeder Breite auf dem Lesemass der Seite
- * (`page-measure--narrow`), der Koerper ist nur noch ihr Rahmen. */
+.pantry-filters,
+.pantry-list--filtered > .pantry-group,
+.pantry-list > .empty-state,
+.pantry-list > .search-empty {
+  grid-column: 1 / -1;
+}
+
+.pantry-group {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.pantry-saved-products {
+  grid-column: 1 / -1;
+}
+
+.pantry-saved-products > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--target-lg);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  list-style: none;
+  border-radius: var(--radius-md);
+}
+
+.pantry-saved-products > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pantry-saved-products > summary:hover {
+  background-color: var(--color-surface);
+}
+
+.pantry-saved-products > summary:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.pantry-saved-products__chevron {
+  flex-shrink: 0;
+}
+
+.pantry-saved-products:not([open]) .pantry-saved-products__chevron {
+  transform: rotate(-90deg);
+}
+
+[dir="rtl"] .pantry-saved-products:not([open]) .pantry-saved-products__chevron {
+  transform: rotate(90deg);
+}
+
+@container pantry-surface (min-width: 58rem) {
+  .pantry-list:not(.pantry-list--filtered) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    align-items: start;
+    column-gap: var(--space-4);
+    row-gap: var(--space-4);
+  }
+}
+
+/* The scrollport fills the remaining page height below the toolbar. */
 .pantry-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -246,6 +453,24 @@
  * Textspalte: 168px statt 220px, und das war der Umbruch der Metazeile.
  *
  * Die Begründung ist damit abgelaufen, nicht falsch gewesen. */
+.pantry-row__cart-slot:has(.pantry-restock) {
+  width: auto;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+@container pantry-surface (max-width: 34rem) {
+  .list-row:has(.pantry-restock) {
+    flex-wrap: wrap;
+  }
+
+  .list-row:has(.pantry-restock) > .list-row__actions {
+    max-width: 100%;
+    flex-wrap: wrap;
+    margin-inline-start: auto;
+  }
+}
+
 .pantry-row__cart-slot:empty {
   display: none;
 }
@@ -427,7 +652,7 @@
  * actions zone takes no room, unless it carries the more button of a product
  * without batches: without a minimum that row has no cart (#2118) but must
  * keep its delete. */
-.pantry-product__actions:not(:has(.pantry-row__cart, .row-action--more)) {
+.pantry-product__actions:not(:has(.pantry-row__cart, .row-action--more, .pantry-restock)) {
   display: none;
 }
 

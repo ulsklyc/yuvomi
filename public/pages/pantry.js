@@ -30,11 +30,12 @@ import { renderSkeletonList } from '/utils/skeleton.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { pageToolsMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { rowMenuHtml } from '/utils/row-action.js';
+import { openFilterSheet, filterChipsHtml } from '/utils/filter-sheet.js';
 import { errorSentence } from '/utils/friendly-error.js';
 // Alias, weil dieses Modul selbst eine `emptyStateEl()`-Funktion hat, die den
 // Renderer mit den Vorrats-Texten füllt.
 import { emptyStateEl as emptyStateComponentEl, mountLoadError, searchEmptyEl } from '/utils/empty-state.js';
-import { scheduleUndoableDelete, vibrate, wireScrollFade, collapseOut, expandIn, toggleRegion, durationToken, easingToken } from '/utils/ux.js';
+import { scheduleUndoableDelete, vibrate, collapseOut, expandIn, toggleRegion, durationToken, easingToken } from '/utils/ux.js';
 import { redrawList } from '/utils/list-motion.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
 import { todayKey } from '/utils/date.js';
@@ -48,7 +49,6 @@ import {
   hasPantryMinimum,
   matchesPantryFilter,
   pantryExpiryPhrase,
-  pantryFilterCounts,
   pantryFilterFromSearch,
   pantryItemStatus,
   pantryProductStock,
@@ -56,20 +56,37 @@ import {
 } from '/utils/pantry-status.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
 
+/** @type {HTMLElement|null} */
 let _container = null;
 /** Handle des geteilten Suchfelds (setValue/clear), gesetzt in render(). */
+/** @type {ReturnType<typeof wirePageSearch>} */
 let _search = null;
 
+/**
+ * @typedef {{id: number, name: string, quantity: number, unit: string, product_id?: number|null,
+ *   category?: string, min_quantity?: number|null, location_id?: number|null,
+ *   location_name?: string|null, location_icon?: string|null, expires_on?: string|null, notes?: string|null}} PantryItem
+ * @typedef {{id: number, name: string, unit: string, category?: string,
+ *   min_quantity?: number|null, batch_count?: number}} PantryProduct
+ * @typedef {{id: number, name: string, icon?: string|null}} PantryLocation
+ * @typedef {{id?: number|null, batches: PantryItem[], total: number, min: number|null, low: boolean, out: boolean}} ProductStock
+ */
 const state = {
+  /** @type {PantryItem[]} */
   items: [],
   /** Die Haushaltsprodukte ueber den Chargen (#1448), auch die ohne Charge. */
+  /** @type {PantryProduct[]} */
   products: [],
+  /** @type {PantryLocation[]} */
   locations: [],
+  /** @type {Array<{name: string, icon?: string, sort_order?: number}>} */
   categories: [],
   /** Einkaufslisten - erst beim ersten „Auf die Einkaufsliste" nachgeladen. */
   lists: null,
   query: '',
   filter: 'all',
+  /** @type {number|'none'|null} */
+  locationId: null,
   /** Einmal pro Render eingefroren: sonst könnte ein über Mitternacht offener
    *  Tab Zeilen unterschiedlich bewerten, je nachdem wann sie gezeichnet wurden. */
   todayKey: todayKey(),
@@ -179,6 +196,12 @@ function quantityText(item) {
   return pantryQuantityLabel(item.quantity, item.unit, { t, formatNumber: formatQuantity });
 }
 
+/** Pantry dates keep their regional separators and omit a dangling final dot. */
+/** @param {string} value */
+function expiryDateText(value) {
+  return dateText(value, { today: state.todayKey }).replace(/\.$/u, '');
+}
+
 /**
  * Ablauf-Badge als { text, tone } oder null. Bewusst nur für abgelaufen/bald:
  * ein Badge auf jeder Zeile wäre Ornament und würde genau die Zeilen entwerten,
@@ -214,9 +237,12 @@ function stockBadge(stock) {
  * The stock of every product as the rows show it: with the intent of a step
  * still in its debounce window, and without a batch in its undo window.
  */
+function shownBatches() {
+  return state.items.filter((item) => !pendingDeletes.has(item.id)).map(withIntent);
+}
+
 function productStock() {
-  const shown = state.items.filter((i) => !pendingDeletes.has(i.id)).map(withIntent);
-  return pantryProductStock(shown, state.products);
+  return /** @type {Map<string, ProductStock>} */ (pantryProductStock(shownBatches(), state.products));
 }
 
 // --------------------------------------------------------
@@ -263,21 +289,36 @@ async function ensureLists() {
 // Auswahl / Gruppierung
 // --------------------------------------------------------
 
-/** The storage location of a place chip ("place:3"), or null for the other filters. */
-function placeFilterId(filter = state.filter) {
-  const match = /^place:(\d+)$/.exec(String(filter ?? ''));
-  return match ? Number(match[1]) : null;
+function hasFilter() {
+  return state.filter !== 'all' || state.locationId != null;
+}
+
+/** @param {string} key */
+function selectFilter(key) {
+  if (key === 'all') {
+    state.filter = 'all';
+    state.locationId = null;
+  } else if (key.startsWith('place:')) {
+    const id = key === 'place:all' ? null : (key === 'place:none' ? 'none' : Number(key.slice(6)));
+    state.locationId = state.locationId === id ? null : id;
+  } else {
+    state.filter = state.filter === key ? 'all' : key;
+  }
+}
+
+/** @param {PantryItem} item */
+function matchesPlace(item) {
+  return state.locationId == null || (state.locationId === 'none' ? item.location_id == null : item.location_id === state.locationId);
 }
 
 function visibleItems() {
   const q = state.query.toLowerCase();
-  const place = placeFilterId();
   // Gefiltert wird nach dem, was die Zeile ZEIGT - sonst faellt ein Artikel aus
   // „Fast leer", waehrend die Zeile ihn noch dort zeigt.
   const stock = state.filter === 'low' ? productStock() : null;
-  return state.items.map(withIntent).filter((item) => {
+  return shownBatches().filter((item) => {
     // A place chip (#1448) asks "what is in the freezer?": the batches there.
-    if (place != null ? item.location_id !== place : !matchesPantryFilter(item, state.filter, state.todayKey, stock)) return false;
+    if (!matchesPlace(item) || !matchesPantryFilter(item, state.filter, state.todayKey, stock)) return false;
     if (!q) return true;
     return item.name?.toLowerCase().includes(q)
       || item.notes?.toLowerCase().includes(q)
@@ -293,7 +334,7 @@ function visibleItems() {
  */
 function flatItems(items) {
   const flat = [...items];
-  if (placeFilterId() != null) {
+  if (state.locationId != null && state.filter === 'all') {
     // A place lists its batches like the page lists products: by name, then
     // best-before (none last), then id.
     flat.sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), undefined, { sensitivity: 'base' })
@@ -316,10 +357,10 @@ function productKeyOf(item) {
 /** Every batch of the household per product, as the rows show them (with intent). */
 function batchesByProduct() {
   const byProduct = new Map();
-  for (const item of state.items) {
+  for (const item of shownBatches()) {
     const key = productKeyOf(item);
     if (!byProduct.has(key)) byProduct.set(key, []);
-    byProduct.get(key).push(withIntent(item));
+    byProduct.get(key).push(item);
   }
   return byProduct;
 }
@@ -388,7 +429,7 @@ function fillProductBadge(slot, batches, stock) {
  * server sorts batches (case-insensitive); batches by place order, best-before
  * (none last) and id.
  *
- * @returns {Array<{ key: string, label: string, products: object[] }>}
+ * @returns {Array<{ key: string, label: string, products: ReturnType<typeof productEntries> }>}
  */
 function productSections(matching) {
   const products = productEntries(matching);
@@ -419,11 +460,7 @@ function productSections(matching) {
  * empty product). The search narrows it like the unfiltered list.
  */
 function lowProducts() {
-  const q = state.query.toLowerCase();
-  const matching = state.items.map(withIntent).filter((item) => !q
-    || item.name?.toLowerCase().includes(q)
-    || item.notes?.toLowerCase().includes(q)
-    || (item.location_name && locationLabel(item.location_name).toLowerCase().includes(q)));
+  const matching = visibleItems();
   const nameOrder = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
   // A low product has a minimum above 0 (out wins at 0), so the share is defined.
   const share = (p) => (p.stock.out ? 0 : p.stock.total / Number(p.stock.min));
@@ -447,7 +484,7 @@ function productEntries(matching) {
   const keys = new Set(matching.map(productKeyOf));
   for (const p of state.products) {
     if (pendingProductDeletes.has(p.id)) continue;
-    if (!byProduct.has(`p${p.id}`) && (!q || p.name?.toLowerCase().includes(q))) keys.add(`p${p.id}`);
+    if (state.locationId == null && !byProduct.has(`p${p.id}`) && (!q || p.name?.toLowerCase().includes(q))) keys.add(`p${p.id}`);
   }
 
   const placeOrder = new Map(state.locations.map((loc, idx) => [loc.id, idx]));
@@ -485,24 +522,27 @@ function productEntries(matching) {
 export async function render(container) {
   _container = container;
   state.todayKey = todayKey();
-  // Frische Seite: die Chip-Leiste darf beim ersten Zeichnen wieder scrollen.
-  _scrolledFilter = null;
   expandedProducts.clear();
-  // Deep-Link der Dashboard-Kachel „Läuft bald ab" (`?filter=expired|soon`).
-  // Trifft der Chip gerade nichts, setzt die Chip-Leiste ohnehin auf „Alle"
-  // zurück - ein veralteter Link endet nie in einer leeren Liste.
-  const linkedFilter = pantryFilterFromSearch(window.location.search);
-  if (linkedFilter) state.filter = linkedFilter;
+  // Start fresh on entry. Dashboard links can explicitly request a status.
+  state.filter = pantryFilterFromSearch(window.location.search) ?? 'all';
+  state.locationId = null;
+  state.query = '';
 
   const page = document.createElement('div');
-  page.className = 'pantry-page app-page app-page--reading page-measure--narrow';
-  page.dataset.composition = 'reading';
+  page.className = 'pantry-page app-page app-page--full';
+  page.dataset.composition = 'full';
 
-  // sr-only: die Küchen-Tab-Leiste benennt das Modul bereits sichtbar -
-  // dieselbe Kopf-Grammatik wie Mahlzeiten/Rezepte/Einkauf.
+  // A visible page title anchors the denser overview below the kitchen tabs.
   const title = document.createElement('h1');
-  title.className = 'sr-only';
+  title.className = 'pantry-title';
   title.textContent = t('nav.pantry');
+
+  const heading = document.createElement('header');
+  heading.className = 'pantry-heading';
+  const summary = document.createElement('p');
+  summary.className = 'pantry-heading__summary';
+  summary.hidden = true;
+  heading.append(title, summary);
 
   // Eine geteilte Live-Region für die ganze Seite statt einer je Zeile.
   const live = document.createElement('div');
@@ -555,10 +595,6 @@ export async function render(container) {
       })}
     </div>`}`);
 
-  // DIE CHIPREIHE STEHT IM SCROLLPORT (Kopfregel mobil, Regel 3): als erstes
-  // Kind von #pantry-list scrollt sie mit der Liste weg, statt dauerhaft 60px
-  // ueber dem Port zu belegen (A8: fix bis y181). renderList() ersetzt nur,
-  // was HINTER ihr steht.
   const filters = document.createElement('div');
   filters.className = 'page-chip-row pantry-filters';
   filters.id = 'pantry-filters';
@@ -587,17 +623,11 @@ export async function render(container) {
   fab.dataset.dockLabel = t('newLabel.pantry');
   fab.insertAdjacentHTML('beforeend', '<i data-lucide="plus" aria-hidden="true"></i>');
 
-  // KEINE SEITENSPALTE (R24, E2). Hier stand ab 60rem das Nebenpanel „Im
-  // Blick" mit dem, was bald ablaeuft - dieselben Artikel wie der Chip
-  // „Laeuft bald ab" mit seinem Zaehler und wie das Etikett an der Zeile, also
-  // dreimal dieselbe Aussage (Critique 2026-10-26, G3-Vorrat-P2-1). Die
-  // Chipreihe mit ihren Zaehlern IST die Kennzahl der Flaeche; die Liste steht
-  // auf dem Lesemass wie in jeder Breite.
   const body = document.createElement('div');
   body.className = 'pantry-body';
   body.append(list);
 
-  page.append(title, live, toolbar, body, fab);
+  page.append(heading, live, toolbar, body, fab);
   container.replaceChildren(page);
   renderKitchenTabsBar(container, '/pantry');
 
@@ -631,9 +661,14 @@ export async function render(container) {
   fab.addEventListener('click', () => openItemModal('create'));
 
   filters.addEventListener('click', (e) => {
+    if (!(e.target instanceof Element)) return;
+    if (e.target.closest('[data-location-filter]')) {
+      openLocationFilter();
+      return;
+    }
     const chip = e.target.closest('[data-filter]');
     if (!chip) return;
-    state.filter = chip.dataset.filter;
+    selectFilter(chip.dataset.filter);
     renderFilters();
     renderList();
   });
@@ -670,129 +705,146 @@ function renderLoadError(list, err) {
   });
 }
 
-/**
- * Filter-Chips. Ein Zustand ohne Treffer bekommt keine Chip: eine Chip, die
- * garantiert auf eine leere Liste führt, ist eine Sackgasse. Bleibt nur „Alle"
- * übrig, entfällt die Zeile ganz - eine einzelne Chip filtert nichts.
- */
-/**
- * Zuletzt ins Sichtfeld geholter Filter. Ohne dieses Gedächtnis rief jeder
- * Re-Render `scrollIntoView` auf - und weil `adjustQuantity` die Leiste bei
- * jedem ±-Tap neu zeichnet, riss ein einziger Tap die manuell zurückgescrollte
- * Leiste wieder weg und schob den „Alle"-Ausgang aus dem Bild (Critique P1).
- */
-let _scrolledFilter = null;
+/** @type {Record<string, {key: string, icon: string}>} */
+const statusChips = {
+  expired: { key: 'pantry.filterExpired', icon: 'circle-alert' },
+  soon: { key: 'pantry.filterSoon', icon: 'clock' },
+  low: { key: 'pantry.filterLow', icon: 'package-open' },
+};
 
-/**
- * @returns {{ wasReset: boolean }} `wasReset` ist true, wenn der aktive Filter
- * seinen letzten Treffer verloren hat und automatisch auf „Alle" zurückfiel -
- * dann muss der Aufrufer auch die Liste neu zeichnen, sonst zeigen die Chips
- * „Alle" und die Liste weiter die alte gefilterte Teilmenge.
- */
 function renderFilters() {
   const bar = _container?.querySelector('#pantry-filters');
-  if (!bar) return { wasReset: false };
+  if (!bar) return;
 
-  // Kanten-Anriss der Chip-Leiste. Sie scrollt horizontal (gemessen 135px
-  // Überhang bei 393px, 208px bei 320px), blendet ihre Scrollbar per CSS aus
-  // und hatte damit NULL Affordanz: der vierte Filter „Fast leer" begann bei
-  // x=394 in einem 393px-Viewport und existierte für Mobilnutzer nicht
-  // (Critique 2026-07-30). wireScrollFade setzt die geteilten has-fade-*-
-  // Klassen aus filter-chip.css - dasselbe Werkzeug, das das Wochenboard und
-  // die Kontakte-Filter schon nutzen. Einmal binden; der MutationObserver
-  // deckt die replaceChildren-Rerenders darunter ab.
-  if (!bar.dataset.fadeWired) {
-    bar.dataset.fadeWired = 'true';
-    wireScrollFade(bar);
-  }
-
-  const shown = state.items.map(withIntent);
-  const counts = filterCounts();
-  const active = PANTRY_FILTERS.filter((key) => counts[key] > 0);
-  const places = placeChips(shown);
-  const ids = [...active, ...places.map((chip) => chip.id)];
-
-  // Der aktive Filter hat gerade seinen letzten Treffer verloren → zurück auf Alle.
-  const previousFilter = state.filter;
-  if (state.filter !== 'all' && !ids.includes(state.filter)) state.filter = 'all';
-  const wasReset = state.filter !== previousFilter;
-
-  // replaceChildren zerstört den fokussierten Chip; ohne Rettung landet der
-  // Tastatur-Fokus auf <body> und der Tab-Weg beginnt wieder ganz oben.
-  const hadFocus = bar.contains(document.activeElement);
-
+  const shown = shownBatches();
+  // An empty location stays selected until the user clears it or the location itself is removed.
+  if (state.locationId != null && state.locationId !== 'none' && !state.locations.some((loc) => loc.id === state.locationId)) state.locationId = null;
+  const stock = productStock();
+  const counts = filterCounts(shown, stock);
+  const places = placeChips(shown, stock);
+  const active = PANTRY_FILTERS;
+  const focusedKey = bar.contains(document.activeElement) && document.activeElement instanceof HTMLElement ? document.activeElement.dataset.filter : null;
+  const locationFocused = bar.contains(document.activeElement) && document.activeElement?.matches?.('[data-location-filter]');
   bar.replaceChildren();
-  if (!ids.length || (!state.items.length && !state.products.length)) {
-    bar.hidden = true;
-    return { wasReset };
-  }
-  bar.hidden = false;
+  bar.hidden = !active.length && !places.length;
+  if (bar.hidden) return;
 
-  const labels = {
-    expired: { key: 'pantry.filterExpired', icon: 'circle-alert' },
-    soon: { key: 'pantry.filterSoon', icon: 'clock' },
-    low: { key: 'pantry.filterLow', icon: 'package-open' },
-  };
-
-  const chips = [{ id: 'all', label: t('pantry.filterAll'), icon: 'boxes', count: null }];
+  /** @type {Array<{id: string, label: string, icon: string, selected: boolean, count: number|null}>} */
+  const chips = [{ id: 'all', label: t('pantry.filterAll'), icon: 'boxes', selected: !hasFilter(), count: null }];
   for (const key of active) {
-    chips.push({ id: key, label: t(labels[key].key), icon: labels[key].icon, count: counts[key] });
+    chips.push({ id: key, label: t(statusChips[key].key), icon: statusChips[key].icon,
+      count: counts[key], selected: state.filter === key });
   }
-  chips.push(...places);
 
-  bar.insertAdjacentHTML('beforeend', chips.map((chip) => `
-    <button type="button" class="filter-chip filter-chip--sm${chip.id === state.filter ? ' filter-chip--active' : ''}"
-            data-filter="${esc(chip.id)}" aria-pressed="${chip.id === state.filter}">
+  /** @param {{id: string, label: string, icon: string, selected: boolean, count: number|null}} chip */
+  const chipHtml = (chip) => `
+    <button type="button" class="filter-chip filter-chip--sm${chip.selected ? ' filter-chip--active' : ''}"
+            data-filter="${esc(chip.id)}" aria-pressed="${chip.selected}">
       <i data-lucide="${esc(chip.icon)}" class="icon-md" aria-hidden="true"></i>
       <span>${esc(chip.label)}</span>
       ${chip.count != null ? `<span class="filter-chip__count">${chip.count}</span>` : ''}
-    </button>`).join(''));
-
+    </button>`;
+  bar.insertAdjacentHTML('beforeend', `
+    <div class="pantry-filter-group" role="group" aria-label="${esc(t('pantry.statusLabel'))}">
+      ${chips.map(chipHtml).join('')}
+    </div>
+    <button type="button" class="filter-chip filter-chip--sm pantry-location-filter${state.locationId != null ? ' filter-chip--active' : ''}"
+            id="pantry-location-filter" data-location-filter aria-haspopup="dialog" aria-label="${esc(t('pantry.locationLabel') + ': ' + (places.find((place) => place.selected)?.label ?? t('pantry.allLocations')))}">
+      <i data-lucide="map-pin" class="icon-md" aria-hidden="true"></i>
+      <span class="pantry-location-filter__label">${esc(places.find((place) => place.selected)?.label ?? t('pantry.locations'))}</span>
+      <i data-lucide="sliders-horizontal" class="icon-md" aria-hidden="true"></i>
+    </button>`);
   if (window.lucide) window.lucide.createIcons({ el: bar });
 
   const activeChip = bar.querySelector('.filter-chip--active');
-  if (hadFocus) activeChip?.focus({ preventScroll: true });
+  if (focusedKey) (bar.querySelector(`[data-filter="${focusedKey}"]`) ?? activeChip)?.focus({ preventScroll: true });
+  if (locationFocused) bar.querySelector('[data-location-filter]')?.focus({ preventScroll: true });
 
-  // Die Chip-Leiste scrollt horizontal; ein aktiver Chip außerhalb des
-  // Sichtfelds nimmt der Liste ihre wichtigste Erklärung ("warum sehe ich nur
-  // drei Artikel?"). Aber NUR beim echten Wechsel - sonst kämpft jeder ±-Tap
-  // gegen die Scrollposition, die der Nutzer gerade selbst gesetzt hat.
-  if (_scrolledFilter !== state.filter) {
-    activeChip?.scrollIntoView({ inline: 'center', block: 'nearest' });
-    _scrolledFilter = state.filter;
-  }
-
-  return { wasReset };
 }
 
-/**
- * One chip per storage location that holds a batch (#1448): grouped by
- * category, the page no longer answers "what is in the freezer?" at a glance,
- * so the place gets a direct way in. Same chips as expired, soon and low, in
- * the same single-select bar: a tap on a place replaces a status filter, the
- * search narrows either. In the order of the locations (`sort_order`, as the
- * server sends them), with the number of batches there. Every place that holds
- * a batch gets its chip, also when it is the only one (as asked on #2085); no
- * chip for a place without a batch (a dead end), and batches without a place
- * get none either.
- */
-function placeChips(items) {
-  const counts = new Map();
+function openLocationFilter() {
+  const places = placeChips(shownBatches());
+  const choices = [
+    { value: 'all', label: t('pantry.allLocations'), active: state.locationId == null },
+    ...places.map((place) => ({ value: place.id.slice(6), label: `${place.label} (${place.count})`, active: place.selected })),
+  ];
+  const search = choices.length > 8 ? renderPageSearch({
+    id: 'pantry-location-search',
+    label: t('pantry.locations'),
+    placeholder: t('nav.search'),
+    clearLabel: t('common.searchClear'),
+    className: 'pantry-location-search',
+  }) : '';
+  const panel = openFilterSheet({
+    title: t('pantry.locations'),
+    groups: [{ heading: '', html: `<div class="pantry-location-options">${search}
+      ${filterChipsHtml('pantry-location', t('pantry.locations'), choices)}
+      <p class="pantry-location-no-results" role="status" hidden>${esc(t('common.searchNoResultsTitle'))}</p>
+    </div>` }],
+    resetLabel: null,
+    anchor: () => _container?.querySelector('[data-location-filter]') ?? null,
+  });
+  if (!panel) return;
+  panel.classList.add('pantry-location-sheet');
+  panel.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) return;
+    const chip = event.target.closest('[data-filter="pantry-location"]');
+    if (!(chip instanceof HTMLElement)) return;
+    selectFilter(`place:${chip.dataset.value}`);
+    panel.querySelectorAll('button[data-filter="pantry-location"]').forEach((button) => {
+      const selected = button.dataset.value === String(state.locationId ?? 'all');
+      button.classList.toggle('filter-chip--active', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    renderFilters();
+    renderList();
+  });
+  wirePageSearch(panel, {
+    id: 'pantry-location-search',
+    delay: 0,
+    onQuery: (query) => {
+      /** @param {string} value */
+      const normalize = (value) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
+      const term = normalize(query.trim());
+      let matches = 0;
+      panel.querySelectorAll('button[data-filter="pantry-location"]').forEach((chip) => {
+        chip.hidden = !normalize(chip.textContent ?? '').includes(term);
+        if (!chip.hidden) matches++;
+      });
+      const empty = panel.querySelector('.pantry-location-no-results');
+      if (empty instanceof HTMLElement) empty.hidden = matches > 0;
+    },
+  });
+}
+
+/** Predict the results at each location: batches for expiry, distinct products for low stock. */
+/** @param {PantryItem[]} items */
+function placeChips(items, stock = productStock()) {
+  const matches = new Map();
   for (const item of items) {
-    if (item.location_id != null) counts.set(item.location_id, (counts.get(item.location_id) ?? 0) + 1);
+    if (!matchesPantryFilter(item, state.filter, state.todayKey, stock)) continue;
+    const location = item.location_id ?? 'none';
+    if (!matches.has(location)) matches.set(location, new Set());
+    matches.get(location).add(state.filter === 'low' ? productKeyOf(item) : item.id);
   }
-  return state.locations
-    .filter((loc) => counts.has(loc.id))
-    .map((loc) => ({ id: `place:${loc.id}`, label: locationLabel(loc.name), icon: loc.icon || 'map-pin', count: counts.get(loc.id) }));
+  return [...state.locations, { id: 'none', name: null, icon: 'map-pin-off' }]
+    .map((loc) => ({ id: `place:${loc.id}`, label: loc.name == null ? t('pantry.unlocated') : locationLabel(loc.name), icon: loc.icon || 'map-pin',
+      count: matches.get(loc.id)?.size ?? 0, selected: loc.id === state.locationId }));
 }
 
-/**
- * The counts of the chips, as the rows show them: expired and soon per batch,
- * "Running low" per product, a product without batches included when it has a
- * minimum (#1448, step 3; #2118).
- */
-function filterCounts() {
-  return pantryFilterCounts(state.items.filter((i) => !pendingDeletes.has(i.id)).map(withIntent), state.todayKey, state.products);
+function filterCounts(items = shownBatches(), stock = productStock()) {
+  /** @type {Record<string, number>} */
+  const counts = { expired: 0, soon: 0, low: 0 };
+  for (const item of items) {
+    if (!matchesPlace(item)) continue;
+    const { expiry } = pantryItemStatus(item, state.todayKey);
+    if (expiry) counts[expiry]++;
+  }
+  for (const entry of stock.values()) {
+    if (pendingProductDeletes.has(entry.id) || (!entry.low && !entry.out)) continue;
+    if (state.locationId == null || entry.batches.some(matchesPlace)) counts.low++;
+  }
+  return counts;
 }
 
 /**
@@ -887,25 +939,34 @@ const PANTRY_ROW = '.pantry-swipe[data-swipe-id]';
 function renderList({ motion = false } = {}) {
   const list = _container?.querySelector('#pantry-list');
   if (!list) return;
+  list.classList.toggle('pantry-list--filtered', hasFilter());
   if (motion) redrawList(list, () => drawList(list), { selector: PANTRY_ROW, keyAttr: 'data-swipe-id' });
   else drawList(list);
 }
 
 function drawList(list) {
   list.removeAttribute('aria-busy');
-  // Die Chipreihe ist das erste Kind des Ports und ueberlebt den Neuaufbau.
+  const savedOpen = list.querySelector('.pantry-saved-products')?.open;
+  const hadStock = list.dataset.hasStock === 'true';
+  const hasStock = shownBatches().some((item) => Number(item.quantity) > 0);
+  list.dataset.hasStock = String(hasStock);
   const chipRow = list.querySelector(':scope > #pantry-filters');
+  const focusedChip = chipRow?.contains?.(document.activeElement) && document.activeElement instanceof HTMLElement ? document.activeElement : null;
   // Taking the row out and back in resets its scroll position, the one
   // renderFilters() has just set to show the active chip. With a chip per place
   // the active one often sits beyond the edge at 375px (#1448), so keep it.
   const chipScroll = chipRow?.scrollLeft ?? 0;
   list.replaceChildren(...(chipRow ? [chipRow] : []));
+  focusedChip?.focus({ preventScroll: true });
   if (chipRow && chipScroll) chipRow.scrollLeft = chipScroll;
   renderBulkBar();
 
+  const summary = _container?.querySelector('.pantry-heading__summary');
   // A product outlives its last batch (#1448): with products left, the page is
   // not empty, it shows them as out of stock.
-  if (!state.items.length && !state.products.length) {
+  if (!hasFilter() && !state.query && !state.items.some((item) => !pendingDeletes.has(item.id)) && !state.products.some((p) => !pendingProductDeletes.has(p.id))) {
+    announce('');
+    if (summary) summary.hidden = true;
     list.appendChild(emptyStateEl());
     if (window.lucide) window.lucide.createIcons({ el: list });
     return;
@@ -913,15 +974,19 @@ function drawList(list) {
 
   const items = state.filter === 'low' ? [] : visibleItems();
   // "Running low" lists products, as one flat group without a heading.
-  const sections = state.filter === 'all'
+  const sections = !hasFilter()
     ? productSections(items)
     : (state.filter === 'low' ? [{ key: 'flat', label: null, products: lowProducts() }] : null);
   const shown = sections ? sections.reduce((n, s) => n + s.products.length, 0) : items.length;
-  // Filtern und Suchen ändern die Liste, ohne dass sich der Fokus bewegt -
-  // ohne Ansage bleibt die neue Trefferzahl für Screenreader unsichtbar.
-  if (state.filter !== 'all' || state.query) {
-    announce(t('pantry.resultCount', { count: shown }));
+  const filtered = hasFilter() || Boolean(state.query);
+  const resultCount = t('pantry.resultCount', { count: shown });
+  if (summary) {
+    summary.hidden = false;
+    const products = t('pantry.products') + ': ' + formatQuantity(shown);
+    const locations = t('pantry.locations') + ': ' + formatQuantity(state.locations.length);
+    summary.textContent = filtered ? resultCount : products + ' · ' + locations;
   }
+  announce(filtered ? resultCount : '');
 
   if (!shown) {
     // Dieselbe .empty-state-Grammatik wie der leere Vorrat: davor stand hier ein
@@ -936,8 +1001,18 @@ function drawList(list) {
   // (renderBulkBar oben), nicht mehr als erstes Kind der Liste - dort scrollte
   // sie weg, obwohl sie die ganze gefilterte Liste betrifft.
 
-  const groups = sections ?? [{ key: 'flat', label: null, items: flatItems(items) }];
+  const groups = sections?.map((section) => ({ ...section, items: [] })) ?? [{ key: 'flat', label: null, items: flatItems(items), products: null }];
+  const saved = [];
   for (const group of groups) {
+    let products = group.products;
+    if (!hasFilter() && products) {
+      products = [];
+      for (const product of group.products) {
+        if (product.batches.length) products.push(product);
+        else saved.push(product);
+      }
+      if (!products.length) continue;
+    }
     const section = document.createElement('section');
     // Geteilte Gruppen-Grammatik (styles/list-row.css): die Gruppe trägt die
     // weiße Fläche, die Zeilen darin nur Trennlinien.
@@ -950,15 +1025,15 @@ function drawList(list) {
       name.textContent = group.label;
       const count = document.createElement('span');
       count.className = 'list-group__count';
-      count.textContent = String(group.products.length);
+      count.textContent = String(products.length);
       heading.append(name, count);
       section.appendChild(heading);
     }
 
     const rows = document.createElement('ul');
     rows.className = 'row-carrier pantry-rows';
-    if (group.products) {
-      for (const product of group.products) rows.appendChild(productEl(product));
+    if (products) {
+      for (const product of products) rows.appendChild(productEl(product));
     } else {
       // Both maps once per render, not once per row (#2118).
       const byProduct = batchesByProduct();
@@ -967,6 +1042,24 @@ function drawList(list) {
     }
     section.appendChild(rows);
     list.appendChild(section);
+  }
+
+  // Products outlive their last batch. Keep their restock and delete actions
+  // reachable without keeping empty stock categories on the overview.
+  if (saved.length) {
+    const details = document.createElement('details');
+    details.className = 'pantry-saved-products';
+    details.open = Boolean(state.query) || (hadStock && !hasStock) || (savedOpen ?? !hasStock);
+    const label = document.createElement('summary');
+    const savedLabel = document.createElement('span');
+    savedLabel.textContent = t('pantry.badgeOut') + ' (' + formatQuantity(saved.length) + ')';
+    label.appendChild(savedLabel);
+    label.insertAdjacentHTML('beforeend', '<i data-lucide="chevron-down" class="icon-md pantry-saved-products__chevron" aria-hidden="true"></i>');
+    const rows = document.createElement('ul');
+    rows.className = 'row-carrier pantry-rows';
+    for (const product of saved) rows.appendChild(productEl(product));
+    details.append(label, rows);
+    list.appendChild(details);
   }
 
   wirePantrySwipe(list);
@@ -981,24 +1074,28 @@ function drawList(list) {
 function noResultsEl() {
   // Der geteilte Leerzustand einer leeren Suche (R19): Begriff und Filter als
   // Chips, EIN Knopf hebt beide auf.
-  const place = placeFilterId();
-  const placeName = state.locations.find((loc) => loc.id === place)?.name;
-  const filters = state.filter === 'all' ? []
-    : place != null ? [placeName ? locationLabel(placeName) : t('pantry.unlocated')]
-      : [t({ expired: 'pantry.filterExpired', soon: 'pantry.filterSoon', low: 'pantry.filterLow' }[state.filter])];
-  return searchEmptyEl({
-    query: state.query,
-    filters,
-    onReset: () => {
-      state.query = '';
-      state.filter = 'all';
-      // clear() versteckt zugleich den Leeren-Knopf des geteilten Suchfelds;
-      // ein blankes `value = ''` ließe ihn über dem leeren Feld stehen.
-      _search?.clear();
-      renderFilters();
-      renderList();
-      _search?.input.focus();
-    },
+  const place = state.locations.find((loc) => loc.id === state.locationId);
+  const filters = [];
+  if (state.filter !== 'all') filters.push(t(statusChips[state.filter].key));
+  const placeName = state.locationId === 'none' ? t('pantry.unlocated') : (place ? locationLabel(place.name) : '');
+  if (placeName) filters.push(placeName);
+  const onReset = () => {
+    state.query = '';
+    selectFilter('all');
+    _search?.clear();
+    renderFilters();
+    renderList();
+    const all = _container?.querySelector('[data-filter="all"]');
+    if (all) all.focus();
+    else _search?.input?.focus();
+  };
+  if (state.query) return searchEmptyEl({ query: state.query, filters, onReset });
+  return emptyStateComponentEl({
+    icon: 'list-filter',
+    variant: 'no-results',
+    title: t({ expired: 'pantry.filterEmptyExpired', soon: 'pantry.filterEmptySoon', low: 'pantry.filterEmptyLow' }[state.filter] ?? 'pantry.filterNoResults'),
+    description: placeName,
+    action: { label: t('pantry.showAll'), onClick: onReset },
   });
 }
 
@@ -1042,10 +1139,10 @@ function placeText(item) {
 function rowOptions(item, byProduct = batchesByProduct(), stock = productStock()) {
   const siblings = byProduct.get(productKeyOf(item)) ?? [item];
   const several = siblings.length > 1;
-  const batch = several && (state.filter === 'all' || state.filter === 'low');
+  const batch = several && (!hasFilter() || state.filter === 'low');
   return {
     batch,
-    byDate: batch && new Set(siblings.map((b) => b.location_id ?? 'none')).size === 1,
+    byDate: batch && (state.locationId != null || new Set(siblings.map((b) => b.location_id ?? 'none')).size === 1),
     total: several ? productTotal(siblings) : null,
     stock: several ? null : (stock.get(productKeyOf(item)) ?? pantryStockStatus(item.quantity, item.min_quantity)),
   };
@@ -1055,7 +1152,7 @@ function rowOptions(item, byProduct = batchesByProduct(), stock = productStock()
 function batchTitle(item, opts) {
   if (!opts.byDate) return placeText(item);
   return item.expires_on
-    ? t('pantry.bestBefore', { date: dateText(item.expires_on) })
+    ? t('pantry.bestBefore', { date: expiryDateText(item.expires_on) })
     : t('pantry.noBestBefore');
 }
 
@@ -1115,6 +1212,20 @@ function badgesEl(badges) {
   return wrap;
 }
 
+/** @param {string} name @param {number|null|undefined} productId @param {number} [batchId] */
+function restockButton(name, productId, batchId) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn--secondary btn--sm pantry-restock';
+  button.dataset.action = 'restock';
+  if (productId != null) button.dataset.productId = String(productId);
+  else button.dataset.batchId = String(batchId);
+  button.textContent = t('pantry.restock');
+  button.setAttribute('aria-label', button.textContent + ': ' + name);
+  return button;
+}
+
+/** @param {PantryItem} item @param {Partial<ReturnType<typeof rowOptions>>} [opts] */
 function rowEl(item, opts = rowOptions(item)) {
   const stock = opts.stock ?? null;
   const place = placeText(item);
@@ -1262,22 +1373,22 @@ function rowEl(item, opts = rowOptions(item)) {
     date.className = 'pantry-row__date';
     const shown = document.createElement('span');
     shown.setAttribute('aria-hidden', 'true');
-    shown.textContent = ` · ${dateText(item.expires_on)}`;
+    shown.textContent = ` · ${expiryDateText(item.expires_on)}`;
     const spoken = document.createElement('span');
     spoken.className = 'sr-only';
-    spoken.textContent = `, ${t('pantry.bestBefore', { date: dateText(item.expires_on) })}`;
+    spoken.textContent = `, ${t('pantry.bestBefore', { date: expiryDateText(item.expires_on) })}`;
     date.append(shown, spoken);
     whereParts.push(date);
   } else if (item.expires_on && !opts.batch) {
     const expiry = document.createElement('span');
     expiry.className = 'pantry-row__expiry';
-    expiry.textContent = ` · ${t('pantry.bestBefore', { date: dateText(item.expires_on) })}`;
+    expiry.textContent = ` · ${t('pantry.bestBefore', { date: expiryDateText(item.expires_on) })}`;
     whereParts.push(expiry);
   }
   // Seit die Seite nach Produkten statt nach Lagerort gliedert (#1448), traegt
   // jede Zeile ihren Ort selbst - wie vorher nur im gefilterten Modus. Unter
   // ihrem Produkt steht er schon als Name der Zeile, unter einem Ort-Chip im Chip.
-  if (!opts.batch && placeFilterId() == null) {
+  if (!opts.batch && state.locationId == null) {
     const placeEl = document.createElement('span');
     placeEl.className = 'pantry-row__place';
     placeEl.textContent = ` · ${place}`;
@@ -1340,6 +1451,7 @@ function rowEl(item, opts = rowOptions(item)) {
   cartSlot.className = 'pantry-row__cart-slot';
   // Der Warenkorb schreibt in den EINKAUF, gefragt wird also dessen Recht
   // (#1265, Regel 1 in utils/module-access.js). Der Slot bleibt trotzdem.
+  if (!ro && stock?.out) cartSlot.appendChild(restockButton(item.name, item.product_id, item.id));
   if (stock && (stock.out || stock.low) && mayTransferPantryToShopping()) cartSlot.appendChild(cartEl(item, controlName));
   actions.appendChild(cartSlot);
 
@@ -1430,7 +1542,8 @@ function productEl(product) {
   const open = expandedProducts.has(product.key) || product.openForSearch;
   const regionId = `pantry-batches-${product.key}`;
   const total = productTotal(product.batches);
-  const places = new Set(product.batches.map((b) => b.location_id ?? 'none')).size;
+  const visibleBatches = product.batches.filter(matchesPlace);
+  const places = new Set(visibleBatches.map((b) => b.location_id ?? 'none')).size;
 
   const li = document.createElement('li');
   li.className = 'pantry-product';
@@ -1458,7 +1571,7 @@ function productEl(product) {
   name.textContent = product.name;
   const badges = document.createElement('span');
   badges.className = 'pantry-row__badges pantry-product__badges';
-  fillProductBadge(badges, product.batches, product.stock);
+  fillProductBadge(badges, visibleBatches, product.stock);
   headline.append(name);
   // Wie die Charge (R24): der Status folgt der Summe in der Metazeile.
   const meta = document.createElement('span');
@@ -1468,7 +1581,7 @@ function productEl(product) {
   totalEl.textContent = productTotalText(total, product.unit);
   const where = document.createElement('span');
   where.className = 'pantry-product__where';
-  where.textContent = ` · ${productWhereText(product.batches)}`;
+  where.textContent = ` · ${productWhereText(visibleBatches)}`;
   // The places are the second half of the meta line, like a batch row's
   // best-before and place: with two statuses and the cart (step 3) a narrow
   // row moves them to a line of their own instead of cutting off "Running
@@ -1483,13 +1596,13 @@ function productEl(product) {
   // The cart of the product, beside the toggle and not in it: a button inside
   // a button is no button. The slot is there when the shopping list may be
   // written, so the row keeps its width when the cart comes and goes.
-  if (mayTransferPantryToShopping()) row.appendChild(productCartActions(product));
+  if (!readOnly() || mayTransferPantryToShopping()) row.appendChild(productCartActions(product));
 
   const batches = document.createElement('ul');
   batches.className = 'pantry-batches';
   batches.id = regionId;
   batches.hidden = !open;
-  for (const batch of product.batches) batches.appendChild(rowEl(batch, { batch: true, byDate: places === 1, total }));
+  for (const batch of visibleBatches) batches.appendChild(rowEl(batch, { batch: true, byDate: places === 1, total }));
 
   li.append(row, batches);
   return li;
@@ -1589,9 +1702,13 @@ function emptyProductEl(product) {
  * with its shortfall over all batches. `cart: false` keeps the slot empty (no
  * right to write Shopping), for a row that still needs the zone for its menu.
  */
-function productCartActions(product, { cart: withCart = true } = {}) {
+/** @param {Pick<ReturnType<typeof productEntries>[number], 'id'|'name'|'batches'|'stock'>} product */
+function productCartActions(product, { cart: withCart = mayTransferPantryToShopping() } = {}) {
   const actions = document.createElement('div');
   actions.className = 'list-row__actions pantry-product__actions';
+  if (!readOnly() && (!product.batches.length || product.stock.out)) {
+    actions.appendChild(restockButton(product.name, product.id, product.batches[0]?.id));
+  }
   const cartSlot = document.createElement('div');
   cartSlot.className = 'pantry-row__cart-slot';
   if (withCart && product.id != null && (product.stock.out || product.stock.low)) {
@@ -1661,9 +1778,10 @@ function refreshProductTotals(item, { speak = true } = {}) {
   const text = productTotalText(productTotal(batches), item.unit);
   const head = `.pantry-product[data-product-key="${key}"] > .pantry-product__row`;
   for (const el of _container.querySelectorAll(`${head} .pantry-product__total`)) el.textContent = text;
-  for (const el of _container.querySelectorAll(`${head} .pantry-product__where`)) el.textContent = productWhereText(batches);
+  const visibleBatches = batches.filter(matchesPlace);
+  for (const el of _container.querySelectorAll(`${head} .pantry-product__where`)) el.textContent = productWhereText(visibleBatches);
   const entry = productEntryOf(key);
-  for (const el of _container.querySelectorAll(`${head} .pantry-product__badges`)) fillProductBadge(el, batches, entry?.stock);
+  for (const el of _container.querySelectorAll(`${head} .pantry-product__badges`)) fillProductBadge(el, visibleBatches, entry?.stock);
   if (entry) {
     for (const el of _container.querySelectorAll(`${head} .pantry-product__actions`)) el.replaceWith(productCartActions(entry));
   }
@@ -1686,7 +1804,7 @@ function wirePantrySwipe(list) {
   if (readOnly()) return null;
   const optionen = {
     card: '.pantry-row',
-    ignore: '.pantry-stepper, .pantry-row__cart, .popover-menu__trigger',
+    ignore: '.pantry-stepper, .pantry-row__cart, .pantry-restock, .popover-menu__trigger',
     trailing: {
       reveal: '.swipe-reveal--delete',
       run: (row) => {
@@ -1733,6 +1851,13 @@ function onListClick(e) {
   if (btn.dataset.action === 'to-shopping-product') {
     const product = productEntryOf(`p${Number(btn.dataset.productId)}`);
     if (product) sendToShopping([product], btn, [shoppingEntry(product)]);
+    return;
+  }
+  if (btn.dataset.action === 'restock') {
+    const product = btn.dataset.productId
+      ? state.products.find((p) => p.id === Number(btn.dataset.productId))
+      : state.items.find((b) => b.id === Number(btn.dataset.batchId));
+    if (product) openItemModal('create', product);
     return;
   }
   if (btn.dataset.action === 'delete-product') {
@@ -1811,7 +1936,7 @@ function adjustQuantity(item, direction, row) {
       const rowNow = liveRow(item.id, row);
       if (!rowNow) return;
       if (current) refreshRowQuantity(rowNow, withIntent(current));
-      if (renderFilters().wasReset) renderList();
+      renderFilters();
       window.yuvomi?.showToast(errorSentence(err), 'danger');
     }
   }, QUANTITY_DEBOUNCE_MS_OVERRIDE ?? QUANTITY_DEBOUNCE_MS);
@@ -1834,7 +1959,7 @@ function adjustQuantity(item, direction, row) {
 
   vibrate(8);
   refreshRowQuantity(row, withIntent(item), { stepped: true });
-  if (renderFilters().wasReset) renderList();
+  renderFilters();
   bindQuantityFlush();
 }
 
@@ -2014,7 +2139,7 @@ function itemReadHtml(item) {
         ${readRowHtml({ icon: 'hash', label: t('pantry.quantityLabel'), value: amount(item.quantity) })}
         ${readRowHtml({ icon: 'map-pin', label: t('pantry.locationLabel'), value: item.location_name ? locationLabel(item.location_name) : t('pantry.unlocated') })}
         ${readRowHtml({ icon: 'tag', label: t('pantry.categoryLabel'), value: item.category ? categoryLabel(item.category) : '' })}
-        ${readRowHtml({ icon: 'calendar', label: t('pantry.expiresLabel'), value: item.expires_on ? dateText(item.expires_on) : '' })}
+        ${readRowHtml({ icon: 'calendar', label: t('pantry.expiresLabel'), value: item.expires_on ? expiryDateText(item.expires_on) : '' })}
         ${readRowHtml({ icon: 'triangle-alert', label: t('pantry.minQuantityLabel'), value: item.min_quantity != null ? amount(item.min_quantity) : '' })}
         ${readRowHtml({ icon: 'align-left', label: t('pantry.notesLabel'), value: item.notes || '', multiline: true })}
       </div>
@@ -2032,8 +2157,10 @@ function openItemReadModal(item) {
   });
 }
 
+/** @param {string} mode @param {(PantryProduct & Partial<PantryItem>)|null} [item] */
 function openItemModal(mode, item = null) {
   const isEdit = mode === 'edit';
+  const restock = !isEdit && item != null;
   // Der Riegel steht VOR jeder Vorbereitung, und er steht HIER, weil Liste,
   // FAB und Leerzustand alle diesen Weg nehmen: bei `read` geht
   // fuer einen Artikel die Leseansicht auf, und Anlegen gibt es nicht. Den FAB
@@ -2066,10 +2193,10 @@ function openItemModal(mode, item = null) {
 
   openSharedModal({
     staged: !isEdit, // Buehne zuerst, Felder nach dem ersten Bild (modal.js, R21 a6)
-    title: isEdit ? t('common.editItem') : t('pantry.addItem'),
+    title: isEdit ? t('common.editItem') : t(restock ? 'pantry.restock' : 'pantry.addItem'),
     size: 'md',
     // Die Zeile antippen holt am Finger keine Tastatur (R23 D13, R24 S9).
-    initialFocus: isEdit ? 'edit' : 'first-field',
+    initialFocus: isEdit ? 'edit' : (restock ? '#pantry-quantity' : 'first-field'),
     content: `
       <div class="form-group">
         <label class="form-label" for="pantry-name">${esc(t('common.nameLabel'))}${REQUIRED_MARK}</label>
@@ -2099,7 +2226,7 @@ function openItemModal(mode, item = null) {
       <div class="form-group">
         <label class="form-label" for="pantry-expires">${esc(t('pantry.expiresLabel'))}</label>
         <yuvomi-datepicker id="pantry-expires" type="date"
-                           value="${esc(isEdit && item.expires_on ? item.expires_on : '')}"></yuvomi-datepicker>
+                           value="${esc(isEdit && item?.expires_on ? item.expires_on : '')}"></yuvomi-datepicker>
         <p class="form-hint">${esc(t('pantry.expiresHint'))}</p>
       </div>
       ${advancedSection(`
@@ -2114,26 +2241,27 @@ function openItemModal(mode, item = null) {
           <textarea id="pantry-notes" class="form-input" rows="3"
                     placeholder="${esc(t('pantry.notesPlaceholder'))}"></textarea>
         </div>`,
-      { open: isEdit && (item.min_quantity != null || !!item.notes), hint: t('pantry.moreDetailsHint') })}
+      { open: isEdit && (item?.min_quantity != null || !!item?.notes), hint: t('pantry.moreDetailsHint') })}
       <div class="modal-panel__footer modal-panel__footer--plain">
         ${isEdit ? `<button type="button" class="btn btn--danger-outline pantry-form__delete" id="pantry-delete"><i data-lucide="trash-2" class="icon-md" aria-hidden="true"></i>${esc(t('common.delete'))}</button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
         <button type="button" class="btn btn--primary" id="pantry-save">${esc(isEdit ? t('common.save') : t('common.add'))}</button>
       </div>`,
     onSave(panel) {
-      panel.querySelector('#pantry-name').value = isEdit ? item.name : '';
-      panel.querySelector('#pantry-quantity').value = isEdit ? String(item.quantity) : '1';
-      panel.querySelector('#pantry-unit').value = isEdit ? item.unit : 'pcs';
-      panel.querySelector('#pantry-location').value = isEdit && item.location_id ? String(item.location_id) : '';
-      panel.querySelector('#pantry-category').value = isEdit
-        ? item.category
-        : (categories.find((c) => c.name === DEFAULT_CATEGORY_NAME)?.name ?? categories[0]?.name ?? DEFAULT_CATEGORY_NAME);
+      panel.querySelector('#pantry-name').value = item?.name ?? '';
+      panel.querySelector('#pantry-name').readOnly = restock;
+      panel.querySelector('#pantry-quantity').value = isEdit ? String(item?.quantity ?? 1) : '1';
+      panel.querySelector('#pantry-unit').value = item?.unit ?? 'pcs';
+      panel.querySelector('#pantry-unit').disabled = restock;
+      panel.querySelector('#pantry-location').value = isEdit ? String(item?.location_id ?? '') : (state.locationId === 'none' ? '' : String(state.locationId ?? ''));
+      panel.querySelector('#pantry-category').value = item?.category
+        ?? (categories.find((c) => c.name === DEFAULT_CATEGORY_NAME)?.name ?? categories[0]?.name ?? DEFAULT_CATEGORY_NAME);
       // The product's minimum (the API returns it on the batch). Remembered as
       // shown, so a save sends it only when it was changed (saveItem).
       const minInput = panel.querySelector('#pantry-min');
-      minInput.value = isEdit && item.min_quantity != null ? String(item.min_quantity) : '';
+      minInput.value = item?.min_quantity != null ? String(item.min_quantity) : '';
       minInput.dataset.initial = minInput.value;
-      panel.querySelector('#pantry-notes').value = isEdit && item.notes ? item.notes : '';
+      panel.querySelector('#pantry-notes').value = isEdit && item?.notes ? item.notes : '';
 
       panel.querySelector('#pantry-save').addEventListener('click', () => saveItem(panel, mode, item));
       panel.querySelector('#pantry-delete')?.addEventListener('click', async () => {
@@ -2220,7 +2348,12 @@ async function removeItem(item) {
   // das Netz fuer alles, was nicht animiert (reduzierte Bewegung, kein
   // `animate`): der Zustand "weg" haengt an keiner Animation.
   let restored = false;
-  if (rowEl_) collapseOut(rowEl_).then(() => { if (!restored) rowEl_.style.display = 'none'; });
+  collapseOut(rowEl_).then(() => {
+    if (restored) return;
+    if (rowEl_) rowEl_.style.display = 'none';
+    renderFilters();
+    renderList();
+  });
   // The product row above counts what is left (#1448); undo gives it back.
   pendingDeletes.add(item.id);
   refreshProductTotals(item, { speak: false });
@@ -2246,6 +2379,8 @@ async function removeItem(item) {
         rowEl_.style.overflow = '';
         expandIn(rowEl_);
       }
+      renderFilters();
+      renderList();
       if (err) window.yuvomi?.showToast(errorSentence(err), 'danger');
     },
   });
@@ -2263,7 +2398,12 @@ function removeProduct(product) {
   if (readOnly()) return;
   const stage = _container?.querySelector(`.pantry-product[data-product-key="p${product.id}"]`);
   let restored = false;
-  if (stage) collapseOut(stage).then(() => { if (!restored) stage.style.display = 'none'; });
+  collapseOut(stage).then(() => {
+    if (restored) return;
+    if (stage) stage.style.display = 'none';
+    renderFilters();
+    renderList();
+  });
   pendingProductDeletes.add(product.id);
 
   scheduleUndoableDelete({
@@ -2284,10 +2424,9 @@ function removeProduct(product) {
         stage.getAnimations?.().forEach((anim) => anim.cancel());
         stage.style.overflow = '';
         expandIn(stage);
-      } else {
-        // Redrawn in the window (search, chip): the row is drawn anew.
-        renderList();
       }
+      renderFilters();
+      renderList();
       if (!err) return;
       // The sentence of the app, not the server's (#1909, CASE_MESSAGES).
       window.yuvomi?.showToast(errorSentence(err, 'common.unknownError'), 'danger');
@@ -2410,6 +2549,8 @@ export const __test = {
   pendingProductDeletes,
   emptyProductEl,
   renderFilters,
+  selectFilter,
+  openLocationFilter,
   visibleItems,
   flatItems,
   placeChips,

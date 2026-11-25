@@ -139,6 +139,7 @@ export function daysUntil(dateKey, todayKey = householdToday()) {
  * pantryProductStock) a batch matches when its product is low or out. Without
  * it the batch is read alone.
  */
+/** @param {Map<string, {low: boolean, out: boolean}>|null} stock */
 export function matchesPantryFilter(item, filter, todayKey = householdToday(), stock = null) {
   if (!filter || filter === 'all') return true;
   const status = pantryItemStatus(item, todayKey);

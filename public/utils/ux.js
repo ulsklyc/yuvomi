@@ -301,7 +301,7 @@ function closedFrame() {
  * Unterschied (`glideThenClose`). Zeilen, die im selben Moment gehen (Einkauf:
  * mehrere Haken in einer Pause), schliessen gemeinsam.
  *
- * @param {Element} el
+ * @param {Element|null|undefined} el
  * @param {Object} [opts]
  * @param {number} [opts.duration] - ms des Nachrueckens, Standard `--duration-lg`
  * @returns {Promise<void>}
