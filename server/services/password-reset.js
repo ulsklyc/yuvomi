@@ -43,13 +43,29 @@ export function createPasswordResetService({ db, now = () => Date.now() } = {}) 
     getDb().prepare('DELETE FROM password_resets WHERE token_hash = ?').run(hash(token));
   }
 
+  /**
+   * Loest einen Token ein: loescht ihn, sofern er noch da und nicht abgelaufen
+   * ist. true nur fuer genau den einen Aufruf, der die Zeile entfernt hat -
+   * ein zweiter Antrag mit demselben Token bekommt false (#2938).
+   *
+   * @param {string} token
+   * @returns {boolean}
+   */
+  function redeemToken(token) {
+    if (!token) return false;
+    const info = getDb().prepare(
+      'DELETE FROM password_resets WHERE token_hash = ? AND expires_at > ?'
+    ).run(hash(token), now());
+    return info.changes === 1;
+  }
+
   function cleanupExpired() {
     const info = getDb().prepare('DELETE FROM password_resets WHERE expires_at <= ?').run(now());
     if (info.changes) log.info(`Cleaned up ${info.changes} expired reset token(s)`);
     return info.changes;
   }
 
-  return { createToken, verifyToken, consumeToken, cleanupExpired };
+  return { createToken, verifyToken, consumeToken, redeemToken, cleanupExpired };
 }
 
 export const passwordResetService = createPasswordResetService();

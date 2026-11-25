@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **A password reset link works exactly once.** Two requests with the same link that
+  arrived at almost the same time could both set a password, and the one that finished last
+  counted. Now only the first one sets the password; the second gets the same answer as an
+  expired link. An account that is deactivated while the new password is being saved no longer
+  gets it.
 - **Large shopping lists, calendars and task lists change quickly again.** Every change to a
   searchable entry read the whole search index, so renaming or clearing 4000 shopping items took
   seconds and a CalDAV sync of a large calendar slowed down with every event; each entry is now

@@ -567,3 +567,109 @@ test('reset-password/check: der echte Router haengt die Pruefung an den Reset-Li
   assert.match(src, /limiter = passwordResetLimiter,\n\s*defer = /);
   assert.match(src, /^buildResetRoutes\(router\);$/m);
 });
+
+// --- Einloesen genau einmal (#2938) ---------------------------------------
+// Zwischen Pruefen des Tokens und Schreiben des Passworts liegt das Hashen,
+// ein await: ein zweiter Antrag mit demselben Token lief dort dazwischen und
+// setzte sein Passwort ebenfalls. `crypto.argon2` wird beim Aufruf vom
+// Modulobjekt gelesen (server/utils/password.js); hier haelt der Test jede
+// Berechnung an, bis er sie selbst freigibt - ohne Uhr als Taktgeber.
+
+/**
+ * Haelt jeden Aufruf von `crypto.argon2` an. `started(n)` loest auf, sobald n
+ * Aufrufe warten; `release(i)` rechnet den i-ten zu Ende.
+ */
+function holdArgon2() {
+  const original = crypto.argon2;
+  /** @type {any[][]} */
+  const held = [];
+  /** @type {{ n: number, resolve: () => void }[]} */
+  let waiters = [];
+  crypto.argon2 = /** @type {any} */ (function holdCall(/** @type {any[]} */ ...args) {
+    held.push(args);
+    const due = waiters.filter((w) => held.length >= w.n);
+    waiters = waiters.filter((w) => held.length < w.n);
+    for (const w of due) w.resolve();
+  });
+  return {
+    /** @param {number} n */
+    started: (n) => (held.length >= n ? Promise.resolve()
+      : new Promise((resolve) => { waiters.push({ n, resolve: () => resolve(undefined) }); })),
+    /** @param {number} i */
+    release: (i) => /** @type {any} */ (original)(...held[i]),
+    restore: () => { crypto.argon2 = original; },
+  };
+}
+
+/** @param {DatabaseSync} db */
+const passwordHashOf = (db) => /** @type {{ password_hash: string }} */ (
+  db.prepare('SELECT password_hash FROM users WHERE id = 1').get()).password_hash;
+/** @param {DatabaseSync} db */
+const resetRows = (db) => /** @type {{ c: number }} */ (
+  db.prepare('SELECT COUNT(*) c FROM password_resets').get()).c;
+
+/** @param {import('express').Express} app */
+async function listen(app) {
+  const { createServer } = await import('node:http');
+  const server = createServer(app);
+  await new Promise((r) => server.listen(0, '127.0.0.1', () => r(undefined)));
+  const { port } = /** @type {import('node:net').AddressInfo} */ (server.address());
+  /** @param {string} path @param {object} body */
+  const post = (path, body) => fetch(`http://127.0.0.1:${port}/api/v1${path}`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  }).then(async (res) => ({ status: res.status, json: await res.json() }));
+  return { post, close: () => server.close() };
+}
+
+test('reset-password: zwei Antraege mit demselben Token, die sich im Hashen ueberlappen - nur der erste setzt sein Passwort (#2938)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, token } = await issuedToken(db);
+  const before = passwordHashOf(db);
+  const server = await listen(app);
+  const hold = holdArgon2();
+  try {
+    const a = server.post('/auth/reset-password', { token, password: 'password-of-a' });
+    await hold.started(1);
+    const b = server.post('/auth/reset-password', { token, password: 'password-of-b' });
+    await hold.started(2);
+    // Beide haben den Token geprueft und hashen. A schreibt zuerst, dann B.
+    hold.release(0);
+    const answerA = await a;
+    hold.release(1);
+    const answerB = await b;
+    assert.deepEqual(answerA, { status: 200, json: { data: { ok: true } } });
+    // B bekommt dieselbe Antwort wie fuer einen ungueltigen Token.
+    assert.deepEqual(answerB, { status: 400, json: { error: 'Invalid or expired token.', code: 400 } });
+  } finally {
+    hold.restore();
+    server.close();
+  }
+  const hash = passwordHashOf(db);
+  assert.notEqual(hash, before);
+  assert.equal((await verifyPassword('password-of-a', hash)).valid, true, 'das Passwort von A gilt');
+  assert.equal((await verifyPassword('password-of-b', hash)).valid, false, 'B hat nichts geschrieben');
+  assert.equal(resetRows(db), 0);
+});
+
+test('reset-password: wird das Konto waehrend des Hashens deaktiviert, schreibt das Einloesen nichts (#2938)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, token } = await issuedToken(db);
+  const before = passwordHashOf(db);
+  const server = await listen(app);
+  const hold = holdArgon2();
+  try {
+    const a = server.post('/auth/reset-password', { token, password: 'password-of-a' });
+    await hold.started(1);
+    db.prepare("UPDATE users SET deactivated_at = '2026-01-01T00:00:00Z' WHERE id = 1").run();
+    hold.release(0);
+    assert.deepEqual(await a, { status: 400, json: { error: 'Invalid or expired token.', code: 400 } });
+  } finally {
+    hold.restore();
+    server.close();
+  }
+  assert.equal(passwordHashOf(db), before);
+  // Wie beim Ablehnen vor dem Hashen ist der Token danach verbraucht.
+  assert.equal(resetRows(db), 0);
+});
