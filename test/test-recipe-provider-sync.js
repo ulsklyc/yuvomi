@@ -781,10 +781,11 @@ function recipeDetail(ref) {
 // Riegel sofort beginnt, ist also gleich nach seinem Aufruf daran zu erkennen.
 /**
  * @param {Array<{ list: () => Promise<any>, detail: (ref: string) => Promise<any> }>} plans
- * @param {{ n: number }} calls
+ * @param {{ n: number, accounts?: any[] }} calls
  */
 function plannedAdapters(plans, calls) {
-  return () => {
+  return (/** @type {any} */ account) => {
+    (calls.accounts ??= []).push(account);
     const plan = plans[calls.n++];
     return {
       testConnection: async () => ({ ok: true, status: 200, linkContext: { groupSlug: 'home' } }),
@@ -878,4 +879,111 @@ test('zwei Laeufe: ein wartender Lauf, den ein Restore ueberholt, schreibt nicht
   assert.equal(account.last_error, 'Fetching the recipes failed.', 'der Fehlschlag von A bleibt stehen');
   assert.equal(account.last_sync, null);
   assert.equal(mirroredRecipes(accountId).length, 0);
+});
+
+// --------------------------------------------------------------------------
+// Das Konto, wie es ist, wenn der Lauf beginnt (#2945, Runde 2)
+// --------------------------------------------------------------------------
+// Ein Lauf, der am Riegel wartet, liest sein Konto erst, wenn er dran ist: was
+// ein Admin in der Wartezeit aendert (URL, Token, abschalten, loeschen), gilt.
+
+const okPlan = {
+  list: async () => [{ id: 'uuid-r', ref: 'r', updatedAt: 't1' }],
+  detail: async (/** @type {string} */ ref) => recipeDetail(ref),
+};
+
+test('Konto in der Wartezeit abgeschaltet: der Lauf aller Konten faehrt es nicht, "Jetzt synchronisieren" schon (#2945)', async () => {
+  const accountId = newAccount('Abgeschaltet-Wartend');
+  const listA = deferred();
+  const calls = { n: 0 };
+  _setAdapterFactory(plannedAdapters([{ list: () => listA.promise, detail: okPlan.detail }, okPlan, okPlan], calls));
+
+  const runA = sync.syncOne(accountId);
+  const runAll = sync.sync();
+  const runOne = sync.syncOne(accountId);
+  conn.prepare('UPDATE recipe_provider_accounts SET enabled = 0 WHERE id = ?').run(accountId);
+  listA.resolve([]);
+  await runA;
+  const resultAll = /** @type {any} */ (await runAll);
+  const resultOne = /** @type {any} */ (await runOne);
+
+  assert.equal(resultAll.syncedAccounts, 0, 'der Lauf aller Konten zaehlt das abgeschaltete nicht');
+  assert.equal(calls.n, 2, 'genau ein weiterer Abruf beim Anbieter: der von Hand');
+  assert.equal(resultOne.imported, 1, 'syncOne fragt wie bisher nicht nach enabled');
+});
+
+test('Konto in der Wartezeit geloescht: der wartende Lauf schreibt nichts und meldet "nicht gefunden" (#2945)', async () => {
+  const accountId = newAccount('Geloescht-Wartend');
+  const listA = deferred();
+  const calls = { n: 0 };
+  _setAdapterFactory(plannedAdapters([{ list: () => listA.promise, detail: okPlan.detail }, okPlan, okPlan], calls));
+
+  const runA = sync.syncOne(accountId);
+  const runB = sync.syncOne(accountId);
+  const runAll = sync.sync();
+  conn.prepare('DELETE FROM recipe_provider_accounts WHERE id = ?').run(accountId);
+  listA.reject(new Error('network down'));
+  await runA;
+  await assert.rejects(runB, (/** @type {any} */ err) => /not found/i.test(err.message) && !String(err.code).startsWith('SQLITE'));
+  const resultAll = /** @type {any} */ (await runAll);
+  assert.equal(resultAll.syncedAccounts, 0);
+  assert.equal(calls.n, 1, 'kein Abruf mehr fuer ein geloeschtes Konto');
+  assert.equal(mirroredRecipes(accountId).length, 0);
+});
+
+test('URL und Token in der Wartezeit geaendert: der Nachlauf benutzt die neuen Werte (#2945)', async () => {
+  const accountId = newAccount('Umgezogen');
+  const listA = deferred();
+  const calls = /** @type {{ n: number, accounts?: any[] }} */ ({ n: 0 });
+  _setAdapterFactory(plannedAdapters([{ list: () => listA.promise, detail: okPlan.detail }, okPlan], calls));
+
+  const runA = sync.syncOne(accountId);
+  const runB = sync.syncOne(accountId);
+  conn.prepare('UPDATE recipe_provider_accounts SET base_url = ?, api_token = ? WHERE id = ?')
+    .run('https://neu.example.com', 'tok-neu', accountId);
+  listA.resolve([]);
+  await runA;
+  await runB;
+
+  assert.equal(calls.n, 2);
+  const accounts = /** @type {any[]} */ (calls.accounts);
+  assert.equal(accounts[1].base_url, 'https://neu.example.com');
+  assert.equal(accounts[1].api_token, 'tok-neu');
+});
+
+test('Konto waehrend der Detailabrufe geloescht: der Lauf schreibt nichts, wirft nicht, das naechste Konto laeuft (#2945)', async () => {
+  const goneId = newAccount('Weg-Mitten');
+  const nextId = newAccount('Danach');
+  const reached = deferred();
+  const detailGone = deferred();
+  const calls = { n: 0 };
+  _setAdapterFactory(plannedAdapters([
+    { list: okPlan.list, detail: () => { reached.resolve(); return detailGone.promise; } },
+    okPlan,
+  ], calls));
+
+  const runAll = sync.sync();
+  await reached.promise;
+  conn.prepare('DELETE FROM recipe_provider_accounts WHERE id = ?').run(goneId);
+  detailGone.resolve(recipeDetail('r'));
+  const result = /** @type {any} */ (await runAll);
+
+  assert.equal(result.syncedAccounts, 1);
+  assert.equal(mirroredRecipes(goneId).length, 0);
+  assert.deepEqual(mirroredRecipes(nextId).map((/** @type {any} */ r) => r.provider_recipe_id), ['uuid-r']);
+});
+
+test('Konto waehrend der Detailabrufe geloescht: "Jetzt synchronisieren" meldet "nicht gefunden" statt eines Datenbankfehlers (#2945)', async () => {
+  const goneId = newAccount('Weg-Mitten-Eins');
+  const reached = deferred();
+  const detailGone = deferred();
+  const calls = { n: 0 };
+  _setAdapterFactory(plannedAdapters([{ list: okPlan.list, detail: () => { reached.resolve(); return detailGone.promise; } }], calls));
+
+  const runOne = sync.syncOne(goneId);
+  await reached.promise;
+  conn.prepare('DELETE FROM recipe_provider_accounts WHERE id = ?').run(goneId);
+  detailGone.resolve(recipeDetail('r'));
+  await assert.rejects(runOne, (/** @type {any} */ err) => /not found/i.test(err.message) && !String(err.code).startsWith('SQLITE'));
+  assert.equal(mirroredRecipes(goneId).length, 0);
 });
