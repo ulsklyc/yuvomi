@@ -899,7 +899,6 @@
     {
       "files": [
         "server/db.js",
-        "server/db-schema-test.js",
         "server/migrations/**"
       ],
       "rules": {

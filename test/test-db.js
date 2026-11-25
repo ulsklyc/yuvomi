@@ -7,13 +7,13 @@
  * Ausführen: node test-db.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
-
 // --------------------------------------------------------
-// Migrations-SQL direkt aus db.js extrahieren
-// (Nur für Tests - in Produktion läuft db.js mit better-sqlite3)
+// Schema aus den echten Quellen: Baseline (server/migrations/baseline.sql)
+// plus die Migrationen darueber, auf node:sqlite (test/helpers/schema-db.js).
+// In Produktion laeuft dasselbe ueber server/db/migrate.ts mit better-sqlite3.
 // --------------------------------------------------------
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
+import { MIGRATIONS } from '../server/migrations/index.ts';
 
 let passed = 0;
 let failed = 0;
@@ -37,34 +37,26 @@ function assert(condition, message) {
 // --------------------------------------------------------
 // Datenbank in Memory aufbauen
 // --------------------------------------------------------
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
+const db = openSchemaDb();
 
 console.log('\n[DB-Test] Schema-Migration\n');
 
 // --------------------------------------------------------
-// Test 1: Migrations-Tabelle anlegen
+// Test 1: Jede ausgelieferte Migration ist genau einmal verbucht
 // --------------------------------------------------------
-test('schema_migrations Tabelle erstellen', () => {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version     INTEGER PRIMARY KEY,
-      description TEXT    NOT NULL,
-      applied_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-    );
-  `);
-  const count = db.prepare('SELECT count(*) as n FROM schema_migrations').get();
-  assert(count.n === 0, 'Tabelle sollte leer sein');
+test('schema_migrations verbucht jede ausgelieferte Migration einmal', () => {
+  const versions = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all().map((r) => r.version);
+  assert(JSON.stringify(versions) === JSON.stringify(MIGRATIONS.map((m) => m.version)),
+    `verbucht ${versions.length}, ausgeliefert ${MIGRATIONS.length}`);
 });
 
 // --------------------------------------------------------
-// Test 2: Vollständige Migration v1 ausführen
+// Test 2: Stand ist die neueste ausgelieferte Migration
 // --------------------------------------------------------
-test('Migration v1 ausführen (alle Tabellen und Triggers)', () => {
-  db.exec(MIGRATIONS_SQL[1]);
-  db.prepare('INSERT INTO schema_migrations (version, description) VALUES (1, ?)').run('Initiales Schema');
+test('MAX(version) ist die neueste ausgelieferte Migration', () => {
   const v = db.prepare('SELECT MAX(version) as v FROM schema_migrations').get();
-  assert(v.v === 1, 'Version sollte 1 sein');
+  const newest = Math.max(...MIGRATIONS.map((m) => m.version));
+  assert(v.v === newest, `Version sollte ${newest} sein, ist ${v.v}`);
 });
 
 // --------------------------------------------------------
@@ -183,13 +175,6 @@ test('CHECK constraint: ungültige Priorität wird abgelehnt', () => {
   assert(threw, 'CHECK constraint sollte Fehler werfen');
 });
 
-test('Idempotenz: Migration zweimal ausführen ändert nichts', () => {
-  // CREATE TABLE IF NOT EXISTS + CREATE TRIGGER IF NOT EXISTS müssen idempotent sein
-  db.exec(MIGRATIONS_SQL[1]);
-  const tables = db.prepare("SELECT count(*) as n FROM sqlite_master WHERE type='table'").get();
-  assert(tables.n > 0, 'Tabellen sollten noch vorhanden sein');
-});
-
 test('API-Token anlegen und lesen', () => {
   const result = db.prepare(`
     INSERT INTO api_tokens (name, token_hash, token_prefix, created_by, expires_at)
@@ -202,11 +187,7 @@ test('API-Token anlegen und lesen', () => {
 });
 
 test('Migration 64 legt wiederkehrende Mahlzeiten-Struktur an', () => {
-  const recurrentDb = new DatabaseSync(':memory:');
-  recurrentDb.exec('PRAGMA foreign_keys = ON;');
-  recurrentDb.exec(MIGRATIONS_SQL[1]);
-  recurrentDb.exec(MIGRATIONS_SQL[13]);
-  recurrentDb.exec(MIGRATIONS_SQL[64]);
+  const recurrentDb = openSchemaDb(); // volles Schema: die Struktur aus 64 steht dort weiter
 
   for (const table of ['meal_recurrence_templates', 'meal_recurrence_ingredients', 'meal_recurrence_exceptions']) {
     const row = recurrentDb.prepare(

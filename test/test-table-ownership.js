@@ -158,9 +158,6 @@ test('every table created outside the migrations is in the schema built here', (
   };
   walk(join(REPO, 'server'));
   assert.ok(files.length >= 200, `only ${files.length} server files - the walk does not reach them`);
-  // server/db-schema-test.js is the test mirror of the migrations: no server code runs it,
-  // its tables are the migrated ones under a second spelling.
-  const scanned = files.filter((f) => f !== 'server/db-schema-test.js');
   // The statements of the migrations are the migrated schema (a migration may create a
   // table a later one drops). They are taken from the imported array, as text of each `up`
   // string and of each `up`/`afterUp` function, and one statement in server/migrations/
@@ -179,7 +176,7 @@ test('every table created outside the migrations is in the schema built here', (
   const tables = new Set(schemaTables());
   const problems = [];
   let seen = 0;
-  for (const file of scanned) {
+  for (const file of files) {
     const text = readFileSync(join(REPO, file), 'utf8');
     for (const c of createStatements(text)) {
       seen += 1;

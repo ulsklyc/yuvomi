@@ -12,7 +12,7 @@ import { freshTestDbPath } from './tmp-db.js';
 
 freshTestDbPath('calendar-occurrence-overrides');
 
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import {
   baseOccurrenceFor,
   CalendarAttachmentCloneRequiredError,
@@ -108,82 +108,39 @@ test('body-free event projection mirrors every calendar_events column but the in
 });
 
 function createDatabase() {
-  const database = new DatabaseSync(':memory:');
-  database.exec('PRAGMA foreign_keys = ON;');
-  database.exec(MIGRATIONS_SQL[1]);
-  database.exec(MIGRATIONS_SQL[44]); // search index rebuilt by migration 194
-  database.exec(MIGRATIONS_SQL[26]); // family document ACLs
-  database.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions
-  database.exec(MIGRATIONS_SQL[174]); // generated name-day event owner
-  database.exec(MIGRATIONS_SQL[245]);
-  // Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
-  database.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
-  database.exec(`
-    CREATE TABLE housekeeping_work_sessions (
-      id INTEGER PRIMARY KEY,
-      calendar_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL
-    );
-    CREATE TABLE IF NOT EXISTS event_assignments (
-      event_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      PRIMARY KEY (event_id, user_id)
-    );
-    CREATE TABLE outlook_accounts (
-      id INTEGER PRIMARY KEY,
-      needs_reauth INTEGER NOT NULL DEFAULT 0,
-      auto_sync_calendar_id TEXT,
-      owner_user_id INTEGER
-    );
-    CREATE TABLE outlook_calendar_selection (
-      account_id INTEGER NOT NULL,
-      calendar_id TEXT NOT NULL,
-      can_edit INTEGER NOT NULL DEFAULT 1,
-      enabled INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY (account_id, calendar_id)
-    );
-    CREATE TABLE outlook_event_links (
-      event_id INTEGER NOT NULL,
-      account_id INTEGER NOT NULL,
-      outlook_calendar_id TEXT NOT NULL,
-      outlook_event_id TEXT NOT NULL,
-      PRIMARY KEY (event_id, account_id)
-    );
-  `);
-  database.exec(MIGRATIONS_SQL[194]);
-  database.exec(`
-    ALTER TABLE calendar_events ADD COLUMN countdown INTEGER NOT NULL DEFAULT 0;
-    ALTER TABLE calendar_events ADD COLUMN attachment_name TEXT;
-    ALTER TABLE calendar_events ADD COLUMN attachment_mime TEXT;
-    ALTER TABLE calendar_events ADD COLUMN attachment_size INTEGER;
-    ALTER TABLE calendar_events ADD COLUMN attachment_data TEXT;
-    ALTER TABLE calendar_events ADD COLUMN attachment_document_id INTEGER;
-    ALTER TABLE calendar_events ADD COLUMN calendar_ref_id INTEGER;
-    ALTER TABLE calendar_events ADD COLUMN subscription_id INTEGER;
-    ALTER TABLE calendar_events ADD COLUMN external_object_url TEXT;
-    ALTER TABLE calendar_events ADD COLUMN target_google_calendar_id TEXT;
-    ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
-    ALTER TABLE calendar_events ADD COLUMN target_caldav_calendar_url TEXT;
-    ALTER TABLE calendar_events ADD COLUMN target_outlook_account_id INTEGER;
-    ALTER TABLE calendar_events ADD COLUMN target_outlook_calendar_id TEXT;
-    ALTER TABLE calendar_events ADD COLUMN tzid TEXT;
-    CREATE TABLE reminders (
-      id INTEGER PRIMARY KEY,
-      entity_type TEXT NOT NULL,
-      entity_id INTEGER NOT NULL,
-      remind_at TEXT NOT NULL,
-      dismissed INTEGER NOT NULL DEFAULT 0,
-      created_by INTEGER NOT NULL,
-      assigned_from INTEGER
-    );
-  `);
+  const database = openSchemaDb(); // volles Schema aus der Baseline (test/helpers/schema-db.js)
   database.prepare(`
     INSERT INTO users (id, username, display_name, password_hash, role)
     VALUES (1, 'admin', 'Admin', 'x', 'admin'),
            (2, 'member', 'Member', 'x', 'member'),
            (3, 'other', 'Other', 'x', 'member')
   `).run();
+  // series()/child() and several fixtures attach documents 100 and 200; the
+  // schema holds calendar_events.attachment_document_id to family_documents.
+  database.prepare(`
+    INSERT INTO family_documents
+      (id, name, description, category, status, visibility, original_name, mime_type,
+       file_size, content_data, storage_provider, storage_key, created_by)
+    VALUES (100, 'Series doc', 'fixture', 'other', 'active', 'family', 'series.txt', 'text/plain',
+            12, 'series bytes', 'local', 'fixture-100', 1),
+           (200, 'Child doc', 'fixture', 'other', 'active', 'family', 'child.txt', 'text/plain',
+            5, 'child', 'local', 'fixture-200', 1)
+  `).run();
   setHouseholdTimeZone(database, 'Europe/Berlin');
   return database;
+}
+
+/**
+ * An Outlook account with the columns the schema requires (tokens are placeholders).
+ * @param {import('node:sqlite').DatabaseSync} database
+ * @param {{ id: number, autoSyncCalendarId?: string | null, ownerUserId?: number | null }} account
+ */
+function insertOutlookAccount(database, { id, autoSyncCalendarId = null, ownerUserId = null }) {
+  database.prepare(`
+    INSERT INTO outlook_accounts
+      (id, name, access_token, refresh_token, auto_sync_calendar_id, owner_user_id)
+    VALUES (?, ?, 'test-access', 'test-refresh', ?, ?)
+  `).run(id, `Outlook ${id}`, autoSyncCalendarId, ownerUserId);
 }
 
 /**
@@ -196,7 +153,6 @@ function createDatabase() {
  * von 0 versteckt genau den Fehler, um den es geht.
  */
 function setHouseholdTimeZone(database, zone) {
-  database.exec('CREATE TABLE IF NOT EXISTS sync_config (key TEXT PRIMARY KEY, value TEXT)');
   database.prepare(`
     INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?)
     ON CONFLICT (key) DO UPDATE SET value = excluded.value
@@ -450,6 +406,7 @@ test('local recurring series with an Outlook push link is ineligible without an 
   const eventId = insertSeries(database);
   const event = database.prepare('SELECT * FROM calendar_events WHERE id = ?').get(eventId);
 
+  insertOutlookAccount(database, { id: 77 });
   database.prepare(`
     INSERT INTO outlook_event_links (event_id, account_id, outlook_calendar_id, outlook_event_id)
     VALUES (?, ?, ?, ?)
@@ -490,12 +447,9 @@ test('Apple outbound collector excludes linked state but preserves deletion-only
 
 test('Outlook auto-sync eligibility follows visible event ownership and assignments', () => {
   const database = createDatabase();
-  database.prepare(`
-    INSERT INTO outlook_accounts (id, needs_reauth, auto_sync_calendar_id, owner_user_id)
-    VALUES (20, 0, 'family-calendar', 2)
-  `).run();
+  insertOutlookAccount(database, { id: 20, autoSyncCalendarId: 'family-calendar', ownerUserId: 2 });
   database.prepare(`INSERT INTO outlook_calendar_selection
-    (account_id, calendar_id, enabled, can_edit) VALUES (20, 'family-calendar', 1, 1)`).run();
+    (account_id, calendar_id, calendar_name, enabled, can_edit) VALUES (20, 'family-calendar', 'Family', 1, 1)`).run();
 
   const publicEvent = database.prepare('SELECT * FROM calendar_events WHERE id = ?')
     .get(insertSeries(database));
@@ -556,10 +510,9 @@ test('Outlook target check reads a TEXT creator through Number(): the series sta
   // '0x2', so a writable auto-sync target exists and the series takes no linked
   // overrides - a narrower answer would grant a capability nobody had before.
   const database = createDatabase();
-  database.prepare(`INSERT INTO outlook_accounts (id, needs_reauth, auto_sync_calendar_id, owner_user_id)
-    VALUES (20, 0, 'family-calendar', 2)`).run();
+  insertOutlookAccount(database, { id: 20, autoSyncCalendarId: 'family-calendar', ownerUserId: 2 });
   database.prepare(`INSERT INTO outlook_calendar_selection
-    (account_id, calendar_id, enabled, can_edit) VALUES (20, 'family-calendar', 1, 1)`).run();
+    (account_id, calendar_id, calendar_name, enabled, can_edit) VALUES (20, 'family-calendar', 'Family', 1, 1)`).run();
   const row = textCreatorSeries(database);
   assert.deepEqual(isEligibleLocalSeries(database, row, 1), { eligible: false, reason: 'ineligible_series' });
   assert.deepEqual(isEligibleLocalSeries(database, row, 2), { eligible: false, reason: 'ineligible_series' });
@@ -591,6 +544,7 @@ test('a series the caller does not see, TEXT creator: no override and no detach 
     // Detach: a local series that cannot take linked overrides (an Outlook push
     // link) and has no linked child.
     const pushed = textCreatorSeries(database, { numeric, title: 'Pushed' });
+    insertOutlookAccount(database, { id: 77 });
     database.prepare(`INSERT INTO outlook_event_links (event_id, account_id, outlook_calendar_id, outlook_event_id)
       VALUES (?, 77, 'calendar-77', 'outlook-event-77')`).run(pushed.id);
     const detached = serializeWith(pushed, { database, actorId: 2 });
@@ -603,10 +557,9 @@ test('a series the caller does not see, TEXT creator: no override and no detach 
 test('disabled, read-only and missing Outlook targets preserve linked capabilities and mutation eligibility', () => {
   for (const selection of [{ enabled: 0, canEdit: 1 }, { enabled: 1, canEdit: 0 }, null]) {
     const database = createDatabase();
-    database.prepare(`INSERT INTO outlook_accounts
-      (id, auto_sync_calendar_id, owner_user_id) VALUES (20, 'family-calendar', 2)`).run();
+    insertOutlookAccount(database, { id: 20, autoSyncCalendarId: 'family-calendar', ownerUserId: 2 });
     if (selection) database.prepare(`INSERT INTO outlook_calendar_selection
-      (account_id, calendar_id, enabled, can_edit) VALUES (20, 'family-calendar', ?, ?)`)
+      (account_id, calendar_id, calendar_name, enabled, can_edit) VALUES (20, 'family-calendar', 'Family', ?, ?)`)
       .run(selection.enabled, selection.canEdit);
     const seriesId = Number(insertSeries(database, {
       start_datetime: '2026-10-01T09:00:00', recurrence_rule: 'FREQ=DAILY',
@@ -628,10 +581,9 @@ test('visibility and assignment changes keep linked overrides when Outlook targe
     for (const mode of ['visibility', 'assignments']) {
       for (const scope of ['series', 'following']) {
         const database = createDatabase();
-        database.prepare(`INSERT INTO outlook_accounts
-          (id, auto_sync_calendar_id, owner_user_id) VALUES (20, 'family-calendar', 2)`).run();
+        insertOutlookAccount(database, { id: 20, autoSyncCalendarId: 'family-calendar', ownerUserId: 2 });
         if (selection) database.prepare(`INSERT INTO outlook_calendar_selection
-          (account_id, calendar_id, enabled, can_edit) VALUES (20, 'family-calendar', ?, ?)`)
+          (account_id, calendar_id, calendar_name, enabled, can_edit) VALUES (20, 'family-calendar', 'Family', ?, ?)`)
           .run(selection.enabled, selection.canEdit);
         const seriesId = Number(insertSeries(database, {
           visibility: mode === 'visibility' ? 'private' : 'assignees',
@@ -3038,10 +2990,9 @@ test('following edit confirms all linked children before successor enters Outloo
       visibility: mode === 'visibility' ? 'private' : 'assignees',
       recurrence_rule: 'FREQ=DAILY',
     }));
-    database.prepare(`INSERT INTO outlook_accounts
-      (id, auto_sync_calendar_id, owner_user_id) VALUES (20, 'family-calendar', 2)`).run();
+    insertOutlookAccount(database, { id: 20, autoSyncCalendarId: 'family-calendar', ownerUserId: 2 });
     database.prepare(`INSERT INTO outlook_calendar_selection
-      (account_id, calendar_id, enabled, can_edit) VALUES (20, 'family-calendar', 1, 1)`).run();
+      (account_id, calendar_id, calendar_name, enabled, can_edit) VALUES (20, 'family-calendar', 'Family', 1, 1)`).run();
     for (const date of ['2026-10-03', '2026-10-04']) {
       upsertOccurrenceOverride(database, {
         seriesId, recurrenceId: date, actorId: 1, changes: { title: `Edited ${date}` },

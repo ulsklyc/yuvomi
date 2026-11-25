@@ -11,7 +11,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
 import * as nodeAssert from 'node:assert/strict';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { addLocalDays, toLocalDateKey } from '../public/utils/date.js';
 import { withoutBlockComments } from './source-text.js';
 import { eachRule } from './css-rules.js';
@@ -50,26 +50,8 @@ function assert(condition, msg) {
 // --------------------------------------------------------
 // DB aufbauen
 // --------------------------------------------------------
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`
-  CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-    applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-  );
-`);
-db.exec(MIGRATIONS_SQL[1]);
-db.exec(MIGRATIONS_SQL[2]);  // sync_config - traegt die Haushaltszone (siehe unten)
-db.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions (EXDATE, #489)
-db.exec(MIGRATIONS_SQL[174]); // birthday/name-day membership exclusions
-db.exec(`
-  ALTER TABLE calendar_events ADD COLUMN target_google_calendar_id TEXT;
-  ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
-  CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
-`);
-db.exec(MIGRATIONS_SQL[245]);
-// Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
-db.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
+// Volles Schema aus der Baseline (test/helpers/schema-db.js); sync_config traegt die Haushaltszone (siehe unten).
+const db = openSchemaDb();
 
 // Testdaten einfügen
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -1513,16 +1495,7 @@ test('Geburtstage: haushaltsweit, sortiert nach nächstem Geburtstag', () => {
  * innerhalb eines Laufs konstant.
  */
 test('Geburtstage: der Stichtag folgt der Haushaltszone, nicht der des Servers', () => {
-  const zdb = new DatabaseSync(':memory:');
-  zdb.exec('PRAGMA foreign_keys = ON;');
-  zdb.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-      applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-    );
-  `);
-  zdb.exec(MIGRATIONS_SQL[1]);
-  zdb.exec(MIGRATIONS_SQL[2]); // sync_config - traegt die Haushaltszone, hier bewusst eine fremde
+  const zdb = openSchemaDb(); // sync_config traegt die Haushaltszone, hier bewusst eine fremde
 
   const zoneUser = zdb.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color)
     VALUES ('zonen-test', 'Zonen Test', 'x', '#FF9500')`).run().lastInsertRowid;
@@ -2057,83 +2030,10 @@ test('Budget: Monatswerte für Einnahmen, Ausgaben, Saldo und Top-Ausgabe', () =
 // der Vergangenheit liegt, müssen auf der Übersicht erscheinen.
 // --------------------------------------------------------
 
-// Eigene DB mit vollständigem Kalender-Schema (subscription_id, calendar_ref_id).
-const cdb = new DatabaseSync(':memory:');
-cdb.exec('PRAGMA foreign_keys = ON;');
-cdb.exec(`
-  CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL, avatar_color TEXT NOT NULL DEFAULT '#007AFF',
-    avatar_data TEXT, avatar_key TEXT
-  );
-  CREATE TABLE external_calendars (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source TEXT NOT NULL DEFAULT 'google', external_id TEXT,
-    name TEXT NOT NULL, color TEXT
-  );
-  CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
-  -- color gehoert dazu: sie ist die GEERBTE Farbe eines Abos und wird seit #891
-  -- als cal_color mitgelesen, weil ein Abo-Termin keinen external_calendars-
-  -- Eintrag hat. Fehlt sie hier, misst dieses verkuerzte Schema an der echten
-  -- Abfrage vorbei. Dasselbe gilt fuer source/external_id und die beiden
-  -- target_*-Spalten unten: SOURCE_CALENDAR_JOIN loest darueber die Quelle
-  -- eines noch nicht hochgeladenen Termins auf (#1064).
-  CREATE TABLE ics_subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL, color TEXT, shared INTEGER NOT NULL DEFAULT 0,
-    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE
-  );
-  CREATE TABLE calendar_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL, description TEXT,
-    start_datetime TEXT NOT NULL, end_datetime TEXT,
-    all_day INTEGER NOT NULL DEFAULT 0, location TEXT,
-    color TEXT NOT NULL DEFAULT '#007AFF', icon TEXT NOT NULL DEFAULT 'calendar',
-    assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    external_source TEXT NOT NULL DEFAULT 'local',
-    recurrence_rule TEXT,
-    subscription_id INTEGER REFERENCES ics_subscriptions(id) ON DELETE CASCADE,
-    calendar_ref_id INTEGER REFERENCES external_calendars(id) ON DELETE SET NULL,
-    target_google_calendar_id TEXT, target_caldav_calendar_url TEXT, outbound_move_to TEXT,
-    visibility TEXT NOT NULL DEFAULT 'all',
-    recurrence_parent_id INTEGER REFERENCES calendar_events(id) ON DELETE CASCADE,
-    recurrence_id TEXT,
-    overridden_fields TEXT,
-    attachment_data TEXT
-  );
-  CREATE TABLE event_assignments (
-    event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
-    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    PRIMARY KEY (event_id, user_id)
-  );
-  CREATE TABLE calendar_event_exceptions (
-    event_id       INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
-    exception_date TEXT    NOT NULL,
-    created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    PRIMARY KEY (event_id, exception_date)
-  );
-  -- Für den LEFT JOIN in getUpcomingEvents (Geburtstags-Lokalisierung, Issue #524).
-  CREATE TABLE birthdays (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL, birth_date TEXT NOT NULL,
-    calendar_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
-    name_day TEXT,
-    name_day_calendar_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
-    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    -- Migration 254 (#2095): ohne Jahr liefert der Join kein birthday_date.
-    year_unknown INTEGER NOT NULL DEFAULT 0
-  );
-`);
-
-cdb.exec(`
-  ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
-  CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
-`);
-cdb.exec(MIGRATIONS_SQL[245]);
-// Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
-cdb.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
+// Eigene DB mit vollem Schema aus der Baseline (test/helpers/schema-db.js): die
+// echten Abfragen (SOURCE_CALENDAR_JOIN, cal_color, Geburtstags-Join) laufen
+// gegen die Spalten, die eine Installation wirklich hat.
+const cdb = openSchemaDb();
 
 const cu1 = cdb.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color)
   VALUES ('theodore', 'Theodore', 'x', '#34C759')`).run();
@@ -2247,8 +2147,8 @@ test('getUpcomingEvents limits by effective instant after merging moved occurren
       recurrence_rule: 'FREQ=YEARLY', created_by: cuTheo,
     });
     cdb.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(birthday, cuTheo);
-    cdb.prepare('INSERT INTO birthdays (name, birth_date, calendar_event_id) VALUES (?, ?, ?)')
-      .run('Birthday fixture', '2000-01-01', birthday);
+    cdb.prepare('INSERT INTO birthdays (name, birth_date, calendar_event_id, created_by) VALUES (?, ?, ?, ?)')
+      .run('Birthday fixture', '2000-01-01', birthday, cuTheo);
     insertEvent({
       title: 'Unassigned before everything', start_datetime: '2090-01-01T07:00:00Z',
       recurrence_rule: 'FREQ=DAILY', created_by: cuTheo,
@@ -2493,7 +2393,7 @@ test('getUpcomingEvents liest keine großen attachment_data-Bodies', () => {
 });
 
 test('getUpcomingEvents: private ICS-Termine fremder User werden ausgeblendet', () => {
-  const sub = cdb.prepare(`INSERT INTO ics_subscriptions (name, shared, created_by) VALUES ('Privat', 0, ?)`)
+  const sub = cdb.prepare(`INSERT INTO ics_subscriptions (name, url, shared, created_by) VALUES ('Privat', 'https://feed.test/privat.ics', 0, ?)`)
     .run(cuSofia).lastInsertRowid;
   insertEvent({
     title: 'Sofias privater ICS-Termin',

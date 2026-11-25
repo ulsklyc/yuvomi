@@ -127,11 +127,11 @@ const SQL_LIST_SELECTORS = [
   { selector: `CallExpression[callee.property.name='repeat'][callee.object.value=${marks}]`, message: SQL_LIST },
   { selector: `CallExpression[callee.property.name='join'][arguments.0.value=${marks}]`, message: SQL_LIST },
 ];
-// The schema, its migrations and the test mirror write SQL that is frozen once applied.
-const SCHEMA_HOME = ['server/db.js', 'server/db-schema-test.js', 'server/migrations/**'];
+// The schema and its migrations write SQL that is frozen once applied.
+const SCHEMA_HOME = ['server/db.js', 'server/migrations/**'];
 
 // Where the rule is the rule itself: the permission module and the API documentation;
-// the schema and its test mirror (migrations and seeds write visibility values) are SCHEMA_HOME.
+// the schema and its migrations (migrations and seeds write visibility values) are SCHEMA_HOME.
 const RIGHTS_HOME = ['server/authorize/**', 'server/openapi/**'];
 
 const isSend = ":matches([callee.property.name='send'], [callee.property.value='send'])";

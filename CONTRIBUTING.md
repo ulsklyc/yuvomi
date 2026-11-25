@@ -192,7 +192,7 @@ The rights rules keep the visibility rules and the module verdict in `server/aut
 outside it no module imports anything but `server/authorize/index.ts`
 (`rights-only-through-authorize`, tests apart), the permission module never reaches
 `server/db.js` (`authorize-not-to-db`), and no file under `server/` outside `server/authorize/`,
-the schema (`server/db.js`, `server/migrations/`, `server/db-schema-test.js`) and the API docs (`server/openapi/`)
+the schema (`server/db.js`, `server/migrations/`) and the API docs (`server/openapi/`)
 compares a module level in dot notation (`x.modules.y`) with `'none'` (`RIGHTS-MODULE`), all
 three hard; a visibility literal in SQL there (`RIGHTS-SQL`) and a visibility level compared
 with a string literal in JavaScript (`RIGHTS-ROW`: `row.visibility === 'all'`, also reversed,
@@ -566,8 +566,11 @@ stops being one.
   [The pre-release handrail](#the-pre-release-handrail)). `npm run test:suite-chain` fails on a file
   without a script and on a script that runs in the wrong chain or in none.
 - Real SQLite, never a mock: an in-memory database or a temp file from `freshTestDbPath()` in
-  `test/tmp-db.js`, with the real migrations (or their test mirror in `server/db-schema-test.js`)
-  applied. Don't stub out migrations.
+  `test/tmp-db.js`, with the real migrations applied. A suite on `node:sqlite` takes its schema
+  from `test/helpers/schema-db.js`: the shipped baseline plus the migrations above it
+  (`openSchemaDb()`), or a legacy state from the real migrations up to version K
+  (`openSchemaDb({ upTo: K })`, then `migrateTo(db, M)`). Don't stub out migrations or hand-copy
+  the schema.
 - Route tests may go over HTTP on loopback: mount the router on a small Express app, set
   `req.authUserId`, `req.authRole` and `req.session` in a stub middleware, `listen(0, '127.0.0.1')`
   and `fetch()` that port. `createHarness()` in `test/test-document-folders.js` shows the pattern.

@@ -4,9 +4,8 @@
  * Ausführen: node test-notes-contacts-budget.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
 import nodeAssert from 'node:assert/strict';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { budgetCategoryLabelKey } from '../public/utils/category-labels.js';
 import {
   categoryInUseCount,
@@ -24,13 +23,7 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[1]);
+const db = openSchemaDb();
 
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
   VALUES ('admin', 'Admin', 'x', 'admin')`).run();
@@ -356,16 +349,18 @@ test('Empréstimo com parcelas calcula restante', () => {
 });
 
 // --- Guard-Helfer (Kategorienverwaltung) ---
-// Fixtures: Kategorien/Subkategorien selbst seeden (Test-Schema seedet sie nicht).
+// Fixtures: das Schema bringt die Vorgabezeilen der Migrationen mit (Kategorien
+// und Subkategorien, darunter housing, food, leisure und ihre Subkategorien).
+// Die Fixture-Zeilen unten sind fuer diese Keys deshalb ein No-op; neu ist nur
+// inc_main. `seeded` haelt die Vorgabe fest, bevor der Test eigene Zeilen anlegt,
+// damit die Zaehl-Tests sie ausdruecklich einrechnen.
 console.log('\n[Budget-Guards] Kategorie-Verwaltung\n');
-// Die Loeschsperre zaehlt seit Codex an #2364 auch Ausgaben und Serien der
-// Aufteilung (`budget_category`, Migration 271). Der Auszug in db-schema-test.js
-// fuehrt die Aufteilung nicht; hier steht nur die Spalte, die die Sperre liest.
-// Das volle Verhalten haelt test-split-expenses-routes.js gegen server/db.js.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS expenses (id INTEGER PRIMARY KEY, budget_category TEXT);
-  CREATE TABLE IF NOT EXISTS recurring_expenses (id INTEGER PRIMARY KEY, budget_category TEXT);
-`);
+/** @param {string} sql */
+const countsBy = (sql) => Object.fromEntries(db.prepare(sql).all().map((r) => [r.k, r.n]));
+const seeded = {
+  categories: countsBy('SELECT type AS k, COUNT(*) AS n FROM budget_categories GROUP BY type'),
+  subcategories: countsBy('SELECT category_key AS k, COUNT(*) AS n FROM budget_subcategories GROUP BY category_key'),
+};
 db.exec(`
   INSERT OR IGNORE INTO budget_categories (key, name, type, sort_order) VALUES
     ('housing', 'Housing', 'expense', 0),
@@ -391,13 +386,16 @@ test('Guard: subcategoryInUseCount zählt Einträge der Subkategorie', () => {
 });
 
 test('Guard: categoryCountByType zählt Kategorien je Typ', () => {
-  assert(categoryCountByType(db, 'expense') === 3, 'expense: housing, food, leisure');
-  assert(categoryCountByType(db, 'income') === 1, 'income: inc_main');
+  // housing, food, leisure sind Vorgabezeilen; inc_main kommt aus der Fixture dazu.
+  assert(categoryCountByType(db, 'expense') === seeded.categories.expense, `expense: Vorgabe (${seeded.categories.expense}), Fixture fuegt keine hinzu`);
+  assert(categoryCountByType(db, 'income') === seeded.categories.income + 1, `income: Vorgabe (${seeded.categories.income}) + inc_main`);
 });
 
 test('Guard: subcategoryCountForCategory zählt Subkategorien einer Kategorie', () => {
-  assert(subcategoryCountForCategory(db, 'housing') === 3, 'housing hat 3 Subkategorien');
-  assert(subcategoryCountForCategory(db, 'food') === 1, 'food hat 1 Subkategorie');
+  // rent_mortgage, condominium, utilities (housing) und groceries (food) sind Vorgabezeilen.
+  assert(subcategoryCountForCategory(db, 'housing') === seeded.subcategories.housing, `housing: ${seeded.subcategories.housing} Subkategorien`);
+  assert(subcategoryCountForCategory(db, 'food') === seeded.subcategories.food, `food: ${seeded.subcategories.food} Subkategorien`);
+  assert(seeded.subcategories.housing !== seeded.subcategories.food, 'Kontrolle: zwei Kategorien mit verschiedener Zahl, sonst unterscheidet der Test sie nicht');
 });
 
 // --- Endpunkte: PUT/DELETE/PATCH-reorder Kategorien (DB-Level, gespiegelt an Routen) ---
@@ -451,9 +449,17 @@ test('Kategorie löschen blockiert, wenn in Benutzung (Guard hat Priorität vor 
 test('Kategorie löschen blockiert, wenn letzte ihres Typs (Guard greift nur wenn NICHT in Benutzung)', () => {
   // inc_main ist frei (keine Budgeteinträge) UND die einzige income-Kategorie
   // -> erster Guard (inUse) lässt durch, zweiter Guard (countByType<=1) blockiert -> 409 "last".
-  const inUse = categoryInUseCount(db, 'inc_main');
-  assert(inUse === 0, 'inc_main muss frei sein, sonst würde der in-use-Guard zuerst greifen, nicht der letzte-Kategorie-Guard');
-  const blockedByLastOfType = categoryCountByType(db, 'income') <= 1;
+  // Der Test handelt von einem Typ mit genau einer Kategorie. Die Haupt-DB hat
+  // neben inc_main die income-Vorgabezeilen, eine davon in Benutzung (Darlehen
+  // oben); deshalb eine eigene DB, in der die (dort freien) income-Vorgabezeilen
+  // entfernt werden und inc_main allein bleibt.
+  const lone = openSchemaDb();
+  lone.exec("DELETE FROM budget_categories WHERE type = 'income'");
+  lone.exec("INSERT INTO budget_categories (key, name, type, sort_order) VALUES ('inc_main', 'Haupteinkommen', 'income', 0)");
+  assert(categoryInUseCount(lone, 'inc_main') === 0, 'inc_main muss frei sein, sonst würde der in-use-Guard zuerst greifen, nicht der letzte-Kategorie-Guard');
+  assert(categoryCountByType(lone, 'income') === 1, 'Kontrolle: inc_main ist die einzige income-Kategorie');
+  const blockedByLastOfType = categoryCountByType(lone, 'income') <= 1;
+  lone.close();
   assert(blockedByLastOfType === true, 'Nur eine income-Kategorie -> letzter-Guard greift -> Endpunkt liefert 409 "last category"');
 });
 

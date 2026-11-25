@@ -1,5 +1,4 @@
 import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {

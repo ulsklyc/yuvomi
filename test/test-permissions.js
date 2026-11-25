@@ -13,8 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { migrateTo, openSchemaDb } from './helpers/schema-db.js';
 import {
   resolvePermissions,
   buildSessionModuleAccess,
@@ -33,11 +32,7 @@ import { effectiveCapabilityAccess, isPermissionDeviation } from '../public/util
 import { WIDGET_IDS } from '../public/utils/dashboard-widgets.js';
 
 function freshDb() {
-  const db = new DatabaseSync(':memory:');
-  db.exec(MIGRATIONS_SQL[1]);   // users
-  db.exec(MIGRATIONS_SQL[74]);  // access_permissions
-  db.exec(MIGRATIONS_SQL[175]); // capability resource type
-  return db;
+  return openSchemaDb(); // volles Schema aus der Baseline (test/helpers/schema-db.js)
 }
 
 function addUser(db, { id, role = 'member', family_role = 'other', name = 'U' }) {
@@ -47,15 +42,16 @@ function addUser(db, { id, role = 'member', family_role = 'other', name = 'U' })
 }
 
 test('migration 175 preserves overrides and permits capability resources', () => {
-  const db = new DatabaseSync(':memory:');
-  db.exec(MIGRATIONS_SQL[74]);
+  // Altzustand aus den echten Migrationen: access_permissions in der Form von
+  // 74 (noch ohne Ressourcentyp 'capability'), dann 175.
+  const db = openSchemaDb({ upTo: 174 });
   db.prepare(`
     INSERT INTO access_permissions
       (subject_type, subject_id, resource_type, resource_key, access, updated_at)
     VALUES ('role', 'child', 'module', 'notes', 'read', '2024-01-02T03:04:05Z')
   `).run();
 
-  db.exec(MIGRATIONS_SQL[175]);
+  migrateTo(db, 175);
 
   assert.deepEqual(
     { ...db.prepare(`
@@ -269,7 +265,6 @@ test('replaceSubjectPermissions ersetzt atomar (kein Merge)', () => {
 
 test('replaceSubjectPermissions erhält Capability-Zeilen beim Speichern von Modulen', () => {
   const db = freshDb();
-  db.exec(MIGRATIONS_SQL[175]);
   db.prepare(`
     INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
     VALUES ('role', 'child', 'capability', 'notes.categories', 'allow')

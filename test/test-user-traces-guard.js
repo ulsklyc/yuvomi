@@ -457,7 +457,6 @@ const COLUMN_HOMES = new Map([
   ['server/services/user-removal.js', null],
   // Die Migrationen, eine Datei je Version: zaehlen als EIN Zuhause.
   ['server/migrations/', null],
-  ['server/db-schema-test.js', null],
   // publicUser(): `deactivated_at: row.deactivated_at ?? null` - das Feld der Antwort.
   ['server/auth.js', 2],
   // Die Beschreibung desselben Felds an GET /auth/users.
