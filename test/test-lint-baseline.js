@@ -454,10 +454,10 @@ test('the fixture gives exactly its twelve findings, and nothing for the allowed
       'a.js:20 UTC-DAY-KEY', // toISOString().slice(0, 10)
       'a.js:21 UTC-DAY-KEY', // toISOString().substring(0, 10)
       'a.js:24 LOG-PLUS-500', // catch block answering 500
-      'tx.js:10 TX-ASYNC-FN', // async function passed to withTx()
-      'tx.js:12 TX-AWAIT-INSIDE', // await nested in a synchronous withTx() body
-      'tx.js:5 TX-ASYNC-FN', // async transaction function
-      'tx.js:7 TX-AWAIT-INSIDE', // await nested in a synchronous transaction body
+      'tx.js:12 TX-ASYNC-FN', // async function passed to withTx()
+      'tx.js:14 TX-AWAIT-INSIDE', // await nested in a synchronous withTx() body
+      'tx.js:7 TX-ASYNC-FN', // async transaction function
+      'tx.js:9 TX-AWAIT-INSIDE', // await nested in a synchronous transaction body
     ]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
