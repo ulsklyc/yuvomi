@@ -20,7 +20,10 @@ const ohneKommentare = workflow
   .filter((zeile) => !/^\s*#/.test(zeile))
   .join('\n');
 
-/** Die Rumpfe aller run:-Bloecke (mehrzeilig per `|` oder einzeilig). */
+/**
+ * Die Rumpfe aller run:-Bloecke (mehrzeilig per `|` oder einzeilig).
+ * @param {string} text
+ */
 function runBloecke(text) {
   const zeilen = text.split('\n');
   const bloecke = [];
