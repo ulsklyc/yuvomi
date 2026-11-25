@@ -3661,3 +3661,105 @@ describe('Smart-Merge haelt verschiedene Karten auseinander (#2513)', () => {
     assert.deepStrictEqual(emails, []);
   });
 });
+
+// ========================================
+// #2943: Laeufe eines Kontos ueberlappen nicht, die Auswahl gilt beim Schreiben
+// ========================================
+
+describe('CardDAV: one run per account, the selection holds at the write (#2943)', () => {
+  /** @type {any} */
+  let database;
+  /** @type {any} */
+  let syncAccount;
+  /** @type {number | bigint} */
+  let accountId;
+  /** @type {number | bigint} */
+  let selectionId;
+  const abUrl = 'https://overlap-2943.example.com/ab/';
+  /** @param {string} uid @param {string} name */
+  const vcf = (uid, name) =>
+    ['BEGIN:VCARD', 'VERSION:3.0', `UID:${uid}`, `FN:${name}`, 'END:VCARD'].join('\r\n');
+  // Ein Makrotask-Durchgang: alles, was nur auf Mikrotasks wartet, laeuft bis
+  // zu seinem naechsten echten Warten. Kein Takt, keine Wartezeit.
+  const turn = () => new Promise((resolve) => setImmediate(resolve));
+
+  /**
+   * Ein Client, dessen vCard-Abrufe haengen, bis der Test sie beantwortet;
+   * `pending` haelt je offenem Abruf seine Nummer (Reihenfolge der Abrufe).
+   */
+  function heldClientFactory() {
+    /** @type {Array<{ index: number, resolve: (value: any) => void }>} */
+    const pending = [];
+    let calls = 0;
+    const createClient = async () => ({
+      fetchAddressBooks: async () => [{ url: abUrl, displayName: 'Familie' }],
+      fetchVCards: () => new Promise((resolve) => pending.push({ index: calls++, resolve })),
+    });
+    return { pending, createClient };
+  }
+
+  before(async () => {
+    const dbModule = await import('../server/db.js');
+    dbModule.init();
+    database = dbModule.get();
+    ({ syncAccount } = await import('../server/services/cardav-sync.js'));
+  });
+
+  const uids = () => database.prepare(
+    'SELECT carddav_uid FROM contacts WHERE carddav_account_id = ? ORDER BY carddav_uid'
+  ).all(accountId).map((/** @type {any} */ r) => r.carddav_uid);
+
+  /** @param {string} name */
+  function freshAccount(name) {
+    accountId = database.prepare(
+      "INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES (?, 'https://overlap-2943.example.com', ?, 'p')"
+    ).run(name, name).lastInsertRowid;
+    selectionId = database.prepare(`
+      INSERT INTO carddav_addressbook_selection (account_id, addressbook_url, addressbook_name, enabled)
+      VALUES (?, ?, 'Familie', 1)
+    `).run(accountId, abUrl).lastInsertRowid;
+  }
+
+  it('an older run does not delete a contact a later run just imported', async () => {
+    freshAccount('overlap');
+    const { pending, createClient } = heldClientFactory();
+    // Der Server antwortet dem spaeteren Abruf mit dem neueren Stand: erst nur
+    // Anker, dann ist dort ein neuer Kontakt dazugekommen.
+    const answers = [
+      [{ url: `${abUrl}anchor.vcf`, data: vcf('ov-anchor', 'Anker') }],
+      [{ url: `${abUrl}anchor.vcf`, data: vcf('ov-anchor', 'Anker') },
+        { url: `${abUrl}new.vcf`, data: vcf('ov-new', 'Neu') }],
+    ];
+
+    // Stundenlauf und "Jetzt synchronisieren" fuer dasselbe Konto.
+    const runs = [syncAccount(accountId, { createClient }), syncAccount(accountId, { createClient })];
+    // Offene Abrufe immer vom juengsten her beantworten: laufen beide Laeufe
+    // gleichzeitig, importiert der spaetere den neuen Kontakt, bevor der
+    // aeltere mit seiner Liste ohne ihn aufraeumt.
+    let answered = 0;
+    while (answered < answers.length) {
+      await turn();
+      const open = pending.splice(0);
+      assert.ok(open.length > 0, 'a fetch is waiting');
+      for (const call of open.reverse()) call.resolve(answers[call.index]);
+      answered += open.length;
+    }
+    await Promise.all(runs);
+
+    assert.deepStrictEqual(uids(), ['ov-anchor', 'ov-new'], 'the contact the server now has stays');
+  });
+
+  it('an address book switched off during the fetch is not imported', async () => {
+    freshAccount('switched-off');
+    const { pending, createClient } = heldClientFactory();
+    const run = syncAccount(accountId, { createClient });
+    await turn();
+    assert.equal(pending.length, 1, 'the run waits on the fetch');
+    // Waehrenddessen schaltet jemand das Adressbuch ab.
+    database.prepare('UPDATE carddav_addressbook_selection SET enabled = 0 WHERE id = ?').run(selectionId);
+    pending[0].resolve([{ url: `${abUrl}late.vcf`, data: vcf('off-late', 'Spaet') }]);
+    await run;
+
+    assert.deepStrictEqual(uids(), [], 'nothing from the switched-off address book');
+  });
+});

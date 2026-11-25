@@ -4,7 +4,8 @@
  * Abhängigkeiten: tsdav, server/db.js
  */
 
-import { runExternalJob } from '../utils/restore-state.js';
+import { runExternalJob, SKIPPED_FOR_RESTORE } from '../utils/restore-state.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { createLogger } from '../logger.js';
 const log = createLogger('CardDAV');
 
@@ -777,11 +778,11 @@ function toggleAddressbook(addressbookId, enabled) {
  * Der Sync als Job, der nach aussen schreibt: waehrend eines Restores beginnt
  * er nicht, und ein laufender wird abgewartet (Codex-Befund in #1431).
  */
-function sync() {
-  return runExternalJob(() => runCarddavSync());
+function sync(options = {}) {
+  return runExternalJob(() => runCarddavSync(options));
 }
 
-async function runCarddavSync() {
+async function runCarddavSync(options = {}) {
   const accounts = getAllAccounts();
 
   if (accounts.length === 0) {
@@ -794,8 +795,10 @@ async function runCarddavSync() {
 
   for (const account of accounts) {
     try {
-      const { synced } = await syncAccount(account.id);
-      syncedContacts += synced;
+      const result = await syncAccount(account.id, options);
+      // Ein Restore begann, waehrend der Lauf am Riegel des Kontos wartete.
+      if (result === SKIPPED_FOR_RESTORE) continue;
+      syncedContacts += result.synced;
       successfulAccounts++;
     } catch (err) {
       // syncAccount loggt bereits; hier nur weitermachen statt abbrechen.
@@ -877,14 +880,30 @@ export function pruneRemovedContacts(database, accountId, addressbookUrl, seenUi
 /**
  * Sync all enabled addressbooks for an account
  * @param {number} accountId - Account ID
+ * @param {{ createClient?: Function }} [options] - createClient setzen nur Tests
  * @returns {Promise<Object>} { synced, errors }
  */
-async function syncAccount(accountId) {
+function syncAccount(accountId, { createClient = createCardDAVClient } = {}) {
   // Use mock if set (for testing)
   if (_syncAccountMock) {
     return _syncAccountMock(accountId);
   }
 
+  // Ein Lauf je Konto, nie zwei gleichzeitig (#2943). Der Prune loescht, was
+  // in der Liste DIESES Laufs fehlt: lief ein zweiter Lauf (Stundenlauf und
+  // "Jetzt synchronisieren") dazwischen und importierte einen Kontakt, den der
+  // Server inzwischen hat, raeumte der erste ihn mit seiner aelteren Liste
+  // wieder ab, samt allem, was an der Zeile hing. Ein Aufruf waehrend eines
+  // Laufs wartet auf genau einen Nachlauf; waehrend eines Restores beginnt
+  // keiner (SKIPPED_FOR_RESTORE, server/utils/sync-lock.js).
+  return runSerialized(`carddav:${accountId}`, 'sync', () => runSyncAccount(accountId, createClient));
+}
+
+/**
+ * @param {number} accountId
+ * @param {Function} createClient
+ */
+async function runSyncAccount(accountId, createClient) {
   try {
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
     if (!account) {
@@ -893,8 +912,9 @@ async function syncAccount(accountId) {
 
     log.info(`Syncing CardDAV account ${accountId} ("${account.name}")...`);
 
-    // Create tsdav client
-    const client = await createCardDAVClient(account);
+    // Create tsdav client (`createClient` setzen nur Tests: ohne ihn spricht
+    // tsdav HTTP mit dem Server)
+    const client = await createClient(account);
 
     // Get enabled addressbooks for this account
     const enabledAddressbooks = db.get().prepare(`
@@ -1073,7 +1093,8 @@ async function fetchVCardsResilient(client, addressBook) {
  */
 async function syncAddressbook(accountId, addressbookUrl, client = null, serverAddressbook = null) {
   try {
-    const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
+    const conn = db.get();
+    const account = conn.prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
     if (!account) {
       throw new Error(`Account ${accountId} not found.`);
     }
@@ -1103,6 +1124,19 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
       // festhalten kann - im Log allein sieht sie niemand (#534).
       const label = calendarDisplayName(serverAddressbook?.displayName, addressbookUrl);
       return { synced: 0, errors: 1, errorMessage: `${label}: ${err.message}` };
+    }
+
+    // Die Auswahl wurde vor dem Abruf gelesen; waehrend er lief, kann jemand
+    // das Adressbuch abgeschaltet oder das Konto geloescht haben (#2943). Ab
+    // hier laeuft der Abgleich ohne weiteres Warten bis zum Prune, also gilt
+    // die Auswahl, wie sie jetzt steht.
+    const stillSelected = conn.prepare(`
+      SELECT 1 FROM carddav_addressbook_selection
+      WHERE account_id = ? AND addressbook_url = ? AND enabled = 1
+    `).get(accountId, addressbookUrl);
+    if (!stillSelected) {
+      log.debug(`Addressbook ${addressbookUrl} was switched off during the fetch, skipping.`);
+      return { synced: 0, errors: 0, deleted: 0, decoupled: 0 };
     }
 
     let synced = 0;
