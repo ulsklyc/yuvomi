@@ -25,9 +25,7 @@ import { withTx } from '../server/db/tx.ts';
  *   exec(sql: string): unknown,
  *   prepare(sql: string): { all(...p: unknown[]): any[], run(...p: unknown[]): unknown },
  *   close(): void,
- *   inTransaction?: boolean,
- *   isTransaction?: boolean,
- * }} AnyDatabase
+ * } & ({ inTransaction: boolean } | { isTransaction: boolean })} AnyDatabase
  */
 
 /** @type {{ name: string, open: () => AnyDatabase }[]} */
@@ -54,7 +52,7 @@ const write = (db, label) => db.prepare('INSERT INTO notes (label) VALUES (?)').
 /** @param {AnyDatabase} db @returns {string[]} */
 const labels = (db) => db.prepare('SELECT label FROM notes ORDER BY label').all().map((row) => row.label);
 /** Der Zustand der Verbindung, je Treiber unter anderem Namen. @param {AnyDatabase} db */
-const inTransaction = (db) => db.inTransaction ?? db.isTransaction;
+const inTransaction = (db) => ('inTransaction' in db ? db.inTransaction : db.isTransaction);
 
 /**
  * @param {string} name
@@ -220,14 +218,16 @@ onBothDrivers('die Folge der Anweisungen: eine innere Ebene laesst keinen Savepo
 
 onBothDrivers('async fn: Fehler, und was vor dem ersten await geschrieben wurde, faellt', (db) => {
   // Per Namen uebergeben - genau die Schreibweise, die TX-ASYNC-FN im Lint nicht
-  // sieht und fuer die es den Laufzeitriegel gibt. Die Typpruefung wird dafuer
-  // umgangen: `() => Promise<void>` waere als fn sonst still erlaubt.
+  // sieht. Zwei Riegel bleiben: der Typ von fn (deshalb die erwartete
+  // Fehlermeldung von tsc - faellt der Typriegel, wird DIESE Zeile zum
+  // Typfehler) und der Laufzeitriegel, der hier gemessen wird.
   const asyncBody = async () => {
     write(db, 'before-await');
     await null;
   };
   assert.throws(
-    () => withTx(db, /** @type {() => void} */ (/** @type {unknown} */ (asyncBody))),
+    // @ts-expect-error eine async-Funktion ist als fn ein Typfehler
+    () => withTx(db, asyncBody),
     (err) => err instanceof TypeError && /withTx/.test(err.message) && /promise/i.test(err.message),
   );
   assert.equal(inTransaction(db), false);
@@ -237,7 +237,7 @@ onBothDrivers('async fn: Fehler, und was vor dem ersten await geschrieben wurde,
 onBothDrivers('ein Thenable, das kein Promise ist, zaehlt genauso; ein Objekt ohne then nicht', (db) => {
   assert.throws(() => withTx(db, () => {
     write(db, 'a');
-    return { then() {} };
+    return /** @type {unknown} */ ({ then() {} });
   }), TypeError);
   assert.deepEqual(labels(db), []);
   assert.deepEqual(withTx(db, () => ({ then: 'kein Aufruf' })), { then: 'kein Aufruf' });
@@ -248,7 +248,7 @@ onBothDrivers('async fn in der inneren Ebene: nur die innere Ebene faellt', (db)
     write(db, 'outer');
     assert.throws(() => withTx(db, () => {
       write(db, 'inner');
-      return Promise.resolve();
+      return /** @type {unknown} */ (Promise.resolve());
     }), TypeError);
     assert.equal(inTransaction(db), true);
   });
@@ -332,6 +332,7 @@ test('eine Verbindung ohne inTransaction/isTransaction wird abgelehnt, bevor etw
   const statements = [];
   let called = false;
   const blind = { exec: (/** @type {string} */ sql) => { statements.push(sql); } };
+  // @ts-expect-error eine Verbindung ohne Zustand ist schon ein Typfehler
   assert.throws(() => withTx(blind, () => { called = true; }), TypeError);
   assert.deepEqual(statements, [], 'keine Anweisung');
   assert.equal(called, false, 'fn lief nicht');

@@ -184,7 +184,8 @@ through type stripping, which is why only erasable syntax is allowed.
 household's zone), no catch block that answers 500 itself, no `async` function or `await` in a
 `db.transaction()` or `withTx()` body, no manual `BEGIN`/`COMMIT` (`withTx()` from
 `server/db/tx.ts` writes them once, for both drivers), and oxlint's `correctness` category. The
-`innerHTML` and transaction rules are hard: they have no baseline and fail at the first finding.
+`innerHTML` rule and the two rules on a transaction body are hard: they have no baseline and fail
+at the first finding; a manual `BEGIN`/`COMMIT` is counted against the baseline.
 The same script runs dependency-cruiser with the layer rules in `.dependency-cruiser.mjs`: no
 import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
 named files import `server/services/push.js`, and only that file imports `web-push`; the server

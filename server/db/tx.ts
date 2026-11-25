@@ -29,13 +29,24 @@
 
 /**
  * Eine Verbindung, so weit withTx sie braucht. Ihren Zustand nennt
- * better-sqlite3-multiple-ciphers `inTransaction`, node:sqlite `isTransaction`.
+ * better-sqlite3-multiple-ciphers `inTransaction`, node:sqlite `isTransaction`;
+ * eine von beiden Eigenschaften muss da sein (eine Attrappe ohne Zustand ist
+ * schon ein Typfehler, zur Laufzeit ein TypeError).
  */
-export type TxDatabase = {
-  exec(sql: string): unknown;
-  readonly inTransaction?: boolean;
-  readonly isTransaction?: boolean;
-};
+export type TxDatabase = { exec(sql: string): unknown } & (
+  | { readonly inTransaction: boolean }
+  | { readonly isTransaction: boolean }
+);
+
+/**
+ * `fn` darf nichts Wartbares liefern: steckt in seiner Rueckgabe ein Promise
+ * (auch als Teil einer Vereinigung), wird der Parameter `never` und der Aufruf
+ * ein Typfehler. `any` (untypisierter Aufrufer) und `never` (fn wirft immer)
+ * bleiben erlaubt; fuer sie gibt es den Laufzeitriegel.
+ */
+type SyncOnly<Result> = 0 extends 1 & Result
+  ? unknown
+  : [Extract<Result, PromiseLike<unknown>>] extends [never] ? unknown : never;
 
 /**
  * Steht auf der Verbindung eine Transaktion offen? Eine Verbindung, die das
@@ -43,8 +54,9 @@ export type TxDatabase = {
  * waehlen noch erkennen, dass SQLite die Transaktion selbst beendet hat.
  */
 function isOpen(db: TxDatabase): boolean {
-  if (typeof db.inTransaction === 'boolean') return db.inTransaction;
-  if (typeof db.isTransaction === 'boolean') return db.isTransaction;
+  const state = db as { inTransaction?: unknown; isTransaction?: unknown };
+  if (typeof state.inTransaction === 'boolean') return state.inTransaction;
+  if (typeof state.isTransaction === 'boolean') return state.isTransaction;
   throw new TypeError('withTx needs a connection that reports its transaction state (inTransaction or isTransaction).');
 }
 
@@ -57,9 +69,10 @@ function isThenable(value: unknown): boolean {
  * `fn` in einer Transaktion von `db` fahren und seine Rueckgabe liefern.
  * Aeusserste Ebene: BEGIN, dann COMMIT oder ROLLBACK. Innere Ebene: SAVEPOINT,
  * dann RELEASE oder ROLLBACK TO und RELEASE. Der Fehler von `fn` kommt als
- * derselbe Fehler an.
+ * derselbe Fehler an; scheitert das Aufraeumen selbst, kommt dessen Fehler an
+ * (wie beim Treiber).
  */
-export function withTx<Result>(db: TxDatabase, fn: () => Result): Result {
+export function withTx<Result>(db: TxDatabase, fn: (() => Result) & SyncOnly<Result>): Result {
   const nested = isOpen(db);
   // Ein fester Name genuegt: Savepoints gleichen Namens stapeln sich, RELEASE
   // und ROLLBACK TO treffen den juengsten.
