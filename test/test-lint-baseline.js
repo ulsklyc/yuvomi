@@ -436,7 +436,7 @@ test('the TypeScript layer fixture gives exactly its three violations', () => {
   ]);
 });
 
-test('the fixture gives exactly its ten findings, and nothing for the allowed lines', () => {
+test('the fixture gives exactly its twelve findings, and nothing for the allowed lines', () => {
   const dir = tempDir('yuvomi-lint-fixture-');
   try {
     writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
@@ -454,6 +454,8 @@ test('the fixture gives exactly its ten findings, and nothing for the allowed li
       'a.js:20 UTC-DAY-KEY', // toISOString().slice(0, 10)
       'a.js:21 UTC-DAY-KEY', // toISOString().substring(0, 10)
       'a.js:24 LOG-PLUS-500', // catch block answering 500
+      'tx.js:10 TX-ASYNC-FN', // async function passed to withTx()
+      'tx.js:12 TX-AWAIT-INSIDE', // await nested in a synchronous withTx() body
       'tx.js:5 TX-ASYNC-FN', // async transaction function
       'tx.js:7 TX-AWAIT-INSIDE', // await nested in a synchronous transaction body
     ]);

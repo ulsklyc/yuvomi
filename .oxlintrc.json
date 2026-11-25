@@ -58,16 +58,16 @@
         "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
       },
       {
-        "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-        "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+        "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function[async=true]",
+        "message": "TX-ASYNC-FN: db.transaction() and withTx() need a synchronous function; both throw on a returned promise and roll back, and code after the first await runs outside the transaction."
       },
       {
-        "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
-        "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+        "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function:not([async=true]) AwaitExpression",
+        "message": "TX-AWAIT-INSIDE: an await inside a db.transaction() or withTx() body runs after the commit."
       },
       {
         "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
-        "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+        "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
       },
       {
         "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
@@ -112,16 +112,16 @@
             "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() and withTx() need a synchronous function; both throw on a returned promise and roll back, and code after the first await runs outside the transaction."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
-            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside a db.transaction() or withTx() body runs after the commit."
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
-            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
@@ -254,16 +254,16 @@
             "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() and withTx() need a synchronous function; both throw on a returned promise and roll back, and code after the first await runs outside the transaction."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
-            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside a db.transaction() or withTx() body runs after the commit."
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
-            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
@@ -400,16 +400,16 @@
             "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() and withTx() need a synchronous function; both throw on a returned promise and roll back, and code after the first await runs outside the transaction."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
-            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside a db.transaction() or withTx() body runs after the commit."
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
-            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
@@ -529,16 +529,16 @@
             "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() and withTx() need a synchronous function; both throw on a returned promise and roll back, and code after the first await runs outside the transaction."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
-            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside a db.transaction() or withTx() body runs after the commit."
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
-            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
@@ -671,16 +671,16 @@
             "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() and withTx() need a synchronous function; both throw on a returned promise and roll back, and code after the first await runs outside the transaction."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
-            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside a db.transaction() or withTx() body runs after the commit."
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
-            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
@@ -810,16 +810,16 @@
             "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() and withTx() need a synchronous function; both throw on a returned promise and roll back, and code after the first await runs outside the transaction."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
-            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside a db.transaction() or withTx() body runs after the commit."
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
-            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
@@ -925,16 +925,16 @@
             "message": "LOG-PLUS-500: a catch block answers 500 itself; pass the error on to the central error handler."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function[async=true]",
-            "message": "TX-ASYNC-FN: db.transaction() needs a synchronous function; the driver throws on a returned promise and rolls back, and code after the first await runs outside the transaction."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function[async=true]",
+            "message": "TX-ASYNC-FN: db.transaction() and withTx() need a synchronous function; both throw on a returned promise and roll back, and code after the first await runs outside the transaction."
           },
           {
-            "selector": "CallExpression[callee.property.name='transaction'] > :function:not([async=true]) AwaitExpression",
-            "message": "TX-AWAIT-INSIDE: an await inside the db.transaction() body runs after the commit."
+            "selector": "CallExpression:matches([callee.property.name='transaction'], [callee.name='withTx'], [callee.property.name='withTx']) > :function:not([async=true]) AwaitExpression",
+            "message": "TX-AWAIT-INSIDE: an await inside a db.transaction() or withTx() body runs after the commit."
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
-            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use db.transaction()."
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",

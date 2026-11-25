@@ -14,11 +14,13 @@ import { backfillShoppingMoveSince, backfillSeriesAuthored } from '../migrations
 import { applyBaseline, isPristine, loadBaseline } from './baseline.ts';
 import type { Baseline } from './baseline.ts';
 import type { SqliteDatabase } from './handle.ts';
+import { withTx } from './tx.ts';
+import type { TxDatabase } from './tx.ts';
 
 const log = createLogger('DB');
 
 /** Was die Selbstheilung braucht; Suiten fahren sie auch auf node:sqlite. */
-type ReconcileDatabase = Pick<SqliteDatabase, 'prepare' | 'exec'>;
+type ReconcileDatabase = Pick<SqliteDatabase, 'prepare' | 'exec'> & TxDatabase;
 
 // --------------------------------------------------------
 // Migrations-Engine
@@ -514,18 +516,12 @@ export function reconcileCriticalSchema(database: ReconcileDatabase | null | und
       if (backfill) {
         // Spalte und Nachtrag zusammen oder gar nicht: eine Spalte ohne ihren
         // Nachtrag gaelte beim naechsten Start als vorhanden, und der Nachtrag
-        // liefe nie mehr. SAVEPOINT, weil es unter better-sqlite3 und
-        // node:sqlite gleich geht und auch in einer offenen Transaktion.
-        database.exec('SAVEPOINT reconcile_column');
-        try {
+        // liefe nie mehr. withTx, weil es unter better-sqlite3 und node:sqlite
+        // gleich geht und auch in einer offenen Transaktion (dort als SAVEPOINT).
+        withTx(database, () => {
           database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
           backfill(database);
-          database.exec('RELEASE SAVEPOINT reconcile_column');
-        } catch (err) {
-          database.exec('ROLLBACK TO SAVEPOINT reconcile_column');
-          database.exec('RELEASE SAVEPOINT reconcile_column');
-          throw err;
-        }
+        });
       } else {
         database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
       }
@@ -557,20 +553,14 @@ function reconcileAvatarKeyTriggers(database: ReconcileDatabase): void {
     // JEDER SCHLUESSEL NEU, nicht nur die fehlenden: ohne die Trigger kann ein
     // Bild unter dem alten Schluessel ersetzt worden sein, und dessen
     // `immutable`-Adresse zeigte aus dem Cache weiter das alte Bild.
-    database.exec('SAVEPOINT reconcile_avatar_key');
-    try {
+    withTx(database, () => {
       createAvatarKeyTriggers(database);
       database.exec(`
         UPDATE users SET avatar_key = CASE
           WHEN avatar_data IS NULL OR avatar_data = '' THEN NULL
           ELSE lower(hex(randomblob(16))) END
       `);
-      database.exec('RELEASE SAVEPOINT reconcile_avatar_key');
-    } catch (err) {
-      database.exec('ROLLBACK TO SAVEPOINT reconcile_avatar_key');
-      database.exec('RELEASE SAVEPOINT reconcile_avatar_key');
-      throw err;
-    }
+    });
     log.warn('Schema-Drift behoben: Trigger fuer users.avatar_key fehlten, wurden neu angelegt und alle Schluessel neu gewuerfelt (#2056).');
   } catch (err) {
     log.error('Schema-Reconciliation der avatar_key-Trigger fehlgeschlagen:', (err as { message?: string } | null)?.message || err);

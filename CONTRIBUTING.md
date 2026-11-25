@@ -182,7 +182,8 @@ through type stripping, which is why only erasable syntax is allowed.
 1,500 lines and functions up to 200, no `innerHTML`/`outerHTML` assignment, no
 `toISOString().slice(0, 10)` as a day key (the helpers in `server/utils/timezone.js` know the
 household's zone), no catch block that answers 500 itself, no `async` function or `await` in a
-`db.transaction()` body, no manual `BEGIN`/`COMMIT`, and oxlint's `correctness` category. The
+`db.transaction()` or `withTx()` body, no manual `BEGIN`/`COMMIT` (`withTx()` from
+`server/db/tx.ts` writes them once, for both drivers), and oxlint's `correctness` category. The
 `innerHTML` and transaction rules are hard: they have no baseline and fail at the first finding.
 The same script runs dependency-cruiser with the layer rules in `.dependency-cruiser.mjs`: no
 import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
