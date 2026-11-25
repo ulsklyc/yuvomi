@@ -23,7 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   new contact without what was attached to it. Now only one sync runs at a time; a second one
   waits for it and then runs once. An event made private, deleted, given another calendar or
   left out of the automatic sync while an Outlook sync is running is no longer sent by that
-  sync, and an address book switched off during a CardDAV sync is no longer imported.
+  sync, and an address book switched off during a CardDAV sync is no longer imported. An
+  Outlook account removed while its sync is creating an event no longer leaves that new copy
+  behind in Outlook: the sync deletes it again and does not report the account as synced.
 - **A reminder is no longer sent twice when a push or a channel answers slowly.** Reminders go
   out once a minute; when sending them took longer than that (a slow push service or an ntfy,
   Gotify, webhook or e-mail channel that answers late), the next run started anyway and sent the

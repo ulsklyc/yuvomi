@@ -865,6 +865,43 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
         SELECT can_edit FROM outlook_calendar_selection
         WHERE account_id = ? AND calendar_id = ? AND enabled = 1
       `);
+      const accountStillThere = conn.prepare('SELECT 1 FROM outlook_accounts WHERE id = ?');
+      let accountGone = false;
+
+      /**
+       * Legt den Termin im Zielkalender an und schreibt seinen Link - oder,
+       * wenn das Konto waehrend des POST geloescht wurde, entfernt die eben
+       * angelegte Kopie wieder (#2943): ein Link kann am Fremdschluessel auf
+       * das Konto nicht mehr entstehen, ohne ihn bliebe die Kopie dort fuer
+       * immer. Das DELETE nimmt den Token, den der Lauf schon haelt; scheitert
+       * es, steht es nur im Log. Alle POST-Stellen gehen hierueber.
+       * @param {number} eventId
+       * @param {string} calendarId
+       * @param {object} payload
+       * @param {string} hash
+       * @returns {Promise<boolean>} ob der Link geschrieben wurde
+       */
+      const createRemote = async (eventId, calendarId, payload, hash) => {
+        const created = await graphJson(
+          `/me/calendars/${encodeURIComponent(calendarId)}/events`,
+          accessToken, { method: 'POST', body: payload }, fetchImpl
+        );
+        if (!accountStillThere.get(account.id)) {
+          accountGone = true;
+          try {
+            const res = await graphRequest(
+              `/me/events/${encodeURIComponent(created.id)}`,
+              accessToken, { method: 'DELETE' }, fetchImpl
+            );
+            if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+          } catch (err) {
+            log.warn(`Account ${account.id} was deleted during the sync; removing the Outlook copy of event ${eventId} failed:`, err.message);
+          }
+          return false;
+        }
+        insLink.run(eventId, account.id, calendarId, created.id, hash, created.changeKey ?? null);
+        return true;
+      };
 
       for (const candidateId of candidates.keys()) {
         // Die Menge oben stammt von vor den Netzaufrufen; jeder Create oder
@@ -902,12 +939,7 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
 
         try {
           if (!link) {
-            const created = await graphJson(
-              `/me/calendars/${encodeURIComponent(calendarId)}/events`,
-              accessToken, { method: 'POST', body: payload }, fetchImpl
-            );
-            insLink.run(event.id, account.id, calendarId, created.id, hash, created.changeKey ?? null);
-            pushed++;
+            if (await createRemote(event.id, calendarId, payload, hash)) pushed++;
           } else if (link.outlook_calendar_id !== calendarId) {
             // Zielkalender gewechselt → Delete + Create (Graph-"move" wäre ein
             // eigener Endpoint mit eigenen Fehlerpfaden — Delete+Create genügt).
@@ -916,38 +948,32 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
               accessToken, { method: 'DELETE' }, fetchImpl
             );
             if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status} on delete`);
-            const created = await graphJson(
-              `/me/calendars/${encodeURIComponent(calendarId)}/events`,
-              accessToken, { method: 'POST', body: payload }, fetchImpl
-            );
-            insLink.run(event.id, account.id, calendarId, created.id, hash, created.changeKey ?? null);
-            updated++;
+            if (await createRemote(event.id, calendarId, payload, hash)) updated++;
           } else if (remoteMissing) {
             // In Outlook von Hand gelöscht → Yuvomi ist Source of Truth: neu anlegen.
-            const created = await graphJson(
-              `/me/calendars/${encodeURIComponent(calendarId)}/events`,
-              accessToken, { method: 'POST', body: payload }, fetchImpl
-            );
-            insLink.run(event.id, account.id, calendarId, created.id, hash, created.changeKey ?? null);
-            updated++;
+            if (await createRemote(event.id, calendarId, payload, hash)) updated++;
           } else if (link.content_hash !== hash || remoteDrifted) {
+            let written;
             try {
               const patched = await graphJson(
                 `/me/events/${encodeURIComponent(link.outlook_event_id)}`,
                 accessToken, { method: 'PATCH', body: payload }, fetchImpl
               );
-              insLink.run(event.id, account.id, calendarId, link.outlook_event_id, hash, patched.changeKey ?? null);
+              // Waehrend des PATCH geloescht: der Link ist mit dem Konto weg,
+              // die Kopie bleibt wie jede andere eines geloeschten Kontos.
+              written = !!accountStillThere.get(account.id);
+              if (written) {
+                insLink.run(event.id, account.id, calendarId, link.outlook_event_id, hash, patched.changeKey ?? null);
+              } else {
+                accountGone = true;
+              }
             } catch (err) {
               // Fallback ohne Drift-Erkennung (Listing fehlgeschlagen): Remote
               // von Hand gelöscht → neu anlegen.
               if (err.status !== 404) throw err;
-              const created = await graphJson(
-                `/me/calendars/${encodeURIComponent(calendarId)}/events`,
-                accessToken, { method: 'POST', body: payload }, fetchImpl
-              );
-              insLink.run(event.id, account.id, calendarId, created.id, hash, created.changeKey ?? null);
+              written = await createRemote(event.id, calendarId, payload, hash);
             }
-            updated++;
+            if (written) updated++;
           }
           // Hash unverändert + kein Drift → No-Op (keine weitere Anfrage).
         } catch (err) {
@@ -956,6 +982,8 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
         }
       }
 
+      // Ein waehrend des Laufs geloeschtes Konto ist nicht synchronisiert.
+      if (accountGone || !accountStillThere.get(account.id)) continue;
       conn.prepare(`
         UPDATE outlook_accounts SET last_sync = ?, last_error = NULL WHERE id = ?
       `).run(new Date().toISOString(), account.id);
