@@ -299,6 +299,104 @@ test('callback requires a refresh token and preserves existing credentials on ac
   assert.equal(cfg('document_storage_google_drive_refresh_token'), 'drive-refresh-a');
 });
 
+// #2946: a first document stored while another account's callback waits on
+// Drive keeps the account that stores it.
+test('callback re-checks the account against documents stored while it waited on Drive', async () => {
+  const { state, factory } = createFake();
+  driveStorage.__setGoogleApiFactoryForTests(factory);
+  await driveStorage.handleCallback('first');
+  const drive = factory.createDrive();
+  const originalGet = drive.files.get;
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  // The folder check of the callback below waits here until the test lets it go.
+  drive.files.get = async (/** @type {any} */ args) => {
+    started.resolve();
+    await released.promise;
+    return originalGet(args);
+  };
+
+  state.account = { permissionId: 'account-b', emailAddress: 'b@example.test', displayName: 'Account B' };
+  state.tokenResponse = {
+    access_token: 'replacement-access',
+    refresh_token: 'replacement-refresh',
+    expiry_date: 2_000_000_000_000,
+  };
+  const pending = driveStorage.handleCallback('replacement');
+  await started.promise;
+  // Meanwhile a first document is stored with the connected account A.
+  database.prepare("INSERT INTO family_documents (storage_backend, storage_key) VALUES ('google_drive', 'stored-by-a')")
+    .run();
+  released.resolve();
+
+  await assert.rejects(
+    pending,
+    (/** @type {any} */ error) => error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED'
+  );
+  assert.equal(cfg('document_storage_google_drive_account_id'), 'account-a');
+  assert.equal(cfg('document_storage_google_drive_refresh_token'), 'drive-refresh-a');
+});
+
+/**
+ * Account A connected; account B is connected while a call through A waits
+ * on its first Drive request (#2946). Returns the hold and the switch.
+ */
+async function accountSwitchDuringFirstDriveCall() {
+  const { state, factory } = createFake();
+  driveStorage.__setGoogleApiFactoryForTests(factory);
+  await driveStorage.handleCallback('first');
+  const drive = factory.createDrive();
+  const originalGet = drive.files.get;
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  let held = false;
+  drive.files.get = async (/** @type {any} */ args) => {
+    if (!held) {
+      held = true;
+      started.resolve();
+      await released.promise;
+    }
+    return originalGet(args);
+  };
+  return {
+    state,
+    async switchToAccountB() {
+      await started.promise;
+      setCfg('document_storage_google_drive_refresh_token', 'drive-refresh-b');
+      setCfg('document_storage_google_drive_account_id', 'account-b');
+      setCfg('document_storage_google_drive_folder_id', 'folder-of-b');
+      released.resolve();
+    },
+  };
+}
+
+test('an upload through account A does not store its folder over account B connected meanwhile', async () => {
+  const { state, switchToAccountB } = await accountSwitchDuringFirstDriveCall();
+  // A's stored folder is gone, so the upload finds or creates one and would store it.
+  const storedFolder = state.files.get(cfg('document_storage_google_drive_folder_id'));
+  storedFolder.trashed = true;
+
+  const upload = driveStorage.uploadFile({ buffer: Buffer.from('bytes'), originalName: 'a.txt' });
+  await switchToAccountB();
+  await upload;
+
+  assert.equal(cfg('document_storage_google_drive_folder_id'), 'folder-of-b');
+});
+
+test('a connection test of account A does not record its result for account B connected meanwhile', async () => {
+  const { switchToAccountB } = await accountSwitchDuringFirstDriveCall();
+
+  const tested = driveStorage.testConnection();
+  await switchToAccountB();
+  assert.deepEqual(await tested, { ok: true });
+
+  assert.equal(cfg('document_storage_google_drive_last_test'), null);
+});
+
 test('upload, streaming read, token refresh, delete and missing delete are supported', async () => {
   await driveStorage.handleCallback('code');
   const id = await driveStorage.uploadFile({

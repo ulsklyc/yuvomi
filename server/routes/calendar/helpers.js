@@ -4,7 +4,11 @@
  *        genutzt werden. Aufgeteilt aus server/routes/calendar.js (God-File-Split).
  */
 
-import { StorageError } from '../../services/document-storage.js';
+import {
+  STORAGE_CONFIG_CHANGED_MESSAGE,
+  StorageError,
+  assertStagedTargetCurrent,
+} from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
@@ -242,6 +246,9 @@ export function ensureDocumentFolder(database, name, actorId) {
 
 export function createAttachmentDocument(database, attachment, staged, body, actorId) {
   if (!attachment?.buffer || !staged) return null;
+  // Called in the transaction of the write: the storage settings may have
+  // changed while the attachment was uploaded (#2946).
+  assertStagedTargetCurrent(staged);
   const originalName = String(body.attachment_name || 'Attachment').trim() || 'Attachment';
   const folderId = ensureDocumentFolder(database, body.document_folder_name || DEFAULT_ATTACHMENT_FOLDER, actorId);
   const result = database.prepare(`
@@ -286,6 +293,8 @@ export function cloneAttachmentDocument(database, source, staged) {
 }
 
 function insertAttachmentClone(database, source, staged) {
+  // As for a new attachment: the copy was uploaded before this write (#2946).
+  assertStagedTargetCurrent(staged);
   return database.prepare(`
     INSERT INTO family_documents
       (name, description, category, status, visibility, folder_id, original_name,
@@ -554,6 +563,12 @@ export function serializeEvents(events, context) {
 
 export function sendStorageError(res, error, fallbackMessage) {
   if (!(error instanceof StorageError)) return false;
+  // The storage settings changed during the upload (#2946): 409 with its own
+  // sentence, the client may send the request again.
+  if (error.storageCode === 'DOCUMENT_STORAGE_CONFIG_CHANGED') {
+    res.status(409).json({ error: STORAGE_CONFIG_CHANGED_MESSAGE, code: 409, storage_code: error.storageCode });
+    return true;
+  }
   res.status(502).json({
     error: fallbackMessage,
     code: 502,
