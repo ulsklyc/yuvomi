@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **Changing your password twice at the same time keeps one of the two.** Two password
+  changes for the same account that overlapped could both succeed, each signing out the other,
+  and the one that finished last counted. Now the second one gets the same answer as a wrong
+  current password and nobody is signed out by it.
 - **A password reset link works exactly once.** Two requests with the same link that
   arrived at almost the same time could both set a password, and the one that finished last
   counted. Now only the first one sets the password; the second gets the same answer as an
