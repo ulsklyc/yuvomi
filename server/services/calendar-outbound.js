@@ -761,11 +761,20 @@ export function clearOutbound(eventId) {
 /**
  * Nur der Umzug fällt weg - eine gleichzeitig vorgemerkte Feldänderung soll
  * trotzdem noch rausgehen, dann eben im bisherigen Kalender.
+ *
+ * Mit `handled` fällt die Vormerkung nur, solange sie noch dieses Ziel nennt
+ * (#2944): zwischen der Entscheidung und hier liegt oft ein await, in dem der
+ * Nutzer ein anderes Ziel gewählt haben kann - das ist ein neuer Umzug.
+ *
+ * @param {number} eventId
+ * @param {string} [handled] das Ziel, über das entschieden wurde
  */
-export function clearOutboundMove(eventId) {
-  db.get().prepare(
-    'UPDATE calendar_events SET outbound_move_to = NULL, outbound_attempts = 0 WHERE id = ?'
-  ).run(eventId);
+export function clearOutboundMove(eventId, handled) {
+  const any = handled === undefined;
+  db.get().prepare(`
+    UPDATE calendar_events SET outbound_move_to = NULL, outbound_attempts = 0
+    WHERE id = ? AND (? = 1 OR outbound_move_to IS ?)
+  `).run(eventId, any ? 1 : 0, any ? null : handled);
 }
 
 export function failOutbound(eventId) {

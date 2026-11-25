@@ -540,6 +540,11 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
           clearMove(event.id);
         }
       } else {
+        // `moveTo` stammt aus der Auswahl; seitdem lagen die Metadaten-Abrufe von
+        // Quelle und Ziel. Nennt der Termin jetzt ein anderes Ziel oder keins mehr,
+        // geht in diesem Lauf nichts hinaus, der nächste entscheidet (#2944).
+        const now = outbound.reloadEvent(event.id);
+        if (!now || now.outbound_move_to !== moveTo) continue;
         try {
           const moved = await calendar.events.move({
             calendarId,
@@ -570,7 +575,9 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
       }
     } else if (moveTo) {
       // Ziel == aktueller Kalender: nichts zu tun (z. B. Umzug bereits erfolgt).
-      clearMove(event.id);
+      // Nur diese Vormerkung fällt: ein während des Metadaten-Abrufs gewähltes
+      // Ziel ist ein neuer Umzug (#2944).
+      clearMove(event.id, moveTo);
     }
 
     // ── Geänderte Felder pushen (events.patch) ───────────────────────────────

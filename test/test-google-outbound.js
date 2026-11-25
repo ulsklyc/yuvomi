@@ -1614,6 +1614,81 @@ test('ein während des Zielabrufs gewähltes Ziel fällt nicht mit dem unschreib
   assert.equal(row.outbound_move_to, 'work@g', 'der zuletzt gewählte Kalender steht weiter an');
 });
 
+test('#2944: ein während des Quellabrufs gewähltes Ziel fällt nicht mit dem erledigten Umzug', async () => {
+  // Die Zeile nennt einen Umzug in den Kalender, in dem der Termin schon liegt -
+  // nichts zu tun, die Vormerkung fällt. Während calendarList.get für die Quelle
+  // unterwegs ist, wählt der Nutzer work@g: das ist ein neuer Umzug.
+  reset();
+  const event = seedMirrored('gev-stale-move-retarget');
+  db.prepare("UPDATE calendar_events SET outbound_move_to = 'primary' WHERE id = ?").run(event.id);
+
+  const calendar = fakeCalendar({ calendars: writableCalendars(['primary', 'work@g']) });
+  const originalGet = calendar.calendarList.get;
+  calendar.calendarList.get = async (params) => {
+    if (params.calendarId === 'primary') await put(event.id, { target_google_calendar_id: 'work@g' });
+    return originalGet(params);
+  };
+  await __test.processPendingUpdates(/** @type {any} */ (calendar), {});
+
+  assert.equal(calendar.moves.length, 0, 'Vorbedingung: der Lauf entschied über die alte Vormerkung');
+  const row = reload(event.id);
+  assert.equal(__test.currentGoogleCalendarId(row), 'primary');
+  assert.equal(row.outbound_move_to, 'work@g', 'der zuletzt gewählte Kalender steht weiter an');
+});
+
+/**
+ * Hält calendarList.get für `pauseAt` an und lässt währenddessen `during` laufen.
+ * @param {any} calendar
+ * @param {string} pauseAt
+ * @param {() => Promise<void>} during
+ */
+function duringMeta(calendar, pauseAt, during) {
+  const originalGet = calendar.calendarList.get;
+  calendar.calendarList.get = async (/** @type {any} */ params) => {
+    if (params.calendarId === pauseAt) await during();
+    return originalGet(params);
+  };
+  return calendar;
+}
+
+test('#2944: ein während des Zielabrufs zurückgenommener Umzug läuft nicht los', async () => {
+  reset();
+  const event = seedMirrored('gev-withdraw-during-dest-meta');
+  await put(event.id, { target_google_calendar_id: 'fam@g' });
+  assert.equal(reload(event.id).outbound_move_to, 'fam@g', 'Vorbedingung: der Umzug steht an');
+
+  const calendar = duringMeta(fakeCalendar({ calendars: writableCalendars(['primary', 'fam@g']) }),
+    'fam@g', () => put(event.id, { target_google_calendar_id: 'primary' }));
+  await __test.processPendingUpdates(/** @type {any} */ (calendar), {});
+
+  assert.equal(calendar.moves.length, 0, 'der Termin bleibt in dem Kalender, der jetzt gewählt ist');
+  const row = reload(event.id);
+  assert.equal(__test.currentGoogleCalendarId(row), 'primary');
+  assert.equal(row.outbound_move_to, null);
+});
+
+test('#2944: ein während des Quellabrufs gewähltes neues Ziel ersetzt den Umzug im Lauf', async () => {
+  reset();
+  const event = seedMirrored('gev-retarget-during-source-meta');
+  await put(event.id, { target_google_calendar_id: 'fam@g' });
+
+  const calendar = duringMeta(fakeCalendar({ calendars: writableCalendars(['primary', 'fam@g', 'work@g']) }),
+    'primary', () => put(event.id, { target_google_calendar_id: 'work@g' }));
+  await __test.processPendingUpdates(/** @type {any} */ (calendar), {});
+
+  assert.equal(calendar.moves.length, 0, 'nicht in den Kalender, der vorher gewählt war');
+  let row = reload(event.id);
+  assert.equal(__test.currentGoogleCalendarId(row), 'primary');
+  assert.equal(row.outbound_move_to, 'work@g', 'der nächste Lauf entscheidet über das neue Ziel');
+
+  const next = fakeCalendar({ calendars: writableCalendars(['primary', 'fam@g', 'work@g']) });
+  assert.equal(await __test.processPendingUpdates(/** @type {any} */ (next), {}), 1);
+  assert.deepEqual(next.moves.map((m) => m.destination), ['work@g']);
+  row = reload(event.id);
+  assert.equal(__test.currentGoogleCalendarId(row), 'work@g');
+  assert.equal(row.outbound_move_to, null);
+});
+
 test('ein während des scheiternden Umzugs gewähltes Ziel fällt nicht mit ihm', async () => {
   // Google lehnt den Umzug nach fam@g ab (400, aufgeben). Während des Aufrufs hat der
   // Nutzer work@g gewählt - das ist ein neuer Umzug, kein Teil des abgelehnten.

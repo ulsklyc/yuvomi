@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **A calendar chosen for an event while its changes are being sent is kept.** When several
+  events waited to go out to Google Calendar or a CalDAV server, a calendar picked for one of
+  them while an earlier one was still being sent could be dropped, and the event stayed where it
+  was while the app showed the new calendar. An event could also still be moved to the
+  calendar picked before, even after it had been set back. Now the event goes to the calendar
+  that is chosen when its turn comes, and a later choice is never cleared with an earlier one.
 - **A sync no longer undoes a change made while it runs.** A task or shopping item edited
   while the CalDAV reminders sync was fetching from the server got the server's old state back,
   and that old state was then sent to the server; one deleted in that moment came back. The same
