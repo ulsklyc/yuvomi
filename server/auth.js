@@ -2187,8 +2187,19 @@ export function buildResetRoutes(targetRouter, {
       return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
     }
     const hash = await hashPassword(password);
-    getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
-    resetService.consumeToken(token);
+    // Das Hashen war ein await: ein zweiter Antrag mit demselben Token oder ein
+    // Admin kann dazwischen gelaufen sein (#2938). Erst hier, ohne await
+    // dazwischen, gilt das Gepruefte: wer die Token-Zeile entfernt, setzt das
+    // Passwort, jeder weitere bekommt die Antwort fuer einen ungueltigen Token.
+    const written = withTx(getDb(), () => {
+      if (!resetService.redeemToken(token)) return false;
+      if (!accountAcceptsReset(userId)) return false;
+      getDb().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+      return true;
+    });
+    if (!written) {
+      return res.status(400).json({ error: 'Invalid or expired token.', code: 400 });
+    }
     // Best-effort: invalidate existing sessions for this user.
     try { invalidateUserSessions(userId, null, getDb()); }
     catch { /* sessions table may not exist in tests */ }
