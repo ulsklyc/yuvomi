@@ -36,18 +36,19 @@ jobs:
       pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      # Nur ob der Schluessel gesetzt ist; den Wert sieht allein der API-Schritt.
+      MISTRAL_KONFIGURIERT: ${{ secrets.MISTRAL_API_KEY != '' }}
       # Modell-Alias der La Plateforme; umstellbar ohne weiteren Eingriff.
       MISTRAL_MODELL: mistral-large-latest
       REPO: ${{ github.repository }}
       PR: ${{ github.event.pull_request.number }}
     steps:
       - name: Ueberspringen, wenn MISTRAL_API_KEY fehlt
-        if: env.MISTRAL_API_KEY == ''
+        if: env.MISTRAL_KONFIGURIERT != 'true'
         run: echo "::notice::MISTRAL_API_KEY ist nicht als Repo-Secret konfiguriert - Mistral Code Review wird uebersprungen."
 
       - name: PR-Metadaten und Diff holen
-        if: env.MISTRAL_API_KEY != ''
+        if: env.MISTRAL_KONFIGURIERT == 'true'
         id: daten
         run: |
           set -euo pipefail
@@ -65,13 +66,13 @@ jobs:
           echo "abgeschnitten=$abgeschnitten" >> "$GITHUB_OUTPUT"
 
       - name: Review-Prompt bauen
-        if: env.MISTRAL_API_KEY != ''
+        if: env.MISTRAL_KONFIGURIERT == 'true'
         env:
           ABGESCHNITTEN: ${{ steps.daten.outputs.abgeschnitten }}
         run: |
           set -euo pipefail
           titel=$(jq -r '.title // ""' "$RUNNER_TEMP/pr.json")
-          body=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json")
+          jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/body.txt"
           autor=$(jq -r '.author.login // ""' "$RUNNER_TEMP/pr.json")
           kopf=$(jq -r '.headRefOid // ""' "$RUNNER_TEMP/pr.json")
           branch=$(jq -r '.headRefName // ""' "$RUNNER_TEMP/pr.json")
@@ -100,6 +101,14 @@ jobs:
           - Tests: ein Fix braucht einen Test, der gegen den alten Stand rot war. CHANGELOG.md unter [Unreleased] bei Aenderungen, die ein Nutzer oder Client sieht.
           PROMPT_ENDE
 
+          # Der Zaun ist laenger als jede Backtick-Folge in Diff und
+          # Beschreibung: keiner der beiden bricht aus seinem Codeblock aus.
+          # ZAUN-ANFANG
+          laengste=$({ grep -oh '`\+' "$RUNNER_TEMP/diff.patch" "$RUNNER_TEMP/body.txt" || true; } | awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }')
+          zaunlaenge=$(( laengste >= 3 ? laengste + 1 : 3 ))
+          zaun=$(printf '%*s' "$zaunlaenge" '' | tr ' ' '`')
+          # ZAUN-ENDE
+
           {
             echo "Repository: $REPO"
             echo "Pull Request: #$PR - $titel"
@@ -107,7 +116,9 @@ jobs:
             echo
             echo "## PR-Beschreibung"
             echo
-            printf '%s\n' "$body"
+            echo "${zaun}text"
+            cat "$RUNNER_TEMP/body.txt"
+            echo "$zaun"
             echo
             echo "## Diff"
             if [ "$ABGESCHNITTEN" = "yes" ]; then
@@ -115,20 +126,15 @@ jobs:
               echo "(Diff auf 200000 Bytes abgeschnitten - nur der Anfang ist sichtbar.)"
             fi
             echo
-            # Der Zaun ist laenger als jede Backtick-Folge im Diff: ein Diff,
-            # der selbst ``` enthaelt, bricht nicht aus dem Codeblock aus.
-            # ZAUN-ANFANG
-            laengste=$({ grep -o '`\+' "$RUNNER_TEMP/diff.patch" || true; } | awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }')
-            zaunlaenge=$(( laengste >= 3 ? laengste + 1 : 3 ))
-            zaun=$(printf '%*s' "$zaunlaenge" '' | tr ' ' '`')
-            # ZAUN-ENDE
             echo "${zaun}diff"
             cat "$RUNNER_TEMP/diff.patch"
             echo "$zaun"
           } > "$RUNNER_TEMP/nutzer.txt"
 
       - name: Mistral API aufrufen
-        if: env.MISTRAL_API_KEY != ''
+        if: env.MISTRAL_KONFIGURIERT == 'true'
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         run: |
           set -euo pipefail
           jq -n \
@@ -177,7 +183,7 @@ jobs:
           } > "$RUNNER_TEMP/review.md"
 
       - name: Review als PR-Review posten
-        if: env.MISTRAL_API_KEY != ''
+        if: env.MISTRAL_KONFIGURIERT == 'true'
         run: |
           set -euo pipefail
           # COMMENT statt APPROVE/CHANGES: das Review blockiert nie den PR.

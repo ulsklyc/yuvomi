@@ -126,7 +126,18 @@ test('der API-Schluessel steht nie im argv von curl', () => {
   assert.match(ohneKommentare, /umask 077\n\s*printf 'Authorization: Bearer %s\\n' "\$MISTRAL_API_KEY" > "\$RUNNER_TEMP\/auth-header"/);
 });
 
-test('der Diff-Zaun ist laenger als jede Backtick-Folge im Diff', (t) => {
+test('der API-Schluessel steht nur im env des API-Schritts', () => {
+  // Mistral-Review #2965: im Job-env sah jeder Schritt den Schluessel.
+  const vorkommen = ohneKommentare.match(/secrets\.MISTRAL_API_KEY(?! != '')/g) ?? [];
+  assert.equal(vorkommen.length, 1, 'secrets.MISTRAL_API_KEY genau einmal als Wert');
+  const apiSchritt = ohneKommentare.match(/- name: Mistral API aufrufen\n([\s\S]*?)\n\s*run: \|/)?.[1] ?? '';
+  assert.match(apiSchritt, /env:\n\s+MISTRAL_API_KEY: \$\{\{ secrets\.MISTRAL_API_KEY \}\}/);
+  const jobEnv = ohneKommentare.match(/\n    env:\n((?:      .*\n)+)/)?.[1] ?? '';
+  assert.ok(jobEnv, 'Job-env nicht gefunden');
+  assert.doesNotMatch(jobEnv, /MISTRAL_API_KEY:/);
+});
+
+test('der Diff-Zaun ist laenger als jede Backtick-Folge in Diff und Beschreibung', (t) => {
   // Mistral-Review #2965: ein Diff mit ``` brach aus einer festen
   // ```diff-Fence aus und stand als freier Text im Prompt.
   const zaunSkript = workflow.match(/# ZAUN-ANFANG\n([\s\S]*?)\n\s*# ZAUN-ENDE/)?.[1];
@@ -138,9 +149,10 @@ test('der Diff-Zaun ist laenger als jede Backtick-Folge im Diff', (t) => {
     return;
   }
   const dir = tempDir('yuvomi-mistral-zaun-');
-  /** @param {string} diff */
-  const zaun = (diff) => {
+  /** @param {string} diff @param {string} [beschreibung] */
+  const zaun = (diff, beschreibung = '') => {
     writeFileSync(join(dir, 'diff.patch'), diff);
+    writeFileSync(join(dir, 'body.txt'), beschreibung);
     return execFileSync('bash', ['-euo', 'pipefail', '-c', `${zaunSkript}\nprintf '%s' "$zaun"`], {
       env: { ...process.env, RUNNER_TEMP: dir },
       encoding: 'utf8',
@@ -149,4 +161,8 @@ test('der Diff-Zaun ist laenger als jede Backtick-Folge im Diff', (t) => {
   assert.equal(zaun('+const a = 1;\n'), '```');
   assert.equal(zaun('+```js\n+x\n+```\n'), '````');
   assert.equal(zaun('+``````\n'), '```````');
+  assert.equal(zaun('+x\n', 'Beispiel:\n`````\ncode\n`````\n'), '``````');
+  // Beschreibung steht im eigenen Zaun, nie roh im Prompt.
+  assert.match(ohneKommentare, /echo "\$\{zaun\}text"\n\s*cat "\$RUNNER_TEMP\/body\.txt"\n\s*echo "\$zaun"/);
+  assert.doesNotMatch(ohneKommentare, /printf '%s\\n' "\$body"/);
 });
