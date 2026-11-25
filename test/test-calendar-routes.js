@@ -1980,12 +1980,13 @@ test('PUT /:id — partielles Update lässt andere Felder unberührt', async () 
 /**
  * Jeder weitere Upload bekommt eine eigene Datei-ID (`<fileId>-2`, ...). Mit
  * `holdDeletes` haelt auch `files.delete`, bis der Test `releaseDeletes` ruft
- * (#2956: die Antwort nach dem Aufraeumen).
+ * (#2956: die Antwort nach dem Aufraeumen). Mit `eachUpload` laeuft statt des
+ * Tors dieser Haken in jedem Upload, mit der laufenden Nummer.
  * @param {string} fileId
  * @param {(held: { started: Promise<unknown>, release: () => void, deleted: string[], deleteStarted: Promise<unknown>, releaseDeletes: () => void }) => Promise<void>} probe
- * @param {{ holdDeletes?: boolean }} [options]
+ * @param {{ holdDeletes?: boolean, eachUpload?: (n: number) => unknown }} [options]
  */
-async function withHeldDriveUpload(fileId, probe, { holdDeletes = false } = {}) {
+async function withHeldDriveUpload(fileId, probe, { holdDeletes = false, eachUpload } = {}) {
   const driveStorage = await import('../server/services/google-drive-storage.js');
   const configKeys = [
     'document_storage_selected_backend',
@@ -2039,7 +2040,10 @@ async function withHeldDriveUpload(fileId, probe, { holdDeletes = false } = {}) 
             uploads += 1;
             const id = uploads === 1 ? fileId : `${fileId}-${uploads}`;
             uploadStarted();
-            await gate;
+            // Waehrend JEDES Uploads (#2956): der Test aendert den Stand, dann
+            // laeuft dieser Upload weiter. Ohne den Haken haelt das Tor.
+            if (eachUpload) await eachUpload(uploads);
+            else await gate;
             return { data: { id } };
           },
           delete: async (/** @type {{ fileId: string }} */ { fileId: id }) => {
@@ -2253,10 +2257,12 @@ test('PUT /:id - an event made private during the upload answers 404 to the othe
 // Anfrage die Serie.
 /**
  * Eine Serie mit Anhang ab einem Mittwoch und eine Ausnahme am Freitag, die
- * den Anhang erbt; die Quelle liegt im lokalen Speicher.
+ * den Anhang erbt; die Quelle liegt im lokalen Speicher. `extraDocuments`
+ * legt dort weitere Anhang-Dokumente an (an eigenen Terminen) und gibt ihre IDs.
  * @param {string} title
+ * @param {number} [extraDocuments]
  */
-async function seriesWithInheritingOverride(title) {
+async function seriesWithInheritingOverride(title, extraDocuments = 0) {
   const previousEnabled = process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
   const previousBackend = db.prepare("SELECT value FROM sync_config WHERE key = 'document_storage_selected_backend'").get()?.value;
   try {
@@ -2271,7 +2277,18 @@ async function seriesWithInheritingOverride(title) {
     const seriesId = Number(created.body.data.id);
     const child = await call('PUT', `/${seriesId}/occurrences/2059-01-03`, /** @type {any} */ ({ body: { title: `${title} Freitag` } }));
     assert.equal(child.status, 200);
-    return { seriesId, childId: Number(child.body.data.id) };
+    /** @type {number[]} */
+    const documentIds = [];
+    for (let n = 1; n <= extraDocuments; n += 1) {
+      const other = await call('POST', '/', /** @type {any} */ ({ body: {
+        title: `${title} Dokument ${n}`, start_datetime: '2059-06-01T09:00:00',
+        attachment_name: `${title}-${n}.txt`,
+        attachment_data: `data:text/plain;base64,${Buffer.from(`${title} ${n}`).toString('base64')}`,
+      } }));
+      assert.equal(other.status, 201);
+      documentIds.push(Number(db.prepare('SELECT attachment_document_id AS d FROM calendar_events WHERE id = ?').get(other.body.data.id).d));
+    }
+    return { seriesId, childId: Number(child.body.data.id), documentIds };
   } finally {
     if (previousEnabled === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
     else process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = previousEnabled;
@@ -2344,6 +2361,70 @@ test('PUT /:id - the copies follow the overrides found after the attachment copy
   assert.equal(uploadsDeleted.length, 0, 'die bereitgestellte Kopie wird benutzt, nicht weggeraeumt');
 });
 
+// NACH DREI RUNDEN 409 (#2956). Aendert sich die Serie waehrend JEDES
+// Kopier-Uploads so, dass die bereitgestellten Kopien nicht mehr passen, plant
+// das Speichern dreimal neu und gibt dann auf: 409 `calendar_series_changed`,
+// nichts gespeichert, alle Kopien weggeraeumt. Den Anhang der Serie stellt der
+// Test direkt um (eine Route dafuer liefe selbst durch den gehaltenen Upload).
+const SERIES_CHANGED = {
+  error: 'The series changed while attachment copies were uploaded. Nothing was saved; send the request again.',
+  code: 409,
+  reason: 'calendar_series_changed',
+};
+
+/**
+ * @param {string} title
+ * @param {number} uploads - Uploads ueber drei Runden (je Runde einer je Kopie)
+ * @param {(seriesId: number) => Promise<any>} send
+ */
+async function seriesChangedDuringEveryCopy(title, uploads, send) {
+  const { seriesId, childId, documentIds } = await seriesWithInheritingOverride(title, uploads);
+  const before = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(seriesId);
+  const seriesCount = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  /** @type {any} */
+  let answer;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  /** @type {number[]} */
+  const seen = [];
+  await withHeldDriveUpload(`drive-2956-${title}`, async ({ deleted }) => {
+    answer = await send(seriesId);
+    uploadsDeleted = deleted;
+  }, {
+    eachUpload: (n) => {
+      seen.push(n);
+      db.prepare('UPDATE calendar_events SET attachment_document_id = ? WHERE id = ?').run(documentIds[n - 1], seriesId);
+    },
+  });
+  assert.equal(seen.length, uploads, 'jede Runde laedt ihre Kopien neu hoch');
+  assert.equal(answer.status, 409, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, SERIES_CHANGED);
+  const after = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(seriesId);
+  assert.deepEqual({ ...after, attachment_document_id: before.attachment_document_id }, { ...before },
+    'die Serie ist bis auf den umgestellten Anhang unveraendert');
+  assert.equal(after.attachment_document_id, documentIds[uploads - 1]);
+  assert.equal(db.prepare('SELECT recurrence_parent_id AS p FROM calendar_events WHERE id = ?').get(childId).p, seriesId,
+    'die Ausnahme bleibt verknuepft');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, seriesCount, 'keine neue Serie');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE ?').get(`drive-2956-${title}%`).n, 0,
+    'kein Dokument fuer eine Kopie');
+  assert.equal(uploadsDeleted.length, uploads, 'jede bereitgestellte Kopie wird wieder entfernt');
+  assert.equal(new Set(uploadsDeleted).size, uploads);
+}
+
+test('PUT /:id - a series that changes during every copy upload answers 409 after three rounds (#2956)', async () => {
+  await seriesChangedDuringEveryCopy('rounds-put', 3, (seriesId) => call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+    recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+  } })));
+});
+
+test('PUT /:seriesId/occurrences/:recurrenceId/following - the same 409 after three rounds (#2956)', async () => {
+  // Zwei Kopien je Runde: die Folgeserie und die verwaiste Freitags-Ausnahme.
+  await seriesChangedDuringEveryCopy('rounds-following', 6, (seriesId) => call('PUT', `/${seriesId}/occurrences/2059-01-02/following`, /** @type {any} */ ({ body: {
+    recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+  } })));
+});
+
 test('PUT /:id - a refusal after the upload answers from what the check read (#2956)', async () => {
   const seriesId = insertEvent({ title: 'PUT-REFUSAL-SERIES', start_datetime: '2059-02-01T09:00', recurrence_rule: 'FREQ=DAILY' });
   const id = insertEvent({ title: 'PUT-REFUSAL-EVENT', start_datetime: '2059-02-03T09:00' });
@@ -2377,6 +2458,8 @@ test('PUT /:id - a refusal after the upload answers from what the check read (#2
     reason: 'calendar_occurrence_route_required',
   });
   assert.equal(db.prepare('SELECT description AS d FROM calendar_events WHERE id = ?').get(id).d, null);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE 'drive-2956-refusal%'").get().n, 0,
+    'kein Dokument fuer den verworfenen Anhang');
   assert.deepEqual(uploadsDeleted, ['drive-2956-refusal'], 'der hochgeladene Anhang wird wieder entfernt');
 });
 

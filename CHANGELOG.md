@@ -22,7 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   series was changed in the meantime - its repetition removed, or one changed date replaced by
   another - the save could be refused with a wrong message or end in an error. Now the save
   follows the series as it is after the copies, and a changed date that needs a copy gets one.
-  A save that is refused after an attachment upload now also says why with what was checked,
+  If the series keeps changing while the copies are made, the save stops after three tries with a
+  conflict (`409`, reason `calendar_series_changed`) instead of an error: nothing is saved, the
+  copies are removed, and the change can be sent again. This also applies to changing "this and
+  following" dates of a series. A save that is refused after an attachment upload now also says why with what was checked,
   not with what happened while the upload was being removed.
 - **Changing the document storage no longer cuts off documents stored at the same moment.** The
   WebDAV settings and the Google Drive connection check that existing documents stay reachable,

@@ -192,6 +192,10 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
   // der Serie austauschen. Das zweite Speichern fragt deshalb wieder die Zeile
   // von jetzt; verlangt es eine Kopie, die nicht bereitliegt, wird neu geplant.
   // Bereitgestellte Dateien derselben Quelle werden dabei wiederverwendet.
+  // Puffer und Dateien gelten ueber alle Runden: den Inhalt einer Dokument-ID
+  // (storage_key, storage_backend, content_data) schreibt nach dem Anlegen
+  // niemand mehr um - die Dokument-Route aendert nur Metadaten, und die nimmt
+  // `consume` aus der frisch gelesenen Zeile.
   const contents = new Map();
   /** @type {{ sourceDocumentId: number, staged: any, written?: boolean }[]} */
   const files = [];
@@ -268,7 +272,17 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
       });
       written = new Set(prepared.filter((clone) => clone.written).map((clone) => clone.file));
     } catch (error) {
-      if (!(error instanceof ClonePlanChangedError) || round >= CLONE_PLAN_ROUNDS) throw error;
+      if (!(error instanceof ClonePlanChangedError)) throw error;
+      // Nach der letzten Runde ist es ein Konflikt mit dem Stand der Serie,
+      // kein Serverfehler: 409, gespeichert ist nichts (die Transaktion ist
+      // zurueckgerollt), die Kopien raeumt der catch der Route weg, und die
+      // Anfrage darf wiederholt werden.
+      if (round >= CLONE_PLAN_ROUNDS) {
+        throw new CalendarOccurrenceError('The series changed while attachment copies were uploaded.', {
+          status: 409,
+          code: 'calendar_series_changed',
+        });
+      }
       // Neu planen gegen die Zeile von jetzt, synchron: braucht sie gar keine
       // Kopie mehr, ist dieser Aufruf schon das Speichern.
       try {
@@ -904,6 +918,7 @@ const CALENDAR_OCCURRENCE_ERRORS = {
   calendar_occurrence_route_required: 'Use the occurrence endpoint to change a linked recurring occurrence.',
   empty_successor_series: 'The successor series has no occurrence on or after its start date.',
   invalid_successor_override: 'An occurrence override does not fit the successor series.',
+  calendar_series_changed: 'The series changed while attachment copies were uploaded. Nothing was saved; send the request again.',
 };
 
 function sendCalendarOccurrenceError(res, error) {
