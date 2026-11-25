@@ -38,7 +38,7 @@ function runBloecke(text) {
     const rumpf = [];
     for (i++; i < zeilen.length; i++) {
       const zeile = zeilen[i];
-      if (zeile.trim() !== '' && zeile.match(/^\s*/)[0].length <= einzug) { i--; break; }
+      if (zeile.trim() !== '' && zeile.length - zeile.trimStart().length <= einzug) { i--; break; }
       rumpf.push(zeile);
     }
     bloecke.push(rumpf.join('\n'));
