@@ -299,6 +299,46 @@ test('callback requires a refresh token and preserves existing credentials on ac
   assert.equal(cfg('document_storage_google_drive_refresh_token'), 'drive-refresh-a');
 });
 
+// #2946: a first document stored while another account's callback waits on
+// Drive keeps the account that stores it.
+test('callback re-checks the account against documents stored while it waited on Drive', async () => {
+  const { state, factory } = createFake();
+  driveStorage.__setGoogleApiFactoryForTests(factory);
+  await driveStorage.handleCallback('first');
+  const drive = factory.createDrive();
+  const originalGet = drive.files.get;
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  // The folder check of the callback below waits here until the test lets it go.
+  drive.files.get = async (/** @type {any} */ args) => {
+    started.resolve();
+    await released.promise;
+    return originalGet(args);
+  };
+
+  state.account = { permissionId: 'account-b', emailAddress: 'b@example.test', displayName: 'Account B' };
+  state.tokenResponse = {
+    access_token: 'replacement-access',
+    refresh_token: 'replacement-refresh',
+    expiry_date: 2_000_000_000_000,
+  };
+  const pending = driveStorage.handleCallback('replacement');
+  await started.promise;
+  // Meanwhile a first document is stored with the connected account A.
+  database.prepare("INSERT INTO family_documents (storage_backend, storage_key) VALUES ('google_drive', 'stored-by-a')")
+    .run();
+  released.resolve();
+
+  await assert.rejects(
+    pending,
+    (/** @type {any} */ error) => error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED'
+  );
+  assert.equal(cfg('document_storage_google_drive_account_id'), 'account-a');
+  assert.equal(cfg('document_storage_google_drive_refresh_token'), 'drive-refresh-a');
+});
+
 test('upload, streaming read, token refresh, delete and missing delete are supported', async () => {
   await driveStorage.handleCallback('code');
   const id = await driveStorage.uploadFile({

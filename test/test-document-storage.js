@@ -396,6 +396,14 @@ function clearWebdavDocuments() {
   get().prepare("DELETE FROM family_documents WHERE storage_backend = 'webdav'").run();
 }
 
+/**
+ * @param {any} t
+ * @param {{
+ *   username?: string,
+ *   password?: string,
+ *   handler?: (req: any, res: any, request: any, files: Map<string, Buffer>) => boolean | Promise<boolean>,
+ * }} [options]
+ */
 async function createWebdavServer(t, {
   username = 'alice',
   password = 'secret',
@@ -2365,6 +2373,166 @@ test('protected effective connection changes require explicit confirmation', asy
   assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_PROTECTED');
   assert.equal(storage.getConfig().url, current.url);
   assert.equal(proposed.requests.length, 0);
+});
+
+// #2946: the protection is decided on the documents as they are at the
+// write, not as they were before the target check went to the network.
+test('a WebDAV document stored during the target check protects the configuration', async (t) => {
+  clearWebdavDocuments();
+  t.after(() => clearWebdavDocuments());
+  const current = await createWebdavServer(t);
+  setConfig({
+    enabled: '1',
+    url: current.url,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  storage.__setPrivateNetworkAccessForTests(false);
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  storage.__setHostnameLookupForTests(async () => {
+    started.resolve();
+    await released.promise;
+    return [{ address: '93.184.216.34', family: 4 }];
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const pending = routeCall(harness, 'PUT', '/storage/config', {
+    url: 'https://webdav.example.test/dav',
+  });
+  await started.promise;
+  insertRouteDocument(userId, {
+    contentData: '',
+    storageProvider: 'external',
+    storageBackend: 'webdav',
+    storageKey: 'arrived-meanwhile.txt',
+  });
+  released.resolve();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_PROTECTED');
+  assert.equal(storage.getConfig().url, current.url);
+});
+
+// #2946: two confirmed changes that overlap are each verified against the
+// configuration they started from; the one that writes second must not
+// store a merge of both that no request ever verified.
+test('overlapping confirmed WebDAV changes do not store an unverified merge', async (t) => {
+  clearWebdavDocuments();
+  t.after(() => clearWebdavDocuments());
+  const current = await createWebdavServer(t, {
+    handler(req, res) {
+      if (req.method !== 'GET') return false;
+      res.writeHead(200, { 'Content-Length': 2 });
+      res.end('ok');
+      return true;
+    },
+  });
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  const moved = await createWebdavServer(t, {
+    async handler(/** @type {any} */ req) {
+      if (req.method === 'GET') {
+        started.resolve();
+        await released.promise;
+      }
+      return false;
+    },
+  });
+  moved.files.set('/documents/protected.txt', Buffer.from('ok'));
+  setConfig({
+    enabled: '1',
+    url: current.url,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  const userId = createRouteUser();
+  insertRouteDocument(userId, {
+    contentData: '',
+    storageProvider: 'external',
+    storageBackend: 'webdav',
+    storageKey: 'protected.txt',
+  });
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const moveTarget = routeCall(harness, 'PUT', '/storage/config', {
+    url: moved.url,
+    confirm_existing_access: true,
+  });
+  await started.promise;
+  const changeAccount = await routeCall(harness, 'PUT', '/storage/config', {
+    username: 'bob',
+    password: 'other-secret',
+    confirm_existing_access: true,
+  });
+  assert.equal(changeAccount.response.status, 200);
+  released.resolve();
+  const result = await moveTarget;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_PROTECTED');
+  assert.equal(storage.getConfig().url, current.url);
+  assert.equal(storage.getConfig().username, 'bob');
+  assert.equal(storage.getConfig().password, 'other-secret');
+});
+
+// #2946: what counts as a change is measured against the configuration
+// stored at the write. A change saved while the target check waits turns an
+// unchanged connection into one that needs the admin's confirmation.
+test('a WebDAV change saved during the target check is compared at the write', async (t) => {
+  clearWebdavDocuments();
+  t.after(() => clearWebdavDocuments());
+  setConfig({
+    enabled: '1',
+    url: 'https://files.example.test/dav',
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  storage.__setPrivateNetworkAccessForTests(false);
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  storage.__setHostnameLookupForTests(async () => {
+    started.resolve();
+    await released.promise;
+    return [{ address: '93.184.216.34', family: 4 }];
+  });
+  const userId = createRouteUser();
+  insertRouteDocument(userId, {
+    contentData: '',
+    storageProvider: 'external',
+    storageBackend: 'webdav',
+    storageKey: 'protected.txt',
+  });
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const pending = routeCall(harness, 'PUT', '/storage/config', {
+    url: 'https://files.example.test/dav',
+    username: 'alice',
+    password: 'secret',
+  });
+  await started.promise;
+  setConfig({ username: 'bob', password: 'other-secret' });
+  released.resolve();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_PROTECTED');
+  assert.equal(storage.getConfig().username, 'bob');
+  assert.equal(storage.getConfig().password, 'other-secret');
 });
 
 test('equivalent normalized WebDAV targets do not require confirmation', async (t) => {

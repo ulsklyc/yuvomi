@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **Changing the document storage no longer cuts off documents stored at the same moment.** The
+  WebDAV settings and the Google Drive connection check that existing documents stay reachable,
+  but they checked before testing the new connection over the network and saved afterwards. A
+  first document stored during that test ended up behind a WebDAV connection or a Google account
+  that could not reach it, and two WebDAV changes saved at the same time could combine into a
+  connection that was never tested. Now the check is repeated on the documents and settings as
+  they are when saving; if they changed in the meantime, the change is refused and can be made
+  again.
 - **Outlook and CardDAV syncs of one account no longer get in each other's way.** When the
   regular sync and "Sync now" (or, for Outlook, connecting the account) ran at the same time, an
   event could be created twice in Outlook, and the extra copy stayed there for good; a CardDAV

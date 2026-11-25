@@ -509,20 +509,78 @@ router.get('/storage/config', requireAdmin, validateRequest(), (req, res) => {
   }
 });
 
+function firstWebdavDocument() {
+  return db.get().prepare(`
+    SELECT *
+    FROM family_documents
+    WHERE storage_backend = 'webdav'
+    ORDER BY id
+    LIMIT 1
+  `).get();
+}
+
+/**
+ * @param {ReturnType<typeof getStorageConfig>} a
+ * @param {ReturnType<typeof getStorageConfig>} b
+ */
+function webdavConnectionDiffers(a, b) {
+  return getEffectiveTarget(a) !== getEffectiveTarget(b)
+    || a.username !== b.username
+    || a.password !== b.password;
+}
+
+// Existing WebDAV documents protect the connection that reaches them: required
+// fields stay, and a changed connection needs the admin's confirmation. Throws
+// those refusals and answers whether the proposed connection still has to
+// prove that it reads an existing document.
+/**
+ * @param {Record<string, any>} body
+ * @param {unknown} existing
+ * @param {ReturnType<typeof getStorageConfig>} current
+ * @param {ReturnType<typeof getStorageConfig>} proposed
+ */
+function webdavChangeNeedsVerification(body, existing, current, proposed) {
+  if (!existing) return false;
+  const deletingRequiredField = (
+    (!current.envControlled.url
+      && Object.hasOwn(body, 'url')
+      && String(body.url ?? '').trim() === '')
+    || (!current.envControlled.username
+      && Object.hasOwn(body, 'username')
+      && String(body.username ?? '').trim() === '')
+    || (!current.envControlled.password && body.clear_password === true)
+    || (!current.envControlled.path
+      && (Object.hasOwn(body, 'path') || Object.hasOwn(body, 'basePath'))
+      && String(body.path ?? body.basePath ?? '').trim() === '')
+  );
+  if (
+    deletingRequiredField
+    || !proposed.url
+    || !proposed.username
+    || !proposed.password
+    || !proposed.basePath
+  ) {
+    throw configProtected(
+      'Required WebDAV connection data cannot be removed while documents exist.'
+    );
+  }
+  if (!webdavConnectionDiffers(proposed, current)) return false;
+  if (body.confirm_existing_access !== true) {
+    throw configProtected(
+      'Changing WebDAV connection data requires explicit confirmation.'
+    );
+  }
+  return true;
+}
+
 router.put('/storage/config', requireAdmin, validateRequest(), async (req, res) => {
   try {
     // `selected_upload_backend` (one of DOCUMENT_UPLOAD_BACKENDS),
     // `confirm_existing_access` and `clear_password` (booleans) are the
     // schema's checks (#2810); the service checks the backend again.
-    const existing = db.get().prepare(`
-      SELECT *
-      FROM family_documents
-      WHERE storage_backend = 'webdav'
-      ORDER BY id
-      LIMIT 1
-    `).get();
+    const existing = firstWebdavDocument();
     const current = getStorageConfig();
-    const proposed = resolveConfig(req.body);
+    let proposed = resolveConfig(req.body);
     const targetChanged = (
       (!current.envControlled.url && Object.hasOwn(req.body, 'url'))
       || (!current.envControlled.path
@@ -532,55 +590,41 @@ router.put('/storage/config', requireAdmin, validateRequest(), async (req, res) 
       await assertWebdavTargetAllowed(proposed);
     }
 
-    if (existing) {
-      const deletingRequiredField = (
-        (!current.envControlled.url
-          && Object.hasOwn(req.body, 'url')
-          && String(req.body.url ?? '').trim() === '')
-        || (!current.envControlled.username
-          && Object.hasOwn(req.body, 'username')
-          && String(req.body.username ?? '').trim() === '')
-        || (!current.envControlled.password && req.body.clear_password === true)
-        || (!current.envControlled.path
-          && (Object.hasOwn(req.body, 'path') || Object.hasOwn(req.body, 'basePath'))
-          && String(req.body.path ?? req.body.basePath ?? '').trim() === '')
-      );
-      if (
-        deletingRequiredField
-        || !proposed.url
-        || !proposed.username
-        || !proposed.password
-        || !proposed.basePath
-      ) {
+    let verified = null;
+    if (webdavChangeNeedsVerification(req.body, existing, current, proposed)) {
+      try {
+        await verifyExistingWebdavDocument(existing, proposed);
+      } catch (error) {
+        if (error instanceof StorageError
+          && error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED') {
+          throw error;
+        }
         throw configProtected(
-          'Required WebDAV connection data cannot be removed while documents exist.'
+          'The proposed WebDAV configuration cannot read an existing document.',
+          { cause: error }
         );
       }
+      verified = proposed;
+    }
 
-      const connectionChanged = (
-        getEffectiveTarget(proposed) !== getEffectiveTarget(current)
-        || proposed.username !== current.username
-        || proposed.password !== current.password
+    // The awaits above let other requests run (#2946): a document may have
+    // been stored in WebDAV, or another change saved. The protection is
+    // decided again on the documents and the configuration as they are now;
+    // nothing below awaits before the write. A connection verified above
+    // counts only if it is still the one that would be saved.
+    proposed = resolveConfig(req.body);
+    if (
+      webdavChangeNeedsVerification(
+        req.body,
+        firstWebdavDocument(),
+        getStorageConfig(),
+        proposed
+      )
+      && !(verified && !webdavConnectionDiffers(verified, proposed))
+    ) {
+      throw configProtected(
+        'The proposed WebDAV configuration cannot read an existing document.'
       );
-      if (connectionChanged) {
-        if (req.body.confirm_existing_access !== true) {
-          throw configProtected(
-            'Changing WebDAV connection data requires explicit confirmation.'
-          );
-        }
-        try {
-          await verifyExistingWebdavDocument(existing, proposed);
-        } catch (error) {
-          if (error instanceof StorageError
-            && error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED') {
-            throw error;
-          }
-          throw configProtected(
-            'The proposed WebDAV configuration cannot read an existing document.',
-            { cause: error }
-          );
-        }
-      }
     }
 
     const selectorProvided = Object.hasOwn(req.body, 'selected_upload_backend');

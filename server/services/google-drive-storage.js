@@ -247,6 +247,29 @@ export function getAuthUrl(session) {
   });
 }
 
+function firstDriveDocument() {
+  return db.get().prepare(`
+    SELECT storage_key
+    FROM family_documents
+    WHERE storage_backend = 'google_drive'
+    ORDER BY id
+    LIMIT 1
+  `).get();
+}
+
+// Documents already in Drive belong to the stored account; another account
+// would cut them off.
+/** @param {{ permissionId?: string | null }} account */
+function assertStoringAccount(account) {
+  const storedAccountId = cfgGet('account_id');
+  if (!storedAccountId || storedAccountId !== account.permissionId) {
+    throw new GoogleDriveStorageError(
+      'DOCUMENT_STORAGE_CONFIG_PROTECTED',
+      'The connected Google account does not match the account that stores existing documents.'
+    );
+  }
+}
+
 export async function handleCallback(code) {
   const candidate = createClient();
   const { tokens } = await candidate.getToken(code);
@@ -269,21 +292,9 @@ export async function handleCallback(code) {
     );
   }
 
-  const existingDocument = db.get().prepare(`
-    SELECT storage_key
-    FROM family_documents
-    WHERE storage_backend = 'google_drive'
-    ORDER BY id
-    LIMIT 1
-  `).get();
+  const existingDocument = firstDriveDocument();
   if (existingDocument) {
-    const storedAccountId = cfgGet('account_id');
-    if (!storedAccountId || storedAccountId !== account.permissionId) {
-      throw new GoogleDriveStorageError(
-        'DOCUMENT_STORAGE_CONFIG_PROTECTED',
-        'The connected Google account does not match the account that stores existing documents.'
-      );
-    }
+    assertStoringAccount(account);
     try {
       await drive.files.get({ fileId: existingDocument.storage_key, fields: 'id' });
     } catch (error) {
@@ -297,6 +308,10 @@ export async function handleCallback(code) {
 
   const folder = await ensureAppFolder(drive, { persist: false });
   withTx(db.get(), () => {
+    // The Drive calls above let other requests run (#2946): a first document
+    // may have been stored meanwhile. The account check is decided again on
+    // the documents as they are at the write.
+    if (firstDriveDocument()) assertStoringAccount(account);
     if (tokens.access_token) cfgSet('access_token', tokens.access_token);
     else cfgDel('access_token');
     cfgSet('refresh_token', tokens.refresh_token);
