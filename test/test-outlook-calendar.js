@@ -893,6 +893,275 @@ describe('Outlook occurrence override target guards', () => {
   });
 });
 
+// --------------------------------------------------------
+// Ueberlappende Laeufe und Aenderungen waehrend eines Laufs (#2943)
+// --------------------------------------------------------
+
+/** @type {number | bigint} */
+let owner;
+/** @type {number | bigint} */
+let stranger;
+/** @type {number | bigint} */
+let accountId;
+const futureExpiry = new Date(Date.now() + 3600 * 1000).toISOString();
+// Ein Makrotask-Durchgang: alles, was nur auf Mikrotasks wartet, laeuft
+// bis zu seinem naechsten echten Warten. Kein Takt, keine Wartezeit.
+const turn = () => new Promise((resolve) => setImmediate(resolve));
+
+/** @returns {{ promise: Promise<any>, resolve: (value?: any) => void }} */
+function deferred() {
+  /** @type {(value?: any) => void} */
+  let resolve = () => {};
+  const promise = new Promise((r) => { resolve = r; });
+  return { promise, resolve };
+}
+
+/**
+ * @param {string} title
+ * @param {{ createdBy?: number | bigint, visibility?: string }} [options]
+ */
+function insertEvent(title, { createdBy = owner, visibility = 'all' } = {}) {
+  return db.prepare(
+    `INSERT INTO calendar_events (title, start_datetime, color, created_by, visibility, external_source)
+     VALUES (?, '2026-10-01T10:00', '#007AFF', ?, ?, 'local')`
+  ).run(title, createdBy, visibility).lastInsertRowid;
+}
+
+function seedOverlapUsers() {
+  if (owner !== undefined) return; // einmal fuer beide Suiten
+  owner = db.prepare("INSERT INTO users (username, display_name, password_hash) VALUES ('overlap-owner', 'Olga', 'x')").run().lastInsertRowid;
+  stranger = db.prepare("INSERT INTO users (username, display_name, password_hash) VALUES ('overlap-other', 'Otto', 'x')").run().lastInsertRowid;
+}
+
+function seedOverlapAccount() {
+  db.prepare('DELETE FROM calendar_events').run();
+  db.prepare('DELETE FROM outlook_event_links').run();
+  db.prepare('DELETE FROM outlook_calendar_selection').run();
+  db.prepare('DELETE FROM outlook_accounts').run();
+  accountId = db.prepare(
+    `INSERT INTO outlook_accounts
+       (name, ms_user_id, email, access_token, refresh_token, token_expiry, auto_sync_calendar_id, owner_user_id)
+     VALUES ('Olga Outlook', 'ms-olga', 'olga@example.com', 'tok', 'ref', ?, 'auto-cal', ?)`
+  ).run(futureExpiry, owner).lastInsertRowid;
+  const insCal = db.prepare(
+    `INSERT INTO outlook_calendar_selection (account_id, calendar_id, calendar_name, can_edit, enabled)
+     VALUES (?, ?, ?, 1, 1)`
+  );
+  insCal.run(accountId, 'auto-cal', 'Yuvomi');
+  insCal.run(accountId, 'extra-cal', 'Extra');
+}
+
+describe('Outlook: a run decides with what holds at the write (#2943)', () => {
+  before(seedOverlapUsers);
+  beforeEach(seedOverlapAccount);
+
+  it('a second run started during a create waits and does not create the event again', async () => {
+    const eventId = insertEvent('Elternabend');
+    let hold = true;
+    /** @type {Array<() => void>} */
+    const held = [];
+    let created = 0;
+    const fetchImpl = makeFetch((/** @type {any} */ call) => {
+      const drift = answerDriftList(call);
+      if (drift) return drift;
+      if (call.method === 'POST') {
+        created++;
+        const answer = jsonRes(201, { id: `graph-${created}`, changeKey: `ck-${created}` });
+        if (!hold) return answer;
+        const d = deferred();
+        held.push(() => d.resolve(answer));
+        return d.promise;
+      }
+      throw new Error(`Unexpected request: ${call.method} ${call.url}`);
+    });
+
+    // Stundenlauf und "Jetzt synchronisieren" fuer dasselbe Konto.
+    const first = outlook.sync({ fetchImpl });
+    const second = outlook.sync({ fetchImpl });
+    await turn();
+    hold = false;
+    for (const release of held) release();
+    await Promise.all([first, second]);
+
+    const posts = fetchImpl.calls.filter((c) => c.method === 'POST');
+    assert.equal(posts.length, 1, 'the event is created in Outlook once, no orphan copy');
+    const links = db.prepare('SELECT outlook_event_id FROM outlook_event_links WHERE event_id = ?').all(eventId);
+    assert.deepEqual(links.map((/** @type {any} */ l) => l.outlook_event_id), ['graph-1']);
+  });
+
+  it('an event that turned private, was deleted or lost its calendar during the run is not sent', async () => {
+    const first = insertEvent('Erster Termin');
+    const turnsPrivate = insertEvent('Wird privat');
+    const deleted = insertEvent('Wird geloescht');
+    const explicitTarget = insertEvent('Eigener Kalender');
+    db.prepare(
+      'UPDATE calendar_events SET target_outlook_account_id = ?, target_outlook_calendar_id = ? WHERE id = ?'
+    ).run(accountId, 'extra-cal', explicitTarget);
+
+    const gate = deferred();
+    let posts = 0;
+    const fetchImpl = makeFetch((/** @type {any} */ call) => {
+      if (call.method === 'POST') {
+        posts++;
+        const answer = jsonRes(201, { id: `graph-${call.body.subject}`, changeKey: 'ck' });
+        // Der erste Create haengt, bis der Test die Aenderungen gemacht hat.
+        return posts === 1 ? gate.promise.then(() => answer) : answer;
+      }
+      throw new Error(`Unexpected request: ${call.method} ${call.url}`);
+    });
+
+    const run = outlook.sync({ fetchImpl });
+    await turn();
+    assert.equal(posts, 1, 'the run waits on the create of the first event');
+    // Waehrenddessen, je eine Anfrage: privat fuer jemand anderen, geloescht,
+    // Zielkalender abgeschaltet.
+    db.prepare("UPDATE calendar_events SET visibility = 'private', created_by = ? WHERE id = ?")
+      .run(stranger, turnsPrivate);
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(deleted);
+    db.prepare("UPDATE outlook_calendar_selection SET enabled = 0 WHERE account_id = ? AND calendar_id = 'extra-cal'")
+      .run(accountId);
+    gate.resolve();
+    await run;
+
+    const subjects = fetchImpl.calls.filter((c) => c.method === 'POST').map((c) => c.body.subject);
+    assert.deepEqual(subjects, ['Erster Termin'], 'only the event that still qualifies is sent');
+    const linked = db.prepare('SELECT event_id FROM outlook_event_links ORDER BY event_id').all()
+      .map((/** @type {any} */ l) => l.event_id);
+    assert.deepEqual(linked, [first]);
+  });
+
+  it('auto-sync switched off during the run stops sending the remaining events', async () => {
+    const first = insertEvent('Vorher');
+    insertEvent('Nachher');
+
+    const gate = deferred();
+    let posts = 0;
+    const fetchImpl = makeFetch((/** @type {any} */ call) => {
+      if (call.method === 'POST') {
+        posts++;
+        const answer = jsonRes(201, { id: `graph-${call.body.subject}`, changeKey: 'ck' });
+        return posts === 1 ? gate.promise.then(() => answer) : answer;
+      }
+      throw new Error(`Unexpected request: ${call.method} ${call.url}`);
+    });
+
+    const run = outlook.sync({ fetchImpl });
+    await turn();
+    assert.equal(posts, 1, 'the run waits on the create of the first event');
+    outlook.updateAccount(accountId, { autoSyncCalendarId: null });
+    gate.resolve();
+    await run;
+
+    const subjects = fetchImpl.calls.filter((c) => c.method === 'POST').map((c) => c.body.subject);
+    assert.deepEqual(subjects, ['Vorher'], 'the account as it stands now decides');
+    const linked = db.prepare('SELECT event_id FROM outlook_event_links').all().map((/** @type {any} */ l) => l.event_id);
+    assert.deepEqual(linked, [first]);
+  });
+});
+
+describe('Outlook: an account deleted during a write keeps no copy behind (#2943)', () => {
+  before(seedOverlapUsers);
+  beforeEach(seedOverlapAccount);
+
+  /**
+   * Das Konto wird geloescht, waehrend der Create eines Termins wartet. Danach
+   * kann kein Link mehr entstehen (Fremdschluessel auf das Konto), also muss
+   * der Lauf die gerade angelegte Kopie selbst wieder entfernen, sonst bleibt
+   * sie in Outlook ohne Link und ohne Tombstone.
+   * @param {(call: any) => any} [answerOther] - Antwort auf alles ausser POST/DELETE
+   */
+  async function deleteAccountDuringCreate(answerOther = () => null) {
+    const gate = deferred();
+    const fetchImpl = makeFetch((/** @type {any} */ call) => {
+      if (call.method === 'POST') {
+        return gate.promise.then(() => jsonRes(201, { id: 'graph-orphan', changeKey: 'ck-new' }));
+      }
+      if (call.method === 'DELETE') return jsonRes(204);
+      const other = answerOther(call);
+      if (other) return other;
+      throw new Error(`Unexpected request: ${call.method} ${call.url}`);
+    });
+    /** @type {string[]} */
+    const errors = [];
+    const original = console.error;
+    console.error = (...args) => { errors.push(args.map(String).join(' ')); };
+    try {
+      const run = outlook.sync({ fetchImpl });
+      await turn();
+      assert.equal(fetchImpl.calls.filter((c) => c.method === 'POST').length, 1, 'the run waits on the create');
+      outlook.deleteAccount(accountId);
+      gate.resolve();
+      const result = await run;
+      return { fetchImpl, errors, result };
+    } finally {
+      console.error = original;
+    }
+  }
+
+  it('an account deleted while a create waits gets its new Outlook copy removed again', async () => {
+    insertEvent('Neu angelegt');
+    const { fetchImpl, errors, result } = await deleteAccountDuringCreate();
+
+    const deletes = fetchImpl.calls.filter((c) => c.method === 'DELETE').map((c) => c.url);
+    assert.deepEqual(deletes, ['https://graph.microsoft.com/v1.0/me/events/graph-orphan'],
+      'exactly one DELETE, on the copy just created');
+    assert.deepEqual(errors.filter((e) => /FOREIGN KEY/i.test(e)), [], 'no foreign key error');
+    assert.equal(result.syncedAccounts, 0, 'the deleted account is not reported as synced');
+    assert.equal(result.pushed, 0);
+  });
+
+  it('the same holds for the create that replaces an event deleted in Outlook', async () => {
+    const eventId = insertEvent('Drueben geloescht');
+    // Verlinkt, aber das Drift-Listing kennt die id nicht mehr (remoteMissing).
+    db.prepare(
+      `INSERT INTO outlook_event_links (event_id, account_id, outlook_calendar_id, outlook_event_id, content_hash, outlook_change_key)
+       VALUES (?, ?, 'auto-cal', 'graph-gone', 'old-hash', 'ck-old')`
+    ).run(eventId, accountId);
+    const { fetchImpl, errors, result } = await deleteAccountDuringCreate(
+      (call) => answerDriftList(call, { 'auto-cal': [] })
+    );
+
+    const deletes = fetchImpl.calls.filter((c) => c.method === 'DELETE').map((c) => c.url);
+    assert.deepEqual(deletes, ['https://graph.microsoft.com/v1.0/me/events/graph-orphan'],
+      'exactly one DELETE, on the copy just created');
+    assert.deepEqual(errors.filter((e) => /FOREIGN KEY/i.test(e)), [], 'no foreign key error');
+    assert.equal(result.syncedAccounts, 0, 'the deleted account is not reported as synced');
+  });
+
+  it('an account deleted while a PATCH waits writes no link and is not reported as synced', async () => {
+    const eventId = insertEvent('Geaendert');
+    db.prepare(
+      `INSERT INTO outlook_event_links (event_id, account_id, outlook_calendar_id, outlook_event_id, content_hash, outlook_change_key)
+       VALUES (?, ?, 'auto-cal', 'graph-kept', 'old-hash', 'ck-old')`
+    ).run(eventId, accountId);
+    const gate = deferred();
+    const fetchImpl = makeFetch((/** @type {any} */ call) => {
+      const drift = answerDriftList(call);
+      if (drift) return drift;
+      if (call.method === 'PATCH') return gate.promise.then(() => jsonRes(200, { changeKey: 'ck-patched' }));
+      throw new Error(`Unexpected request: ${call.method} ${call.url}`);
+    });
+    /** @type {string[]} */
+    const errors = [];
+    const original = console.error;
+    console.error = (...args) => { errors.push(args.map(String).join(' ')); };
+    let result;
+    try {
+      const run = outlook.sync({ fetchImpl });
+      await turn();
+      assert.equal(fetchImpl.calls.filter((c) => c.method === 'PATCH').length, 1, 'the run waits on the PATCH');
+      outlook.deleteAccount(accountId);
+      gate.resolve();
+      result = await run;
+    } finally {
+      console.error = original;
+    }
+    assert.deepEqual(errors.filter((e) => /FOREIGN KEY/i.test(e)), [], 'no foreign key error');
+    assert.equal(result.syncedAccounts, 0, 'the deleted account is not reported as synced');
+    assert.equal(result.updated, 0);
+  });
+});
+
 describe('assertConfigured', () => {
   it('wirft ohne MS_*-Env denselben lauten Konfigurationsfehler wie Google', () => {
     const saved = process.env.MS_CLIENT_ID;
