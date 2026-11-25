@@ -204,16 +204,21 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
     const reserved = new Set();
     for (const request of requests) {
       const sourceId = Number(request.sourceDocumentId);
-      // Keine Kopie ohne Recht: weder gelesen noch gestaged, `consume` liefert `null`.
-      if (!mayClone(request.sourceDocumentId)) {
+      // Keine Kopie ohne Recht und keine ohne Quelle: weder gelesen noch
+      // gestaged, `consume` liefert `null`. Die Zeile wird nach den awaits der
+      // Anfragen davor gelesen; ein inzwischen geloeschtes Dokument ist wie
+      // eine verweigerte Kopie, nicht ein Serverfehler (wie `fresh` in `consume`).
+      const sourceDocument = database.prepare('SELECT * FROM family_documents WHERE id = ?')
+        .get(request.sourceDocumentId);
+      if (!sourceDocument || !mayClone(request.sourceDocumentId)) {
         prepared.push({ request, refused: true, used: false });
         continue;
       }
       let file = files.find((entry) => entry.sourceDocumentId === sourceId && !reserved.has(entry));
       if (!file) {
-        const sourceDocument = database.prepare('SELECT * FROM family_documents WHERE id = ?')
-          .get(request.sourceDocumentId);
-        if (!sourceDocument) throw new Error('Attachment clone source document no longer exists.');
+        // Kategorie und Name bestimmen hier nur den Speicherpfad der Datei;
+        // was die Kopie zeigt (Name, Kategorie, Dateiname, Typ, Groesse),
+        // nimmt cloneAttachmentDocument aus der frisch gelesenen Zeile.
         if (!contents.has(sourceId)) {
           contents.set(sourceId, await readDocumentContent(sourceDocument));
         }

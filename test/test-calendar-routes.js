@@ -2425,6 +2425,48 @@ test('PUT /:seriesId/occurrences/:recurrenceId/following - the same 409 after th
   } })));
 });
 
+// DIE QUELLE VERSCHWINDET WAEHREND DER KOPIEN (#2956). Zwei verwaiste
+// Ausnahmen brauchen je eine Kopie derselben Quelle (alle Kopie-Anfragen eines
+// Speicherns nennen das Dokument der Serie). Waehrend die erste hochlaedt, wird
+// das Dokument geloescht; die zweite Anfrage liest seine Zeile erst danach.
+// Wie eine verweigerte Kopie: keine Kopie, das Speichern laeuft durch.
+test('PUT /:id - a source document deleted during the copy upload leaves the overrides without a copy (#2956)', async () => {
+  const { seriesId, childId } = await seriesWithInheritingOverride('PUT-CLONE-GONE');
+  const second = await call('PUT', `/${seriesId}/occurrences/2059-01-04`, /** @type {any} */ ({ body: { title: 'Samstag' } }));
+  assert.equal(second.status, 200);
+  const secondId = Number(second.body.data.id);
+  const sourceId = db.prepare('SELECT attachment_document_id AS d FROM calendar_events WHERE id = ?').get(seriesId).d;
+  assert.ok(sourceId);
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  /** @type {number[]} */
+  const seen = [];
+  await withHeldDriveUpload('drive-2956-gone-source', async ({ deleted }) => {
+    saved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 2,
+    } }));
+    uploadsDeleted = deleted;
+  }, {
+    eachUpload: (n) => {
+      seen.push(n);
+      if (n === 1) db.prepare('DELETE FROM family_documents WHERE id = ?').run(sourceId);
+    },
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual(seen, [1], 'die zweite Kopie wird gar nicht erst hochgeladen');
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=WEEKLY;BYDAY=MO');
+  for (const id of [childId, secondId]) {
+    const row = db.prepare('SELECT recurrence_parent_id AS p, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(id);
+    assert.equal(row.p, null, 'die Ausnahme ist abgeloest');
+    assert.equal(row.d, null, 'ohne Kopie der geloeschten Quelle');
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE 'drive-2956-gone-source%'").get().n, 0,
+    'kein Dokument fuer eine Kopie');
+  assert.deepEqual(uploadsDeleted, ['drive-2956-gone-source'], 'die bereitgestellte Kopie wird wieder entfernt');
+});
+
 test('PUT /:id - a refusal after the upload answers from what the check read (#2956)', async () => {
   const seriesId = insertEvent({ title: 'PUT-REFUSAL-SERIES', start_datetime: '2059-02-01T09:00', recurrence_rule: 'FREQ=DAILY' });
   const id = insertEvent({ title: 'PUT-REFUSAL-EVENT', start_datetime: '2059-02-03T09:00' });
