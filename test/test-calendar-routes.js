@@ -2637,6 +2637,64 @@ test('POST / - a person removed during the upload is refused like without it (#2
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'kein Termin');
 });
 
+// KEIN MITGLIED MEHR WAEHREND DES UPLOADS (#2956, #1207). Die Person bleibt als
+// Zeile stehen, faellt aber aus dem Haushalt: entfernt ueber removeUser(), den
+// Weg der Personenverwaltung - mit einer Spur (eigener Termin) wird sie
+// deaktiviert statt geloescht. Die Bestandspruefung `validateOccurrenceAssignments`
+// sieht das nicht (die Zeile gibt es noch), nur die Mitgliederpruefung.
+async function memberToRetire(/** @type {string} */ name) {
+  const userId = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'x', 'member')").run(name, name).lastInsertRowid);
+  insertEvent({ title: `${name}-Spur`, created_by: userId });
+  return userId;
+}
+async function retire(/** @type {number} */ userId) {
+  const { removeUser } = await import('../server/services/user-removal.js');
+  assert.equal(removeUser(db, userId).outcome, 'deactivated');
+}
+const notMember = (/** @type {number} */ userId) => ({
+  error: `Only household members can be chosen here - user ${userId} is not a household member.`,
+  code: 400,
+});
+
+test('POST / - a person who stops being a member during the upload is refused like without it (#2956)', async () => {
+  const userId = await memberToRetire('ehemals2956post');
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const body = { title: 'POST-UPLOAD-MEMBER', start_datetime: '2059-04-03T09:00', assigned_to: [userId] };
+  const answer = await duringUpload('drive-2956-post-member',
+    () => call('POST', '/', /** @type {any} */ ({ body: { ...body, ...uploadBody('post-member') } })),
+    () => retire(userId));
+  const direct = await call('POST', '/', /** @type {any} */ ({ body }));
+  assert.deepEqual(direct.body, notMember(userId));
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, direct.body, 'dieselbe Absage wie ohne Upload');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'kein Termin');
+});
+
+test('PUT /:seriesId/occurrences/:recurrenceId - a person who stops being a member during the upload is refused (#2956)', async () => {
+  const userId = await memberToRetire('ehemals2956occ');
+  const seriesId = insertEvent({ title: 'OCC-UPLOAD-MEMBER', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const answer = await duringUpload('drive-2956-occ-member',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-03`, /** @type {any} */ ({ body: { assigned_to: [userId], ...uploadBody('occ-member') } })),
+    () => retire(userId));
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, notMember(userId));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId).n, 0,
+    'keine Ausnahme-Zeile');
+});
+
+test('PUT .../following - a person who stops being a member during the upload is refused (#2956)', async () => {
+  const userId = await memberToRetire('ehemals2956follow');
+  const seriesId = insertEvent({ title: 'FOLLOW-UPLOAD-MEMBER', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const answer = await duringUpload('drive-2956-follow-member',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-05/following`, /** @type {any} */ ({ body: { assigned_to: [userId], ...uploadBody('follow-member') } })),
+    () => retire(userId));
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, notMember(userId));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'keine Folgeserie');
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=DAILY');
+});
+
 test('POST / - a CalDAV target switched off during the upload is refused like without it (#2956)', async () => {
   caldavTargetAccount7();
   const target = { target_caldav_account_id: 7, target_caldav_calendar_url: 'https://dav.test/cal/' };
