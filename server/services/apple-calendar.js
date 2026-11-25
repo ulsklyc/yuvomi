@@ -488,8 +488,6 @@ async function runSync({ makeClient } = {}) {
   const objectIndex     = new Map();
   const calendarsByUrl  = new Map();
   const ownCalendarUrls = new Set();
-  // Offene Löschungen einmal je Lauf, nicht je eingehendem Termin.
-  const pendingDeletionUids = outbound.pendingDeletionUids('apple');
 
   for (const cal of syncCalendars) {
     let calObjects;
@@ -501,6 +499,11 @@ async function runSync({ makeClient } = {}) {
     }
 
     totalObjects += calObjects.length;
+
+    // Ausstehende Rückrichtung (#617): was der Nutzer während des Abrufs
+    // gelöscht hat, zählt mit. Gelesen NACH dem Abruf, je Kalender (#2941);
+    // bis zum Schreiben unten liegt kein await mehr.
+    const pendingDeletionUids = outbound.pendingDeletionUids('apple');
 
     // Kalender-Metadaten in external_calendars upserten
     const calColor = normalizeCalColor(cal.calendarColor) || APPLE_COLOR;

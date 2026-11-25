@@ -487,6 +487,192 @@ test('iCloud: der Abruf eines aufgelisteten Kalenders scheitert - sein Auftrag b
   }
 });
 
+// Der Fake-Server bringt keine Typen mit; die Fälle zu #2941 sprechen ihn
+// über diese Sicht an, statt die Baseline der Typprüfung anzuheben.
+const davAny = /** @type {any} */ (dav);
+
+test('iCloud: ein während des Abrufs gelöschter Termin kommt nicht zurück (#2941)', async () => {
+  reset();
+  const icloud = davAny.addCollection('icloud', { name: 'iCloud' });
+  davAny.putObject(icloud, 'neighbour.ics', ics('VEVENT', 'apple-neighbour@test', 'Nachbar'));
+  davAny.putObject(icloud, 'gone.ics', ics('VEVENT', 'apple-gone@test', 'Weg damit'));
+  appleCalendar.saveCredentials(davAny.url, 'u', 'p');
+  let deleted = false;
+  try {
+    await appleCalendar.sync();
+    const row = db.prepare('SELECT * FROM calendar_events WHERE external_calendar_id = ?').get('apple-gone@test');
+    assert.ok(row, 'der Lauf hat den Termin nicht gespiegelt - der Fall misst etwas anderes');
+
+    // Der Nutzer löscht, während der Lauf auf den Objektabruf wartet.
+    davAny.refuse({
+      method: 'REPORT',
+      when: () => {
+        if (!deleted) { deleted = true; deleteInYuvomi(row); }
+        return false;
+      },
+    });
+
+    await appleCalendar.sync();
+
+    assert.equal(deleted, true, 'die Löschung fiel nicht in den Abruf - der Fall misst nichts');
+    assert.deepEqual(eventRows('apple-gone@test'), [], 'der gelöschte Termin ist als Import zurückgekommen');
+  } finally {
+    davAny.allowAll();
+    appleCalendar.clearCredentials();
+  }
+});
+
+test('CalDAV: ein während des Abrufs gelöschter Termin kommt nicht zurück (#2941)', async () => {
+  const { a, row } = await mirroredEvent();
+  let deleted = false;
+  // `when` läuft, während der Lauf auf die Objekte von `a` wartet.
+  davAny.refuse({
+    method: 'REPORT', path: new URL(a).pathname,
+    when: () => { if (!deleted) { deleted = true; deleteInYuvomi(row); } return false; },
+  });
+  try {
+    await caldavSync.sync();
+  } finally {
+    davAny.allowAll();
+  }
+
+  assert.equal(deleted, true, 'die Löschung fiel nicht in den Abruf - der Fall misst nichts');
+  assert.deepEqual(eventRows(), [], 'der gelöschte Termin ist als Import zurückgekommen');
+  assert.equal(davAny.getObject(a, 'gone.ics'), null, 'stattdessen geht die Löschung hinaus');
+});
+
+test('CalDAV: ein während des Abrufs samt Terminen abgewählter Kalender liest sie nicht wieder ein (#2941)', async () => {
+  const { a } = await mirroredEvent();
+  let switchedOff = false;
+  davAny.refuse({
+    method: 'REPORT', path: new URL(a).pathname,
+    when: () => {
+      if (!switchedOff) {
+        switchedOff = true;
+        // Wie die Route: abwählen und die gespiegelten Termine mitnehmen.
+        const account = /** @type {{ id: number }} */ (db.prepare('SELECT id FROM caldav_accounts').get());
+        caldavSync.updateCalendarSelection(account.id, a, false, { deleteEvents: true });
+      }
+      return false;
+    },
+  });
+  try {
+    await caldavSync.sync();
+  } finally {
+    davAny.allowAll();
+  }
+
+  assert.equal(switchedOff, true, 'die Abwahl fiel nicht in den Abruf - der Fall misst nichts');
+  assert.deepEqual(eventRows(), [], 'der Termin des abgewählten Kalenders ist zurückgekommen');
+  assert.deepEqual(eventRows('neighbour-a@test'), [], 'auch sein Nachbar ist zurückgekommen');
+  assert.equal(eventRows('neighbour-b@test').length, 1, 'der eingeschaltete Kalender wurde nicht mehr gelesen');
+});
+
+test('CalDAV: eine Löschung in der Atempause eines grossen Kalenders zählt mit (#2941)', async (t) => {
+  // Mehr Objekte, als der Lauf ohne Atempause verarbeitet (YIELD_EVERY = 50),
+  // der gelöschte Termin hinter ihnen.
+  reset();
+  const a = calendar('a');
+  for (let i = 0; i < 60; i++) {
+    davAny.putObject(a, `bulk-${i}.ics`, ics('VEVENT', `bulk-${i}@test`, 'Masse'));
+  }
+  davAny.putObject(a, 'gone.ics', ics('VEVENT', UID, 'Weg damit'));
+  await caldavSync.sync();
+  const row = db.prepare('SELECT * FROM calendar_events WHERE external_calendar_id = ?').get(UID);
+  assert.ok(row, 'der Lauf hat den Termin nicht gespiegelt - der Fall misst etwas anderes');
+
+  // Am Server geändert: dass der Lauf ihn übernommen hat, zeigt, dass er in
+  // der Schleife über die Objekte steht. Die erste Atempause danach ist die
+  // des Laufs; in ihr löscht der Nutzer.
+  davAny.putObject(a, 'bulk-0.ics', ics('VEVENT', 'bulk-0@test', 'Geändert'));
+  const inLoop = () => db.prepare(
+    "SELECT 1 FROM calendar_events WHERE external_calendar_id = 'bulk-0@test' AND title = 'Geändert'"
+  ).get();
+  const original = /** @type {any} */ (globalThis.setImmediate);
+  let deleted = false;
+  t.mock.method(globalThis, 'setImmediate', (/** @type {any[]} */ ...args) => {
+    if (!deleted && inLoop()) { deleted = true; deleteInYuvomi(row); }
+    return original(...args);
+  });
+
+  await caldavSync.sync();
+  t.mock.restoreAll();
+
+  assert.equal(deleted, true, 'die Löschung fiel nicht in die Atempause - der Fall misst nichts');
+  assert.deepEqual(eventRows(), [], 'der gelöschte Termin ist als Import zurückgekommen');
+});
+
+/**
+ * Ein gespiegelter Kalender `a` mit mehr Objekten, als der Lauf ohne Atempause
+ * verarbeitet (YIELD_EVERY = 50). `bulk-0` und `bulk-59` sind am Server
+ * geändert: übernimmt der Lauf `bulk-0`, steht er in der Schleife, und die
+ * erste Atempause danach ist seine; `bulk-59` liegt hinter ihr. In dieser
+ * Atempause läuft `inPause`.
+ */
+async function abortedInPause(/** @type {any} */ t, /** @type {(calendarUrl: string) => void} */ inPause) {
+  reset();
+  const a = calendar('a');
+  for (let i = 0; i < 60; i++) {
+    davAny.putObject(a, `bulk-${i}.ics`, ics('VEVENT', `bulk-${i}@test`, 'Masse'));
+  }
+  await caldavSync.sync();
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, 61, 'der Lauf hat nicht alles gespiegelt');
+
+  davAny.putObject(a, 'bulk-0.ics', ics('VEVENT', 'bulk-0@test', 'Geändert'));
+  davAny.putObject(a, 'bulk-59.ics', ics('VEVENT', 'bulk-59@test', 'Geändert'));
+  const inLoop = () => db.prepare(
+    "SELECT 1 FROM calendar_events WHERE external_calendar_id = 'bulk-0@test' AND title = 'Geändert'"
+  ).get();
+  const original = /** @type {any} */ (globalThis.setImmediate);
+  let ran = false;
+  t.mock.method(globalThis, 'setImmediate', (/** @type {any[]} */ ...args) => {
+    if (!ran && inLoop()) { ran = true; inPause(a); }
+    return original(...args);
+  });
+  await caldavSync.sync();
+  t.mock.restoreAll();
+  assert.equal(ran, true, 'nichts fiel in die Atempause - der Fall misst nichts');
+}
+
+const accountOfTest = () => /** @type {{ id: number }} */ (db.prepare('SELECT id FROM caldav_accounts').get()).id;
+const titleOf = (/** @type {string} */ uid) => /** @type {{ title: string } | undefined} */ (
+  db.prepare('SELECT title FROM calendar_events WHERE external_calendar_id = ?').get(uid))?.title;
+
+test('CalDAV: in der Atempause samt Terminen abgewählt - kein Termin des Kalenders kommt zurück (#2941)', async (t) => {
+  await abortedInPause(t, (a) => {
+    caldavSync.updateCalendarSelection(accountOfTest(), a, false, { deleteEvents: true });
+  });
+
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, 0,
+    'Termine des abgewählten Kalenders sind nach der Atempause zurückgekommen');
+});
+
+test('CalDAV: in der Atempause ohne Termine abgewählt - der Rest wird weder gelesen noch weggeräumt (#2941)', async (t) => {
+  await abortedInPause(t, (a) => {
+    caldavSync.updateCalendarSelection(accountOfTest(), a, false);
+  });
+
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, 61,
+    'der halb gelesene Kalender wurde geprunt, als fehlte der Rest am Server');
+  assert.equal(titleOf('bulk-0@test'), 'Geändert', 'vor der Abwahl Gelesenes bleibt');
+  assert.equal(titleOf('bulk-59@test'), 'Masse', 'nach der Abwahl hat der Lauf den Kalender weiter gelesen');
+});
+
+test('CalDAV: in der Atempause abgewählt - eine Bearbeitung geht nicht in den abgewählten Kalender (#2941)', async (t) => {
+  await abortedInPause(t, (a) => {
+    // Bearbeitet wie über die Route, dann abgewählt; `bulk-5` ist vor der
+    // Atempause gelesen.
+    db.prepare("UPDATE calendar_events SET title = 'Lokal', outbound_dirty = 1 WHERE external_calendar_id = 'bulk-5@test'").run();
+    caldavSync.updateCalendarSelection(accountOfTest(), a, false);
+  });
+
+  const puts = davAny.seen('PUT').filter((/** @type {{ body: string }} */ r) => r.body.includes('SUMMARY:Lokal'));
+  assert.equal(puts.length, 0, 'die Bearbeitung ging in einen abgewählten Kalender');
+  assert.equal(titleOf('bulk-5@test'), 'Lokal', 'die Bearbeitung ist verloren');
+  assert.equal(/** @type {{ d: number }} */ (db.prepare("SELECT outbound_dirty AS d FROM calendar_events WHERE external_calendar_id = 'bulk-5@test'").get()).d, 1,
+    'die Bearbeitung wartet nicht mehr auf ihren Push');
+});
+
 // ── Aufgaben und Einkauf (VTODO) ────────────────────────────────────────────────
 
 const TODO_UID = 'todo-gone@test';
