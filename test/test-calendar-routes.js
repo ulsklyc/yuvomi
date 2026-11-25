@@ -2103,6 +2103,73 @@ test('PUT /:id - an event deleted during the attachment upload answers 404 (#294
   assert.deepEqual(uploadsDeleted, ['drive-2940-gone'], 'der hochgeladene Anhang wird wieder entfernt');
 });
 
+test('PUT /:id - the series limits are checked against the row the upload save finds (#2940)', async () => {
+  const id = insertEvent({
+    title: 'PUT-UPLOAD-SERIES', start_datetime: '2041-03-01T09:00', recurrence_rule: 'FREQ=DAILY',
+  });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('serie').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-series', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      start_datetime: '2041-03-10T09:00', attachment_data: dataUrl, attachment_name: 'serie.txt',
+    } }));
+    await started;
+    const rule = await call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=DAILY;UNTIL=20410305',
+    } }));
+    assert.equal(rule.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  // Dieselbe Absage wie ohne Upload gegen denselben Stand.
+  const direct = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { start_datetime: '2041-03-10T09:00' } }));
+  assert.equal(direct.status, 400);
+  assert.equal(refused.status, 400, 'der Start nach dem Serienende wird abgewiesen');
+  assert.deepEqual(refused.body, direct.body);
+  const row = db.prepare('SELECT start_datetime, recurrence_rule, attachment_name FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.start_datetime, '2041-03-01T09:00');
+  assert.equal(row.recurrence_rule, 'FREQ=DAILY;UNTIL=20410305');
+  assert.equal(row.attachment_name, null);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = 'drive-2940-series'").get().n, 0);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-series'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+test('PUT /:id - the linked occurrences follow the calendar the upload save finds (#2940)', async () => {
+  const kalenderA = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 A')").run().lastInsertRowid);
+  const kalenderB = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 B')").run().lastInsertRowid);
+  const created = await call('POST', '/', /** @type {any} */ ({ body: {
+    title: 'PUT-UPLOAD-CHILDREN', start_datetime: '2041-04-01T09:00', recurrence_rule: 'FREQ=DAILY',
+    local_calendar_id: kalenderA,
+  } }));
+  assert.equal(created.status, 201);
+  const seriesId = Number(created.body.data.id);
+  const child = await call('PUT', `/${seriesId}/occurrences/2041-04-03`, /** @type {any} */ ({ body: { title: 'Ausnahme 2940' } }));
+  assert.equal(child.status, 200);
+  const childId = Number(child.body.data.id);
+  assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderA);
+  const dataUrl = `data:text/plain;base64,${Buffer.from('kinder').toString('base64')}`;
+  await withHeldDriveUpload('drive-2940-children', async ({ started, release }) => {
+    const first = call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      target_google_calendar_id: null, attachment_data: dataUrl, attachment_name: 'kinder.txt',
+    } }));
+    await started;
+    const moved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: { local_calendar_id: kalenderB } }));
+    assert.equal(moved.status, 200);
+    assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderB);
+    release();
+    assert.equal((await first).status, 200);
+  });
+  const master = db.prepare('SELECT local_calendar_id AS c, attachment_name AS a FROM calendar_events WHERE id = ?').get(seriesId);
+  assert.equal(master.a, 'kinder.txt');
+  assert.equal(master.c, kalenderB, 'die Serie bleibt in B');
+  assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderB,
+    'die Ausnahme bleibt bei der Serie in B');
+});
+
 test('PUT /:id — Sichtbarkeit, Serie und Zuweisungen aktualisieren', async () => {
   const id = insertEvent({ title: 'PUT-FULL', start_datetime: '2041-03-01T09:00' });
   const res = await call('PUT', `/${id}`, { body: {

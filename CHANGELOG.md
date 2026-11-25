@@ -19,8 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Replacing a calendar attachment no longer undoes a change made in the meantime.** While a
   new attachment was still uploading (WebDAV or a cloud storage can take seconds), a second save
   of the same event could change its description, location or end, and the attachment save then
-  wrote the old values back. It now keeps what the event holds when it saves. An event deleted
-  during the upload answers "not found" and the uploaded file is removed again.
+  wrote the old values back. It now keeps what the event holds when it saves, the occurrences
+  of a series stay in the calendar the series is in, and a new start that the series changed in
+  the meantime no longer allows is refused as before. An event deleted during the upload answers
+  "not found" and the uploaded file is removed again.
 - **Changing your password twice at the same time keeps one of the two.** Two password
   changes for the same account that overlapped could both succeed, each signing out the other,
   and the one that finished last counted. Now the second one gets the same answer as a wrong

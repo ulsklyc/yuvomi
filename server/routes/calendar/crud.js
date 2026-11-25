@@ -376,6 +376,34 @@ async function sendNonMemberAssignment(res, err, staged) {
 class CalendarEventGoneError extends Error {}
 
 /**
+ * Eine Seriengrenze, die erst gegen die Zeile beim Schreiben verletzt ist
+ * (#2940): gestagte Uploads wegraeumen, dann dieselbe 400 wie davor.
+ */
+class SeriesRefusedError extends Error {
+  /** @param {string} refusal */
+  constructor(refusal) {
+    super(refusal);
+    this.refusal = refusal;
+  }
+}
+
+/**
+ * @param {any} res
+ * @param {string} refusal
+ * @param {any[]} staged
+ */
+async function sendSeriesRefusalAfterUpload(res, refusal, staged) {
+  if (staged.length > 0) {
+    try {
+      await cleanupCalendarUploads(staged);
+    } catch (cleanupError) {
+      return sendStorageError(res, cleanupError, 'Calendar attachment storage cleanup failed.');
+    }
+  }
+  return sendSeriesRefusal(res, refusal);
+}
+
+/**
  * @param {any} res
  * @param {any[]} staged
  */
@@ -562,6 +590,17 @@ router.get('/:id', validateRequest(), (req, res) => {
 
 // --------------------------------------------------------
 const SERIES_ENDS_BEFORE_START = 'recurrence_rule: the series ends before the start date.';
+
+/**
+ * Die beiden Absagen der Seriengrenzen im PUT (#960, #1607), aus einer Stelle,
+ * damit die Absage nach dem Upload (#2940) dieselbe ist wie die davor.
+ * @param {any} res
+ * @param {string} refusal
+ */
+function sendSeriesRefusal(res, refusal) {
+  if (refusal === 'no_occurrence') return sendSeriesWithoutOccurrence(res);
+  return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400, reason: 'calendar_series_ends_before_start' });
+}
 
 // POST /api/v1/calendar
 // Neuen Termin anlegen.
@@ -978,7 +1017,6 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
       title, description,
       all_day, color: colorVal, recurrence_rule,
     } = req.body;
-    const location = locationAfterEdit(req.body.location, event.location);
     // `undefined` = nicht mitgeschickt. Ein Start ist danach nie leer (siehe
     // oben), ein Ende mit '' oder `null` kommt als null an und leert es.
     const start_datetime = vStart ? vStart.value : undefined;
@@ -1004,61 +1042,70 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     // Wiederholung abschaltet und dabei das Startdatum aendert, wurde sonst
     // gegen die ALTE Regel geprueft und mit 400 abgewiesen - fuer eine Serie,
     // die es nach dem Speichern gar nicht mehr gibt.
-    const regelDanach = recurrence_rule !== undefined
-      ? (recurrence_rule || null)
-      : event.recurrence_rule;
-    const startDanach = start_datetime !== undefined && start_datetime !== null
-      ? start_datetime
-      : event.start_datetime;
-    const serieBeruehrt = regelDanach !== event.recurrence_rule
-      || String(startDanach ?? '').slice(0, 10) !== String(event.start_datetime ?? '').slice(0, 10);
-    // DER GUARD MUSS DENSELBEN KALENDERTAG MEINEN WIE DIE EXPANSION. Ein
-    // eingelesener Termin kann eine eigene Zone tragen: 31. Januar 20:00 in New
-    // York steht als 1. Februar 01:00 UTC in der Zeile. Fuer "am letzten Tag des
-    // Monats" zaehlt der Ortstag, also der 31. - ohne den Hinweis sah der Guard
-    // den Ersten, hielt die Serie fuer leer und wies eine gueltige Bearbeitung
-    // mit 400 ab. `expandRecurringEvents` nimmt die Pruefung im selben Fall
-    // zurueck (`zonenUnsicher`); nur `tzid` kann diesen Zustand erzeugen, die
-    // Route selbst nimmt das Feld nicht entgegen.
-    // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
-    const wandUhr = event.tzid ? storedToWall(String(startDanach ?? ''), event.tzid, zoneOpts.zone) : null;
-    const zonenUnsicher = storedDayDiffersFromSeriesDay(String(startDanach ?? ''), event.tzid, zoneOpts.zone);
-    if (serieBeruehrt
-      && !hasAnyOccurrence(startDanach, regelDanach, { utcDiffersFromLocal: zonenUnsicher })) {
-      return sendSeriesWithoutOccurrence(res);
-    }
-    // EIN ENDE VOR DEM START (#1607): nur wenn DIESE Anfrage Regel oder
-    // Starttag aendert. Eine eingelesene Serie, die schon so in der Zeile
-    // steht, bleibt bearbeitbar.
-    //
-    // "STARTTAG GEAENDERT" WIRD IN EINER DARSTELLUNG VERGLICHEN, anders als
-    // `serieBeruehrt` oben. Das Formular schickt die Wanduhrzeit des Haushalts;
-    // ein synchronisierter Termin liegt als Instant in der Zeile, und dessen
-    // UTC-Tag kann der Nachbartag sein. Am rohen Text verglichen waere ein
-    // reiner Titel-Edit dort eine Startaenderung. Fuer die Pruefung darueber
-    // ist das unschaedlich (sie wird dadurch nur OEFTER gefragt und nimmt sich
-    // im Zweifel selbst zurueck), hier wuerde es eine Bearbeitung abweisen.
-    const gespeicherterStart = String(event.start_datetime ?? '');
-    const gespeicherterTag = hasExplicitZone(gespeicherterStart)
-      ? (utcToWall(gespeicherterStart, zoneOpts.zone)?.date ?? gespeicherterStart.slice(0, 10))
-      : gespeicherterStart.slice(0, 10);
-    const startTag = String(startDanach ?? '').slice(0, 10);
-    const regelGeaendert = regelDanach !== event.recurrence_rule;
-    const startTagGeaendert = start_datetime !== undefined && start_datetime !== null
-      && startTag !== gespeicherterTag;
-    // WO DER STARTTAG VON DER LESART ABHAENGT, WIRD NICHT GERATEN - ABER AUCH
-    // NICHT WEGGESEHEN. Ein Termin mit eigener Zone hat zwei Kandidaten (der
-    // UTC-Tag der Zeile und der Ortstag); ohne aufloesbare Zone liegt der Ortstag
-    // hoechstens einen Tag daneben. Abgewiesen wird dort nur ein Ende, das vor
-    // JEDEM Kandidaten liegt, und nur bei geaenderter REGEL: die ist in jeder
-    // Darstellung dieselbe Zeichenkette.
-    const startKandidaten = zonenUnsicher
-      ? [startTag, wandUhr?.date ?? shiftDateKey(startTag, -1)]
-      : [startTag];
-    const endeGefragt = zonenUnsicher ? regelGeaendert : (regelGeaendert || startTagGeaendert);
-    if (endeGefragt && startKandidaten.every((tag) => endsBeforeStart(tag, regelDanach))) {
-      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400, reason: 'calendar_series_ends_before_start' });
-    }
+    // SERIENGRENZEN gegen eine Zeile (#2940): hier gegen den geladenen
+    // Termin, in applyUpdate noch einmal gegen die Zeile, die das Schreiben
+    // vorfindet - waehrend des Uploads kann eine zweite Anfrage Regel oder
+    // Start geaendert haben.
+    const seriesCheck = (/** @type {any} */ row) => {
+      const regelDanach = recurrence_rule !== undefined
+        ? (recurrence_rule || null)
+        : row.recurrence_rule;
+      const startDanach = start_datetime !== undefined && start_datetime !== null
+        ? start_datetime
+        : row.start_datetime;
+      const serieBeruehrt = regelDanach !== row.recurrence_rule
+        || String(startDanach ?? '').slice(0, 10) !== String(row.start_datetime ?? '').slice(0, 10);
+      // DER GUARD MUSS DENSELBEN KALENDERTAG MEINEN WIE DIE EXPANSION. Ein
+      // eingelesener Termin kann eine eigene Zone tragen: 31. Januar 20:00 in New
+      // York steht als 1. Februar 01:00 UTC in der Zeile. Fuer "am letzten Tag des
+      // Monats" zaehlt der Ortstag, also der 31. - ohne den Hinweis sah der Guard
+      // den Ersten, hielt die Serie fuer leer und wies eine gueltige Bearbeitung
+      // mit 400 ab. `expandRecurringEvents` nimmt die Pruefung im selben Fall
+      // zurueck (`zonenUnsicher`); nur `tzid` kann diesen Zustand erzeugen, die
+      // Route selbst nimmt das Feld nicht entgegen.
+      // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
+      const wandUhr = row.tzid ? storedToWall(String(startDanach ?? ''), row.tzid, zoneOpts.zone) : null;
+      const zonenUnsicher = storedDayDiffersFromSeriesDay(String(startDanach ?? ''), row.tzid, zoneOpts.zone);
+      if (serieBeruehrt
+        && !hasAnyOccurrence(startDanach, regelDanach, { utcDiffersFromLocal: zonenUnsicher })) {
+        return { regelDanach, startDanach, refusal: 'no_occurrence' };
+      }
+      // EIN ENDE VOR DEM START (#1607): nur wenn DIESE Anfrage Regel oder
+      // Starttag aendert. Eine eingelesene Serie, die schon so in der Zeile
+      // steht, bleibt bearbeitbar.
+      //
+      // "STARTTAG GEAENDERT" WIRD IN EINER DARSTELLUNG VERGLICHEN, anders als
+      // `serieBeruehrt` oben. Das Formular schickt die Wanduhrzeit des Haushalts;
+      // ein synchronisierter Termin liegt als Instant in der Zeile, und dessen
+      // UTC-Tag kann der Nachbartag sein. Am rohen Text verglichen waere ein
+      // reiner Titel-Edit dort eine Startaenderung. Fuer die Pruefung darueber
+      // ist das unschaedlich (sie wird dadurch nur OEFTER gefragt und nimmt sich
+      // im Zweifel selbst zurueck), hier wuerde es eine Bearbeitung abweisen.
+      const gespeicherterStart = String(row.start_datetime ?? '');
+      const gespeicherterTag = hasExplicitZone(gespeicherterStart)
+        ? (utcToWall(gespeicherterStart, zoneOpts.zone)?.date ?? gespeicherterStart.slice(0, 10))
+        : gespeicherterStart.slice(0, 10);
+      const startTag = String(startDanach ?? '').slice(0, 10);
+      const regelGeaendert = regelDanach !== row.recurrence_rule;
+      const startTagGeaendert = start_datetime !== undefined && start_datetime !== null
+        && startTag !== gespeicherterTag;
+      // WO DER STARTTAG VON DER LESART ABHAENGT, WIRD NICHT GERATEN - ABER AUCH
+      // NICHT WEGGESEHEN. Ein Termin mit eigener Zone hat zwei Kandidaten (der
+      // UTC-Tag der Zeile und der Ortstag); ohne aufloesbare Zone liegt der Ortstag
+      // hoechstens einen Tag daneben. Abgewiesen wird dort nur ein Ende, das vor
+      // JEDEM Kandidaten liegt, und nur bei geaenderter REGEL: die ist in jeder
+      // Darstellung dieselbe Zeichenkette.
+      const startKandidaten = zonenUnsicher
+        ? [startTag, wandUhr?.date ?? shiftDateKey(startTag, -1)]
+        : [startTag];
+      const endeGefragt = zonenUnsicher ? regelGeaendert : (regelGeaendert || startTagGeaendert);
+      if (endeGefragt && startKandidaten.every((tag) => endsBeforeStart(tag, regelDanach))) {
+        return { regelDanach, startDanach, refusal: 'ends_before_start' };
+      }
+      return { regelDanach, startDanach, refusal: null };
+    };
+    const { regelDanach, startDanach, refusal: seriesRefusal } = seriesCheck(event);
+    if (seriesRefusal) return sendSeriesRefusal(res, seriesRefusal);
 
     // JEDE ABWEISUNG GEHOERT VOR DAS STAGING. Ab hier laedt
     // `stageDocumentUpload` den Anhang in den Speicher (lokaler Ordner, WebDAV
@@ -1171,10 +1218,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
           : vLocalCalendar ? vLocalCalendar.value : row.local_calendar_id,
       };
     };
-    const {
-      caldavAccountId, caldavCalendarUrl, googleTargetId,
-      outlookAccountId, outlookCalendarId, localCalendarId,
-    } = targetsOf(event);
+    const { caldavAccountId, googleTargetId } = targetsOf(event);
     if (localCalendarProvided && (caldavAccountId || googleTargetId)) {
       return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
     }
@@ -1190,6 +1234,8 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
       // die Route 404 und schreibt nichts nach.
       const stored = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
       if (!stored) throw new CalendarEventGoneError();
+      const freshSeries = seriesCheck(stored);
+      if (freshSeries.refusal) throw new SeriesRefusedError(freshSeries.refusal);
       assertAttachmentStillChangeable(req, db.get(), stored.attachment_document_id,
         { replacementRequested, removalRequested });
       const storedAssignees = storedEventAssignees(db.get(), id);
@@ -1337,30 +1383,41 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     if (linkedOverrideCount > 0
         || (event.recurrence_rule && Object.hasOwn(req.body, 'confirmed_orphan_count'))
         || canUseOccurrenceTransaction) {
-      const seriesChanges = {};
-      if (title !== undefined) seriesChanges.title = title?.trim() || null;
-      if (description !== undefined) seriesChanges.description = description || null;
-      if (start_datetime !== undefined) seriesChanges.start_datetime = start_datetime;
-      if (end_datetime !== undefined) seriesChanges.end_datetime = end_datetime || null;
-      if (all_day !== undefined) seriesChanges.all_day = all_day ? 1 : 0;
-      if (location !== undefined) seriesChanges.location = location || null;
-      if (colorTouched) seriesChanges.color = colorVal ?? null;
-      if (req.body.icon !== undefined) seriesChanges.icon = vIcon;
-      if (recurrence_rule !== undefined) seriesChanges.recurrence_rule = recurrence_rule || null;
-      if (caldavProvided) {
-        seriesChanges.target_caldav_account_id = caldavAccountId;
-        seriesChanges.target_caldav_calendar_url = caldavCalendarUrl;
-      }
-      if (googleProvided) seriesChanges.target_google_calendar_id = googleTargetId;
-      if (outlookProvided) {
-        seriesChanges.target_outlook_account_id = outlookAccountId;
-        seriesChanges.target_outlook_calendar_id = outlookCalendarId;
-      }
-      if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = localCalendarId;
-      if (req.body.visibility !== undefined) {
-        seriesChanges.visibility = normalizeVisibility(req.body.visibility, event.visibility);
-      }
-      if (req.body.countdown !== undefined) seriesChanges.countdown = req.body.countdown ? 1 : 0;
+      // WAS AN DIE AUSNAHMEN GEHT, KOMMT AUS DER ZEILE BEIM SCHREIBEN (#2940),
+      // wie beim Master in applyUpdate: Kalender, Ort und Sichtbarkeit haengen
+      // an ihr, und waehrend des Uploads kann eine zweite Anfrage die Serie in
+      // einen anderen Kalender gelegt haben. Gelesen wird im Aufruf unten,
+      // nach dem letzten await und vor der Transaktion, ohne await dazwischen.
+      const seriesChangesFor = (/** @type {any} */ row) => {
+        const targets = targetsOf(row);
+        const locationNow = locationAfterEdit(req.body.location, row.location);
+        /** @type {Record<string, any>} */
+        const seriesChanges = {};
+        if (title !== undefined) seriesChanges.title = title?.trim() || null;
+        if (description !== undefined) seriesChanges.description = description || null;
+        if (start_datetime !== undefined) seriesChanges.start_datetime = start_datetime;
+        if (end_datetime !== undefined) seriesChanges.end_datetime = end_datetime || null;
+        if (all_day !== undefined) seriesChanges.all_day = all_day ? 1 : 0;
+        if (locationNow !== undefined) seriesChanges.location = locationNow || null;
+        if (colorTouched) seriesChanges.color = colorVal ?? null;
+        if (req.body.icon !== undefined) seriesChanges.icon = vIcon;
+        if (recurrence_rule !== undefined) seriesChanges.recurrence_rule = recurrence_rule || null;
+        if (caldavProvided) {
+          seriesChanges.target_caldav_account_id = targets.caldavAccountId;
+          seriesChanges.target_caldav_calendar_url = targets.caldavCalendarUrl;
+        }
+        if (googleProvided) seriesChanges.target_google_calendar_id = targets.googleTargetId;
+        if (outlookProvided) {
+          seriesChanges.target_outlook_account_id = targets.outlookAccountId;
+          seriesChanges.target_outlook_calendar_id = targets.outlookCalendarId;
+        }
+        if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = targets.localCalendarId;
+        if (req.body.visibility !== undefined) {
+          seriesChanges.visibility = normalizeVisibility(req.body.visibility, row.visibility);
+        }
+        if (req.body.countdown !== undefined) seriesChanges.countdown = req.body.countdown ? 1 : 0;
+        return seriesChanges;
+      };
       await runWithAttachmentClonePlan(
         db.get(),
         stagedClones,
@@ -1369,7 +1426,9 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
           seriesId: id,
           actorId: getUserId(req),
           isAdmin: isAdminRequest(req),
-          changes: seriesChanges,
+          changes: seriesChangesFor(
+            db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id) ?? event,
+          ),
           assignments: assignedTouched ? userIds : undefined,
           confirmedOrphanCount: req.body.confirmed_orphan_count,
           applyUpdate,
@@ -1452,6 +1511,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
     if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
     if (err instanceof CalendarEventGoneError) return sendEventGoneAfterUpload(res, staged);
+    if (err instanceof SeriesRefusedError) return sendSeriesRefusalAfterUpload(res, err.refusal, staged);
     if (err instanceof StorageError && staged.length === 0) {
       log.error('PUT /:id storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
