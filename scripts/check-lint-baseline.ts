@@ -71,7 +71,10 @@ const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.
 // synchronous, and an await between a read and its write lets another request in.
 // TX-DRIVER (phase 2, F6d) keeps every server transaction on withTx(db, fn): no call of a
 // `transaction` method under server/, so the driver's forgotten second call cannot happen.
+// DOC-CONTENT (#2956) keeps the content columns of a family_documents row fixed once it is
+// created; the calendar's attachment copies reuse what they read across planning rounds.
 const HARD = new Set([
+  'oxlint/no-restricted-syntax/DOC-CONTENT',
   'oxlint/no-restricted-syntax/SYNC-ONLY',
   'oxlint/no-restricted-syntax/HTML-STRING-WRITE',
   'oxlint/no-restricted-syntax/TX-ASYNC-FN',

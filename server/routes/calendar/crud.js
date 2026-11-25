@@ -194,9 +194,13 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
   // von jetzt; verlangt es eine Kopie, die nicht bereitliegt, wird neu geplant.
   // Bereitgestellte Dateien derselben Quelle werden dabei wiederverwendet.
   // Puffer und Dateien gelten ueber alle Runden: den Inhalt einer Dokument-ID
-  // (storage_key, storage_backend, content_data) schreibt nach dem Anlegen
+  // (storage_key, storage_backend, storage_provider, content_data, mime_type,
+  // file_size) schreibt nach dem Anlegen
   // niemand mehr um - die Dokument-Route aendert nur Metadaten, und die nimmt
-  // `consume` aus der frisch gelesenen Zeile. Eine geloeschte ID kommt nicht
+  // `consume` aus der frisch gelesenen Zeile. Erzwungen von der harten
+  // Lint-Regel DOC-CONTENT (scripts/generate-oxlint-overrides.mjs): ein UPDATE
+  // auf eine Inhaltsspalte von family_documents unter server/ ist rot, die
+  // Migrationen ausgenommen. Eine geloeschte ID kommt nicht
   // wieder: family_documents zaehlt mit AUTOINCREMENT (baseline.sql).
   const contents = new Map();
   /** @type {{ sourceDocumentId: number, staged: any, written?: boolean }[]} */
@@ -774,8 +778,9 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
       ...(vCaldavForm.error ? [] : [caldavTargetOffered(db.get(), /** @type {any} */ (vCaldavForm.value))]),
       validateOccurrenceAssignments(db.get(), req.body.assigned_to),
     ];
-    const strangersNow = collectErrors(checksNow).length ? [] : newNonMembers(parseAssignedTo(req.body.assigned_to));
-    if (collectErrors(checksNow).length || strangersNow.length) {
+    const checkErrorsNow = collectErrors(checksNow).length > 0;
+    const strangersNow = checkErrorsNow ? [] : newNonMembers(parseAssignedTo(req.body.assigned_to));
+    if (checkErrorsNow || strangersNow.length) {
       if (stagedUpload) await cleanupStagedUpload(stagedUpload);
       if (strangersNow.length) return res.status(400).json({ error: nonMemberMessage(strangersNow), code: 400 });
       return sendValidationErrors(res, checksNow);
@@ -1019,10 +1024,12 @@ const LOCAL_NEXT_TO_TARGET = 'Choose either a sync target or a local calendar.';
 /**
  * Die Folge-Route je Lauf (#2956): die Serie von jetzt, ob sie Ausnahmen
  * tragen kann und Sync-Ziel gegen lokalen Kalender - in der Reihenfolge der
- * Pruefung vor dem Upload. Setzt `changes.local_calendar_id` nach dem Ziel.
- * @param {{ seriesId: number, req: any, actorId: any, changes: Record<string, any>, syncTargetOf: (row: any) => any }} args
+ * Pruefung vor dem Upload. Gibt die Serie und die Aenderungen dieses Laufs
+ * zurueck (`local_calendar_id` nach dem Ziel), ohne `baseChanges` anzufassen.
+ * @param {{ seriesId: number, req: any, actorId: any, baseChanges: Record<string, any>, syncTargetOf: (row: any) => any }} args
+ * @returns {{ now: any, changes: Record<string, any> }}
  */
-function followingSeriesNow({ seriesId, req, actorId, changes, syncTargetOf }) {
+function followingSeriesNow({ seriesId, req, actorId, baseChanges, syncTargetOf }) {
   const now = seriesAfterUpload(seriesId, req);
   const eligibility = isEligibleLocalSeries(db.get(), now, actorId);
   if (!eligibility.eligible) {
@@ -1037,9 +1044,11 @@ function followingSeriesNow({ seriesId, req, actorId, changes, syncTargetOf }) {
   if (localAsked && syncTarget) {
     throw new RefusedAfterUploadError((r) => r.status(400).json({ error: LOCAL_NEXT_TO_TARGET, code: 400 }));
   }
-  if (syncTarget) changes.local_calendar_id = null;
-  else if (!localAsked) delete changes.local_calendar_id;
-  return now;
+  // Je Lauf eine eigene Kopie der Aenderungen: das Ziel dieses Laufs entscheidet
+  // ueber den lokalen Kalender, nichts davon bleibt fuer den naechsten Lauf stehen.
+  const runChanges = { ...baseChanges };
+  if (syncTarget) runChanges.local_calendar_id = null;
+  return { now, changes: runChanges };
 }
 
 function rejectLinkedOccurrenceResource(res, event, req) {
@@ -2012,8 +2021,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
     }
     if (vIcon !== undefined) changes.icon = vIcon;
     const rights = attachmentRights(req);
-    /** @type {any} */
-    let seriesNow = master;
+    let seriesNow = /** @type {any} */ (master);
     const commonOptions = {
       mayWidenAttachment: rights.mayWidenAttachment,
       seriesId,
@@ -2047,14 +2055,13 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
       db.get(),
       stagedClones,
       (cloneOptions) => {
-        // Je Lauf, synchron nach dem letzten await: die Serie, Bestandsliste,
-        // Anhang und Ziel, wie sie JETZT stehen (#1358, #2956).
-        seriesNow = followingSeriesNow({ seriesId, req, actorId, changes, syncTargetOf });
+        // Je Lauf, synchron nach dem letzten await: alles, wie es JETZT steht (#1358, #2956).
+        const run = followingSeriesNow({ seriesId, req, actorId, baseChanges: changes, syncTargetOf }); seriesNow = run.now;
         assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesNow, req.params.recurrenceId));
         assertAttachmentStillChangeable(req, db.get(),
           storedOccurrenceAttachmentDocument(db.get(), seriesNow, req.params.recurrenceId),
           { replacementRequested, removalRequested });
-        return splitSeries(db.get(), { ...commonOptions, ...cloneOptions });
+        return splitSeries(db.get(), { ...commonOptions, changes: run.changes, ...cloneOptions });
       },
       { mayClone: rights.mayCloneAttachment },
     );

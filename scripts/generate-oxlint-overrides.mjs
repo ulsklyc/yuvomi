@@ -140,6 +140,21 @@ const SQL_LIST_SELECTORS = [
 // is a member read, not a call, and its later call `t(fn)` names no `transaction`).
 const TX_DRIVER = 'TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten.';
 const TX_DRIVER_SELECTOR = { selector: "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']", message: TX_DRIVER };
+// #2956 (hard): DOC-CONTENT keeps the content of a document row fixed once it is created.
+// The calendar's attachment copies reuse a read buffer and staged files across planning
+// rounds (runWithAttachmentClonePlan in server/routes/calendar/crud.js); that holds because
+// nothing in the server rewrites storage_key, storage_backend, storage_provider,
+// content_data, mime_type or file_size of a family_documents row. The selectors read the SQL
+// text of a string or of one template part: `UPDATE [OR x] family_documents SET ... <column> =`
+// before any WHERE, also multi-line and with the table name quoted or bracketed. The
+// migrations stay outside (SCHEMA_HOME). Blind: the table or the column name interpolated
+// (`UPDATE ${table}`), SQL split over several strings joined with `+`.
+const DOC_CONTENT = 'DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956).';
+const DOC_CONTENT_RE = `/UPDATE\\s+(OR\\s+\\w+\\s+)?["\`\\[]?family_documents["\`\\]]?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)\\s*=/i`;
+const DOC_CONTENT_SELECTORS = [
+  { selector: `Literal[value=${DOC_CONTENT_RE}]`, message: DOC_CONTENT },
+  { selector: `TemplateElement[value.raw=${DOC_CONTENT_RE}]`, message: DOC_CONTENT },
+];
 // The schema and its migrations write SQL that is frozen once applied.
 const SCHEMA_HOME = ['server/db.js', 'server/migrations/**'];
 
@@ -281,7 +296,7 @@ export function checkNesting(overrides, mayDrop) {
  */
 export function buildOverrides(config, senders) {
   const [severity, ...base] = config.rules[RULE];
-  const server = [...base, ...CHANNEL_SELECTORS, PUSH_SELECTOR, WEBPUSH_SELECTOR, ...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS, TX_DRIVER_SELECTOR];
+  const server = [...base, ...CHANNEL_SELECTORS, PUSH_SELECTOR, WEBPUSH_SELECTOR, ...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS, TX_DRIVER_SELECTOR, ...DOC_CONTENT_SELECTORS];
   const utc = base.filter((/** @type {{ message: string }} */ s) => s.message.startsWith('UTC-DAY-KEY:'));
   // Areas add selectors to every file under them; exceptions drop selectors from their files.
   /** @type {{ files: string[], add: object[] }[]} */
@@ -293,7 +308,7 @@ export function buildOverrides(config, senders) {
     { files: senders, drop: [PUSH_SELECTOR] },
     { files: [PUSH_SERVICE], drop: [PUSH_SELECTOR, WEBPUSH_SELECTOR] },
     { files: RIGHTS_HOME, drop: RIGHTS_SELECTORS },
-    { files: SCHEMA_HOME, drop: [...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS] },
+    { files: SCHEMA_HOME, drop: [...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS, ...DOC_CONTENT_SELECTORS] },
     ...SYNC_EXEMPT_GROUPS,
   ];
   // Exceptions never overlap one another: what a file may drop is named in one place.
