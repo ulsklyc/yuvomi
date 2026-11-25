@@ -87,3 +87,35 @@ test('forced reminder reconciliation failures roll back lifecycle and settings w
   assert.deepEqual(database.prepare('SELECT * FROM health_fasting_settings WHERE user_id = 1').get(), beforeSettings);
   database.close();
 });
+
+test('a failure after the first reminder write leaves the reminders as they were (own transaction)', async () => {
+  // syncFastingRemindersForUser called on its own, outside a lifecycle write: its
+  // delete of a stale reminder and its insert of the wanted one stand or fall together.
+  const { syncFastingRemindersForUser } = await import('../server/services/fasting-reminders.js');
+  const database = setup();
+  acknowledgeSafety(database, actor(1), 1);
+  updateFastingSettings(database, actor(1), { defaultGoalMinutes: 960 }, 1);
+  database.prepare('UPDATE health_fasting_settings SET remind_goal = 1 WHERE user_id = 1').run();
+  const fast = createFast(database, actor(1), base({ acknowledgeSafety: false }));
+  database.prepare('DELETE FROM reminders').run();
+  database.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('fasting_goal', ?, '2026-09-13T09:00:00.000Z', 1)`).run(fast.id + 1000);
+  const before = database.prepare('SELECT * FROM reminders ORDER BY id').all();
+  const failingInsert = new Proxy(database, {
+    get(target, property) {
+      if (property === 'prepare') return (/** @type {string} */ sql) => {
+        if (/^\s*INSERT INTO reminders/.test(sql)) throw new Error('forced reminder insert failure');
+        return target.prepare(sql);
+      };
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const now = new Date('2026-09-13T05:00:00Z');
+  assert.throws(() => syncFastingRemindersForUser(failingInsert, 1, now), /forced reminder insert failure/);
+  assert.deepEqual(database.prepare('SELECT * FROM reminders ORDER BY id').all(), before, 'the stale reminder is gone without its replacement');
+  // Without the failure the same call replaces the stale row with the wanted one.
+  syncFastingRemindersForUser(database, 1, now);
+  assert.deepEqual(database.prepare('SELECT entity_id FROM reminders').all().map((/** @type {any} */ r) => r.entity_id), [fast.id]);
+  database.close();
+});

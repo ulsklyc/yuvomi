@@ -33,7 +33,7 @@
  * file, never the other way round.
  *
  * Dependencies without side effects only (server/scopes.js,
- * server/display-scopes.js, manage.ts; no express, NEVER server/db.js, not even
+ * server/display-scopes.js, manage.ts, server/db/tx.ts; no express, NEVER server/db.js, not even
  * transitively - see actor.ts) - usable in middleware, routes, migrations and
  * tests. The connection is always a parameter.
  * Erasable TS syntax only (runs through type stripping, no build).
@@ -45,6 +45,7 @@ import { MODULE_KEYS, getModuleKeys } from '../scopes.js';
 // (test:db-isolation nannte vier davon).
 import { DISPLAY_SCOPE_MODULES } from '../display-scopes.js';
 import { managesHousehold } from './manage.ts';
+import { withTx, type TxDatabase } from '../db/tx.ts';
 
 /** The statement surface used here; better-sqlite3 and node:sqlite both provide it. */
 type Statement = {
@@ -583,27 +584,19 @@ export function normalizePermissionInput(
  * Ersetzt die gespeicherten Modul- und Widget-Rechte eines Subjekts atomar
  * (delete + insert der abweichenden Einträge). Capabilities bleiben
  * unverändert, wenn das Feld fehlt; ein ausdrücklich mitgegebenes
- * `capabilities` ersetzt dagegen auch diese Achse. Transaktion vom Aufrufer
- * bereitgestellt oder hier gekapselt.
+ * `capabilities` ersetzt dagegen auch diese Achse. Eigene Transaktion, in
+ * einer schon offenen ein SAVEPOINT (withTx).
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
  */
 export function replaceSubjectPermissions(
-  database: Database,
+  database: Database & TxDatabase,
   subjectType: 'role' | 'user',
   subjectId: string | number,
   input: PermissionInput | undefined,
 ) {
-  // Portable Transaktion (BEGIN/COMMIT/ROLLBACK): funktioniert sowohl mit
-  // better-sqlite3 (Produktion) als auch node:sqlite (Tests). Kein
-  // database.transaction()-Helfer, den node:sqlite nicht kennt.
-  database.exec('BEGIN');
-  try {
-    writeSubjectPermissions(database, subjectType, subjectId, input);
-    database.exec('COMMIT');
-  } catch (err) {
-    database.exec('ROLLBACK');
-    throw err;
-  }
+  // Portable Transaktion: withTx() laeuft auf better-sqlite3 (Produktion) und
+  // node:sqlite (Tests) gleich und wird in einer offenen Transaktion ein SAVEPOINT.
+  withTx(database, () => writeSubjectPermissions(database, subjectType, subjectId, input));
   return getSubjectPermissions(database, subjectType, subjectId);
 }
 

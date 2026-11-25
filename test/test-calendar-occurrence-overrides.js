@@ -1168,7 +1168,7 @@ test('occurrence upsert is idempotent and stores one child with one EXDATE', () 
   `).get(seriesId, '2026-10-02T09:00:00').count, 1);
 });
 
-test('node:sqlite transaction fallback nests through a savepoint', () => {
+test('a write inside an open outer transaction on node:sqlite nests and rolls back with it', () => {
   const database = createDatabase();
   const seriesId = Number(insertSeries(database, {
     start_datetime: '2026-10-01T09:00:00',
@@ -1218,6 +1218,70 @@ test('occurrence child and EXDATE roll back together', () => {
   assert.equal(database.prepare(
     'SELECT COUNT(*) AS count FROM calendar_event_exceptions WHERE event_id = ?'
   ).get(seriesId).count, 0);
+});
+
+test('deleting an occurrence rolls back its child delete when the EXDATE write fails', () => {
+  const database = createDatabase();
+  const seriesId = Number(insertSeries(database, {
+    start_datetime: '2026-10-01T09:00:00',
+    recurrence_rule: 'FREQ=DAILY',
+  }));
+  upsertOccurrenceOverride(database, /** @type {any} */ ({
+    seriesId, recurrenceId: '2026-10-02', actorId: 1, changes: { title: 'Child to keep' },
+  }));
+  database.exec('DELETE FROM calendar_event_exceptions');
+  database.exec(`
+    CREATE TEMP TRIGGER fail_delete_exception
+    BEFORE INSERT ON calendar_event_exceptions
+    BEGIN SELECT RAISE(ABORT, 'delete probe'); END;
+  `);
+
+  assert.throws(() => deleteOccurrence(database, { seriesId, recurrenceId: '2026-10-02', actorId: 1 }), /delete probe/);
+
+  assert.deepEqual(database.prepare(
+    'SELECT title FROM calendar_events WHERE recurrence_parent_id = ?'
+  ).all(seriesId).map((/** @type {any} */ row) => row.title), ['Child to keep']);
+});
+
+test('truncating a series rolls back its child deletes when the rule update fails', () => {
+  const database = createDatabase();
+  const seriesId = Number(insertSeries(database, {
+    start_datetime: '2026-10-01T09:00:00',
+    recurrence_rule: 'FREQ=DAILY',
+  }));
+  upsertOccurrenceOverride(database, /** @type {any} */ ({
+    seriesId, recurrenceId: '2026-10-09', actorId: 1, changes: { title: 'Future child' },
+  }));
+  database.exec(`
+    CREATE TEMP TRIGGER fail_truncate_rule
+    BEFORE UPDATE OF recurrence_rule ON calendar_events
+    BEGIN SELECT RAISE(ABORT, 'truncate probe'); END;
+  `);
+
+  assert.throws(() => truncateSeries(database, { seriesId, recurrenceId: '2026-10-05', actorId: 1 }), /truncate probe/);
+
+  assert.deepEqual(database.prepare(
+    'SELECT title FROM calendar_events WHERE recurrence_parent_id = ?'
+  ).all(seriesId).map((/** @type {any} */ row) => row.title), ['Future child']);
+  assert.deepEqual({ ...database.prepare('SELECT recurrence_rule FROM calendar_events WHERE id = ?').get(seriesId) }, { recurrence_rule: 'FREQ=DAILY' });
+});
+
+test('a series update rolls back its master write when a later step throws', () => {
+  const database = createDatabase();
+  const seriesId = Number(insertSeries(database, {
+    title: 'Title before',
+    start_datetime: '2026-10-01T09:00:00',
+    recurrence_rule: 'FREQ=DAILY',
+  }));
+
+  assert.throws(() => updateSeriesWithOverrides(database, /** @type {any} */ ({
+    seriesId,
+    actorId: 1,
+    changes: { title: 'Must roll back' },
+    createAttachment: () => { throw new Error('attachment probe'); },
+  })), /attachment probe/);
+
+  assert.deepEqual({ ...database.prepare('SELECT title FROM calendar_events WHERE id = ?').get(seriesId) }, { title: 'Title before' });
 });
 
 test('saving no actual difference restores the expanded master occurrence', () => {
@@ -2404,7 +2468,8 @@ test('following update revalidates an excluded slot inside its write transaction
   const originalExec = database.exec.bind(database);
   let injectedDelete = false;
   database.exec = (sql) => {
-    if (!injectedDelete && /^SAVEPOINT calendar_occurrence_/i.test(String(sql).trim())) {
+    // The write transaction opens here (withTx: BEGIN, or SAVEPOINT inside an outer one).
+    if (!injectedDelete && /^(BEGIN|SAVEPOINT)\b/i.test(String(sql).trim())) {
       injectedDelete = true;
       database.prepare(`
         DELETE FROM calendar_events

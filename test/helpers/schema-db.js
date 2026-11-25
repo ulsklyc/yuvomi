@@ -12,13 +12,14 @@
  * migrateOnNodeSqlite faehrt dort alle Migrationen von Null und die Baseline
  * samt Migrationen darueber) und durch jede Suite, die hier ihr Schema holt.
  * Abhängigkeiten: node:assert, node:sqlite, server/db/baseline.ts,
- *                 server/migrations/index.ts
+ *                 server/db/tx.ts, server/migrations/index.ts
  */
 
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { applyBaseline, loadBaseline } from '../../server/db/baseline.ts';
+import { withTx } from '../../server/db/tx.ts';
 import { MIGRATIONS } from '../../server/migrations/index.ts';
 
 /**
@@ -99,4 +100,17 @@ export function openSchemaDb({ upTo } = {}) {
  */
 export function migrateTo(database, version) {
   migrateOnNodeSqlite(database, migrationsUpTo(version));
+}
+
+/**
+ * Bildet `db.transaction()` des Produktionstreibers auf einer DatabaseSync nach
+ * (Rueckgabe einer aufrufbaren Funktion, Commit, Rollback bei Wurf, verschachtelt
+ * als SAVEPOINT) - ueber withTx(), also dieselbe Folge wie im Server.
+ * @param {DatabaseSync} database
+ * @returns {DatabaseSync & { transaction: <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A) => R }}
+ */
+export function withTransaction(database) {
+  const target = /** @type {DatabaseSync & { transaction: Function }} */ (database);
+  target.transaction = (/** @type {Function} */ fn) => (/** @type {unknown[]} */ ...args) => withTx(database, () => fn(...args));
+  return /** @type {any} */ (target);
 }

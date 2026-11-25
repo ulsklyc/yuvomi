@@ -6,7 +6,7 @@
  *          exit 1 naming file and rule, a fixed one exit 0 with "Baseline can sink", --update
  *          lowers and never raises, a hard rule fails even with --init, a broken tool run is
  *          exit 2, a disable comment is a finding of its own (hard without a rule list or for
- *          no-restricted-syntax). The fixture test/fixtures/lint/ must give exactly its ten
+ *          no-restricted-syntax). The fixture test/fixtures/lint/ must give exactly its sixteen
  *          findings, the TypeScript layer fixture test/fixtures/lint/layers/ exactly its three
  *          dependency-cruiser violations, the knip fixture test/fixtures/lint/knip/ (run with the
  *          real knip.json) exactly its six findings; a knip entry that names no file is exit 2;
@@ -29,6 +29,9 @@
  *          reason needs its key. The fixture test/fixtures/lint/sql-in-list/ (Refs #2810) must
  *          give exactly its thirteen SQL-IN-LIST lines (one SQL placeholder per value, one line
  *          per spelling) and nothing in server/db.js; a SQL-IN-LIST key needs a reason.
+ *          A TX-MANUAL key needs a reason as well (phase 2, F6b: exec or prepare, string or
+ *          template literal), and in the server only server/db/tx.ts and the instance lock
+ *          carry one.
  * Run:     npm run test:lint-baseline
  */
 
@@ -63,11 +66,13 @@ function portableConfig() {
   return config;
 }
 
-const ONE_MANUAL = "export function f(db) { db.exec('BEGIN'); }\n";
-const TWO_MANUAL = "export function f(db) { db.exec('BEGIN'); db.exec('COMMIT'); }\n";
+// A plain debt rule (no reason, not hard) for the ratchet itself: UTC-DAY-KEY. TX-MANUAL served
+// here until it became a list of exceptions with reasons (phase 2, F6b).
+const ONE_DEBT = 'export const f = (d) => d.toISOString().slice(0, 10);\n';
+const TWO_DEBT = 'export const f = (d) => [d.toISOString().slice(0, 10), d.toISOString().slice(0, 10)];\n';
 const NONE = 'export function f(db) { return db; }\n';
 
-function project(source = TWO_MANUAL) {
+function project(source = TWO_DEBT) {
   const dir = tempDir('yuvomi-lint-baseline-');
   writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
   mkdirSync(join(dir, 'server'));
@@ -86,7 +91,7 @@ function run(dir, ...args) {
 
 /** @param {string} dir */
 const baselineOf = (dir) => JSON.parse(readFileSync(join(dir, 'lint-baseline.json'), 'utf8'));
-const MANUAL = 'server/x.js\toxlint/no-restricted-syntax/TX-MANUAL';
+const DEBT = 'server/x.js\toxlint/no-restricted-syntax/UTC-DAY-KEY';
 // Built from parts so that this file does not carry a directive itself.
 const DISABLE = `// ${'eslint'}-disable-next-line`;
 
@@ -101,7 +106,7 @@ test('--init fills the baseline, after that the run is green', () => {
   const dir = project();
   try {
     assert.equal(run(dir, '--init').code, 0);
-    assert.deepEqual(baselineOf(dir), { [MANUAL]: 2 });
+    assert.deepEqual(baselineOf(dir), { [DEBT]: 2 });
     assert.equal(run(dir).code, 0);
     assert.equal(run(dir, '--init').code, 2, '--init does not overwrite a filled baseline');
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -113,18 +118,18 @@ test('an empty baseline names the whole stock and fails', () => {
     writeFileSync(join(dir, 'lint-baseline.json'), '{}\n');
     const r = run(dir);
     assert.equal(r.code, 1);
-    assert.match(r.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+0 -> 2/);
+    assert.match(r.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/UTC-DAY-KEY\s+0 -> 2/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('an extra finding: exit 1, file and rule are named', () => {
-  const dir = project(ONE_MANUAL);
+  const dir = project(ONE_DEBT);
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, 'server', 'x.js'), TWO_MANUAL);
+    writeFileSync(join(dir, 'server', 'x.js'), TWO_DEBT);
     const r = run(dir);
     assert.equal(r.code, 1);
-    assert.match(r.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+1 -> 2/);
+    assert.match(r.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/UTC-DAY-KEY\s+1 -> 2/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -132,10 +137,10 @@ test('a new key (another file): exit 1', () => {
   const dir = project();
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, 'server', 'y.js'), ONE_MANUAL);
+    writeFileSync(join(dir, 'server', 'y.js'), ONE_DEBT);
     const r = run(dir);
     assert.equal(r.code, 1);
-    assert.match(r.out, /server\/y\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+0 -> 1/);
+    assert.match(r.out, /server\/y\.js\s+oxlint\/no-restricted-syntax\/UTC-DAY-KEY\s+0 -> 1/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -143,11 +148,11 @@ test('a fixed finding: exit 0 with a hint, the baseline stays', () => {
   const dir = project();
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, 'server', 'x.js'), ONE_MANUAL);
+    writeFileSync(join(dir, 'server', 'x.js'), ONE_DEBT);
     const r = run(dir);
     assert.equal(r.code, 0);
     assert.match(r.out, /Baseline can sink: 1 key/);
-    assert.deepEqual(baselineOf(dir), { [MANUAL]: 2 }, 'without --update the file stays');
+    assert.deepEqual(baselineOf(dir), { [DEBT]: 2 }, 'without --update the file stays');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -155,12 +160,12 @@ test('--update lowers and removes, but never raises', () => {
   const dir = project();
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, 'server', 'x.js'), ONE_MANUAL);
+    writeFileSync(join(dir, 'server', 'x.js'), ONE_DEBT);
     assert.equal(run(dir, '--update').code, 0);
-    assert.deepEqual(baselineOf(dir), { [MANUAL]: 1 });
-    writeFileSync(join(dir, 'server', 'x.js'), TWO_MANUAL);
+    assert.deepEqual(baselineOf(dir), { [DEBT]: 1 });
+    writeFileSync(join(dir, 'server', 'x.js'), TWO_DEBT);
     assert.equal(run(dir, '--update').code, 1);
-    assert.deepEqual(baselineOf(dir), { [MANUAL]: 1 });
+    assert.deepEqual(baselineOf(dir), { [DEBT]: 1 });
     writeFileSync(join(dir, 'server', 'x.js'), NONE);
     assert.equal(run(dir, '--update').code, 0);
     assert.deepEqual(baselineOf(dir), {});
@@ -436,7 +441,7 @@ test('the TypeScript layer fixture gives exactly its three violations', () => {
   ]);
 });
 
-test('the fixture gives exactly its twelve findings, and nothing for the allowed lines', () => {
+test('the fixture gives exactly its sixteen findings, and nothing for the allowed lines', () => {
   const dir = tempDir('yuvomi-lint-fixture-');
   try {
     writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
@@ -456,6 +461,10 @@ test('the fixture gives exactly its twelve findings, and nothing for the allowed
       'a.js:24 LOG-PLUS-500', // catch block answering 500
       'tx.js:12 TX-ASYNC-FN', // async function passed to withTx()
       'tx.js:14 TX-AWAIT-INSIDE', // await nested in a synchronous withTx() body
+      'tx.js:17 TX-MANUAL', // exec with a string literal
+      'tx.js:18 TX-MANUAL', // exec with a template literal (phase 2, F6b)
+      'tx.js:19 TX-MANUAL', // prepare with a string literal (phase 2, F6b)
+      'tx.js:20 TX-MANUAL', // prepare with a template literal (phase 2, F6b)
       'tx.js:7 TX-ASYNC-FN', // async transaction function
       'tx.js:9 TX-AWAIT-INSIDE', // await nested in a synchronous transaction body
     ]);
@@ -845,6 +854,30 @@ test('a SQL-IN-LIST key stands only with a reason (a fixed column list), never a
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a TX-MANUAL key stands only with a reason, also for a template literal (phase 2, F6b)', () => {
+  const MANUAL = 'server/x.js\toxlint/no-restricted-syntax/TX-MANUAL';
+  const dir = project("export function f(db, n) { db.exec('BEGIN EXCLUSIVE'); db.exec(`SAVEPOINT ${n}`); }\n");
+  try {
+    const init = run(dir, '--init');
+    assert.equal(init.code, 1, init.out);
+    assert.match(init.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+no reason/);
+    assert.doesNotMatch(init.out, /Hard rules have no baseline/);
+    assert.deepEqual(baselineOf(dir), { [MANUAL]: 2 });
+    writeReasons(dir, { [MANUAL]: 'too short' });
+    assert.equal(run(dir).code, 1, 'a reason under twenty characters');
+    writeReasons(dir, { [MANUAL]: 'an exclusive lock on a file of its own; withTx() only issues BEGIN' });
+    const ok = run(dir);
+    assert.equal(ok.code, 0, ok.out);
+    // A prepared BEGIN in the same file raises the count: red, and --update never takes it in.
+    writeFileSync(join(dir, 'server', 'x.js'), "export function f(db, n) { db.exec('BEGIN EXCLUSIVE'); db.exec(`SAVEPOINT ${n}`); db.prepare('BEGIN').run(); }\n");
+    const more = run(dir);
+    assert.equal(more.code, 1, more.out);
+    assert.match(more.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+2 -> 3/);
+    assert.equal(run(dir, '--update').code, 1);
+    assert.deepEqual(baselineOf(dir), { [MANUAL]: 2 });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 const ROW = 'server/x.js\toxlint/no-restricted-syntax/RIGHTS-ROW';
 const ROW_FILTER = "export const f = (task, set) => { if (task.visibility === 'all') set(task); if (task.visibility !== 'private') set(task); };\n";
 
@@ -1024,7 +1057,7 @@ test('the real lint-baseline.json is sorted, has no hard rule and names only exi
   assert.deepEqual([...new Set(stale)], [], 'baseline names files that do not exist');
 });
 
-test('the real lint-baseline-reasons.json is sorted and explains every error-text, rights-sql and rights-row key', () => {
+test('the real lint-baseline-reasons.json is sorted and explains every error-text, rights-sql, rights-row, sql-in-list and TX-MANUAL key', () => {
   const baseline = JSON.parse(readFileSync(join(REPO, 'lint-baseline.json'), 'utf8'));
   const reasons = JSON.parse(readFileSync(join(REPO, 'lint-baseline-reasons.json'), 'utf8'));
   const keys = Object.keys(reasons);
@@ -1043,4 +1076,10 @@ test('the real lint-baseline-reasons.json is sorted and explains every error-tex
   assert.deepEqual(rightsRow.filter((key) => !(key in reasons)), [], 'rights-row keys without a reason');
   const sqlList = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/SQL-IN-LIST'));
   assert.deepEqual(sqlList.filter((key) => !(key in reasons)), [], 'sql-in-list keys without a reason');
+  const txManual = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/TX-MANUAL'));
+  assert.ok(txManual.length > 0, 'the baseline carries no TX-MANUAL key');
+  assert.deepEqual(txManual.filter((key) => !(key in reasons)), [], 'TX-MANUAL keys without a reason');
+  // F14: in the server only the implementation and the instance lock write transaction statements.
+  assert.deepEqual(txManual.filter((key) => key.startsWith('server/')).map((key) => key.split('\t')[0]),
+    ['server/db/tx.ts', 'server/utils/instance-lock.js']);
 });

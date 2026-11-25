@@ -4,6 +4,7 @@
  */
 import { actorForUser, authorize, userHasCapability } from '../authorize/index.ts';
 import { householdDisabledModules } from './household-modules.js';
+import { withTx } from '../db/tx.ts';
 
 const GOAL_TYPE = 'fasting_goal';
 const NEXT_START_TYPE = 'fasting_next_start';
@@ -68,19 +69,6 @@ function reconcile(database, userId, desired) {
   }
 }
 
-function inTransaction(database, operation) {
-  if (typeof database.transaction === 'function') return database.transaction(operation)();
-  database.exec('BEGIN');
-  try {
-    const result = operation();
-    database.exec('COMMIT');
-    return result;
-  } catch (error) {
-    database.exec('ROLLBACK');
-    throw error;
-  }
-}
-
 /**
  * Synchronize one owner's goal/next-start reminders.
  *
@@ -91,7 +79,7 @@ function inTransaction(database, operation) {
  */
 export function syncFastingRemindersForUser(database, userId, now = new Date()) {
   const nowIso = iso(now);
-  inTransaction(database, () => {
+  withTx(database, () => {
     const settings = database.prepare('SELECT * FROM health_fasting_settings WHERE user_id = ?').get(userId);
     const canUse = userCanUseFasting(database, userId);
     const desired = new Map();

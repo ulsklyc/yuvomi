@@ -11,6 +11,7 @@ import {
 // The visibility rule itself lives in server/authorize/rows/notes.ts (phase 2, B3).
 import { categoryVisibleTo, visibleWhere } from '../authorize/index.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 export { categoryNameKey };
 
 export class NoteCategoryInputError extends Error {
@@ -108,18 +109,8 @@ export function replaceEditableAssignments(database, {
     for (const id of ids) insert.run(noteId, id, userId);
   };
 
-  if (database.inTransaction) {
-    run();
-  } else {
-    database.exec('BEGIN');
-    try {
-      run();
-      database.exec('COMMIT');
-    } catch (error) {
-      database.exec('ROLLBACK');
-      throw error;
-    }
-  }
+  // In einer offenen Transaktion des Aufrufers wird das ein SAVEPOINT.
+  withTx(database, run);
 }
 
 export function validateCategoryName(value) {

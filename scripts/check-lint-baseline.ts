@@ -93,6 +93,14 @@ const HARD = new Set([
 // JavaScript there stands only as a write filter or data upkeep, never a read rule.
 // SQL-IN-LIST (Refs #2810): a fixed column list built with one placeholder per column
 // stands only with its reason; a list of values goes through sqlInList().
+// TX-MANUAL (phase 2, F6b): a transaction statement written by hand (exec or prepare, string
+// or template literal) stands only where withTx() cannot be the tool: its own implementation
+// (server/db/tx.ts), the instance lock (server/utils/instance-lock.js: BEGIN EXCLUSIVE on a
+// lock file of its own, which the plain BEGIN of withTx() does not take), and two kinds of
+// test instrument: a second
+// connection that holds a lock or transaction open across several steps on purpose, and
+// fixture rows that are rolled back in every case (SAVEPOINT ... ROLLBACK TO; withTx commits
+// on return). Everything else runs through withTx().
 // A new key of any of them is red like any new key, and --update never takes one in (it only
 // lowers), so the list grows only by hand, with its reason.
 const REASONED = new Set([
@@ -100,6 +108,7 @@ const REASONED = new Set([
   'oxlint/no-restricted-syntax/RIGHTS-SQL',
   'oxlint/no-restricted-syntax/RIGHTS-ROW',
   'oxlint/no-restricted-syntax/SQL-IN-LIST',
+  'oxlint/no-restricted-syntax/TX-MANUAL',
 ]);
 const MIN_REASON = 20;
 

@@ -4,7 +4,7 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
-import { openSchemaDb } from './helpers/schema-db.js';
+import { openSchemaDb, withTransaction } from './helpers/schema-db.js';
 
 let passed = 0;
 let failed = 0;
@@ -187,20 +187,9 @@ function buildOidcTestDb() {
     );
   `);
   // node:sqlite kennt kein `transaction()` wie better-sqlite3; findOrCreateOidcUser
-  // legt Konto und Kontakt in einer Transaktion an (#1357). Dieselbe Semantik:
-  // BEGIN, bei Wurf ROLLBACK und weiterwerfen.
-  db.transaction = (fn) => (...args) => {
-    db.exec('BEGIN');
-    try {
-      const out = fn(...args);
-      db.exec('COMMIT');
-      return out;
-    } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
-    }
-  };
-  return db;
+  // legt Konto und Kontakt in einer Transaktion an (#1357). withTransaction()
+  // bildet es ueber withTx() nach (Commit, bei Wurf Rollback und weiterwerfen).
+  return withTransaction(db);
 }
 
 // Legt einen lokalen, noch nicht verknuepften Family-User samt Kontakt-E-Mail

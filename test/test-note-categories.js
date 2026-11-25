@@ -193,6 +193,21 @@ test('assignment replacement accepts household categories but rejects invisible 
   db.close();
 });
 
+test('assignment replacement that fails after its delete leaves the old assignments (own transaction, node:sqlite)', () => {
+  const { db, alice, note, household, alicePersonal, bobPersonal } = fixture();
+  const assigned = () => db.prepare('SELECT category_id FROM note_category_assignments WHERE note_id = ? ORDER BY category_id')
+    .all(note).map((row) => row.category_id);
+  const before = assigned();
+  // The DELETE of the editable rows runs, then the INSERT of the new set fails.
+  db.exec(`CREATE TEMP TRIGGER fail_assign BEFORE INSERT ON note_category_assignments
+    BEGIN SELECT RAISE(ABORT, 'forced assignment failure'); END`);
+  assert.throws(() => replaceEditableAssignments(db, { noteId: note, categoryIds: [household], userId: alice }), /forced assignment failure/);
+  db.exec('DROP TRIGGER fail_assign');
+  assert.deepEqual(assigned(), before);
+  assert.deepEqual(before, [household, alicePersonal, bobPersonal].sort((a, b) => a - b));
+  db.close();
+});
+
 test('deleting a category can prune it from all dashboard note widget filters', () => {
   const db = database();
   const config = [
