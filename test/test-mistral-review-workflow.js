@@ -236,3 +236,56 @@ test('gepostet wird nur eine vollstaendige Antwort (finish_reason stop)', (t) =>
   }
   assert.equal(laeuft('stop', ''), false, 'leere Antwort wurde gepostet');
 });
+
+test('die Antwort kommt gestreamt, eine lange Denkphase laeuft nicht ins Zeitlimit', (t) => {
+  // Lauf zu bfd7132 (#2965): ohne Streaming schweigt die Verbindung, bis das
+  // Reasoning fertig ist; `--max-time 300` brach dreimal mit 0 Bytes ab, und
+  // auch die gruenen Laeufe davor kamen erst im zweiten oder dritten Versuch.
+  assert.match(ohneKommentare, /stream: true,/);
+  const curlAufruf = ohneKommentare.match(/curl (?:[^\\\n]|\\\n)*/)?.[0] ?? '';
+  assert.match(curlAufruf, /\s-N\s/, 'curl puffert den Stream');
+  assert.match(curlAufruf, /--speed-limit 1 --speed-time \d+/, 'ein haengender Stream braucht eine Stillstandsgrenze');
+  const gesamt = Number(curlAufruf.match(/--max-time (\d+)/)?.[1]);
+  const job = Number(ohneKommentare.match(/timeout-minutes: (\d+)/)?.[1]) * 60;
+  assert.ok(gesamt >= 900 && gesamt < job, `--max-time ${gesamt} passt nicht zwischen 900 s und das Job-Limit ${job} s`);
+  assert.match(curlAufruf, /--retry-max-time \d+/, 'ein Wiederholversuch darf nicht hinter das Job-Limit starten');
+
+  const stream = workflow.match(/# STREAM-ANFANG\n([\s\S]*?)\n\s*# STREAM-ENDE/)?.[1];
+  const pruefung = workflow.match(/# ANTWORT-ANFANG\n([\s\S]*?)\n\s*# ANTWORT-ENDE/)?.[1];
+  assert.ok(stream, 'Stream-Auswertung nicht gefunden');
+  assert.ok(pruefung, 'Antwortpruefung nicht gefunden');
+  try {
+    execFileSync('bash', ['--version'], { stdio: 'ignore' });
+    execFileSync('jq', ['--version'], { stdio: 'ignore' });
+  } catch {
+    t.skip('bash oder jq ist nicht installiert');
+    return;
+  }
+  const dir = tempDir('yuvomi-mistral-stream-');
+  /** @param {unknown[]} stuecke @param {boolean} [fertig] */
+  const lauf = (stuecke, fertig = true) => {
+    const zeilen = [': keep-alive', ''];
+    for (const s of stuecke) zeilen.push(`data: ${JSON.stringify(s)}\r`, '');
+    if (fertig) zeilen.push('data: [DONE]\r', '');
+    writeFileSync(join(dir, 'antwort.sse'), zeilen.join('\n'));
+    try {
+      return execFileSync('bash', ['-euo', 'pipefail', '-c', `${stream}\n${pruefung}\nprintf '%s' "$text"`], {
+        env: { ...process.env, RUNNER_TEMP: dir }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    } catch {
+      return null;
+    }
+  };
+  /** @param {unknown} content @param {string | null} [grund] */
+  const stueck = (content, grund = null) => ({ choices: [{ index: 0, delta: { content }, finish_reason: grund }] });
+  const denken = stueck([{ type: 'thinking', thinking: [{ type: 'text', text: 'geheime Ueberlegung' }] }]);
+  assert.equal(lauf([
+    stueck(null), denken, denken,
+    stueck([{ type: 'text', text: 'Befund A' }]),
+    stueck(' und B'), stueck('', 'stop'),
+  ]), 'Befund A und B');
+  assert.equal(lauf([denken, stueck('halber Befu')], false), null, 'ein abgerissener Stream wurde gepostet');
+  assert.equal(lauf([denken, stueck('halber Befu', 'length')]), null, 'finish_reason length wurde gepostet');
+  assert.equal(lauf([denken, stueck('', 'stop')]), null, 'nur Denkspur wurde gepostet');
+  assert.equal(lauf([denken, stueck('halber Befu'), { object: 'error', message: 'overloaded' }]), null, 'ein Fehler mitten im Stream wurde gepostet');
+});

@@ -157,6 +157,7 @@ jobs:
               temperature: 0.2,
               reasoning_effort: "high",
               max_tokens: 32000,
+              stream: true,
               messages: [
                 {role: "system", content: $system},
                 {role: "user", content: $user}
@@ -167,12 +168,35 @@ jobs:
           umask 077
           printf 'Authorization: Bearer %s\n' "$MISTRAL_API_KEY" > "$RUNNER_TEMP/auth-header"
           trap 'rm -f "$RUNNER_TEMP/auth-header"' EXIT
-          curl -sS --fail-with-body --max-time 300 --retry 2 \
+          # Gestreamt, weil das Reasoning bei grossen Diffs laenger als fuenf
+          # Minuten denkt und eine stille Verbindung sonst ins Zeitlimit laeuft.
+          # Abgebrochen wird ein Stream, der zwei Minuten nichts liefert, oder
+          # nach 20 Minuten insgesamt; ein Wiederholversuch startet nur in den
+          # ersten 5 Minuten, damit er noch ins Job-Limit passt.
+          curl -sS -N --fail-with-body --connect-timeout 30 \
+            --speed-limit 1 --speed-time 120 --max-time 1200 \
+            --retry 2 --retry-max-time 300 \
             -H @"$RUNNER_TEMP/auth-header" \
             -H "Content-Type: application/json" \
             -d @"$RUNNER_TEMP/anfrage.json" \
             https://api.mistral.ai/v1/chat/completions \
-            -o "$RUNNER_TEMP/antwort.json"
+            -o "$RUNNER_TEMP/antwort.sse"
+          # Der Stream (Server-Sent Events, "data: {...}" je Zeile, Ende
+          # "data: [DONE]") wird zu einer Antwort in der Form ohne Streaming
+          # zusammengesetzt: finish_reason aus dem letzten Teil, der Text aus
+          # allen Deltas, die Denkspur (Teile vom Typ "thinking") faellt weg.
+          # STREAM-ANFANG
+          jq -Rn '
+            [inputs | rtrimstr("\r") | select(startswith("data: ")) | .[6:]
+              | select(. != "[DONE]") | fromjson | .choices[0]? // empty]
+            | {choices: [{
+                finish_reason: ([.[] | .finish_reason | select(. != null)] | last // ""),
+                message: {content: ([.[] | .delta.content
+                  | if type == "string" then .
+                    elif type == "array" then ([.[] | select(.type == "text") | .text] | join(""))
+                    else "" end] | join(""))}
+              }]}' "$RUNNER_TEMP/antwort.sse" > "$RUNNER_TEMP/antwort.json"
+          # STREAM-ENDE
           # Mit Reasoning ist content eine Liste aus "thinking"- und
           # "text"-Teilen, ohne ein String; gepostet wird nur die Antwort,
           # nie die Denkspur. Vollstaendig ist eine Antwort nur mit
