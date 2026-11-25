@@ -38,6 +38,7 @@ import { migrate, MIGRATION_BUSY_ATTEMPTS } from '../server/db/migrate.ts';
 import { MIGRATIONS } from '../server/migrations/index.ts';
 import { applyBaseline, isPristine, loadBaseline, schemaFingerprint, schemaObjects } from '../server/db/baseline.ts';
 import { baselineJson, buildBaseline, dumpBaseline, tableRows } from '../scripts/lib/schema-baseline.ts';
+import { migrateOnNodeSqlite } from './helpers/schema-db.js';
 
 const STARTED = Date.now();
 const SQL_FILE = new URL('../server/migrations/baseline.sql', import.meta.url);
@@ -49,7 +50,6 @@ const shipped = loadBaseline();
  * @typedef {import('../server/db/baseline.ts').BaselineDatabase & { close(): void }} AnyDatabase
  * @typedef {import('../server/db/handle.ts').SqliteDatabase} CipherDatabase
  * @typedef {{ schema: ReturnType<typeof schemaObjects>, rows: Record<string, unknown[]> }} State
- * @typedef {(typeof MIGRATIONS)[number] & { afterUp?: Function, foreignKeysOff?: boolean }} Migration
  */
 
 /**
@@ -92,37 +92,6 @@ function cipher(file = ':memory:') {
   const database = new Database(file);
   database.pragma('foreign_keys = ON');
   return database;
-}
-
-/**
- * Migrationen auf node:sqlite fahren. DatabaseSync hat weder `transaction()`
- * noch `pragma()`, die migrate() braucht; hier laeuft deshalb jede Migration
- * Anweisung fuer Anweisung ohne Transaktion, sonst wie in migrate(): `up`,
- * `afterUp`, bei `foreignKeysOff` die Fremdschluessel aus und danach wieder an
- * mit Pruefung, dann die Buchung.
- * @param {DatabaseSync} database @param {Migration[]} migrations
- */
-function migrateOnNodeSqlite(database, migrations) {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version     INTEGER PRIMARY KEY,
-      description TEXT    NOT NULL,
-      applied_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-    );
-  `);
-  const applied = new Set(database.prepare('SELECT version FROM schema_migrations').all().map((row) => row.version));
-  for (const migration of migrations) {
-    if (applied.has(migration.version)) continue;
-    if (migration.foreignKeysOff) database.exec('PRAGMA foreign_keys = OFF');
-    if (typeof migration.up === 'function') migration.up(/** @type {any} */ (database));
-    else database.exec(migration.up);
-    if (typeof migration.afterUp === 'function') migration.afterUp(database);
-    if (migration.foreignKeysOff) {
-      assert.deepEqual(database.prepare('PRAGMA foreign_key_check').all(), [], `Migration ${migration.version}`);
-      database.exec('PRAGMA foreign_keys = ON');
-    }
-    database.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)').run(migration.version, migration.description);
-  }
 }
 
 /**
