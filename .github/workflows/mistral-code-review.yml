@@ -1,0 +1,203 @@
+name: Mistral Code Review
+
+# Automatisches Code Review durch die Mistral API (La Plateforme) fuer PRs des
+# Maintainers: bei Eroeffnung eines PR und bei jedem Push auf seinen Branch.
+# Das Secret MISTRAL_API_KEY muss als Repo-Secret gesetzt sein; ohne ihn
+# ueberspringt der Job sich mit einem Hinweis (wie claude-code-review.yml).
+#
+# BEWUSST KEIN CHECKOUT: Der Job liest ausschliesslich ueber die GitHub API
+# (gh pr view / gh pr diff) und fuehrt keinen Code aus dem PR aus. Damit gibt
+# es kein artipacked- und kein Template-Injection-Problem, und ein PR kann
+# weder den Workflow-Schritt noch das Secret anfassen. Alle Event-Daten laufen
+# ueber env:, nie als ${{ ... }} direkt im run:-Block.
+#
+# NUR EIGENE PRs: Der Autor-Filter (REVIEW_AUTOR unten) beschraenkt das Review
+# auf PRs des Maintainers - Fork-PRs laufen nie in diesen Job hinein.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: ['**']
+
+# EIN LAUF JE BRANCH, UND ZWAR DER ZUM NEUESTEN STAND (wie bei
+# claude-code-review.yml): das push- und das synchronize-Ereignis desselben
+# Branches landen in derselben Gruppe, der aeltere Lauf wird abgebrochen.
+concurrency:
+  group: mistral-review-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  # Nur PRs dieses Autors werden reviewed.
+  REVIEW_AUTOR: ulsklyc
+
+jobs:
+  ermittle-pr:
+    name: PR zum Ereignis finden
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      pr: ${{ steps.finden.outputs.pr }}
+    steps:
+      - name: PR-Nummer bestimmen
+        id: finden
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMMER: ${{ github.event.pull_request.number }}
+          PR_AUTOR: ${{ github.event.pull_request.user.login }}
+          PR_ENTWURF: ${{ github.event.pull_request.draft }}
+          BRANCH: ${{ github.event_name == 'push' && github.ref_name || github.head_ref }}
+        run: |
+          set -euo pipefail
+          pr=""
+          if [ "$EVENT" = "pull_request" ]; then
+            if [ "$PR_AUTOR" = "$REVIEW_AUTOR" ] && [ "$PR_ENTWURF" != "true" ]; then
+              pr="$PR_NUMMER"
+            fi
+          elif [ -n "$BRANCH" ]; then
+            # PUSH OHNE PR-KONTEXT: gibt es einen offenen, nicht als Entwurf
+            # markierten PR von REVIEW_AUTOR mit genau diesem Head-Branch?
+            pr=$(gh api "repos/$REPO/pulls?state=open&head=$OWNER:$BRANCH" \
+              --jq "[.[] | select(.user.login == \"$REVIEW_AUTOR\" and .draft == false)] | .[0].number // \"\"" \
+              2>/dev/null || true)
+          fi
+          if [ -z "$pr" ]; then
+            echo "pr=" >> "$GITHUB_OUTPUT"
+            echo "::notice::Kein PR von $REVIEW_AUTOR hinter diesem Ereignis - Mistral Code Review uebersprungen."
+            exit 0
+          fi
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "::notice::Mistral Code Review fuer PR #$pr (Ereignis: $EVENT)."
+
+  mistral-review:
+    name: Mistral Code Review
+    needs: ermittle-pr
+    if: needs.ermittle-pr.outputs.pr != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      # Modell-Alias der La Plateforme; umstellbar ohne weiteren Eingriff.
+      MISTRAL_MODELL: mistral-large-latest
+      REPO: ${{ github.repository }}
+      PR: ${{ needs.ermittle-pr.outputs.pr }}
+    steps:
+      - name: Ueberspringen, wenn MISTRAL_API_KEY fehlt
+        if: env.MISTRAL_API_KEY == ''
+        run: echo "MISTRAL_API_KEY ist nicht als Repo-Secret konfiguriert - Mistral Code Review wird uebersprungen."
+
+      - name: PR-Metadaten und Diff holen
+        if: env.MISTRAL_API_KEY != ''
+        id: daten
+        run: |
+          set -euo pipefail
+          gh pr view "$PR" --repo "$REPO" \
+            --json number,title,body,author,headRefOid,headRefName,baseRefName,isDraft \
+            > "$RUNNER_TEMP/pr.json"
+          gh pr diff "$PR" --repo "$REPO" > "$RUNNER_TEMP/diff.patch"
+          # Riesige Diffs (Lockfiles) werden abgeschnitten; der Prompt sagt es.
+          abgeschnitten=no
+          if [ "$(wc -c < "$RUNNER_TEMP/diff.patch")" -gt 200000 ]; then
+            head -c 200000 "$RUNNER_TEMP/diff.patch" > "$RUNNER_TEMP/diff-kurz.patch"
+            mv "$RUNNER_TEMP/diff-kurz.patch" "$RUNNER_TEMP/diff.patch"
+            abgeschnitten=yes
+          fi
+          echo "abgeschnitten=$abgeschnitten" >> "$GITHUB_OUTPUT"
+
+      - name: Review-Prompt bauen
+        if: env.MISTRAL_API_KEY != ''
+        env:
+          ABGESCHNITTEN: ${{ steps.daten.outputs.abgeschnitten }}
+        run: |
+          set -euo pipefail
+          titel=$(jq -r '.title // ""' "$RUNNER_TEMP/pr.json")
+          body=$(jq -r '.body // ""' "$RUNNER_TEMP/pr.json")
+          autor=$(jq -r '.author.login // ""' "$RUNNER_TEMP/pr.json")
+          kopf=$(jq -r '.headRefOid // ""' "$RUNNER_TEMP/pr.json")
+          branch=$(jq -r '.headRefName // ""' "$RUNNER_TEMP/pr.json")
+          basis=$(jq -r '.baseRefName // ""' "$RUNNER_TEMP/pr.json")
+
+          cat > "$RUNNER_TEMP/system.txt" <<'PROMPT_ENDE'
+          Du bist ein erfahrener Code-Reviewer fuer das Open-Source-Repository "ulsklyc/yuvomi" (selbstgehosteter Familienplaner: PWA-Frontend in vanilla JS/TypeScript, Node-Server, SQLite, MIT-Lizenz).
+
+          Du bekommst Titel, Beschreibung und den Diff eines Pull Requests. Pruefe AUSSCHLIESSLICH den Diff, nicht den PR als Ganzes.
+
+          Regeln:
+          - Antworte auf Deutsch, als Markdown.
+          - Beginne mit einer kurzen Gesamtbewertung in ein bis drei Saetzen.
+          - Liste danach konkrete Befunde, jeder mit Datei und Zeilennummer aus dem Diff (z. B. "server/auth.js:42"), gruppiert in "Blocker", "Hinweise" und "Fragen".
+          - Sei praezise und knapp; keine allgemeinen Stilpredigen. Gibt es nichts zu beanstanden, sage das in einem Satz und liste nichts auf.
+          - Pruefe besonders: Sicherheit (Auth, Secrets, SQL-Injection, XSS, Pfad-Traversal), Datenbank-Migrationen, Fehlerbehandlung, Race Conditions, hartkodierte UI-Texte (muessen ueber t('key') laufen), TypeScript-Typen.
+          - Repo-Konventionen: vanilla JS ohne Frameworks, strenger TypeScript-Modus, Tests laufen mit "npm test", CHANGELOG.md bei nutzersichtbaren Aenderungen, Code liegt unter modules/, server/, public/, test/.
+          - Ist der Diff abgeschnitten, steht das im Prompt: bewerte nur, was du siehst, und weise am Ende darauf hin.
+          PROMPT_ENDE
+
+          {
+            echo "Repository: $REPO"
+            echo "Pull Request: #$PR - $titel"
+            echo "Autor: $autor | Branch: $branch -> $basis | Head-Commit: $kopf"
+            echo
+            echo "## PR-Beschreibung"
+            echo
+            printf '%s\n' "$body"
+            echo
+            echo "## Diff"
+            if [ "$ABGESCHNITTEN" = "yes" ]; then
+              echo
+              echo "(Diff auf 200000 Bytes abgeschnitten - nur der Anfang ist sichtbar.)"
+            fi
+            echo
+            echo '```diff'
+            cat "$RUNNER_TEMP/diff.patch"
+            echo '```'
+          } > "$RUNNER_TEMP/nutzer.txt"
+
+      - name: Mistral API aufrufen
+        if: env.MISTRAL_API_KEY != ''
+        run: |
+          set -euo pipefail
+          jq -n \
+            --arg model "$MISTRAL_MODELL" \
+            --rawfile system "$RUNNER_TEMP/system.txt" \
+            --rawfile user "$RUNNER_TEMP/nutzer.txt" \
+            '{model: $model,
+              temperature: 0.2,
+              max_tokens: 8192,
+              messages: [
+                {role: "system", content: $system},
+                {role: "user", content: $user}
+              ]}' > "$RUNNER_TEMP/anfrage.json"
+          curl -sS --fail-with-body --max-time 300 --retry 2 \
+            -H "Authorization: Bearer $MISTRAL_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d @"$RUNNER_TEMP/anfrage.json" \
+            https://api.mistral.ai/v1/chat/completions \
+            -o "$RUNNER_TEMP/antwort.json"
+          text=$(jq -er '.choices[0].message.content' "$RUNNER_TEMP/antwort.json")
+          if [ -z "$text" ]; then
+            echo "::error::Die Mistral API lieferte keinen Review-Text."
+            exit 1
+          fi
+          kopf=$(jq -r '.headRefOid // ""' "$RUNNER_TEMP/pr.json")
+          {
+            echo "#### Mistral Code Review ($MISTRAL_MODELL, Commit \`${kopf:0:12}\`)"
+            echo
+            printf '%s\n' "$text"
+          } > "$RUNNER_TEMP/review.md"
+
+      - name: Review als PR-Review posten
+        if: env.MISTRAL_API_KEY != ''
+        run: |
+          set -euo pipefail
+          # COMMENT statt APPROVE/CHANGES: das Review blockiert nie den PR.
+          gh pr review "$PR" --repo "$REPO" --event COMMENT --body-file "$RUNNER_TEMP/review.md"
+          echo "::notice::Mistral Code Review fuer PR #$PR gepostet."

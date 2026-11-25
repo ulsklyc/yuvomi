@@ -666,7 +666,7 @@ Asked for in [#687](https://github.com/ulsklyc/yuvomi/discussions/687). Yuvomi h
 
 ### How this project is built
 
-**AI coding agents are used here, extensively and openly.** Much of the code in this repository was drafted with them. Two of them also review pull requests automatically, and you will see their comments on yours: a Claude Code workflow and an OpenAI Codex connector.
+**AI coding agents are used here, extensively and openly.** Much of the code in this repository was drafted with them. Three of them also review pull requests automatically, and you will see their comments on yours: a Claude Code workflow, an OpenAI Codex connector, and a Mistral workflow (`.github/workflows/mistral-code-review.yml`) that reviews the maintainer's own pull requests on every push.
 
 That is worth stating plainly rather than leaving to inference. An automated review comment on your PR is not a maintainer's verdict; it is a second pair of eyes with no authority to merge anything.
 
