@@ -602,6 +602,77 @@ test('CalDAV: eine Löschung in der Atempause eines grossen Kalenders zählt mit
   assert.deepEqual(eventRows(), [], 'der gelöschte Termin ist als Import zurückgekommen');
 });
 
+/**
+ * Ein gespiegelter Kalender `a` mit mehr Objekten, als der Lauf ohne Atempause
+ * verarbeitet (YIELD_EVERY = 50). `bulk-0` und `bulk-59` sind am Server
+ * geändert: übernimmt der Lauf `bulk-0`, steht er in der Schleife, und die
+ * erste Atempause danach ist seine; `bulk-59` liegt hinter ihr. In dieser
+ * Atempause läuft `inPause`.
+ */
+async function abortedInPause(/** @type {any} */ t, /** @type {(calendarUrl: string) => void} */ inPause) {
+  reset();
+  const a = calendar('a');
+  for (let i = 0; i < 60; i++) {
+    davAny.putObject(a, `bulk-${i}.ics`, ics('VEVENT', `bulk-${i}@test`, 'Masse'));
+  }
+  await caldavSync.sync();
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, 61, 'der Lauf hat nicht alles gespiegelt');
+
+  davAny.putObject(a, 'bulk-0.ics', ics('VEVENT', 'bulk-0@test', 'Geändert'));
+  davAny.putObject(a, 'bulk-59.ics', ics('VEVENT', 'bulk-59@test', 'Geändert'));
+  const inLoop = () => db.prepare(
+    "SELECT 1 FROM calendar_events WHERE external_calendar_id = 'bulk-0@test' AND title = 'Geändert'"
+  ).get();
+  const original = /** @type {any} */ (globalThis.setImmediate);
+  let ran = false;
+  t.mock.method(globalThis, 'setImmediate', (/** @type {any[]} */ ...args) => {
+    if (!ran && inLoop()) { ran = true; inPause(a); }
+    return original(...args);
+  });
+  await caldavSync.sync();
+  t.mock.restoreAll();
+  assert.equal(ran, true, 'nichts fiel in die Atempause - der Fall misst nichts');
+}
+
+const accountOfTest = () => /** @type {{ id: number }} */ (db.prepare('SELECT id FROM caldav_accounts').get()).id;
+const titleOf = (/** @type {string} */ uid) => /** @type {{ title: string } | undefined} */ (
+  db.prepare('SELECT title FROM calendar_events WHERE external_calendar_id = ?').get(uid))?.title;
+
+test('CalDAV: in der Atempause samt Terminen abgewählt - kein Termin des Kalenders kommt zurück (#2941)', async (t) => {
+  await abortedInPause(t, (a) => {
+    caldavSync.updateCalendarSelection(accountOfTest(), a, false, { deleteEvents: true });
+  });
+
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, 0,
+    'Termine des abgewählten Kalenders sind nach der Atempause zurückgekommen');
+});
+
+test('CalDAV: in der Atempause ohne Termine abgewählt - der Rest wird weder gelesen noch weggeräumt (#2941)', async (t) => {
+  await abortedInPause(t, (a) => {
+    caldavSync.updateCalendarSelection(accountOfTest(), a, false);
+  });
+
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, 61,
+    'der halb gelesene Kalender wurde geprunt, als fehlte der Rest am Server');
+  assert.equal(titleOf('bulk-0@test'), 'Geändert', 'vor der Abwahl Gelesenes bleibt');
+  assert.equal(titleOf('bulk-59@test'), 'Masse', 'nach der Abwahl hat der Lauf den Kalender weiter gelesen');
+});
+
+test('CalDAV: in der Atempause abgewählt - eine Bearbeitung geht nicht in den abgewählten Kalender (#2941)', async (t) => {
+  await abortedInPause(t, (a) => {
+    // Bearbeitet wie über die Route, dann abgewählt; `bulk-5` ist vor der
+    // Atempause gelesen.
+    db.prepare("UPDATE calendar_events SET title = 'Lokal', outbound_dirty = 1 WHERE external_calendar_id = 'bulk-5@test'").run();
+    caldavSync.updateCalendarSelection(accountOfTest(), a, false);
+  });
+
+  const puts = davAny.seen('PUT').filter((/** @type {{ body: string }} */ r) => r.body.includes('SUMMARY:Lokal'));
+  assert.equal(puts.length, 0, 'die Bearbeitung ging in einen abgewählten Kalender');
+  assert.equal(titleOf('bulk-5@test'), 'Lokal', 'die Bearbeitung ist verloren');
+  assert.equal(/** @type {{ d: number }} */ (db.prepare("SELECT outbound_dirty AS d FROM calendar_events WHERE external_calendar_id = 'bulk-5@test'").get()).d, 1,
+    'die Bearbeitung wartet nicht mehr auf ihren Push');
+});
+
 // ── Aufgaben und Einkauf (VTODO) ────────────────────────────────────────────────
 
 const TODO_UID = 'todo-gone@test';

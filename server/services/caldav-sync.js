@@ -1446,6 +1446,12 @@ async function runSync({ createClient } = {}) {
         // Parse and upsert events
         const calendarUids = new Set();
         fetchedCalendars.push({ calRefId, calendarName: selCal.calendar_name, calendarUids });
+        // Was dieser Kalender dem Index der Objekte und der Farb-Heilung
+        // beiträgt, gilt erst, wenn er ganz gelesen ist (#2941): wird er in
+        // einer Atempause abgewählt, zählt er wie ein nicht gelesener.
+        const indexHere = [];
+        const healHere = new Map();
+        let deselectedInPause = false;
 
         for (const obj of calObjects) {
           // RECURRENCE-ID-Overrides zusammenführen, sonst überschreibt ein
@@ -1470,9 +1476,8 @@ async function runSync({ createClient } = {}) {
               // Objekt merken: ausgehende Löschungen brauchen die URL, Änderungen
               // zusätzlich den Originalinhalt zum Patchen (#593).
               if (obj.url) {
-                objectIndex.set(ev.uid, {
-                  url: obj.url, etag: obj.etag, data: obj.data, calendarUrl: selCal.calendar_url,
-                });
+                const entry = { url: obj.url, etag: obj.etag, data: obj.data, calendarUrl: selCal.calendar_url };
+                indexHere.push(() => objectIndex.set(ev.uid, entry));
               }
               // NUR die Eigenfarbe des Termins (RFC 7986 COLOR). Die Kalenderfarbe
               // gehoert NICHT hierher: sie ist geerbt, gilt fuer jeden Termin des
@@ -1589,7 +1594,7 @@ async function runSync({ createClient } = {}) {
                   && existing.color_modified === 1 && existing.color != null
                   && heal.colors.has(String(existing.color).toLowerCase())
                   && heal.snapshot.get(existing.id) === String(existing.color).toLowerCase()) {
-                  healCandidates.set(existing.id, { uid: ev.uid, color: existing.color });
+                  healHere.set(existing.id, { uid: ev.uid, color: existing.color });
                 }
                 changed = updEvent.run(...values, existing.id, ...values).changes > 0;
                 eventId = existing.id;
@@ -1639,9 +1644,8 @@ async function runSync({ createClient } = {}) {
           // Auch ein Objekt, aus dem sich kein Termin lesen liess, liegt an
           // seiner Adresse: eine wartende Löschung findet es darüber.
           if (obj.url) {
-            objectIndex.noteObject({
-              url: obj.url, etag: obj.etag, data: obj.data, calendarUrl: selCal.calendar_url,
-            });
+            const entry = { url: obj.url, etag: obj.etag, data: obj.data, calendarUrl: selCal.calendar_url };
+            indexHere.push(() => objectIndex.noteObject(entry));
           }
 
           // Nach je YIELD_EVERY Objekten dem Event-Loop Luft geben, damit ein großer
@@ -1649,8 +1653,28 @@ async function runSync({ createClient } = {}) {
           if (++processedObjects % YIELD_EVERY === 0) {
             await new Promise((resolve) => setImmediate(resolve));
             awaitsDeletion = readDeletionGuard();
+            // In der Atempause abgewählt (#2941): der Rest wird nicht mehr
+            // gelesen. Was davor geschrieben wurde, hat die Abwahl schon
+            // vorgefunden (und mit "Termine löschen" mitgenommen).
+            if (!isStillSelected.get(account.id, selCal.calendar_url)) {
+              log.info(`Calendar ${selCal.calendar_name} was deselected during the sync, skipping it.`);
+              deselectedInPause = true;
+              break;
+            }
           }
         }
+
+        // Halb gelesen zählt wie nicht gelesen: kein Prune mit der halben
+        // UID-Liste, kein Aufräumen und kein Löschen in diesem Kalender, kein
+        // Objekt aus ihm für die ausgehenden Änderungen, keine Heilung.
+        if (deselectedInPause) {
+          fetchedCalendars.pop();
+          ownCalendarUrls.delete(selCal.calendar_url);
+          fetchedEveryCalendar = false;
+          continue;
+        }
+        for (const add of indexHere) add();
+        for (const [eventId, candidate] of healHere) healCandidates.set(eventId, candidate);
       }
 
       // Farb-Heilung (#1270): erst jetzt, nachdem jede Kopie jeder UID gesehen
