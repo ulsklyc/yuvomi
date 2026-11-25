@@ -68,7 +68,9 @@ const CAL_TOGETHER = 'https://dav.example/together/';
 const CAL_BEN = 'https://dav.example/ben/';
 const UID = 'dentist@example.org';
 
-/** @type {number} */ let OWNER; /** @type {number} */ let ANNA; /** @type {number} */ let BEN;
+/** @type {number} */ let OWNER;
+/** @type {number} */ let ANNA;
+/** @type {number} */ let BEN;
 /** @type {number} */ let CHRIS; /** @type {number} */ let STAFF;
 
 function addUser(username, color = '#123456') {
@@ -457,6 +459,43 @@ describe('Routen', () => {
     assert.equal(ok.body.data.assigned, 0);
     const id = db.prepare("SELECT id FROM calendar_events WHERE external_calendar_id = 'route-1'").get().id;
     assert.deepEqual(assignmentsOf(id), sorted([ANNA, BEN]));
+  });
+
+  it('POST /import from a URL: a person who leaves the household while the feed loads is refused as before it (#2947)', async () => {
+    // Die Route prueft die Personen vor dem Laden des Feeds, einem await. Der
+    // Feed-Server haelt die Antwort, bis der Test Anna entfernt hat; eine Spur
+    // (ein eigener Termin) laesst ihr Konto als deaktivierte Zeile stehen.
+    const http = await import('node:http');
+    const icsText = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'UID:route-2947', 'SUMMARY:R',
+      'DTSTART:20260601T090000Z', 'DTEND:20260601T100000Z', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    db.prepare("INSERT INTO calendar_events (title, start_datetime, created_by) VALUES ('Spur', '2059-01-01T09:00', ?)").run(ANNA);
+    /** @type {(res: import('node:http').ServerResponse) => void} */
+    let arrived = () => {};
+    const requested = new Promise((resolve) => { arrived = resolve; });
+    const feed = http.createServer((_req, res) => arrived(res));
+    await new Promise((resolve) => feed.listen(0, '127.0.0.1', () => resolve(undefined)));
+    const before = process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK;
+    process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK = 'true';
+    const body = { url: `http://127.0.0.1:${/** @type {any} */ (feed.address()).port}/cal.ics`, assignee_user_ids: [ANNA, BEN] };
+    /** @type {any} */
+    let answer;
+    try {
+      const pending = call('POST', '/import', body);
+      const res = await requested;
+      assert.equal(removeUser(db, ANNA).outcome, 'deactivated');
+      res.writeHead(200, { 'Content-Type': 'text/calendar' });
+      res.end(icsText);
+      answer = await pending;
+    } finally {
+      if (before === undefined) delete process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK;
+      else process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK = before;
+      await new Promise((resolve) => feed.close(() => resolve(undefined)));
+    }
+    const direct = await call('POST', '/import', { ics: icsText, assignee_user_ids: [ANNA, BEN] });
+    assert.equal(direct.status, 400, JSON.stringify(direct.body));
+    assert.equal(direct.body.reason, 'calendar_assignee_not_member');
+    assert.deepEqual([answer.status, answer.body], [400, direct.body], 'dieselbe Absage wie ohne Laden dazwischen');
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM calendar_events WHERE external_calendar_id = 'route-2947'").get().c, 0, 'kein Termin');
   });
 
   it('subscriptions: a gone subscription names calendar_subscription_not_found (#1909)', async () => {

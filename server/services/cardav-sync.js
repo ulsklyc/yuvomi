@@ -669,6 +669,24 @@ function deleteAccount(accountId) {
 // Addressbook Discovery & Selection
 // --------------------------------------------------------
 
+/** Das Konto verschwand, waehrend seine Adressbuecher abgefragt wurden (#2947). */
+class CardDAVAccountGoneError extends Error {
+  /** @param {number} accountId */
+  constructor(accountId) { super(`Account ${accountId} not found.`); this.name = 'CardDAVAccountGoneError'; }
+}
+
+/**
+ * Die gespeicherten Adressbuecher eines Kontos, in der Form von discoverAddressbooks().
+ * @param {ReturnType<typeof db.get>} database
+ * @param {number} accountId
+ */
+function storedAddressbooks(database, accountId) {
+  return database.prepare(`
+    SELECT id, addressbook_url AS url, addressbook_name AS name, enabled
+    FROM carddav_addressbook_selection WHERE account_id = ?
+  `).all(accountId).map((/** @type {any} */ row) => ({ id: row.id, url: row.url, name: row.name, enabled: row.enabled === 1 }));
+}
+
 /**
  * Discover addressbooks for an account (refresh from server)
  * @param {number} accountId - Account ID
@@ -676,53 +694,71 @@ function deleteAccount(accountId) {
  */
 async function discoverAddressbooks(accountId) {
   try {
-    const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
+    const database = db.get();
+    const account = database.prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
     if (!account) {
       throw new Error(`Account ${accountId} not found.`);
     }
 
     const { addressbooks } = await testConnection(account.carddav_url, account.username, account.password);
 
-    // UPSERT into carddav_addressbook_selection
-    const result = [];
-    for (const abook of addressbooks) {
-      const abookName = calendarDisplayName(abook.displayName, 'Unnamed Addressbook');
-
-      // Check if exists
-      const existing = db.get().prepare(`
-        SELECT id, enabled FROM carddav_addressbook_selection
-        WHERE account_id = ? AND addressbook_url = ?
-      `).get(accountId, abook.url);
-
-      if (existing) {
-        // Update name only (preserve enabled state)
-        db.get().prepare(`
-          UPDATE carddav_addressbook_selection
-          SET addressbook_name = ?
-          WHERE id = ?
-        `).run(abookName, existing.id);
-
-        result.push({
-          id: existing.id,
-          url: abook.url,
-          name: abookName,
-          enabled: existing.enabled === 1
-        });
-      } else {
-        // Insert new (enabled by default)
-        const insertResult = db.get().prepare(`
-          INSERT INTO carddav_addressbook_selection (account_id, addressbook_url, addressbook_name, enabled)
-          VALUES (?, ?, ?, 1)
-        `).run(accountId, abook.url, abookName);
-
-        result.push({
-          id: insertResult.lastInsertRowid,
-          url: abook.url,
-          name: abookName,
-          enabled: true
-        });
+    // NACH DEM AWAIT NOCH EINMAL (#2947): waehrend der Abfrage kann das Konto
+    // geloescht oder auf einen anderen Server umgestellt worden sein. Geloescht:
+    // dieselbe Antwort wie vorher ("nicht gefunden") statt eines Fremdschluessel-
+    // fehlers. Umgestellt: die Liste stammt vom alten Server und wird nicht
+    // gespeichert; es bleibt, was fuer das Konto schon gespeichert ist.
+    const result = withTx(database, () => {
+      const current = database.prepare('SELECT carddav_url, username, password FROM carddav_accounts WHERE id = ?').get(accountId);
+      if (!current) throw new CardDAVAccountGoneError(accountId);
+      if (current.carddav_url !== account.carddav_url || current.username !== account.username
+          || current.password !== account.password) {
+        log.info(`Account ${accountId} changed during discovery - the result of the old server is not stored.`);
+        return null;
       }
-    }
+
+      // UPSERT into carddav_addressbook_selection
+      const stored = [];
+      for (const abook of addressbooks) {
+        const abookName = calendarDisplayName(abook.displayName, 'Unnamed Addressbook');
+
+        // Check if exists
+        const existing = database.prepare(`
+          SELECT id, enabled FROM carddav_addressbook_selection
+          WHERE account_id = ? AND addressbook_url = ?
+        `).get(accountId, abook.url);
+
+        if (existing) {
+          // Update name only (preserve enabled state)
+          database.prepare(`
+            UPDATE carddav_addressbook_selection
+            SET addressbook_name = ?
+            WHERE id = ?
+          `).run(abookName, existing.id);
+
+          stored.push({
+            id: existing.id,
+            url: abook.url,
+            name: abookName,
+            enabled: existing.enabled === 1
+          });
+        } else {
+          // Insert new (enabled by default)
+          const insertResult = database.prepare(`
+            INSERT INTO carddav_addressbook_selection (account_id, addressbook_url, addressbook_name, enabled)
+            VALUES (?, ?, ?, 1)
+          `).run(accountId, abook.url, abookName);
+
+          stored.push({
+            id: insertResult.lastInsertRowid,
+            url: abook.url,
+            name: abookName,
+            enabled: true
+          });
+        }
+      }
+      return stored;
+    });
+    if (!result) return storedAddressbooks(database, accountId);
 
     log.info(`Discovered ${addressbooks.length} addressbooks for account ${accountId}.`);
 
@@ -1604,6 +1640,7 @@ export {
 
   // Addressbook Discovery
   discoverAddressbooks,
+  CardDAVAccountGoneError,
   toggleAddressbook,
 
   // Contact Sync

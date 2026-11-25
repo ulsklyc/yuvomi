@@ -56,7 +56,25 @@ function pathId(req, name = 'id') {
  */
 function refuseUnknownAccount(res, accountId) {
   if (caldavSync.accountExists(accountId)) return false;
-  res.status(404).json({ error: 'CalDAV account not found.', code: 404, reason: 'caldav_account_not_found' });
+  sendAccountNotFound(res);
+  return true;
+}
+
+/** @param {{ status: (code: number) => { json: (body: unknown) => unknown } }} res */
+function sendAccountNotFound(res) {
+  return res.status(404).json({ error: 'CalDAV account not found.', code: 404, reason: 'caldav_account_not_found' });
+}
+
+/**
+ * The account was deleted while the service waited for the CalDAV server
+ * (#2947): the same answer as for an unknown account before it.
+ * @param {any} res
+ * @param {any} err
+ * @returns {boolean} true when the answer is sent
+ */
+function refuseGoneAccount(res, err) {
+  if (err?.code !== 'caldav_account_gone') return false;
+  sendAccountNotFound(res);
   return true;
 }
 const router = express.Router();
@@ -115,6 +133,7 @@ router.put('/caldav/accounts/:id', requireAdmin, validateRequest(), async (req, 
     if (err.code === 'password_required') {
       return res.status(400).json({ error: err.message, errorCode: 'password_required', code: 400 });
     }
+    if (refuseGoneAccount(res, err)) return;
     sendCaldavFailure(res, err, 'CalDAV account update failed:');
   }
 });
@@ -142,6 +161,7 @@ router.get('/caldav/accounts/:id/calendars', requireAdmin, refuseWhileRestoring,
     const calendars = await caldavSync.getCalendars(accountId, { refresh });
     res.json({ data: calendars });
   } catch (err) {
+    if (refuseGoneAccount(res, err)) return;
     sendCaldavFailure(res, err, 'CalDAV calendars fetch failed:');
   }
 });
@@ -203,6 +223,7 @@ router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileResto
     const lists = await caldavReminders.getReminderLists(accountId, { refresh });
     res.json({ data: lists });
   } catch (err) {
+    if (refuseGoneAccount(res, err)) return;
     sendCaldavFailure(res, err, 'CalDAV reminder lists fetch failed:');
   }
 });

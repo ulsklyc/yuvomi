@@ -75,6 +75,11 @@ class DmsDocumentUnavailableError extends Error {}
 
 /** Der Zielordner verschwand, waehrend die Datei abgelegt wurde (#1909). */
 class SelectedFolderGoneError extends Error {}
+/** Wer in der Freigabeliste nach dem Ablegen der Datei nicht mehr in Frage kommt (#2947). */
+class AccessStrangersError extends Error {
+  /** @param {number[]} strangers */
+  constructor(strangers) { super('access strangers'); this.strangers = strangers; }
+}
 
 const log = createLogger('Documents');
 
@@ -1376,6 +1381,10 @@ router.post('/', validateRequest(), async (req, res) => {
       // waehrend des Ablegens geaendert, stuende die Zeile hinter einer
       // Verbindung, die nicht mehr gilt. 409, die Datei raeumt der catch weg.
       assertStagedTargetCurrent(stagedUpload);
+      // Und die Freigabeliste (#2947): wer waehrend des Ablegens aus dem
+      // Haushalt fiel, bekommt keinen Zugriff, sondern dieselbe 400 wie vorher.
+      const strangersNow = accessStrangers(allowedIds);
+      if (strangersNow.length) throw new AccessStrangersError(strangersNow);
       const folderId = selectedFolderId ?? ensureFolder(folderKey, vFolderName.value, userId(req));
       const expiresAt = vExpiresAtField.value ?? null;
       const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
@@ -1440,6 +1449,7 @@ router.post('/', validateRequest(), async (req, res) => {
       }
     }
     if (folderGone) return selectedFolderGone(res);
+    if (err instanceof AccessStrangersError) return res.status(400).json({ error: nonMemberMessage(err.strangers), code: 400 });
     // A storage refusal after staging (#2946: the settings changed meanwhile),
     // answered once the staged file is gone.
     if (err instanceof StorageError) return sendStorageError(res, err, 'Document storage upload failed.');

@@ -1929,6 +1929,22 @@ function reportClosedLists(gate, what) {
 }
 
 /**
+ * Ist die Liste JETZT für das Modul eingeschaltet (beim Einkauf: mit dieser
+ * Zuordnung)? Synchron vor jedem Upload gefragt (#2947).
+ * @param {number} accountId
+ * @param {string} listUrl
+ * @param {'tasks'|'shopping'} module
+ * @param {number|null} [targetListId]
+ */
+function selectedListFor(accountId, listUrl, module, targetListId = null) {
+  return Boolean(db.get().prepare(`
+    SELECT 1 FROM caldav_reminder_selection
+     WHERE account_id = ? AND list_url = ? AND enabled = 1 AND target_module = ?
+       AND (? IS NULL OR target_list_id = ?)
+  `).get(accountId, listUrl, module, targetListId, targetListId));
+}
+
+/**
  * Legt wartende Aufgaben auf dem Server an und macht sie damit zu Spiegeln.
  *
  * @param {object} client       tsdav-Client
@@ -1957,7 +1973,12 @@ export async function processPendingCreations(client, accountId, module, listsBy
     const fresh = reloadRow(module, listed.id);
     if (!fresh) continue;
 
-    const collection = listsByUrl.get(fresh.target_caldav_list_url);
+    // Die Collections stammen aus einem Abruf, der die Auswahl VOR seinem
+    // await las (#2947): wurde die Liste seitdem abgewählt, gilt sie hier als
+    // weg - wie in jedem Lauf, der nach dem Abwählen beginnt.
+    const collection = selectedListFor(accountId, fresh.target_caldav_list_url, 'tasks')
+      ? listsByUrl.get(fresh.target_caldav_list_url)
+      : undefined;
     if (!collection) {
       // Die Liste ist weg oder wurde abgewählt. Das Ziel stehen zu lassen hieße,
       // es bei jedem Lauf erneut zu versuchen; die Aufgabe bleibt lokal, was der
@@ -2059,6 +2080,9 @@ export async function processPendingShoppingCreations(client, accountId, targets
 
     for (const row of pendingShoppingCreations(targetListId, accountId)) {
       if (gate.isClosed(collection.url)) continue;
+      // Noch dieselbe eingeschaltete Zuordnung (#2947)? Die Ziele wurden vor dem
+      // Listenabruf gelesen, und jeder Upload davor war ein await.
+      if (!selectedListFor(accountId, listUrl, 'shopping', targetListId)) break;
       const fresh = reloadRow('shopping', row.id);
       // Zwischenzeitlich gelöscht, schon gespiegelt oder in eine andere Liste
       // gewandert (#1881): dann wartet er nicht mehr auf den Upload HIERHER.
@@ -2900,6 +2924,7 @@ export async function processPendingUpdates(client, accountId, module, objectInd
 
 /** Konten mit offener ausgehender Arbeit, samt Modul. */
 function accountsWithPendingWork() {
+  const database = db.get();
   const buckets = new Map();
   const add = (accountId, module) => {
     if (!accountId) return;
@@ -2910,14 +2935,14 @@ function accountsWithPendingWork() {
   // Ein Auftrag, der auf eine abgewählte Liste wartet (#1884), ist keine
   // Arbeit für den Sofortversuch: sonst baute jede Bearbeitung einen Client
   // für ein Konto auf, an das nichts geht.
-  for (const row of db.get().prepare(
+  for (const row of database.prepare(
     'SELECT account_id, module, object_url FROM caldav_todo_pending_deletions'
   ).all()) {
     if (row.object_url && inUnselectedList(row.account_id, row.object_url)) continue;
     add(row.account_id, row.module);
   }
   for (const [module, def] of Object.entries(MODULES)) {
-    for (const row of db.get().prepare(`
+    for (const row of database.prepare(`
       SELECT DISTINCT external_account_id AS account_id FROM ${def.table}
       WHERE outbound_dirty = 1 AND external_source = 'caldav'
     `).all()) {

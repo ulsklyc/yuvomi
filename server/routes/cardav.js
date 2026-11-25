@@ -294,6 +294,8 @@ router.post('/accounts/:id/addressbooks/refresh', validateRequest(), async (req,
 
     res.json({ data: addressbooks });
   } catch (err) {
+    // Waehrend der Abfrage geloescht (#2947): dieselbe 404 wie davor.
+    if (err instanceof CardDAVSync.CardDAVAccountGoneError) return fail(res, 404, 'account_not_found', 'Account not found');
     log.error('Error refreshing addressbooks:', err);
     fail(res, 500, 'internal', 'Internal error');
   }

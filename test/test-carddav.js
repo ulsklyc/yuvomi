@@ -1751,6 +1751,7 @@ describe('Multi-Value Validators', () => {
 // ========================================
 
 describe('CardDAV API Routes', () => {
+  /** @type {any} */
   let apiTestDb;
 
   before(async () => {
@@ -2201,6 +2202,76 @@ describe('CardDAV API Routes', () => {
 
       assert.strictEqual(res.statusCode, 200);
       assert.ok(Array.isArray(res.data.data));
+    });
+
+    // Die Abfrage beim Server ist ein await; der Test haelt sie an, aendert das
+    // Konto und gibt sie dann frei (#2947).
+    /**
+     * @param {number|bigint} accountId
+     * @param {() => void} during
+     */
+    async function refreshWhileHeld(accountId, during) {
+      const cardavRouter = await import('../server/routes/cardav.js');
+      const cardavSync = await import('../server/services/cardav-sync.js');
+      /** @type {() => void} */
+      let release = () => {};
+      const gate = new Promise((resolve) => { release = () => resolve(undefined); });
+      /** @type {() => void} */
+      let asked = () => {};
+      const started = new Promise((resolve) => { asked = () => resolve(undefined); });
+      cardavSync._mockTestConnection(async () => {
+        asked();
+        await gate;
+        return { ok: true, addressbooks: [{ url: 'https://old.example/carddav/held', displayName: 'Alt' }] };
+      });
+      /** @type {any} */
+      const res = {
+        statusCode: 200,
+        status(/** @type {number} */ code) { this.statusCode = code; return this; },
+        json(/** @type {unknown} */ data) { this.data = data; return this; },
+      };
+      const refreshHandler = /** @type {any} */ (cardavRouter.default).stack.find(
+        (/** @type {any} */ layer) => layer.route?.path === '/accounts/:id/addressbooks/refresh' && layer.route.methods.post
+      )?.route?.stack.at(-1)?.handle;
+      try {
+        const pending = refreshHandler({ params: { id: String(accountId) }, query: {}, body: {} }, res);
+        await started;
+        during();
+        release();
+        await pending;
+      } finally {
+        cardavSync._mockTestConnection(async () => ({
+          ok: true,
+          addressbooks: [
+            { url: 'https://example.com/carddav/addressbook1', displayName: 'Contacts' },
+            { url: 'https://example.com/carddav/addressbook2', displayName: 'Work' }
+          ]
+        }));
+      }
+      return res;
+    }
+
+    it('POST /accounts/:id/addressbooks/refresh - an account deleted during the query answers 404 as before it (#2947)', async () => {
+      const accountId = apiTestDb.prepare(`
+        INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES ('Weg', 'https://old.example/carddav/', 'gone-2947', 'p')
+      `).run().lastInsertRowid;
+      const res = await refreshWhileHeld(accountId, () => {
+        apiTestDb.prepare('DELETE FROM carddav_accounts WHERE id = ?').run(accountId);
+      });
+      assert.deepEqual([res.statusCode, res.data], [404, { error: 'Account not found', errorCode: 'account_not_found', code: 404 }]);
+    });
+
+    it('POST /accounts/:id/addressbooks/refresh - an account moved to another server during the query keeps no address book of the old one (#2947)', async () => {
+      const accountId = apiTestDb.prepare(`
+        INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES ('Umzug', 'https://old.example/carddav/', 'moved-2947', 'p')
+      `).run().lastInsertRowid;
+      const res = await refreshWhileHeld(accountId, () => {
+        apiTestDb.prepare("UPDATE carddav_accounts SET carddav_url = 'https://new.example/carddav/' WHERE id = ?").run(accountId);
+      });
+      assert.strictEqual(res.statusCode, 200);
+      assert.deepEqual(res.data.data, []);
+      assert.strictEqual(apiTestDb.prepare('SELECT COUNT(*) AS n FROM carddav_addressbook_selection WHERE account_id = ?').get(accountId).n, 0,
+        'kein Adressbuch des alten Servers am umgestellten Konto');
     });
   });
 

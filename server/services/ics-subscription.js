@@ -16,7 +16,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { withTx } from '../db/tx.ts';
 import { assignDefaultToEvent, settlePastInheritedReminders } from './sync-assignment.js';
-import { assigneeFields, readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
+import { assigneeFields, readAllDefaultAssignees, readDefaultAssignees, validateAssigneeIds, writeDefaultAssignees } from './default-assignees.js';
 import { setEventAssignments } from './event-assignments.ts';
 import { remindAtCompareKey } from '../utils/reminder-schedule.js';
 import { parseICS, expandRRULE, normalizeRecurrenceOverrides, providerStatusOf } from './ics-parser.js';
@@ -431,6 +431,20 @@ function toLocalRRule(raw) {
 }
 
 /**
+ * Die Personen eines Imports kommen nach dem Laden des Feeds nicht mehr in
+ * Frage (#2947): dieselbe Absage, die die Route vor dem Laden gegeben haette.
+ */
+class ImportAssigneesRefused extends Error {
+  /** @param {string} error @param {string} reason */
+  constructor(error, reason) {
+    super(error);
+    this.name = 'ImportAssigneesRefused';
+    /** The 400 the route gives for these people before the feed was loaded. */
+    this.answer = { error, reason };
+  }
+}
+
+/**
  * Einmaliger Import von Terminen aus einer ICS-Datei (roher Text) oder einem
  * geteilten Kalender-Feed (URL) in echte, bearbeitbare lokale Termine
  * (external_source='local', subscription_id=NULL). Anders als ein Abonnement
@@ -464,8 +478,17 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   } else {
     throw new Error('Either an ICS file or a URL is required.');
   }
-  const calendarCheck = validateCalendarId(db.get(), localCalendarId);
+  const database = db.get();
+  const calendarCheck = validateCalendarId(database, localCalendarId);
   if (calendarCheck.error) throw new TypeError(calendarCheck.error);
+  // Ebenso die Personen (#2947): die Route hat sie vor dem Laden des Feeds
+  // geprueft; wer seitdem aus dem Haushalt fiel, bekommt keinen Termin.
+  if (assigneeIds?.length) {
+    const assigneeCheck = validateAssigneeIds(database, { assignee_user_ids: assigneeIds }, {
+      listField: 'assignee_user_ids', singleField: 'assignee_user_id',
+    });
+    if ('error' in assigneeCheck && assigneeCheck.error) throw new ImportAssigneesRefused(assigneeCheck.error, assigneeCheck.reason);
+  }
   // RECURRENCE-ID-Overrides zusammenführen: Master behält die Serie, geänderte
   // Einzel-Vorkommen werden eigenständige Termine statt die Serie zu killen (#549).
   rawEvents = normalizeRecurrenceOverrides(rawEvents);
@@ -476,7 +499,7 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   // koennte - seit es lokale Kalender gibt, hat er einen, und die kopierte
   // Farbe hielt ihn bei jedem Umfaerben auf der alten fest. Eine COLOR aus der
   // Datei selbst bleibt wie im Abo-Sync (#891) die Farbe dieses Termins.
-  const { color: fallbackColor, chosen: fallbackChosen } = importedEventColor(db.get(), localCalendarId, color);
+  const { color: fallbackColor, chosen: fallbackChosen } = importedEventColor(database, localCalendarId, color);
   // `series_authored = 1`: die Termine gehoeren nach dem Import dem Nutzer und
   // sind lokale Zeilen wie jede hier angelegte - so hat sie der ausgehende Weg
   // schon behandelt, als er noch `external_source` las (#1935).
@@ -637,4 +660,4 @@ function remove(userId, subId, isAdmin) {
   return true;
 }
 
-export { sync, getAll, getOne, create, update, remove, importToLocal, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };
+export { sync, getAll, getOne, create, update, remove, importToLocal, ImportAssigneesRefused, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };

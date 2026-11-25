@@ -230,6 +230,11 @@ router.post('/import', validateRequest(), async (req, res) => {
     });
     res.status(201).json({ data: result });
   } catch (err) {
+    // Die Personen fielen waehrend des Ladens aus dem Haushalt (#2947): die
+    // Absage, die sie vor dem Laden bekommen haetten.
+    if (err instanceof icsSubscription.ImportAssigneesRefused) {
+      return res.status(400).json({ error: err.answer.error, code: 400, reason: err.answer.reason });
+    }
     // Nutzerorientierte Fehler (SSRF-Block, ungültige URL, HTTP-Status,
     // Größenlimit) direkt zurückgeben, mit ihrem Fall (#1909).
     const fetchCase = icsFetchCase(err);
