@@ -5,12 +5,14 @@
  *        die Selbstheilung gegen additive Schema-Drift (#538). Alle Funktionen
  *        bekommen die Verbindung als Parameter; die Vorgabe "die offene
  *        Verbindung" setzt server/db.js, das sie re-exportiert.
- * Abhängigkeiten: ../migrations/index.ts, ../migrations/helpers.ts, ../logger.js
+ * Abhängigkeiten: ../migrations/index.ts, ../migrations/helpers.ts, ./baseline.ts, ../logger.js
  */
 
 import { createLogger } from '../logger.js';
 import { MIGRATIONS as MIGRATION_FILES } from '../migrations/index.ts';
 import { backfillShoppingMoveSince, backfillSeriesAuthored } from '../migrations/helpers.ts';
+import { applyBaseline, isPristine, loadBaseline } from './baseline.ts';
+import type { Baseline } from './baseline.ts';
 import type { SqliteDatabase } from './handle.ts';
 
 const log = createLogger('DB');
@@ -152,14 +154,108 @@ function sleepSync(ms: number): void {
 }
 
 /**
+ * Eine leere Datenbank aus der Baseline fuellen (server/db/baseline.ts): Schema
+ * und Vorgabezeilen der Migrationen 1 bis N in EINER Transaktion. Danach findet
+ * `migrate()` diese Versionen verbucht vor und faehrt nur noch den Rest.
+ *
+ * Gibt die Version der Baseline zurueck, wenn DIESER Lauf sie eingespielt hat,
+ * sonst `null` - und dann faehrt `migrate()` weiter wie ohne Baseline. Drei
+ * Faelle enden so, keiner davon ist ein Abbruch:
+ * - Die Datenbank traegt schon etwas. Dann ist sie keine Neuinstallation.
+ * - Ein anderer Prozess war schneller (#1331): der eigene Versuch scheitert an
+ *   dessen Tabellen oder an der Schreibsperre, ist zurueckgerollt, und die
+ *   Datenbank ist danach nicht mehr leer. Entschieden wird wie bei den
+ *   Migrationen am ZUSTAND, nicht am Fehlertext.
+ * - Die Baseline laesst sich nicht lesen oder einspielen, oder ihr Schema traegt
+ *   nicht den erwarteten Fingerabdruck. Die Transaktion ist zurueckgerollt, die
+ *   Datei so leer wie zuvor, und alle Migrationen einzeln sind der Weg, der
+ *   schon immer galt. Das steht als Fehler im Log, weil es auf ein
+ *   beschaedigtes Paket zeigt; test:schema-baseline haelt, dass die
+ *   ausgelieferte Baseline diesen Zweig nie nimmt.
+ * Alles andere fliegt weiter: SQLITE_BUSY nach dem letzten Versuch, wie bei
+ * einer Migration, und jeder Fehler, der nicht an der Baseline liegt (Platte
+ * voll, nur lesbar, E/A, beschaedigte Datei) - dort waere "die Baseline ist
+ * unbrauchbar" die falsche Spur, und die Migrationen scheiterten am selben.
+ */
+/**
+ * Liegt dieser Fehler an der Baseline selbst? Dann ist der Ersatzweg richtig.
+ * Ohne SQLite-Code kommt er aus dem eigenen Code (falscher Fingerabdruck); mit
+ * SQLITE_ERROR (SQL, das nicht laeuft) oder SQLITE_CONSTRAINT* (eine Zeile, die
+ * eine Regel verletzt) aus dem Skript. Jeder andere Code meldet die Umgebung.
+ */
+function isBaselineFault(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (typeof code !== 'string' || !code.startsWith('SQLITE_')) return true;
+  return code === 'SQLITE_ERROR' || code.startsWith('SQLITE_CONSTRAINT');
+}
+
+function startFromBaseline(database: SqliteDatabase, load: () => Baseline): number | null {
+  if (!isPristine(database)) return null;
+
+  let baseline: Baseline;
+  try {
+    baseline = load();
+  } catch (err) {
+    log.error(`Schema baseline is not usable, running every migration instead: ${(err as Error)?.message}`);
+    return null;
+  }
+
+  const run = database.transaction(() => applyBaseline(database, baseline));
+  for (let attempt = 1; ; attempt++) {
+    try {
+      run();
+      log.info(`Schema baseline applied: migrations 1 to ${baseline.version}`);
+      return baseline.version;
+    } catch (err) {
+      let pristine: boolean;
+      try {
+        pristine = isPristine(database);
+      } catch {
+        // Die Datei laesst sich nicht einmal mehr lesen: der erste Fehler ist die Nachricht.
+        throw err;
+      }
+      if (!pristine) {
+        log.warn('The database was no longer empty when this run wanted to apply the schema baseline - another process was faster (#1331).');
+        return null;
+      }
+      if (isBusyError(err)) {
+        if (attempt >= MIGRATION_BUSY_ATTEMPTS) throw err;
+        log.warn(
+          `Schema-Baseline kam nicht an die Schreibsperre (${(err as { code: string }).code}), `
+          + `Versuch ${attempt + 1} von ${MIGRATION_BUSY_ATTEMPTS} (#1331).`
+        );
+        sleepSync(MIGRATION_BUSY_BACKOFF_MS * attempt);
+        continue;
+      }
+      if (!isBaselineFault(err)) throw err;
+      log.error(`Schema baseline v${baseline.version} could not be applied, running every migration instead: ${(err as Error)?.message}`);
+      return null;
+    }
+  }
+}
+
+/**
  * Führt alle ausstehenden Migrations in einer Transaktion aus.
  *
- * Beide Parameter tragen im Betrieb ihren Vorgabewert; sie stehen da, damit ein
+ * Die Parameter tragen im Betrieb ihren Vorgabewert; sie stehen da, damit ein
  * Test den Lauf gegen einen GESETZTEN Zustand fahren kann - eine eigene Datei
  * und eine eigene Migrationsliste - statt gegen ein Rennen zu hoffen. Die
  * Vorgabe fuer `database` (die offene Verbindung) setzt server/db.js.
+ *
+ * `baseline`: womit eine LEERE Datenbank beginnt. Vorgabe ist die ausgelieferte
+ * Baseline, aber nur fuer die ausgelieferte Migrationsliste - eine eigene Liste
+ * eines Tests hat mit ihr nichts zu tun. `null` faehrt immer alle Migrationen
+ * von Null (so entsteht die Baseline selbst, und so prueft test:schema-baseline
+ * sie).
+ * @returns die Version der Baseline, wenn dieser Lauf mit ihr begonnen hat
  */
-export function migrate(database: SqliteDatabase, migrations: Migration[] = MIGRATIONS): void {
+export function migrate(
+  database: SqliteDatabase,
+  migrations: Migration[] = MIGRATIONS,
+  baseline: (() => Baseline) | null = migrations === MIGRATIONS ? loadBaseline : null,
+): { baseline: number | null } {
+  const startedFrom = baseline ? startFromBaseline(database, baseline) : null;
+
   // Migrations-Versions-Tabelle sicherstellen (außerhalb der Haupt-Transaktion)
   database.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -175,7 +271,7 @@ export function migrate(database: SqliteDatabase, migrations: Migration[] = MIGR
 
   const pending = migrations.filter((m) => !applied.has(m.version));
 
-  if (pending.length === 0) return;
+  if (pending.length === 0) return { baseline: startedFrom };
 
   const runMigration = database.transaction((migration: Migration) => {
     if (typeof migration.up === 'function') {
@@ -255,6 +351,7 @@ export function migrate(database: SqliteDatabase, migrations: Migration[] = MIGR
       }
     }
   }
+  return { baseline: startedFrom };
 }
 
 /**

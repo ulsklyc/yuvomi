@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **A new installation creates its database in one step.** The first start used to run every
+  migration since the first release one after another (284 of them, each with its own line in the
+  log); it now applies one schema baseline with the same result and logs
+  `Schema baseline applied: migrations 1 to 284`. Existing installations are not touched: they
+  keep running only the migrations they have not seen yet. If the baseline cannot be used, the
+  start falls back to the migrations and says so in the log.
+
 ### Fixed
 - **Large shopping lists, calendars and task lists change quickly again.** Every change to a
   searchable entry read the whole search index, so renaming or clearing 4000 shopping items took

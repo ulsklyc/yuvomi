@@ -965,12 +965,16 @@ function assertStoredEncrypted() {
 const MIGRATIONS = MIGRATION_FILES;
 
 /**
- * Führt alle ausstehenden Migrations aus (server/db/migrate.ts).
+ * Führt alle ausstehenden Migrations aus (server/db/migrate.ts). Eine leere
+ * Datenbank beginnt mit der Schema-Baseline (server/db/baseline.ts), wenn die
+ * ausgelieferte Migrationsliste läuft; `baseline: null` fährt alle von Null.
  * @param {import('better-sqlite3-multiple-ciphers').Database} [database] Vorgabe: die offene Verbindung
  * @param {Migration[]} [migrations]
+ * @param {(() => import('./db/baseline.ts').Baseline) | null} [baseline]
+ * @returns {{ baseline: number | null }} die Version der Baseline, wenn dieser Lauf mit ihr begann
  */
-function migrate(database = db, migrations = MIGRATIONS) {
-  migrateDatabase(database, migrations);
+function migrate(database = db, migrations = MIGRATIONS, baseline) {
+  return migrateDatabase(database, migrations, baseline);
 }
 
 /** Selbstheilung gegen Migrations-Drift (#538, server/db/migrate.ts); Vorgabe: die offene Verbindung. */
