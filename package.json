@@ -757,19 +757,19 @@
   "license": "MIT",
   "devDependencies": {
     "@oddbird/popover-polyfill": "0.7.3",
-    "@seriousme/openapi-schema-validator": "2.11.0",
+    "@seriousme/openapi-schema-validator": "2.12.0",
     "@swc/core": "1.16.22",
-    "@types/node": "24.19.2",
-    "axe-core": "^4.14.0",
-    "dependency-cruiser": "18.7.2",
+    "@types/node": "26.6.6",
+    "axe-core": "^4.14.1",
+    "dependency-cruiser": "18.9.0",
     "esbuild": "0.28.2",
-    "knip": "6.45.0",
-    "oxlint": "1.93.0",
-    "oxlint-plugin-eslint": "1.93.0",
-    "puppeteer": "^25.16.0",
+    "knip": "6.48.0",
+    "oxlint": "1.94.0",
+    "oxlint-plugin-eslint": "1.94.0",
+    "puppeteer": "^25.18.1",
     "sharp": "^0.35.5",
     "typescript": "7.0.2",
-    "vite": "8.3.7"
+    "vite": "8.3.8"
   },
   "allowScripts": {
     "better-sqlite3-multiple-ciphers@13.0.3": true,
