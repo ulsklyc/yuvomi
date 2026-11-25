@@ -4412,10 +4412,18 @@ router.patch('/me/password', requireAuth, csrfMiddleware, validateRequest(), asy
   // sich beim alten Passwort vertippte, landete ohne Meldung auf der
   // Anmeldung, die Eingaben verloren, obwohl die Sitzung gueltig war.
   // Dieselbe Form wie ein falscher Code beim zweiten Faktor (invalid_code).
-  if (!valid) return res.status(400).json({ error: 'Current password is incorrect.', code: 400, reason: 'wrong_password' });
+  const wrongPassword = () => res.status(400).json({ error: 'Current password is incorrect.', code: 400, reason: 'wrong_password' });
+  if (!valid) return wrongPassword();
 
   const hash = await hashPassword(new_password);
-  db.get().prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.authUserId);
+  // Der Hash, gegen den eben geprueft wurde, steht in der Bedingung (#2939):
+  // aenderte sich das Passwort waehrend der awaits (zweite Aenderung, Reset,
+  // Admin), ist das bewiesene "aktuelle" Passwort keins mehr - nichts wird
+  // geschrieben, keine Sitzung endet, die Antwort ist die eines falschen.
+  const { changes } = db.get()
+    .prepare('UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?')
+    .run(hash, req.authUserId, user.password_hash);
+  if (changes === 0) return wrongPassword();
 
   invalidateUserSessions(req.authUserId, req.sessionID);
 
