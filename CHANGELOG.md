@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Schema baseline applied: migrations 1 to 284`. Existing installations are not touched: they
   keep running only the migrations they have not seen yet. If the baseline cannot be used, the
   start falls back to the migrations and says so in the log.
+- **The availability routes check every request against the published API description.** This
+  is about your own API clients; the app sends nothing that is refused now. Under
+  `/api/v1/availability`, `PUT` with a `state` outside `available`/`busy`/`do_not_disturb`/`away`,
+  a `note` longer than 200 characters or not text, or an `expires_at` missing or not an
+  ISO-8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`) still answers 400, now with `reason: validation`
+  and `fields` instead of its own sentence. `expires_at` being in the future and within 30 days is
+  still checked by the route itself and keeps its own sentence (`"expires_at must be in the
+  future."`, `"expires_at must be within 30 days from now."`), since that depends on when the
+  request is made, not on its shape.
 
 ### Fixed
 - **A save that collides with a change made at the same moment now says so.** When a series or
@@ -508,15 +517,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for its content, the tool's error now ends with the path and rule of each refused field, for
   example `[fields: type at body/title]` - at most ten, then "and N more". Values are never
   named. Errors without such fields read as before.
-- **The availability routes check every request against the published API description.** This
-  is about your own API clients; the app sends nothing that is refused now. Under
-  `/api/v1/availability`, `PUT` with a `state` outside `available`/`busy`/`do_not_disturb`/`away`,
-  a `note` longer than 200 characters or not text, or an `expires_at` missing or not an
-  ISO-8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`) still answers 400, now with `reason: validation`
-  and `fields` instead of its own sentence. `expires_at` being in the future and within 30 days is
-  still checked by the route itself and keeps its own sentence (`"expires_at must be in the
-  future."`, `"expires_at must be within 30 days from now."`), since that depends on when the
-  request is made, not on its shape.
 
 ### Removed
 - **`role: "admin"` no longer makes an administrator at `POST /auth/users`.** This is about your
