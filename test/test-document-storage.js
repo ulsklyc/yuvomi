@@ -1565,6 +1565,92 @@ test('document upload stores WebDAV bytes remotely without a SQLite binary copy'
   );
 });
 
+// #2946, the other direction of the protection: a document uploaded to the
+// old WebDAV target while a new one is saved would stand behind a connection
+// that no longer holds. The write is refused and the staged file removed
+// where it lies.
+/** @param {any} t */
+async function heldWebdavMove(t) {
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  const old = await createWebdavServer(t, {
+    async handler(req) {
+      if (req.method === 'PUT') {
+        started.resolve();
+        await released.promise;
+      }
+      return false;
+    },
+  });
+  const moved = await createWebdavServer(t);
+  setConfig({
+    enabled: '1',
+    url: old.url,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  return {
+    old,
+    moved,
+    // Waits until the upload is held at the old target, saves the new one,
+    // and lets the upload go on.
+    async moveDuringUpload() {
+      await started.promise;
+      setConfig({ url: moved.url });
+      released.resolve();
+    },
+  };
+}
+
+test('a WebDAV target saved during a document upload refuses the document and removes the file', async (t) => {
+  const { old, moved, moveDuringUpload } = await heldWebdavMove(t);
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const pending = routeCall(harness, 'POST', '/', uploadBody({
+    name: 'Uploaded during a move',
+    bytes: 'moved bytes',
+  }));
+  await moveDuringUpload();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_CHANGED');
+  assert.equal(get().prepare(
+    "SELECT COUNT(*) AS count FROM family_documents WHERE name = 'Uploaded during a move'"
+  ).get().count, 0);
+  assert.deepEqual(old.requests.map(({ method }) => method).filter((m) => m !== 'MKCOL'), ['PUT', 'DELETE']);
+  assert.equal(old.files.size, 0);
+  assert.equal(moved.requests.length, 0);
+});
+
+test('a WebDAV target saved during a calendar attachment upload refuses the event and removes the file', async (t) => {
+  const { old, moved, moveDuringUpload } = await heldWebdavMove(t);
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+  const body = calendarEventBody({ attachmentBytes: 'moved attachment' });
+  const documentCount = () => get().prepare('SELECT COUNT(*) AS count FROM family_documents').get().count;
+  const documentsBefore = documentCount();
+
+  const pending = calendarRouteCall(harness, 'POST', '/', body);
+  await moveDuringUpload();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_CHANGED');
+  assert.equal(get().prepare('SELECT COUNT(*) AS count FROM calendar_events WHERE title = ?')
+    .get(body.title).count, 0);
+  assert.equal(documentCount(), documentsBefore);
+  assert.deepEqual(old.requests.map(({ method }) => method).filter((m) => m !== 'MKCOL'), ['PUT', 'DELETE']);
+  assert.equal(old.files.size, 0);
+  assert.equal(moved.requests.length, 0);
+});
+
 test('enabled WebDAV upload failures return a stable error and never create a local row', async (t) => {
   const webdav = await createWebdavServer(t, {
     handler(req, res) {

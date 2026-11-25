@@ -38,7 +38,9 @@ import { getAdapter as defaultGetDmsAdapter } from '../services/dms/index.js';
 import { getStatus as getGoogleDriveStatus } from '../services/google-drive-storage.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import {
+  STORAGE_CONFIG_CHANGED_MESSAGE,
   StorageError,
+  assertStagedTargetCurrent,
   assertWebdavTargetAllowed,
   cleanupStagedUpload,
   deleteDocumentContent,
@@ -415,7 +417,10 @@ function sendThumbnail(res, thumb) {
 
 function sendStorageError(res, error, fallbackMessage, { configText = false, adminDetail = false } = {}) {
   if (!(error instanceof StorageError)) return false;
-  const status = error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED'
+  // A change of the storage settings during an upload (#2946) is a 409 with
+  // its own sentence: the client may send the upload again.
+  const changed = error.storageCode === 'DOCUMENT_STORAGE_CONFIG_CHANGED';
+  const status = error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED' || changed
     ? 409
     : (
         error.storageCode === 'DOCUMENT_STORAGE_INVALID_CONFIG'
@@ -433,7 +438,9 @@ function sendStorageError(res, error, fallbackMessage, { configText = false, adm
   // the case without the class.
   const detail = status === 502 && adminDetail ? remoteFailure(error)?.detail : undefined;
   res.status(status).json({
-    error: configText && status !== 502 ? error.message : fallbackMessage,
+    error: changed
+      ? STORAGE_CONFIG_CHANGED_MESSAGE
+      : configText && status !== 502 ? error.message : fallbackMessage,
     code: status,
     storage_code: error.storageCode,
     // Der Speicher hat nicht mitgespielt (#1909): ein Fall, den jeder Nutzer
@@ -1310,6 +1317,7 @@ router.get('/', validateRequest(), (req, res) => {
 });
 
 router.post('/', validateRequest(), async (req, res) => {
+  /** @type {any} */
   let stagedUpload;
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
@@ -1364,6 +1372,10 @@ router.post('/', validateRequest(), async (req, res) => {
       // Ablegens, und dort kann ein anderes Loeschen den Ordner nehmen (Review
       // zu #1994). Erst hier ist das Ergebnis bis zum INSERT verbindlich.
       if (selectedFolderMissing(selectedFolderId)) throw new SelectedFolderGoneError();
+      // Ebenso das Ziel der Ablage (#2946): wurden die Speicher-Einstellungen
+      // waehrend des Ablegens geaendert, stuende die Zeile hinter einer
+      // Verbindung, die nicht mehr gilt. 409, die Datei raeumt der catch weg.
+      assertStagedTargetCurrent(stagedUpload);
       const folderId = selectedFolderId ?? ensureFolder(folderKey, vFolderName.value, userId(req));
       const expiresAt = vExpiresAtField.value ?? null;
       const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
@@ -1408,7 +1420,7 @@ router.post('/', validateRequest(), async (req, res) => {
     });
     res.status(201).json({ data: normalizeDocument(row) });
   } catch (err) {
-    if (err instanceof StorageError) {
+    if (err instanceof StorageError && !stagedUpload) {
       log.error('POST / storage error:', err);
       return sendStorageError(res, err, 'Document storage upload failed.');
     }
@@ -1428,6 +1440,9 @@ router.post('/', validateRequest(), async (req, res) => {
       }
     }
     if (folderGone) return selectedFolderGone(res);
+    // A storage refusal after staging (#2946: the settings changed meanwhile),
+    // answered once the staged file is gone.
+    if (err instanceof StorageError) return sendStorageError(res, err, 'Document storage upload failed.');
     throw err;
   }
 });

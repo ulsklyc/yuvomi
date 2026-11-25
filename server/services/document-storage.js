@@ -805,7 +805,63 @@ export function buildStorageKey({ category, originalName } = {}) {
   return `${safeCategory}/${randomUUID()}-${stem}${extension}`;
 }
 
-export async function stageDocumentUpload({
+/**
+ * Where a new upload would be stored right now, without any secret: the
+ * backend and the identity of its target (#2946). A WebDAV password or a
+ * Google token never goes in; a changed password still reaches the same
+ * files, a changed URL, base path, user or Drive account does not.
+ */
+export function currentUploadTarget() {
+  const localCfg = getLocalStorageConfig();
+  if (localCfg.enabled) return { backend: 'local_folder', base_path: localCfg.basePath };
+  const backend = getSelectedUploadBackend();
+  if (backend === 'local') return { backend: 'local' };
+  if (backend === 'google_drive') {
+    return { backend: 'google_drive', account_id: googleDriveStorage.connectedAccountId() };
+  }
+  const config = getConfig();
+  return { backend: 'webdav', target: getEffectiveTarget(config), username: config.username };
+}
+
+/** The answer when the storage settings changed during an upload (#2946). */
+export const STORAGE_CONFIG_CHANGED_MESSAGE =
+  'The document storage settings changed during the upload. Upload the file again.';
+
+// What a staged upload was written to, per staged object (#2946): `target`,
+// the stamp from currentUploadTarget() taken before the upload awaited, and
+// for WebDAV the connection itself, password included, so that cleaning up
+// after a refusal deletes the file where it lies and not at a target saved in
+// the meantime. Kept beside the staged object rather than in it: the object's
+// fields are what callers store, and the connection must not travel with them.
+/** @type {WeakMap<object, { target: object, webdavConfig?: any }>} */
+const stagedUploads = new WeakMap();
+
+/**
+ * The upload target a staged file was written to is still the one new uploads
+ * go to. Called synchronously in the transaction of the INSERT that records
+ * the staged file: the upload itself awaited, and a change of the storage
+ * settings saved meanwhile would leave the new row behind a connection that
+ * no longer holds (#2946). A staged object not made by stageDocumentUpload
+ * (a test double) carries no stamp and is not checked.
+ *
+ * @param {object | null | undefined} staged
+ */
+export function assertStagedTargetCurrent(staged) {
+  const stamp = staged ? stagedUploads.get(staged) : undefined;
+  if (!stamp) return;
+  if (JSON.stringify(stamp.target) === JSON.stringify(currentUploadTarget())) return;
+  throw new StorageError('DOCUMENT_STORAGE_CONFIG_CHANGED', STORAGE_CONFIG_CHANGED_MESSAGE);
+}
+
+/** @param {any} options the upload, as stageDocumentContent() takes it */
+export async function stageDocumentUpload(options) {
+  const target = currentUploadTarget();
+  const { webdav_config: webdavConfig, ...staged } = await stageDocumentContent(options);
+  stagedUploads.set(staged, { target, webdavConfig });
+  return staged;
+}
+
+async function stageDocumentContent({
   buffer,
   mime = 'application/octet-stream',
   category,
@@ -907,6 +963,7 @@ export async function stageDocumentUpload({
     storage_provider: 'external',
     storage_key: storageKey,
     content_data: '',
+    webdav_config: config,
   };
 }
 
@@ -1058,7 +1115,12 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
   }
 }
 
-export async function deleteDocumentContent(document) {
+/**
+ * @param {any} document
+ * @param {{ webdavConfig?: any }} [options] the WebDAV connection to delete
+ *   with; without it the stored one
+ */
+export async function deleteDocumentContent(document, { webdavConfig } = {}) {
   if (document.storage_backend === 'google_drive') {
     try {
       await googleDriveStorage.deleteFile(document.storage_key);
@@ -1074,7 +1136,7 @@ export async function deleteDocumentContent(document) {
 
   // WebDAV deletion
   if (document.storage_backend === 'webdav') {
-    const config = requireWebdavConfig(getConfig());
+    const config = requireWebdavConfig(webdavConfig ?? getConfig());
     try {
       const response = await davFetch(config, 'DELETE', [
         ...config.basePath.split('/'),
@@ -1117,7 +1179,7 @@ export async function deleteDocumentContent(document) {
 
 export async function cleanupStagedUpload(staged) {
   try {
-    return await deleteDocumentContent(staged);
+    return await deleteDocumentContent(staged, { webdavConfig: stagedUploads.get(staged)?.webdavConfig });
   } catch (error) {
     throw new StorageError(
       'DOCUMENT_STORAGE_CLEANUP_FAILED',

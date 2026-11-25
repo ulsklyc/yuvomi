@@ -23,7 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that could not reach it, and two WebDAV changes saved at the same time could combine into a
   connection that was never tested. Now the check is repeated on the documents and settings as
   they are when saving; if they changed in the meantime, the change is refused and can be made
-  again.
+  again. The same holds the other way round: a document or calendar attachment uploaded while the
+  storage settings are changed is no longer saved behind the old connection; the upload is
+  refused with a note to send it again, and the file is removed from where it was put.
 - **Outlook and CardDAV syncs of one account no longer get in each other's way.** When the
   regular sync and "Sync now" (or, for Outlook, connecting the account) ran at the same time, an
   event could be created twice in Outlook, and the extra copy stayed there for good; a CardDAV

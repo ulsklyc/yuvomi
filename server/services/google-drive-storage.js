@@ -270,6 +270,11 @@ function assertStoringAccount(account) {
   }
 }
 
+/** The account new uploads go to; no secret (#2946, upload target stamp). */
+export function connectedAccountId() {
+  return cfgGet('account_id');
+}
+
 export async function handleCallback(code) {
   const candidate = createClient();
   const { tokens } = await candidate.getToken(code);

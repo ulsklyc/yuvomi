@@ -799,6 +799,10 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
         );
       }
     }
+    // A storage refusal after the upload (#2946: the settings changed meanwhile).
+    if (err instanceof StorageError) {
+      return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
+    }
     throw err;
   }
 });
@@ -1711,6 +1715,10 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
           'Calendar attachment storage cleanup failed.',
         );
       }
+    }
+    // A storage refusal after the upload (#2946: the settings changed meanwhile).
+    if (err instanceof StorageError) {
+      return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
     throw err;
