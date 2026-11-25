@@ -837,6 +837,12 @@ export const schemas = {
               items: reminderTime,
               description: 'The complete new set; an empty list removes every reminder of the entity. At most 5 different instants after conversion to UTC, repeated entries count once.',
             },
+            already_sent: {
+              type: 'array',
+              maxItems: MAX_REMINDER_INSTANTS,
+              items: reminderTime,
+              description: 'Optional. Instants from `remind_ats` that had already gone off: the rows written for them are marked as delivered, so a restored past reminder does not notify a second time. Instants that are not in `remind_ats` are ignored; it only ever silences the caller\'s own rows.',
+            },
           },
         },
         PermissionsInput: {
@@ -1367,11 +1373,16 @@ export const schemas = {
         TaskUpdated: {
           type: 'object',
           description: 'A task after `PUT /tasks/{id}`. Documents are not part of this answer.',
-          required: [...taskRequired, 'subtasks', 'next_due_date'],
+          required: [...taskRequired, 'subtasks', 'next_due_date', 'reminders_removed_others'],
           properties: {
             ...taskProperties,
             subtasks: { type: 'array', items: { $ref: '#/components/schemas/Task' } },
             next_due_date: isoDay('`YYYY-MM-DD` of the next occurrence the caller can see when this call moved a recurring task into `done`, null in every other case.'),
+            reminders_removed_others: {
+              type: 'integer',
+              minimum: 0,
+              description: 'How many visible (not dismissed) reminders of other members went with the due date when this call cleared it (the server removes every reminder of a task whose `due_date` becomes null). 0 in every other case.',
+            },
           },
         },
         TaskResponse: {

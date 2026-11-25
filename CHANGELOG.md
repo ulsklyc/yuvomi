@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A task's due date goes in one step, and its reminders go with it.** The task read view
+  has a "Remove due date" entry in its "More" menu, and the edit dialog a "Remove due date"
+  button under date and time; both clear date and time together, with the countdown flag. When
+  a task's due date is cleared, on any path (the app, the API, MCP or a CalDAV client), the server
+  now removes every reminder of that task, also those of other members, since a reminder needs a
+  due date (`PUT /tasks/{id}` reports them as `reminders_removed_others`). Undo in the read view
+  brings back the date and your own reminder (one that had already gone off stays quiet) and says
+  when other members' reminders went too; a reminder another member had already dismissed is not
+  counted. `PUT /reminders` takes an optional `already_sent` list for that.
+  Clearing only the time keeps the reminder's lead time, counted from the end of the day, and the
+  time field now says when the reminder will arrive. A message about the due date (a reminder
+  without a date, a date or time it cannot read) stands under that field, and the dialog moves
+  there, instead of at the bottom below the fold; the other messages at the bottom scroll into view.
+
 ### Changed
 - **A new installation creates its database in one step.** The first start used to run every
   migration since the first release one after another (284 of them, each with its own line in the

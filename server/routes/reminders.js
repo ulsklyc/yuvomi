@@ -608,7 +608,10 @@ router.post('/', validateRequest(), (req, res) => {
 // --------------------------------------------------------
 // PUT /api/v1/reminders?entity_type=event&entity_id=5
 // Ersetzt die komplette Erinnerungs-Menge einer Entität (#436).
-// Body: { remind_ats: string[] } (dedupliziert, max. MAX_REMINDERS_PER_ENTITY)
+// Body: { remind_ats: string[], already_sent?: string[] } (dedupliziert, max.
+// MAX_REMINDERS_PER_ENTITY). `already_sent` nennt Zeitpunkte aus `remind_ats`,
+// die schon gemeldet waren: die NEU geschriebene Zeile bekommt dafuer
+// `pushed_at` und meldet sich nicht noch einmal (#2705, „Rueckgaengig").
 // Response: { data: Reminder[] }
 // --------------------------------------------------------
 router.put('/', validateRequest(), (req, res) => {
@@ -650,6 +653,20 @@ router.put('/', validateRequest(), (req, res) => {
     return res.status(400).json({ error: `At most ${MAX_REMINDERS_PER_ENTITY} reminders per entity.`, code: 400 });
   }
 
+  // NEU GESCHRIEBEN HEISST NICHT NEU GEMELDET (#2705). Wer eine Erinnerung
+  // zurueckholt, die schon gegangen war (die Loeschung durch den Trigger beim
+  // Entfernen der Faelligkeit nimmt sie samt `pushed_at` mit), sagt es hier;
+  // sonst meldete der naechste Lauf eine vergangene Zeit ein zweites Mal. Es
+  // wirkt nur auf die eigenen Zeilen dieser Menge und nur in Richtung Ruhe.
+  // Eine Liste von Zeitpunkten, laut Schema optional.
+  const sentChecked = (req.body.already_sent ?? [])
+    .map((/** @type {unknown} */ value, /** @type {number} */ i) => v.datetime(value, `already_sent[${i}]`, true, { to: 'utc' }));
+  const sentErrors = v.collectErrors(sentChecked);
+  if (sentErrors.length) {
+    return res.status(400).json({ error: sentErrors.join(' '), code: 400 });
+  }
+  const sentSet = new Set(sentChecked.map((/** @type {{value?: unknown}} */ result) => result.value));
+
   // Ersetzen heisst nicht Neuanlegen: eine eigene Zeile, deren Zeitpunkt in
   // der neuen Menge wieder vorkommt, bleibt samt ID, `dismissed` und
   // `pushed_at` stehen. Vorher wurde alles geloescht und neu geschrieben,
@@ -673,11 +690,14 @@ router.put('/', validateRequest(), (req, res) => {
     }
 
     const insert = db.get().prepare(`
-      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO reminders (entity_type, entity_id, remind_at, created_by, pushed_at)
+      VALUES (?, ?, ?, ?, ?)
     `);
+    const sentAt = new Date().toISOString();
     for (const remindAt of values) {
-      if (!kept.has(remindAt)) insert.run(entityType, entityId, remindAt, userId);
+      if (!kept.has(remindAt)) {
+        insert.run(entityType, entityId, remindAt, userId, sentSet.has(remindAt) ? sentAt : null);
+      }
     }
   });
   replace(unique);

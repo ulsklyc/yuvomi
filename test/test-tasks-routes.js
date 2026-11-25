@@ -22,6 +22,11 @@ process.env.SESSION_SECRET = 'tasks-routes-test-secret';
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { createTasksApp } = await import('./tasks-app.js');
 const { pushService } = await import('../server/services/push.js');
+const { default: remindersRouter } = await import('../server/routes/reminders.js');
+const { processDueNotifications } = await import('../server/services/notifications.js');
+const { createNotificationChannelStore } = await import('../server/services/notification-channels.js');
+const { upsertTask } = await import('../server/services/caldav-reminders-sync.js');
+const { parseVTODO } = await import('../server/services/ics-parser.js');
 const { pendingCreations, processPendingCreations, todoUidFor } =
   await import('../server/services/caldav-todo-outbound.js');
 
@@ -68,6 +73,9 @@ db.prepare('INSERT INTO housekeeping_workers (user_id, daily_rate) VALUES (?, 0)
 // Aktueller Akteur (Middleware liest ihn zur Request-Zeit).
 let actor = { id: ALICE, role: 'admin' };
 const app = await createTasksApp({
+  // Die Erinnerungen fuer die Messung von „Rueckgaengig" (#2705), hinter dem
+  // Anmelde-Ersatz, vor dem Fehlerbehandler.
+  after: [['/api/v1/reminders', remindersRouter]],
   auth: (req, _res, next) => {
     req.authUserId = actor.id;
     req.authRole = actor.role;
@@ -78,6 +86,7 @@ const app = await createTasksApp({
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;
+const remindersBase = base.replace(/\/tasks$/, '/reminders');
 
 test.after(() => { server.close(); db.close(); });
 
@@ -1944,4 +1953,211 @@ test('Serie: Original und Kopie einer Teilaufgabe zahlen auch in umgekehrter Rei
   assert.equal(balanceOf(kid), 5, 'S2 zahlt: die Gutschrift von S1 ist zurückgenommen');
   await tick(s1, 'done');
   assert.equal(balanceOf(kid), 5, 'S1 zahlt nicht noch einmal: die Serie ist für heute über S2 vergütet');
+});
+
+// --------------------------------------------------------
+// #2705: Das Faelligkeitsdatum geht, die Erinnerungen gehen mit
+// --------------------------------------------------------
+// Eine Erinnerung braucht ein Datum. Die Regel stand nur im Formular; der
+// Trigger aus Migration 285 haelt sie fuer jeden Schreibweg - auch fuer die
+// Erinnerungen ANDERER Mitglieder, die kein Formular je loeschen konnte.
+
+/**
+ * @param {number|bigint} taskId
+ * @param {number|bigint} userId
+ * @param {string} [entityType]
+ */
+function seedReminder(taskId, userId, entityType = 'task') {
+  db.prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES (?, ?, '2026-11-13T16:00:00', ?)
+  `).run(entityType, taskId, userId);
+}
+
+/** @param {number|bigint} taskId */
+function taskReminderOwners(taskId) {
+  return db.prepare("SELECT created_by FROM reminders WHERE entity_type = 'task' AND entity_id = ? ORDER BY created_by")
+    .all(taskId).map((/** @type {any} */ r) => Number(r.created_by));
+}
+
+/** @param {string} title */
+async function dueTask(title) {
+  const r = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title, due_date: '2026-11-13', due_time: '18:00' } });
+  assert.equal(r.status, 201);
+  return r.body.data.id;
+}
+
+test('#2705: PUT ohne due_date loescht alle Erinnerungen der Aufgabe und nennt die der anderen', async () => {
+  const id = await dueTask('Stromrechnung bezahlen');
+  seedReminder(id, ALICE);
+  seedReminder(id, BOB);
+  // Dieselbe Zahl als Id einer anderen Art: die bleibt unberuehrt.
+  seedReminder(id, BOB, 'event');
+  const r = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { due_date: null, due_time: null } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.due_date, null);
+  assert.deepEqual(taskReminderOwners(id), [], 'die eigene und die fremde Erinnerung sind weg');
+  assert.equal(r.body.data.reminders_removed_others, 1, 'eine davon gehoerte Bob');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM reminders WHERE entity_type = 'event' AND entity_id = ?").get(id).n, 1);
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'event' AND entity_id = ?").run(id);
+});
+
+test('#2705: bleibt das Datum, bleiben die Erinnerungen - auch wenn nur die Uhrzeit geht', async () => {
+  const id = await dueTask('Reifen wechseln');
+  seedReminder(id, ALICE);
+  seedReminder(id, BOB);
+  const title = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { title: 'Reifen wechseln (Winter)' } });
+  assert.equal(title.body.data.reminders_removed_others, 0);
+  const time = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { due_time: null } });
+  assert.equal(time.status, 200);
+  assert.equal(time.body.data.due_time, null);
+  assert.deepEqual(taskReminderOwners(id), [Number(ALICE), Number(BOB)].sort((a, b) => a - b));
+  assert.equal(time.body.data.reminders_removed_others, 0);
+});
+
+test('#2705: der Trigger gilt fuer jeden Schreibweg - gemessen wird der Uebergang, nicht der Zustand', () => {
+  const id = Number(db.prepare(`
+    INSERT INTO tasks (title, category, due_date, created_by) VALUES ('Aus CalDAV', 'misc', '2026-11-13', ?)
+  `).run(ALICE).lastInsertRowid);
+  seedReminder(id, BOB);
+  // So schreibt ein CalDAV-Abruf ein entferntes DUE: direkt in die Zeile.
+  db.prepare('UPDATE tasks SET due_date = NULL, due_time = NULL WHERE id = ?').run(id);
+  assert.deepEqual(taskReminderOwners(id), []);
+  // Eine Aufgabe, die schon ohne Datum dasteht, verliert bei einer anderen
+  // Aenderung nichts: der Trigger fragt nach dem Uebergang.
+  seedReminder(id, BOB);
+  db.prepare("UPDATE tasks SET title = 'Aus CalDAV (neu)', due_date = NULL WHERE id = ?").run(id);
+  assert.deepEqual(taskReminderOwners(id), [Number(BOB)]);
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'task' AND entity_id = ?").run(id);
+});
+
+test('#2705: eine weggeklickte Erinnerung eines anderen wird nicht als verloren gemeldet', async () => {
+  const id = await dueTask('Muell rausbringen');
+  seedReminder(id, ALICE);
+  seedReminder(id, BOB);
+  // Bob hat seine Erinnerung gelesen und weggeklickt: nichts Sichtbares geht.
+  db.prepare("UPDATE reminders SET dismissed = 1 WHERE entity_type = 'task' AND entity_id = ? AND created_by = ?")
+    .run(id, BOB);
+  const r = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { due_date: null, due_time: null } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.reminders_removed_others, 0, 'weggeklickt zaehlt nicht (wie GET /reminders)');
+  assert.deepEqual(taskReminderOwners(id), [], 'die Zeile selbst geht trotzdem mit dem Datum');
+});
+
+// --------------------------------------------------------
+// #2705, Review: „Rueckgaengig" und die eigene, schon gemeldete Erinnerung
+// --------------------------------------------------------
+// PUT /reminders schreibt nach dem Loeschen durch den Trigger frische Zeilen
+// ohne `pushed_at`. Gemessen: meldet sich eine Erinnerung, die schon
+// gegangen war und in der Vergangenheit liegt, nach „Rueckgaengig" noch einmal?
+
+/**
+ * Ein Lauf des Meldedienstes; liefert, wie viele Meldungen rausgingen.
+ * @param {Date} now
+ */
+async function deliverDue(now) {
+  const sent = [];
+  await processDueNotifications({
+    database: db,
+    channelStore: createNotificationChannelStore({ db }),
+    pushService: /** @type {any} */ ({
+      sendPushToUser: async (/** @type {unknown} */ _userId, /** @type {unknown} */ payload) => { sent.push(payload); return 1; },
+    }),
+    now,
+  });
+  return sent.length;
+}
+
+test('#2705 Review: Rueckgaengig bringt eine schon gemeldete Erinnerung nicht noch einmal', async () => {
+  // Was frühere Tests offen liessen, zaehlt hier nicht mit.
+  db.prepare("UPDATE reminders SET pushed_at = '2000-01-01T00:00:00Z' WHERE pushed_at IS NULL").run();
+  // Ohne Abo hat Alice kein Ziel, und die Zeile gilt sofort als erledigt.
+  db.prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES (?, 'https://push.example/alice', 'k', 'a')").run(ALICE);
+  const id = await dueTask('Steuererklaerung abgeben');
+  const asAlice = { as: { id: ALICE, role: 'admin' } };
+  const put = await fetch(`${remindersBase}/?entity_type=task&entity_id=${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ remind_ats: ['2026-11-13T16:00:00'] }),
+  });
+  assert.equal(put.status, 200);
+  const later = new Date('2026-11-13T17:00:00Z');
+  assert.equal(await deliverDue(later), 1, 'Positivkontrolle: die Erinnerung geht beim ersten Lauf raus');
+  const pushed = db.prepare("SELECT pushed_at FROM reminders WHERE entity_type = 'task' AND entity_id = ?").get(id);
+  assert.ok(pushed.pushed_at, 'Ausgangslage: die Erinnerung ist schon gemeldet');
+
+  const putReminders = (/** @type {object} */ body) => fetch(`${remindersBase}/?entity_type=task&entity_id=${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  // Genau der Undo-Pfad aus task-due.js: Datum entfernen (der Trigger loescht),
+  // Datum zurueck, Erinnerungen zurueckschreiben.
+  const clearAndRestore = async (/** @type {object} */ body) => {
+    await call('PUT', `/${id}`, { ...asAlice, body: { due_date: null, due_time: null } });
+    assert.deepEqual(taskReminderOwners(id), []);
+    await call('PUT', `/${id}`, { ...asAlice, body: { due_date: '2026-11-13', due_time: '18:00' } });
+    assert.equal((await putReminders(body)).status, 200);
+  };
+
+  // BEFUND: ohne Hinweis ist die zurueckgeschriebene Zeile frisch, ohne
+  // `pushed_at` - und die vergangene Erinnerung geht ein zweites Mal raus.
+  await clearAndRestore({ remind_ats: ['2026-11-13T16:00:00'] });
+  assert.equal(await deliverDue(later), 1, 'ohne already_sent meldet sich die Erinnerung erneut (der Befund)');
+
+  // FIX: Undo sagt, dass sie schon gemeldet war.
+  await clearAndRestore({ remind_ats: ['2026-11-13T16:00:00'], already_sent: ['2026-11-13T16:00:00'] });
+  assert.equal(await deliverDue(later), 0, 'mit already_sent meldet sich die vergangene Erinnerung nicht erneut');
+  // Eine, die noch NICHT gemeldet war, bleibt ausstehend und geht raus.
+  await clearAndRestore({ remind_ats: ['2026-11-13T16:00:00', '2026-11-13T16:30:00'], already_sent: ['2026-11-13T16:00:00'] });
+  assert.equal(await deliverDue(later), 1, 'nur die ungemeldete Zeile geht raus');
+});
+
+test('#2705 Review: already_sent wird wie remind_ats geprueft und wirkt nur auf Zeitpunkte der Menge', async () => {
+  const id = await dueTask('Pruefung already_sent');
+  const url = `${remindersBase}/?entity_type=task&entity_id=${id}`;
+  const put = (/** @type {object} */ body) => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await put({ remind_ats: ['2026-11-13T16:00:00'], already_sent: 'x' })).status, 400, 'kein Array');
+  assert.equal((await put({ remind_ats: ['2026-11-13T16:00:00'], already_sent: ['kein Datum'] })).status, 400, 'kein Zeitpunkt');
+  // Ein Zeitpunkt, der nicht in der Menge steht, wird ignoriert (und legt nichts an).
+  const ok = await put({ remind_ats: ['2026-11-13T16:00:00'], already_sent: ['2026-11-13T09:00:00'] });
+  assert.equal(ok.status, 200);
+  const rows = db.prepare("SELECT remind_at, pushed_at FROM reminders WHERE entity_type = 'task' AND entity_id = ?").all(id);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].pushed_at, null, 'nicht genannt, nicht als gemeldet markiert');
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'task' AND entity_id = ?").run(id);
+});
+
+// --------------------------------------------------------
+// #2705, Review: der echte CalDAV-Weg (upsertTask), nicht nur ein UPDATE
+// --------------------------------------------------------
+const CALDAV_ACCOUNT = Number(db.prepare(
+  "INSERT INTO caldav_accounts (name, caldav_url, username, password) VALUES ('Fake', 'https://dav.example/', 'u', 'p')",
+).run().lastInsertRowid);
+
+// upsertTask tippt die Objekt-URL als null; der Abruf reicht eine Zeichenkette.
+const OBJECT_URL = /** @type {any} */ ('/l/c1.ics');
+
+/** @param {string} uid @param {string|null} due */
+const vtodoOf = (uid, due) => parseVTODO([
+  'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Example//EN',
+  'BEGIN:VTODO', `UID:${uid}`, 'DTSTAMP:20261101T090000Z', `SUMMARY:Aufgabe ${uid}`,
+  ...(due ? [`DUE;VALUE=DATE:${due}`] : []),
+  'END:VTODO', 'END:VCALENDAR',
+].join('\r\n'))[0];
+
+test('#2705 Review: ein VTODO, dem die andere App DUE genommen hat, nimmt die Erinnerungen mit - jeder Abruf davor nicht', () => {
+  const id = Number(upsertTask(vtodoOf('clear-due-1', '20261113'), CALDAV_ACCOUNT, ALICE, OBJECT_URL));
+  assert.equal(db.prepare('SELECT due_date FROM tasks WHERE id = ?').get(id).due_date, '2026-11-13');
+  seedReminder(id, ALICE);
+  seedReminder(id, BOB);
+  // Jeder Abruf schreibt due_date erneut, auch unveraendert: keine Wirkung.
+  upsertTask(vtodoOf('clear-due-1', '20261113'), CALDAV_ACCOUNT, ALICE, OBJECT_URL);
+  assert.deepEqual(taskReminderOwners(id), [Number(ALICE), Number(BOB)].sort((a, b) => a - b));
+  // Die andere App hat DUE entfernt.
+  upsertTask(vtodoOf('clear-due-1', null), CALDAV_ACCOUNT, ALICE, OBJECT_URL);
+  assert.equal(db.prepare('SELECT due_date FROM tasks WHERE id = ?').get(id).due_date, null);
+  assert.deepEqual(taskReminderOwners(id), [], 'alle Erinnerungen gehen mit dem Datum');
+  // Und weitere Abrufe ohne DUE aendern nichts mehr (Uebergang, nicht Zustand).
+  seedReminder(id, BOB);
+  upsertTask(vtodoOf('clear-due-1', null), CALDAV_ACCOUNT, ALICE, OBJECT_URL);
+  assert.deepEqual(taskReminderOwners(id), [Number(BOB)]);
+  db.prepare("DELETE FROM reminders WHERE entity_type = 'task' AND entity_id = ?").run(id);
 });
