@@ -65,7 +65,7 @@ function reset() {
 const scopeOf = (source) => (source === 'caldav' ? { accountId } : {});
 const processPendingDeletions = (client, source, index, ownCalendarUrls = null) =>
   caldavOutbound.processPendingDeletions(client, source, index, ownCalendarUrls, scopeOf(source));
-const processPendingUpdates = (client, source, index, calendarsByUrl = null) =>
+const processPendingUpdates = (client, source, index, /** @type {Map<string, any>|null} */ calendarsByUrl = null) =>
   caldavOutbound.processPendingUpdates(client, source, index, calendarsByUrl, scopeOf(source));
 
 function upsertCalendar(url, name = 'Familie') {
@@ -1474,6 +1474,115 @@ test('ein während des PUT vorgemerkter Umzug bleibt stehen', async () => {
   const row = reload(event.id);
   assert.equal(row.outbound_move_to, CAL2_URL, 'der Umzug läuft im nächsten Durchgang');
   assert.equal(row.outbound_dirty, 0, 'die Feldänderung selbst ist angekommen');
+});
+
+// ── Was während eines früheren Termins desselben Laufs eintrifft (#2944) ────────
+//
+// Die Liste der wartenden Termine wird einmal gelesen, dann geht ein Termin nach
+// dem anderen hinaus. Während der PUT des ersten unterwegs ist, kann der Nutzer
+// den zweiten umsetzen; dessen Zeile in der Liste ist dann veraltet.
+
+/** @param {...string} uids */
+function indexForAll(...uids) {
+  return new Map(uids.flatMap((uid) => [...indexFor(uid)]));
+}
+
+/**
+ * Setzt das Ziel eines Termins um, wie es die Route tut.
+ * @param {number} eventId
+ * @param {string} url
+ */
+function retarget(eventId, url) {
+  const before = reload(eventId);
+  db.prepare('UPDATE calendar_events SET target_caldav_calendar_url = ? WHERE id = ?').run(url, eventId);
+  outbound.markEventOutbound(before, reload(eventId));
+}
+
+test('#2944: ein während des Laufs zurückgenommener Umzug läuft nicht mehr los', async () => {
+  reset();
+  const first = seedDirty('race1a@t', { title: 'Erster' });
+  const event = seedMoved('race1b@t');
+
+  const client = fakeClient({ onUpdate: () => retarget(event.id, CAL_URL) });
+  const calendars = new Map([[CAL2_URL, { url: CAL2_URL, displayName: 'Arbeit' }]]);
+  await processPendingUpdates(client, 'caldav', indexForAll('race1a@t', 'race1b@t'), calendars);
+
+  assert.equal(client.updates.length, 1, 'Vorbedingung: der erste Termin ging hinaus');
+  assert.equal(reload(first.id).outbound_dirty, 0);
+  assert.equal(client.creates.length, 0, 'der Termin bleibt in dem Kalender, der jetzt gewählt ist');
+  assert.equal(client.deletes.length, 0);
+  const row = reload(event.id);
+  assert.equal(row.calendar_ref_id, calRefFor(CAL_URL));
+  assert.equal(row.outbound_move_to, null);
+});
+
+test('#2944: ein während des Laufs gewähltes Ziel fällt nicht mit dem verschwundenen', async () => {
+  reset();
+  const CAL3_URL = 'https://dav.example/cal/school/';
+  seedDirty('race2a@t', { title: 'Erster' });
+  const event = seedMoved('race2b@t');
+  retarget(event.id, CAL3_URL);
+  assert.equal(reload(event.id).outbound_move_to, CAL3_URL, 'Vorbedingung: der Umzug geht in einen Kalender, den es nicht mehr gibt');
+
+  const client = fakeClient({ onUpdate: () => retarget(event.id, CAL2_URL) });
+  const calendars = new Map([[CAL2_URL, { url: CAL2_URL, displayName: 'Arbeit' }]]);
+  await processPendingUpdates(client, 'caldav', indexForAll('race2a@t', 'race2b@t'), calendars);
+
+  assert.deepEqual(client.creates.map((c) => c.calendar.url), [CAL2_URL], 'der Umzug geht in den zuletzt gewählten Kalender');
+  const row = reload(event.id);
+  assert.equal(row.calendar_ref_id, calRefFor(CAL2_URL));
+  assert.equal(row.outbound_move_to, null);
+});
+
+test('#2944: eine während des Laufs eingetroffene Bearbeitung geht im selben Lauf hinaus', async () => {
+  reset();
+  const CAL3_URL = 'https://dav.example/cal/school/';
+  seedDirty('race3a@t', { title: 'Erster' });
+  const event = seedMoved('race3b@t');
+  retarget(event.id, CAL3_URL);
+  assert.equal(reload(event.id).outbound_dirty, 0, 'Vorbedingung: in der Liste steht nur der Umzug');
+
+  const client = fakeClient({
+    onUpdate: (/** @type {any} */ p) => {
+      if (!p.calendarObject.url.includes('race3a@t')) return;
+      const before = reload(event.id);
+      db.prepare("UPDATE calendar_events SET title = 'Während des Laufs' WHERE id = ?").run(event.id);
+      outbound.markEventOutbound(before, reload(event.id));
+    },
+  });
+  await processPendingUpdates(client, 'caldav', indexForAll('race3a@t', 'race3b@t'), new Map());
+
+  const sent = client.updates.find((u) => u.calendarObject.url.includes('race3b@t'));
+  assert.ok(sent, 'der PUT des zweiten Termins wartet nicht auf den nächsten Lauf');
+  assert.match(sent.calendarObject.data, /SUMMARY:Während des Laufs/);
+  assert.equal(reload(event.id).outbound_dirty, 0);
+});
+
+test('#2944: ein während des scheiternden Anlegens gewähltes Ziel fällt nicht mit ihm', async () => {
+  reset();
+  const CAL3_URL = 'https://dav.example/cal/school/';
+  const event = seedMoved('race4@t');
+
+  // 404 auf das Anlegen heisst "das Ziel ist weg": nur dieser Umzug fällt.
+  const client = fakeClient({ onCreate: () => { retarget(event.id, CAL3_URL); throw httpError(404); } });
+  const calendars = new Map([[CAL2_URL, { url: CAL2_URL, displayName: 'Arbeit' }]]);
+  await processPendingUpdates(client, 'caldav', indexFor('race4@t'), calendars);
+
+  assert.equal(client.creates.length, 1);
+  assert.equal(reload(event.id).outbound_move_to, CAL3_URL, 'der zuletzt gewählte Kalender steht weiter an');
+});
+
+test('#2944: ein während des abgelehnten Anlegens gewähltes Ziel überlebt das Aufgeben', async () => {
+  reset();
+  const CAL3_URL = 'https://dav.example/cal/school/';
+  const event = seedMoved('race5@t');
+
+  // 400 gibt den Umzug sofort auf (handleUpdateError -> giveUp).
+  const client = fakeClient({ onCreate: () => { retarget(event.id, CAL3_URL); throw httpError(400); } });
+  const calendars = new Map([[CAL2_URL, { url: CAL2_URL, displayName: 'Arbeit' }]]);
+  await processPendingUpdates(client, 'caldav', indexFor('race5@t'), calendars);
+
+  assert.equal(reload(event.id).outbound_move_to, CAL3_URL, 'der zuletzt gewählte Kalender steht weiter an');
 });
 
 test('wird der Quellkalender während des Umzugs aufgeräumt, bleibt die Kopie im Ziel stehen', async () => {

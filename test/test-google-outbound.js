@@ -1614,6 +1614,28 @@ test('ein während des Zielabrufs gewähltes Ziel fällt nicht mit dem unschreib
   assert.equal(row.outbound_move_to, 'work@g', 'der zuletzt gewählte Kalender steht weiter an');
 });
 
+test('#2944: ein während des Quellabrufs gewähltes Ziel fällt nicht mit dem erledigten Umzug', async () => {
+  // Die Zeile nennt einen Umzug in den Kalender, in dem der Termin schon liegt -
+  // nichts zu tun, die Vormerkung fällt. Während calendarList.get für die Quelle
+  // unterwegs ist, wählt der Nutzer work@g: das ist ein neuer Umzug.
+  reset();
+  const event = seedMirrored('gev-stale-move-retarget');
+  db.prepare("UPDATE calendar_events SET outbound_move_to = 'primary' WHERE id = ?").run(event.id);
+
+  const calendar = fakeCalendar({ calendars: writableCalendars(['primary', 'work@g']) });
+  const originalGet = calendar.calendarList.get;
+  calendar.calendarList.get = async (params) => {
+    if (params.calendarId === 'primary') await put(event.id, { target_google_calendar_id: 'work@g' });
+    return originalGet(params);
+  };
+  await __test.processPendingUpdates(/** @type {any} */ (calendar), {});
+
+  assert.equal(calendar.moves.length, 0, 'Vorbedingung: der Lauf entschied über die alte Vormerkung');
+  const row = reload(event.id);
+  assert.equal(__test.currentGoogleCalendarId(row), 'primary');
+  assert.equal(row.outbound_move_to, 'work@g', 'der zuletzt gewählte Kalender steht weiter an');
+});
+
 test('ein während des scheiternden Umzugs gewähltes Ziel fällt nicht mit ihm', async () => {
   // Google lehnt den Umzug nach fam@g ab (400, aufgeben). Während des Aufrufs hat der
   // Nutzer work@g gewählt - das ist ein neuer Umzug, kein Teil des abgelehnten.

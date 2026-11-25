@@ -570,7 +570,9 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
       }
     } else if (moveTo) {
       // Ziel == aktueller Kalender: nichts zu tun (z. B. Umzug bereits erfolgt).
-      clearMove(event.id);
+      // Nur diese Vormerkung fällt: ein während des Metadaten-Abrufs gewähltes
+      // Ziel ist ein neuer Umzug (#2944).
+      clearMove(event.id, moveTo);
     }
 
     // ── Geänderte Felder pushen (events.patch) ───────────────────────────────
