@@ -324,6 +324,42 @@ test('adoption joins an existing product, creates a missing one, and a second ru
   assert.deepEqual(database.prepare('SELECT * FROM pantry_items ORDER BY id').all(), batchesBefore);
 });
 
+test('adoption that fails halfway leaves nothing behind: no product, no assignment, and the triggers are back', () => {
+  // groupBatchesIntoProducts() drops the triggers of pantry_items for its run and
+  // creates them again at the end. Without the transaction around it (withTx in
+  // adoptOrphanPantryBatches), a failure in the middle would leave the first
+  // product written and the triggers gone for good.
+  const database = databaseAt(Infinity);
+  database.prepare(`
+    INSERT INTO pantry_items (id, name, unit, created_by) VALUES
+      (100, 'Milch', 'l', 1),
+      (101, 'Brot', 'pcs', 1)
+  `).run();
+  // The second group fails when its product is written; the first one is through by then.
+  database.exec(`
+    CREATE TRIGGER test_second_product_fails BEFORE INSERT ON pantry_products
+    WHEN NEW.name = 'Brot'
+    BEGIN SELECT RAISE(ABORT, 'the second product fails'); END
+  `);
+  const triggers = () => database.prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'pantry_items' ORDER BY name`).all().map((/** @type {{ name: string }} */ t) => t.name);
+  const triggersBefore = triggers();
+  assert.ok(triggersBefore.length > 0, 'control: pantry_items has triggers the run drops');
+  const productsBefore = database.prepare('SELECT * FROM pantry_products ORDER BY id').all();
+  const batchesBefore = database.prepare('SELECT * FROM pantry_items ORDER BY id').all();
+
+  dbmod.adoptOrphanPantryBatches(database); // logs the failure and lets the start go on
+
+  assert.deepEqual(database.prepare('SELECT * FROM pantry_products ORDER BY id').all(), productsBefore, 'the product of the first group is not left behind');
+  assert.deepEqual(database.prepare('SELECT * FROM pantry_items ORDER BY id').all(), batchesBefore, 'no batch was assigned');
+  assert.deepEqual(triggers(), triggersBefore, 'the dropped triggers are back');
+  assert.equal(database.inTransaction, false);
+
+  // Control: with the obstacle gone, the same stock is adopted.
+  database.exec('DROP TRIGGER test_second_product_fails');
+  dbmod.adoptOrphanPantryBatches(database);
+  assert.equal(nullProducts(database), 0);
+});
+
 test('adoption re-homes a batch whose name or unit no longer matches its product', () => {
   const database = databaseAt(Infinity);
   const insert = database.prepare('INSERT INTO pantry_items (name, unit, created_by) VALUES (?, ?, 1)');

@@ -31,6 +31,7 @@ import {
   migrate as migrateDatabase, reconcileCriticalSchema as reconcileSchema, unknownMigrationVersions,
   latestKnownVersion, allowNewerSchema, schemaVersion, MIGRATION_BUSY_ATTEMPTS,
 } from './db/migrate.ts';
+import { withTx } from './db/tx.ts';
 import { backupToFile as backupToFileFor, checkBackupFile as checkBackupFileFor } from './db/backup.ts';
 import {
   restoreFromFile as restoreFromFileFor, closeForShutdown as closeForShutdownFor, isRestoreRunning as isRestoreRunningFor,
@@ -1010,16 +1011,7 @@ function adoptOrphanPantryBatches(database = db) {
     return; // pantry_items not readable - nothing to adopt.
   }
   try {
-    database.exec('SAVEPOINT adopt_pantry_batches');
-    let result;
-    try {
-      result = groupBatchesIntoProducts(database, productKey);
-      database.exec('RELEASE SAVEPOINT adopt_pantry_batches');
-    } catch (err) {
-      database.exec('ROLLBACK TO SAVEPOINT adopt_pantry_batches');
-      database.exec('RELEASE SAVEPOINT adopt_pantry_batches');
-      throw err;
-    }
+    const result = withTx(database, () => groupBatchesIntoProducts(database, productKey));
     if (result.batches === 0) return;
     log.warn(
       `${result.batches} pantry batch(es) had no matching product, probably written by an older version `
