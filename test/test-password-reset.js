@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 // Recovery uses the production driver's transaction API.
 const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
 import { createPasswordResetService } from '../server/services/password-reset.js';
+import passkeysMigration from '../server/migrations/0285.ts';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
@@ -19,9 +20,6 @@ function makeDb() {
   db.exec(`
     CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL DEFAULT 'x');
-    CREATE TABLE user_passkeys (user_id INTEGER);
-    CREATE TABLE user_passkey_handles (user_id INTEGER);
-    CREATE TABLE passkey_challenges (user_id INTEGER);
     CREATE TABLE password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -30,6 +28,7 @@ function makeDb() {
     );
     CREATE UNIQUE INDEX idx_password_resets_hash ON password_resets(token_hash);
   `);
+  db.exec(passkeysMigration.up);
   db.prepare("INSERT INTO users (id, username) VALUES (1,'alice')").run();
   return db;
 }
@@ -458,7 +457,8 @@ test('a failure consuming the reset token rolls back the new password and passke
   const options = { db, now: Date.now };
   const reset = createPasswordResetService(options);
   const token = reset.createToken(1).token;
-  db.prepare('INSERT INTO user_passkeys (user_id) VALUES (1)').run();
+  db.prepare(`INSERT INTO user_passkeys (user_id, credential_id, public_key, name)
+    VALUES (1, 'fixture-credential', X'00', 'Fixture key')`).run();
   db.exec(`CREATE TRIGGER reject_token_delete BEFORE DELETE ON password_resets
     BEGIN SELECT RAISE(ABORT, 'Token deletion failed'); END;`);
   const { app } = await makeAuthApp(db);
