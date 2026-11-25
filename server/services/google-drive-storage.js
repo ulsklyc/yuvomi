@@ -162,7 +162,13 @@ async function createFolder(drive, name, parentId = null) {
   return response.data;
 }
 
-async function ensureAppFolder(drive, { persist = true } = {}) {
+/**
+ * @param {any} drive
+ * @param {{ persist?: boolean, accountId?: string | null }} [options]
+ *   `accountId`: the account `drive` belongs to; without it the stored one,
+ *   read here before the first await
+ */
+async function ensureAppFolder(drive, { persist = true, accountId = cfgGet('account_id') } = {}) {
   const storedId = cfgGet('folder_id');
   if (storedId) {
     try {
@@ -182,7 +188,10 @@ async function ensureAppFolder(drive, { persist = true } = {}) {
     || await createFolder(drive, APP_FOLDER_NAME);
   const documentsFolder = await findFolder(drive, DOCUMENTS_FOLDER_NAME, appFolder.id)
     || await createFolder(drive, DOCUMENTS_FOLDER_NAME, appFolder.id);
-  if (persist) {
+  // The folder belongs to the account of `drive`. Another account connected
+  // during the awaits above has its own folder; this one is not written over
+  // it (#2946).
+  if (persist && cfgGet('account_id') === accountId) {
     cfgSet('folder_id', documentsFolder.id);
     cfgSet('folder_name', DISPLAY_FOLDER_NAME);
   }
@@ -397,13 +406,13 @@ export function getStatus() {
 
 /**
  * @param {{ buffer?: any, mime?: string, originalName?: string,
- *   connection?: { drive: any } }} [options] `connection` from
- *   openUploadConnection(); without it the stored grant
+ *   connection?: { drive: any, accountId: string | null } }} [options]
+ *   `connection` from openUploadConnection(); without it the stored grant
  */
 export async function uploadFile({ buffer, mime = 'application/octet-stream', originalName, connection } = {}) {
   const content = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || '');
-  const drive = connection?.drive ?? createDrive();
-  const folder = await ensureAppFolder(drive);
+  const { drive, accountId } = connection ?? openUploadConnection();
+  const folder = await ensureAppFolder(drive, { accountId });
   try {
     const response = await drive.files.create({
       requestBody: {
@@ -428,8 +437,13 @@ export async function uploadFile({ buffer, mime = 'application/octet-stream', or
   }
 }
 
-export async function readFile(fileId) {
-  const drive = createDrive();
+/**
+ * @param {string} fileId
+ * @param {{ connection?: { drive: any } }} [options] the connection to read
+ *   through; without it the stored grant
+ */
+export async function readFile(fileId, { connection } = {}) {
+  const drive = connection?.drive ?? createDrive();
   try {
     const metadata = await drive.files.get({
       fileId,
@@ -482,25 +496,35 @@ export async function deleteFile(fileId, { connection } = {}) {
 export async function testConnection() {
   const expected = Buffer.from(`yuvomi-google-drive-test:${randomUUID()}`);
   let fileId = null;
+  // The whole roundtrip goes through one account, and its result is written
+  // only while that account is still the connected one: another account
+  // connected during the test has not been tested (#2946).
+  /** @type {{ drive: any, accountId: string | null } | null} */
+  let connection = null;
+  const stillConnected = () => connection !== null && cfgGet('account_id') === connection.accountId;
   try {
+    connection = openUploadConnection();
     fileId = await uploadFile({
       buffer: expected,
       mime: 'application/octet-stream',
       originalName: '.connection-test.bin',
+      connection,
     });
-    const actual = await readFile(fileId);
+    const actual = await readFile(fileId, { connection });
     if (!actual.buffer.equals(expected)) {
       throw new Error('Google Drive roundtrip verification failed.');
     }
-    await deleteFile(fileId);
+    await deleteFile(fileId, { connection });
     fileId = null;
-    cfgSet('last_test', new Date().toISOString());
-    cfgDel('last_error');
+    if (stillConnected()) {
+      cfgSet('last_test', new Date().toISOString());
+      cfgDel('last_error');
+    }
     return { ok: true };
   } catch (error) {
     if (fileId) {
       try {
-        await deleteFile(fileId);
+        await deleteFile(fileId, { connection: connection ?? undefined });
       } catch {
         // Preserve the primary test failure.
       }
@@ -514,7 +538,7 @@ export async function testConnection() {
     ) {
       throw error;
     }
-    cfgSet('last_error', 'Google Drive connection test failed.');
+    if (stillConnected()) cfgSet('last_error', 'Google Drive connection test failed.');
     throw new GoogleDriveStorageError(
       'DOCUMENT_STORAGE_CONNECTION_TEST_FAILED',
       'The Google Drive connection test failed.',

@@ -339,6 +339,64 @@ test('callback re-checks the account against documents stored while it waited on
   assert.equal(cfg('document_storage_google_drive_refresh_token'), 'drive-refresh-a');
 });
 
+/**
+ * Account A connected; account B is connected while a call through A waits
+ * on its first Drive request (#2946). Returns the hold and the switch.
+ */
+async function accountSwitchDuringFirstDriveCall() {
+  const { state, factory } = createFake();
+  driveStorage.__setGoogleApiFactoryForTests(factory);
+  await driveStorage.handleCallback('first');
+  const drive = factory.createDrive();
+  const originalGet = drive.files.get;
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  let held = false;
+  drive.files.get = async (/** @type {any} */ args) => {
+    if (!held) {
+      held = true;
+      started.resolve();
+      await released.promise;
+    }
+    return originalGet(args);
+  };
+  return {
+    state,
+    async switchToAccountB() {
+      await started.promise;
+      setCfg('document_storage_google_drive_refresh_token', 'drive-refresh-b');
+      setCfg('document_storage_google_drive_account_id', 'account-b');
+      setCfg('document_storage_google_drive_folder_id', 'folder-of-b');
+      released.resolve();
+    },
+  };
+}
+
+test('an upload through account A does not store its folder over account B connected meanwhile', async () => {
+  const { state, switchToAccountB } = await accountSwitchDuringFirstDriveCall();
+  // A's stored folder is gone, so the upload finds or creates one and would store it.
+  const storedFolder = state.files.get(cfg('document_storage_google_drive_folder_id'));
+  storedFolder.trashed = true;
+
+  const upload = driveStorage.uploadFile({ buffer: Buffer.from('bytes'), originalName: 'a.txt' });
+  await switchToAccountB();
+  await upload;
+
+  assert.equal(cfg('document_storage_google_drive_folder_id'), 'folder-of-b');
+});
+
+test('a connection test of account A does not record its result for account B connected meanwhile', async () => {
+  const { switchToAccountB } = await accountSwitchDuringFirstDriveCall();
+
+  const tested = driveStorage.testConnection();
+  await switchToAccountB();
+  assert.deepEqual(await tested, { ok: true });
+
+  assert.equal(cfg('document_storage_google_drive_last_test'), null);
+});
+
 test('upload, streaming read, token refresh, delete and missing delete are supported', async () => {
   await driveStorage.handleCallback('code');
   const id = await driveStorage.uploadFile({
