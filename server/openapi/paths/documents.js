@@ -391,6 +391,7 @@ export function documentsPaths() {
           },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
+          409: { description: 'The document storage settings changed while the file was uploaded (`storage_code` `DOCUMENT_STORAGE_CONFIG_CHANGED`); no document is created and the uploaded file is removed again, the upload may be sent again', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
           502: { description: 'Document-storage operation failed', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
           500: { $ref: '#/components/responses/InternalServerError' },
         },

@@ -396,6 +396,14 @@ function clearWebdavDocuments() {
   get().prepare("DELETE FROM family_documents WHERE storage_backend = 'webdav'").run();
 }
 
+/**
+ * @param {any} t
+ * @param {{
+ *   username?: string,
+ *   password?: string,
+ *   handler?: (req: any, res: any, request: any, files: Map<string, Buffer>) => boolean | Promise<boolean>,
+ * }} [options]
+ */
 async function createWebdavServer(t, {
   username = 'alice',
   password = 'secret',
@@ -1557,6 +1565,233 @@ test('document upload stores WebDAV bytes remotely without a SQLite binary copy'
   );
 });
 
+// #2946, the other direction of the protection: a document uploaded to the
+// old WebDAV target while a new one is saved would stand behind a connection
+// that no longer holds. The write is refused and the staged file removed
+// where it lies.
+/** @param {any} t */
+async function heldWebdavMove(t) {
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  const old = await createWebdavServer(t, {
+    async handler(req) {
+      if (req.method === 'PUT') {
+        started.resolve();
+        await released.promise;
+      }
+      return false;
+    },
+  });
+  const moved = await createWebdavServer(t);
+  setConfig({
+    enabled: '1',
+    url: old.url,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  return {
+    old,
+    moved,
+    // Waits until the upload is held at the old target, saves the new one,
+    // and lets the upload go on.
+    async moveDuringUpload() {
+      await started.promise;
+      setConfig({ url: moved.url });
+      released.resolve();
+    },
+  };
+}
+
+test('a WebDAV target saved during a document upload refuses the document and removes the file', async (t) => {
+  const { old, moved, moveDuringUpload } = await heldWebdavMove(t);
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const pending = routeCall(harness, 'POST', '/', uploadBody({
+    name: 'Uploaded during a move',
+    bytes: 'moved bytes',
+  }));
+  await moveDuringUpload();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_CHANGED');
+  assert.equal(get().prepare(
+    "SELECT COUNT(*) AS count FROM family_documents WHERE name = 'Uploaded during a move'"
+  ).get().count, 0);
+  assert.deepEqual(old.requests.map(({ method }) => method).filter((m) => m !== 'MKCOL'), ['PUT', 'DELETE']);
+  assert.equal(old.files.size, 0);
+  assert.equal(moved.requests.length, 0);
+});
+
+test('a WebDAV target saved during a calendar attachment upload refuses the event and removes the file', async (t) => {
+  const { old, moved, moveDuringUpload } = await heldWebdavMove(t);
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+  const body = calendarEventBody({ attachmentBytes: 'moved attachment' });
+  const documentCount = () => get().prepare('SELECT COUNT(*) AS count FROM family_documents').get().count;
+  const documentsBefore = documentCount();
+
+  const pending = calendarRouteCall(harness, 'POST', '/', body);
+  await moveDuringUpload();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_CHANGED');
+  assert.equal(get().prepare('SELECT COUNT(*) AS count FROM calendar_events WHERE title = ?')
+    .get(body.title).count, 0);
+  assert.equal(documentCount(), documentsBefore);
+  assert.deepEqual(old.requests.map(({ method }) => method).filter((m) => m !== 'MKCOL'), ['PUT', 'DELETE']);
+  assert.equal(old.files.size, 0);
+  assert.equal(moved.requests.length, 0);
+});
+
+// #2946 for Google Drive: another account connected while a document is
+// uploaded. The upload is refused and the file removed through the account
+// it went to; the old client never writes its token over the new account's.
+test('a Drive account connected during a document upload refuses the document and removes the file from the old account', async (t) => {
+  configureFakeDriveStorage();
+  get().prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('document_storage_selected_backend', 'google_drive')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run();
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  /** @type {Array<{ call: string, grant: string, fileId?: string }>} */
+  const calls = [];
+  /** @type {any[]} */
+  const clients = [];
+  const folder = { id: 'drive-folder', mimeType: 'application/vnd.google-apps.folder', trashed: false };
+  googleDriveStorage.__setGoogleApiFactoryForTests({
+    createOAuth2: () => {
+      const client = {
+        /** @type {any} */ credentials: null,
+        /** @type {Map<string, any>} */ listeners: new Map(),
+        setCredentials(/** @type {any} */ credentials) { this.credentials = credentials; },
+        on(/** @type {string} */ event, /** @type {any} */ listener) { this.listeners.set(event, listener); },
+      };
+      clients.push(client);
+      return client;
+    },
+    createDrive: (/** @type {any} */ client) => ({
+      files: {
+        async get() { return { data: folder }; },
+        async create() {
+          calls.push({ call: 'create', grant: client.credentials.refresh_token });
+          started.resolve();
+          await released.promise;
+          return { data: { id: 'uploaded-file' } };
+        },
+        async delete(/** @type {any} */ { fileId }) {
+          calls.push({ call: 'delete', grant: client.credentials.refresh_token, fileId });
+        },
+      },
+    }),
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const pending = routeCall(harness, 'POST', '/', uploadBody({
+    name: 'Uploaded during an account change',
+    bytes: 'drive bytes',
+  }));
+  await started.promise;
+  const setDrive = get().prepare(`
+    INSERT INTO sync_config (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `);
+  setDrive.run('document_storage_google_drive_refresh_token', 'refresh-b');
+  setDrive.run('document_storage_google_drive_access_token', 'access-b');
+  setDrive.run('document_storage_google_drive_account_id', 'account-b');
+  released.resolve();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_CHANGED');
+  assert.equal(get().prepare(
+    "SELECT COUNT(*) AS count FROM family_documents WHERE name = 'Uploaded during an account change'"
+  ).get().count, 0);
+  assert.deepEqual(calls, [
+    { call: 'create', grant: 'refresh' },
+    { call: 'delete', grant: 'refresh', fileId: 'uploaded-file' },
+  ]);
+  // A token refresh of the old client arrives after the new account is stored.
+  clients[0].listeners.get('tokens')?.({ access_token: 'access-a-refreshed', expiry_date: 1 });
+  assert.equal(get().prepare(
+    "SELECT value FROM sync_config WHERE key = 'document_storage_google_drive_access_token'"
+  ).get().value, 'access-b');
+});
+
+// #2946, the copy of an inherited attachment when a series is split: the copy
+// is uploaded before the write like a new attachment and checked the same way.
+test('a WebDAV target saved during the attachment copy of a split refuses the split and removes the copy', async (t) => {
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  let hold = false;
+  const old = await createWebdavServer(t, {
+    async handler(req) {
+      if (hold && req.method === 'PUT') {
+        started.resolve();
+        await released.promise;
+      }
+      return false;
+    },
+  });
+  const moved = await createWebdavServer(t);
+  setConfig({
+    enabled: '1',
+    url: old.url,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+  const series = await calendarRouteCall(harness, 'POST', '/', calendarEventBody({
+    start_datetime: '2026-11-19T08:00',
+    attachmentBytes: 'series attachment',
+    extra: { end_datetime: '2026-11-19T09:00', recurrence_rule: 'FREQ=DAILY;COUNT=5' },
+  }));
+  assert.equal(series.response.status, 201);
+  const seriesId = series.body.data.id;
+  const filesBefore = [...old.files.keys()];
+  assert.equal(filesBefore.length, 1);
+  const count = (/** @type {string} */ table) => get().prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count;
+  const eventsBefore = count('calendar_events');
+  const documentsBefore = count('family_documents');
+
+  hold = true;
+  const pending = calendarRouteCall(
+    harness,
+    'PUT',
+    `/${seriesId}/occurrences/2026-11-21T08:00:00/following`,
+    { title: 'Split during a move' }
+  );
+  await started.promise;
+  setConfig({ url: moved.url });
+  released.resolve();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_CHANGED');
+  assert.equal(count('calendar_events'), eventsBefore);
+  assert.equal(count('family_documents'), documentsBefore);
+  assert.deepEqual([...old.files.keys()], filesBefore);
+  assert.equal(old.requests.filter(({ method }) => method === 'DELETE').length, 1);
+  assert.equal(moved.requests.length, 0);
+});
+
 test('enabled WebDAV upload failures return a stable error and never create a local row', async (t) => {
   const webdav = await createWebdavServer(t, {
     handler(req, res) {
@@ -2365,6 +2600,166 @@ test('protected effective connection changes require explicit confirmation', asy
   assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_PROTECTED');
   assert.equal(storage.getConfig().url, current.url);
   assert.equal(proposed.requests.length, 0);
+});
+
+// #2946: the protection is decided on the documents as they are at the
+// write, not as they were before the target check went to the network.
+test('a WebDAV document stored during the target check protects the configuration', async (t) => {
+  clearWebdavDocuments();
+  t.after(() => clearWebdavDocuments());
+  const current = await createWebdavServer(t);
+  setConfig({
+    enabled: '1',
+    url: current.url,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  storage.__setPrivateNetworkAccessForTests(false);
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  storage.__setHostnameLookupForTests(async () => {
+    started.resolve();
+    await released.promise;
+    return [{ address: '93.184.216.34', family: 4 }];
+  });
+  const userId = createRouteUser();
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const pending = routeCall(harness, 'PUT', '/storage/config', {
+    url: 'https://webdav.example.test/dav',
+  });
+  await started.promise;
+  insertRouteDocument(userId, {
+    contentData: '',
+    storageProvider: 'external',
+    storageBackend: 'webdav',
+    storageKey: 'arrived-meanwhile.txt',
+  });
+  released.resolve();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_PROTECTED');
+  assert.equal(storage.getConfig().url, current.url);
+});
+
+// #2946: two confirmed changes that overlap are each verified against the
+// configuration they started from; the one that writes second must not
+// store a merge of both that no request ever verified.
+test('overlapping confirmed WebDAV changes do not store an unverified merge', async (t) => {
+  clearWebdavDocuments();
+  t.after(() => clearWebdavDocuments());
+  const current = await createWebdavServer(t, {
+    handler(req, res) {
+      if (req.method !== 'GET') return false;
+      res.writeHead(200, { 'Content-Length': 2 });
+      res.end('ok');
+      return true;
+    },
+  });
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  const moved = await createWebdavServer(t, {
+    async handler(/** @type {any} */ req) {
+      if (req.method === 'GET') {
+        started.resolve();
+        await released.promise;
+      }
+      return false;
+    },
+  });
+  moved.files.set('/documents/protected.txt', Buffer.from('ok'));
+  setConfig({
+    enabled: '1',
+    url: current.url,
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  const userId = createRouteUser();
+  insertRouteDocument(userId, {
+    contentData: '',
+    storageProvider: 'external',
+    storageBackend: 'webdav',
+    storageKey: 'protected.txt',
+  });
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const moveTarget = routeCall(harness, 'PUT', '/storage/config', {
+    url: moved.url,
+    confirm_existing_access: true,
+  });
+  await started.promise;
+  const changeAccount = await routeCall(harness, 'PUT', '/storage/config', {
+    username: 'bob',
+    password: 'other-secret',
+    confirm_existing_access: true,
+  });
+  assert.equal(changeAccount.response.status, 200);
+  released.resolve();
+  const result = await moveTarget;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_PROTECTED');
+  assert.equal(storage.getConfig().url, current.url);
+  assert.equal(storage.getConfig().username, 'bob');
+  assert.equal(storage.getConfig().password, 'other-secret');
+});
+
+// #2946: what counts as a change is measured against the configuration
+// stored at the write. A change saved while the target check waits turns an
+// unchanged connection into one that needs the admin's confirmation.
+test('a WebDAV change saved during the target check is compared at the write', async (t) => {
+  clearWebdavDocuments();
+  t.after(() => clearWebdavDocuments());
+  setConfig({
+    enabled: '1',
+    url: 'https://files.example.test/dav',
+    username: 'alice',
+    password: 'secret',
+    path: 'documents',
+  });
+  storage.__setPrivateNetworkAccessForTests(false);
+  /** @type {PromiseWithResolvers<void>} */
+  const started = Promise.withResolvers();
+  /** @type {PromiseWithResolvers<void>} */
+  const released = Promise.withResolvers();
+  storage.__setHostnameLookupForTests(async () => {
+    started.resolve();
+    await released.promise;
+    return [{ address: '93.184.216.34', family: 4 }];
+  });
+  const userId = createRouteUser();
+  insertRouteDocument(userId, {
+    contentData: '',
+    storageProvider: 'external',
+    storageBackend: 'webdav',
+    storageKey: 'protected.txt',
+  });
+  const harness = createRouteHarness({ userId });
+  t.after(() => harness.close());
+
+  const pending = routeCall(harness, 'PUT', '/storage/config', {
+    url: 'https://files.example.test/dav',
+    username: 'alice',
+    password: 'secret',
+  });
+  await started.promise;
+  setConfig({ username: 'bob', password: 'other-secret' });
+  released.resolve();
+  const result = await pending;
+
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.storage_code, 'DOCUMENT_STORAGE_CONFIG_PROTECTED');
+  assert.equal(storage.getConfig().username, 'bob');
+  assert.equal(storage.getConfig().password, 'other-secret');
 });
 
 test('equivalent normalized WebDAV targets do not require confirmation', async (t) => {

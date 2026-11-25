@@ -77,6 +77,8 @@ const RECURRENCE_ID_PARAM = 'Original occurrence, as the calendar reads return i
   + 'series with its earlier meaning; when it matches two occurrences (the night of a clock change) the answer '
   + 'is 409 with reason `ambiguous_recurrence_id`.';
 const AMBIGUOUS_RECURRENCE_ID = apiError('A date-only recurrence_id matches two occurrences (reason `ambiguous_recurrence_id`); send the exact recurrence_id');
+// #2946: an attachment uploaded while the document storage settings changed.
+const STORAGE_CHANGED_TEXT = 'the document storage settings changed while an attachment was uploaded (`storage_code` `DOCUMENT_STORAGE_CONFIG_CHANGED`); nothing is saved, the uploaded file is removed again and the request may be sent again';
 
 /**
  * Gilt fuer POST und PUT gleich (#1364), deshalb einmal: ein Offset wird
@@ -170,6 +172,7 @@ export function calendarPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: apiError('A new attachment without write access to the Documents module.'),
+          409: apiError(`The ${STORAGE_CHANGED_TEXT}`),
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -478,7 +481,7 @@ export function calendarPaths() {
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: apiError('Calendar series not found'),
-          409: AMBIGUOUS_RECURRENCE_ID,
+          409: apiError(`A date-only recurrence_id matches two occurrences (reason \`ambiguous_recurrence_id\`; send the exact recurrence_id), or ${STORAGE_CHANGED_TEXT}`),
           500: { $ref: '#/components/responses/InternalServerError' },
         },
       }),
@@ -527,7 +530,7 @@ export function calendarPaths() {
           403: { $ref: '#/components/responses/Forbidden' },
           404: apiError('Calendar series not found'),
           409: {
-            description: 'Linked occurrence replacements require exact-count orphan confirmation, or a date-only recurrence_id matches two occurrences (reason `ambiguous_recurrence_id`)',
+            description: `Linked occurrence replacements require exact-count orphan confirmation, or a date-only recurrence_id matches two occurrences (reason \`ambiguous_recurrence_id\`), or ${STORAGE_CHANGED_TEXT}`,
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarOverrideOrphanConflict' } } },
           },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -588,7 +591,7 @@ export function calendarPaths() {
           403: apiError('A new attachment without write access to the Documents module, or a change to an attachment whose document the caller cannot read.'),
           404: { description: 'Calendar event not found' },
           409: {
-            description: 'Linked occurrence replacements require exact-count orphan confirmation',
+            description: `Linked occurrence replacements require exact-count orphan confirmation, or ${STORAGE_CHANGED_TEXT}`,
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarOverrideOrphanConflict' } } },
           },
           500: { $ref: '#/components/responses/InternalServerError' },

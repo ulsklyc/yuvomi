@@ -961,6 +961,7 @@ export const schemas = {
             'DOCUMENT_STORAGE_TOO_LARGE',
             'DOCUMENT_STORAGE_CONNECTION_TEST_FAILED',
             'DOCUMENT_STORAGE_CONFIG_PROTECTED',
+            'DOCUMENT_STORAGE_CONFIG_CHANGED',
           ],
         },
         FamilyDocument: {

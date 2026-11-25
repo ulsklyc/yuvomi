@@ -805,7 +805,73 @@ export function buildStorageKey({ category, originalName } = {}) {
   return `${safeCategory}/${randomUUID()}-${stem}${extension}`;
 }
 
-export async function stageDocumentUpload({
+/**
+ * Where a new upload would be stored right now, without any secret: the
+ * backend and the identity of its target (#2946). A WebDAV password or a
+ * Google token never goes in; a changed password still reaches the same
+ * files, a changed URL, base path, user or Drive account does not.
+ */
+export function currentUploadTarget() {
+  const localCfg = getLocalStorageConfig();
+  if (localCfg.enabled) return { backend: 'local_folder', base_path: localCfg.basePath };
+  const backend = getSelectedUploadBackend();
+  if (backend === 'local') return { backend: 'local' };
+  if (backend === 'google_drive') {
+    return { backend: 'google_drive', account_id: googleDriveStorage.connectedAccountId() };
+  }
+  const config = getConfig();
+  return { backend: 'webdav', target: getEffectiveTarget(config), username: config.username };
+}
+
+/** The answer when the storage settings changed during an upload (#2946). */
+export const STORAGE_CONFIG_CHANGED_MESSAGE =
+  'The document storage settings changed during the upload. Upload the file again.';
+
+// What a staged upload was written to, per staged object (#2946): `target`,
+// the stamp taken before the upload awaited (for Drive: the account of the
+// upload connection), and the connection itself - for WebDAV the settings,
+// password included, for Drive the authorized client - so that cleaning up
+// after a refusal deletes the file where it lies and not at a target or
+// account saved in the meantime. Only in memory, for as long as the staged
+// object lives (the request); kept beside the staged object rather than in it:
+// the object's fields are what callers store, and the connection must not
+// travel with them.
+/** @type {WeakMap<object, { target: object, webdavConfig?: any, driveConnection?: any }>} */
+const stagedUploads = new WeakMap();
+
+/**
+ * The upload target a staged file was written to is still the one new uploads
+ * go to. Called synchronously in the transaction of the INSERT that records
+ * the staged file: the upload itself awaited, and a change of the storage
+ * settings saved meanwhile would leave the new row behind a connection that
+ * no longer holds (#2946). A staged object not made by stageDocumentUpload
+ * (a test double) carries no stamp and is not checked.
+ *
+ * @param {object | null | undefined} staged
+ */
+export function assertStagedTargetCurrent(staged) {
+  const stamp = staged ? stagedUploads.get(staged) : undefined;
+  if (!stamp) return;
+  if (JSON.stringify(stamp.target) === JSON.stringify(currentUploadTarget())) return;
+  throw new StorageError('DOCUMENT_STORAGE_CONFIG_CHANGED', STORAGE_CONFIG_CHANGED_MESSAGE);
+}
+
+/** @param {any} options the upload, as stageDocumentContent() takes it */
+export async function stageDocumentUpload(options) {
+  let target = currentUploadTarget();
+  const {
+    webdav_config: webdavConfig,
+    drive_connection: driveConnection,
+    ...staged
+  } = await stageDocumentContent(options);
+  // Drive: the account the upload connection was opened for, the same
+  // account the file went to.
+  if (driveConnection) target = { backend: 'google_drive', account_id: driveConnection.accountId };
+  stagedUploads.set(staged, { target, webdavConfig, driveConnection });
+  return staged;
+}
+
+async function stageDocumentContent({
   buffer,
   mime = 'application/octet-stream',
   category,
@@ -852,16 +918,22 @@ export async function stageDocumentUpload({
 
   if (activeBackend === 'google_drive') {
     try {
+      // The account the file goes to is decided here, in one step with its
+      // client: the stamp names this account, and a refused write removes
+      // the file through this client (#2946).
+      const driveConnection = googleDriveStorage.openUploadConnection();
       const fileId = await googleDriveStorage.uploadFile({
         buffer: content,
         mime,
         originalName,
+        connection: driveConnection,
       });
       return {
         storage_backend: 'google_drive',
         storage_provider: 'external',
         storage_key: fileId,
         content_data: '',
+        drive_connection: driveConnection,
       };
     } catch (error) {
       throw toStorageError(
@@ -907,6 +979,7 @@ export async function stageDocumentUpload({
     storage_provider: 'external',
     storage_key: storageKey,
     content_data: '',
+    webdav_config: config,
   };
 }
 
@@ -1058,10 +1131,16 @@ export async function readDocumentContent(document, { dmsResolver } = {}) {
   }
 }
 
-export async function deleteDocumentContent(document) {
+/**
+ * @param {any} document
+ * @param {{ webdavConfig?: any, driveConnection?: any }} [options] the WebDAV
+ *   connection or the Drive connection to delete with; without them the
+ *   stored one
+ */
+export async function deleteDocumentContent(document, { webdavConfig, driveConnection } = {}) {
   if (document.storage_backend === 'google_drive') {
     try {
-      await googleDriveStorage.deleteFile(document.storage_key);
+      await googleDriveStorage.deleteFile(document.storage_key, { connection: driveConnection });
     } catch (error) {
       throw toStorageError(
         error,
@@ -1074,7 +1153,7 @@ export async function deleteDocumentContent(document) {
 
   // WebDAV deletion
   if (document.storage_backend === 'webdav') {
-    const config = requireWebdavConfig(getConfig());
+    const config = requireWebdavConfig(webdavConfig ?? getConfig());
     try {
       const response = await davFetch(config, 'DELETE', [
         ...config.basePath.split('/'),
@@ -1117,7 +1196,11 @@ export async function deleteDocumentContent(document) {
 
 export async function cleanupStagedUpload(staged) {
   try {
-    return await deleteDocumentContent(staged);
+    const stamp = stagedUploads.get(staged);
+    return await deleteDocumentContent(staged, {
+      webdavConfig: stamp?.webdavConfig,
+      driveConnection: stamp?.driveConnection,
+    });
   } catch (error) {
     throw new StorageError(
       'DOCUMENT_STORAGE_CLEANUP_FAILED',
