@@ -922,6 +922,7 @@
       "response 200.data.points",
       "response 200.data.priority",
       "response 200.data.recurrence_rule",
+      "response 200.data.reminders_removed_others",
       "response 200.data.rotation_last_position",
       "response 200.data.rotation_last_user",
       "response 200.data.rotation_mode",
