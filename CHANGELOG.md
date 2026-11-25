@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Gotify, webhook or e-mail channel that answers late), the next run started anyway and sent the
   reminders the first one had not finished yet a second time. Now a new run starts only once the
   previous one is done, and a reminder that is being sent is never sent again in the meantime.
+  A reminder also goes out only if it is still due when its turn comes: one deleted, dismissed or
+  moved to a later time, or whose module was switched off or taken away while earlier reminders
+  were being sent, no longer goes out, and a channel switched off, deleted or made a household
+  channel in that time no longer hears it.
 - **A recipe provider sync no longer deletes a recipe another sync just imported.** When the
   hourly sync and "Sync now" ran for the same Mealie or Tandoor account at the same time, one of
   them could delete a recipe the other had just imported, so the meal plan lost its link to it,

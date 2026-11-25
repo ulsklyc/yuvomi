@@ -518,7 +518,7 @@ export async function processDueNotifications({
     log.error('Prevention reminder sync failed:', err?.message || err);
   }
 
-  const dueRows = activeDb.prepare(`
+  const dueStatement = activeDb.prepare(`
     SELECT r.id, r.created_by, r.entity_type, r.entity_id, r.remind_at, r.assigned_from,
       -- Sieht JEDER das Ziel dieser Zeile? Davon haengt ab, ob sie in einen
       -- Kanal des ganzen Haushalts darf (siehe die Kanalwahl in der Schleife).
@@ -629,8 +629,11 @@ export async function processDueNotifications({
       -- eine oeffentliche Zeile kaeme sonst auch der Haushaltskanal in Frage.
       -- Der Filter steht in der Abfrage und damit vor Push UND Kanaelen.
       AND EXISTS (SELECT 1 FROM users recipient WHERE recipient.id = r.created_by AND ${activeAccountSql('recipient')})
+      -- Alle faelligen Zeilen, oder nur die eine, die die Schleife vor dem
+      -- Senden noch einmal fragt (#2942, siehe dueNow()).
+      AND (? IS NULL OR r.id = ?)
     ORDER BY r.remind_at ASC
-  `).all(remindAtCompareKey(nowIso));
+  `);
 
   // EIN ABGESCHALTETES MODUL MELDET SICH NICHT (#1279). Die Syncs oben raeumen
   // nur die Quellen ab, die sie selbst herstellen; eine Aufgabe, ein Termin, ein
@@ -650,11 +653,22 @@ export async function processDueNotifications({
   // UND EIN GELOESCHTES ERSTES VORKOMMEN MELDET SICH NICHT (#2470): dieselbe
   // Pruefung wie in `/pending` und `/upcoming`, ebenfalls synchron an dieser
   // Stelle (services/reminder-deleted-occurrence.js).
-  const due = withoutGoneEvents(activeDb, withoutModulesDeniedToRecipient(
+  //
+  // UND ALLES DAS GILT NOCH IM AUGENBLICK DES SENDENS (#2942). Die Schleife
+  // unten wartet je Ziel auf den Push-Dienst oder den Kanal; Erinnerung N geht
+  // erst nach den Wartezeiten aller vorigen raus. Wird sie in der Zeit geloescht,
+  // erledigt, verschoben, ihr Modul abgeschaltet oder entzogen oder ihr erstes
+  // Vorkommen geloescht, darf sie nicht mehr raus. Deshalb fragt die Schleife
+  // vor jedem Ziel und vor dem Vermerk `pushed_at` dieselbe Funktion fuer genau
+  // diese Zeile noch einmal - synchron, ohne `await` bis zum Festhalten der
+  // Zustellung. Eine Funktion fuer beide Fragen, damit sie nie auseinanderlaufen.
+  /** @param {number | null} [onlyId] */
+  const dueNow = (onlyId = null) => withoutGoneEvents(activeDb, withoutModulesDeniedToRecipient(
     activeDb,
-    withoutSwitchedOffModules(activeDb, dueRows),
+    withoutSwitchedOffModules(activeDb, dueStatement.all(remindAtCompareKey(nowIso), onlyId, onlyId)),
   )).filter((row) => !fastingSyncFailed
     || (row.entity_type !== 'fasting_goal' && row.entity_type !== 'fasting_next_start'));
+  const due = dueNow();
 
   const counters = { due: due.length, attempted: 0, sent: 0, failed: 0, skipped: 0 };
   const markPushed = activeDb.prepare('UPDATE reminders SET pushed_at = ? WHERE id = ?');
@@ -711,6 +725,18 @@ export async function processDueNotifications({
     `).get(`channel:${channel.id}`, reminder.entity_type, ...targetParams, reminder.remind_at, reminder.id));
   }
 
+  // Die Kanaele, die eine Zeile hoeren duerfen - beim Planen der Ziele und noch
+  // einmal vor jedem Kanal-Ziel (#2942), mit derselben Regel.
+  /** @param {any} reminder */
+  function channelsHearing(reminder) {
+    return store.listEnabledChannelsForUser(reminder.created_by)
+      // Allowlist: fuer eine nicht oeffentliche Zeile zaehlt nur ein Kanal, der
+      // ausdruecklich der Person gehoert - ein Kanal ohne oder mit unbekanntem
+      // `scope` gilt als Haushaltskanal.
+      .filter((channel) => reminder.target_public || channel.scope === 'user')
+      .filter((channel) => channel.scope === 'user' || !householdChannelHeardReminder(reminder, channel));
+  }
+
   for (const reminder of due) {
     reminder.cycle_owner_name = cycleOwnerName(reminder);
     if (reminder.entity_type === 'shopping_move_returned') {
@@ -731,12 +757,7 @@ export async function processDueNotifications({
     // keine Meldung nach draussen - der Toast in der App (`/pending`) zeigt
     // sie weiter. Die Zeile gilt dann als erledigt (kein Ziel, nichts offen),
     // sonst liefe sie in jedem Durchgang wieder an.
-    const channels = store.listEnabledChannelsForUser(reminder.created_by)
-      // Allowlist: fuer eine nicht oeffentliche Zeile zaehlt nur ein Kanal, der
-      // ausdruecklich der Person gehoert - ein Kanal ohne oder mit unbekanntem
-      // `scope` gilt als Haushaltskanal.
-      .filter((channel) => reminder.target_public || channel.scope === 'user')
-      .filter((channel) => channel.scope === 'user' || !householdChannelHeardReminder(reminder, channel));
+    const channels = channelsHearing(reminder);
     const pushCount = activeDb.prepare('SELECT COUNT(*) AS c FROM push_subscriptions WHERE user_id = ?').get(reminder.created_by).c;
     const targets = [];
     if (pushCount > 0) {
@@ -752,7 +773,29 @@ export async function processDueNotifications({
       });
     }
 
+    // Ziele, die beim Senden nicht mehr zaehlen (#2942): der Vermerk `pushed_at`
+    // wartet nicht auf sie.
+    const droppedTargets = new Set();
+    let stillDue = true;
     for (const target of targets) {
+      // Vor jedem Ziel noch einmal, ohne `await` bis zum Festhalten der
+      // Zustellung (#2942): ist die Zeile nicht mehr faellig, geht nichts mehr
+      // raus und es entsteht keine Zustellzeile.
+      const current = dueNow(reminder.id)[0];
+      if (!current) {
+        stillDue = false;
+        break;
+      }
+      if (target.send === 'provider') {
+        // Der Kanal ebenso: noch eingeschaltet, Scope- und Gehoert-Regel
+        // gelten noch - gegen die Zeile, wie sie jetzt ist.
+        const channel = channelsHearing(current).find((/** @type {any} */ candidate) => candidate.id === target.channelId);
+        if (!channel) {
+          droppedTargets.add(target);
+          continue;
+        }
+        target.channel = channel;
+      }
       const delivery = upsertPendingDelivery(activeDb, {
         reminderId: reminder.id,
         provider: target.provider,
@@ -789,7 +832,10 @@ export async function processDueNotifications({
       }
     }
 
-    if (allKnownDeliveriesComplete(activeDb, reminder.id, targets)) {
+    // Auch der Vermerk nur an einer Zeile, die noch faellig ist (#2942): eine
+    // inzwischen verschobene oder abgeschaltete Zeile bleibt ausstehend.
+    if (stillDue && dueNow(reminder.id).length > 0
+      && allKnownDeliveriesComplete(activeDb, reminder.id, targets.filter((target) => !droppedTargets.has(target)))) {
       markPushed.run(nowIso, reminder.id);
     }
   }
