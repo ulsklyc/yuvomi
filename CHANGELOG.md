@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tasks can show who created them (#2451).** Administrators turn on Settings > Tasks >
+  "Show creator in task list"; the task list then names the creator next to each title, and a
+  filter narrows the list to one creator. The household's own tasks are unaffected when the
+  setting is off, and a one-person household never shows it.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation
@@ -830,12 +836,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a missing record or a conflict of waste collection, the 502 of a subscribed address without
   calendar entries, and the 409 of a shift type still in use. The waste feed, the schedule feed
   and the own schedule settings answered this way already.
-
-### Added
-- **Tasks can show who created them (#2451).** Administrators turn on Settings > Tasks >
-  "Show creator in task list"; the task list then names the creator next to each title, and a
-  filter narrows the list to one creator. The household's own tasks are unaffected when the
-  setting is off, and a one-person household never shows it.
 
 ### Fixed
 - **Saving a contact in the app keeps its middle name, title and suffix.** A contact imported
