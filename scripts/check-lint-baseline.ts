@@ -66,8 +66,11 @@ const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.
 // (rights-only-through-authorize) and a permission module that never opens the database
 // (authorize-not-to-db). The settings registry stays a leaf under the services (phase 2,
 // C3: settings-is-a-leaf). A blanket or no-restricted-syntax suppression would switch them
-// off, so it is hard as well.
+// off, so it is hard as well. SYNC-ONLY (phase 2, F6c) keeps async/await out of the
+// permission module, the migrations, the database core and the read slices: the driver is
+// synchronous, and an await between a read and its write lets another request in.
 const HARD = new Set([
+  'oxlint/no-restricted-syntax/SYNC-ONLY',
   'oxlint/no-restricted-syntax/HTML-STRING-WRITE',
   'oxlint/no-restricted-syntax/TX-ASYNC-FN',
   'oxlint/no-restricted-syntax/TX-AWAIT-INSIDE',
