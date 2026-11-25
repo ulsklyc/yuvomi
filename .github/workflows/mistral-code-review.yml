@@ -57,12 +57,16 @@ jobs:
             > "$RUNNER_TEMP/pr.json"
           gh pr diff "$PR" --repo "$REPO" > "$RUNNER_TEMP/diff.patch"
           # Riesige Diffs (Lockfiles) werden abgeschnitten; der Prompt sagt es.
+          # Geschnitten wird an der letzten vollen Zeile: ein Schnitt mitten im
+          # Byte-Strom teilt ein Mehrbyte-Zeichen, und jq bekaeme ungueltiges UTF-8.
+          # KUERZUNG-ANFANG
           abgeschnitten=no
           if [ "$(wc -c < "$RUNNER_TEMP/diff.patch")" -gt 200000 ]; then
-            head -c 200000 "$RUNNER_TEMP/diff.patch" > "$RUNNER_TEMP/diff-kurz.patch"
+            head -c 200000 "$RUNNER_TEMP/diff.patch" | LC_ALL=C sed '$d' > "$RUNNER_TEMP/diff-kurz.patch"
             mv "$RUNNER_TEMP/diff-kurz.patch" "$RUNNER_TEMP/diff.patch"
             abgeschnitten=yes
           fi
+          # KUERZUNG-ENDE
           echo "abgeschnitten=$abgeschnitten" >> "$GITHUB_OUTPUT"
 
       - name: Review-Prompt bauen

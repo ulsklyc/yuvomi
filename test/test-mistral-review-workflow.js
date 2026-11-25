@@ -166,3 +166,36 @@ test('der Diff-Zaun ist laenger als jede Backtick-Folge in Diff und Beschreibung
   assert.match(ohneKommentare, /echo "\$\{zaun\}text"\n\s*cat "\$RUNNER_TEMP\/body\.txt"\n\s*echo "\$zaun"/);
   assert.doesNotMatch(ohneKommentare, /printf '%s\\n' "\$body"/);
 });
+
+test('ein zu grosser Diff wird an einer Zeilengrenze gekuerzt, nie mitten in einem Zeichen', (t) => {
+  // Mistral-Review #2965: `head -c` teilte ein Mehrbyte-Zeichen, und der
+  // Rest ging als ungueltiges UTF-8 an `jq --rawfile`.
+  const kuerzung = workflow.match(/# KUERZUNG-ANFANG\n([\s\S]*?)\n\s*# KUERZUNG-ENDE/)?.[1];
+  assert.ok(kuerzung, 'Kuerzung nicht gefunden');
+  try {
+    execFileSync('bash', ['--version'], { stdio: 'ignore' });
+  } catch {
+    t.skip('bash ist nicht installiert');
+    return;
+  }
+  const dir = tempDir('yuvomi-mistral-kuerzung-');
+  /** @param {string} diff */
+  const kuerze = (diff) => {
+    writeFileSync(join(dir, 'diff.patch'), diff);
+    const marke = execFileSync('bash', ['-euo', 'pipefail', '-c', `${kuerzung}\nprintf '%s' "$abgeschnitten"`], {
+      env: { ...process.env, RUNNER_TEMP: dir },
+      encoding: 'utf8',
+    });
+    return { marke, rest: readFileSync(join(dir, 'diff.patch')) };
+  };
+  const zeile = `+${'ä'.repeat(49)}\n`; // 100 Byte, das 200000. Byte liegt mitten in einem ä
+  const gross = `${'x'.repeat(199_950)}\n${zeile}${zeile}`;
+  const { marke, rest } = kuerze(gross);
+  assert.equal(marke, 'yes');
+  assert.ok(rest.length <= 200_000 && rest.length > 0);
+  assert.equal(rest.at(-1), 0x0a, 'endet nicht auf einer Zeilengrenze');
+  assert.equal(new TextDecoder('utf-8', { fatal: true }).decode(rest), `${'x'.repeat(199_950)}\n`);
+  const klein = kuerze('+a\n');
+  assert.equal(klein.marke, 'no');
+  assert.equal(klein.rest.toString(), '+a\n');
+});
