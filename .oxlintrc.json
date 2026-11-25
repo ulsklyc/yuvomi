@@ -70,6 +70,14 @@
         "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
       },
       {
+        "selector": "CallExpression[callee.property.name='exec'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+        "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+      },
+      {
+        "selector": "CallExpression[callee.property.name='prepare']:matches([arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i], [arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i])",
+        "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+      },
+      {
         "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
         "message": "ERROR-TEXT: the text of an exception goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
       },
@@ -121,6 +129,14 @@
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='prepare']:matches([arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i], [arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i])",
             "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
@@ -263,6 +279,14 @@
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='prepare']:matches([arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i], [arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i])",
             "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
@@ -412,6 +436,14 @@
             "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='prepare']:matches([arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i], [arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i])",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
             "message": "ERROR-TEXT: the text of an exception goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
           },
@@ -538,6 +570,14 @@
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='prepare']:matches([arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i], [arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i])",
             "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
@@ -683,6 +723,14 @@
             "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='prepare']:matches([arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i], [arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i])",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
             "message": "ERROR-TEXT: the text of an exception goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
           },
@@ -822,6 +870,14 @@
             "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='prepare']:matches([arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i], [arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i])",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
             "selector": ":matches(CallExpression, NewExpression):matches([callee.property.name=/^(json|send|end)$/], [arguments.0.name='res']) :matches(MemberExpression:matches([property.name=/^(message|stack)$/], [property.value=/^(message|stack)$/]):matches([object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], [object.type='MemberExpression'][object.property.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/]):not(BinaryExpression[operator=/^[!=]==?$/] > *):not(BinaryExpression[operator=/^[!=]==?$/] > ChainExpression > *), :matches(CallExpression, NewExpression):matches([callee.name='String'], [callee.property.name='String'])[arguments.0.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], CallExpression[callee.property.name='toString'][callee.object.name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/], TemplateLiteral > Identifier[name=/^([\\w$]*[eE]rr(or)?|e|ex|exc|cause|failure)$/])",
             "message": "ERROR-TEXT: the text of an exception goes into a response; answer with a fixed English sentence plus `reason`; let an unexpected error reach the central error handler, or throw an HttpError for a 4xx the client may read."
           },
@@ -934,6 +990,14 @@
           },
           {
             "selector": "CallExpression[callee.property.name='exec'][arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='exec'][arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i]",
+            "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
+          },
+          {
+            "selector": "CallExpression[callee.property.name='prepare']:matches([arguments.0.value=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i], [arguments.0.type='TemplateLiteral'][arguments.0.quasis.0.value.raw=/^\\s*(BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i])",
             "message": "TX-MANUAL: manual BEGIN/COMMIT/ROLLBACK; use withTx() from server/db/tx.ts, which also runs on node:sqlite and nests as a savepoint."
           },
           {

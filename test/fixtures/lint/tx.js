@@ -1,4 +1,4 @@
-// Lint fixture (phase 1b, section D; withTx since phase 2, F6): four findings of the transaction rules.
+// Lint fixture (phase 1b, section D; withTx since phase 2, F6): eight findings of the transaction rules.
 // better-sqlite3 throws on a returned promise and rolls back; code after the
 // first await runs outside any transaction. Blind spots: a function passed by name, an
 // aliased import of withTx, a synchronous function that returns a promise; the thenable
@@ -12,3 +12,11 @@ const withTx = (/** @type {object} */ conn, /** @type {Function} */ fn) => fn(co
 withTx(db, async () => { await 1; db.prepare('x').run(); });                       // tx-async
 withTx(db, () => { db.prepare('x').run(); });                                      // allowed
 withTx(db, function () { const g = async () => { await 2; }; return g(); });       // tx-await
+// TX-MANUAL (phase 2, F6b): a transaction statement written by hand, one line per spelling.
+const conn = { exec: (/** @type {string} */ sql) => sql, prepare: db.prepare }; const name = 'x';
+conn.exec('BEGIN');                                                                // tx-manual, string literal
+conn.exec(`SAVEPOINT ${name}`);                                                    // tx-manual, template literal
+conn.prepare('BEGIN IMMEDIATE').run();                                             // tx-manual, prepare with a string literal
+conn.prepare(`ROLLBACK TO ${name}`).run();                                         // tx-manual, prepare with a template literal
+conn.exec('SELECT 1');                                                             // allowed
+conn.exec(`CREATE TABLE ${name} (id)`);                                            // allowed

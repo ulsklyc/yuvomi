@@ -19,6 +19,7 @@ import {
 import { createLogger } from '../logger.js';
 import { applyDocumentAccess, attachmentAccessMode, eventAudienceChanged, rowVisible } from '../authorize/index.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 
 const log = createLogger('CalendarOccurrenceOverrides');
 
@@ -702,24 +703,16 @@ const SCALAR_OVERRIDE_FIELDS = Object.freeze([
   'color', 'icon', 'visibility', 'countdown',
 ]);
 
-let fallbackTransactionId = 0;
-
+/**
+ * Eine Transaktion um einen Schreibweg (withTx: beide Treiber, in einer offenen
+ * Transaktion ein SAVEPOINT). Die Rueckgabe bleibt bewusst untypisiert, wie vor
+ * dem Umzug auf withTx: die Schreibwege liefern je nach Zweig andere Formen.
+ * @param {import('../db/tx.ts').TxDatabase} database
+ * @param {() => any} work
+ * @returns {any}
+ */
 function runTransaction(database, work) {
-  if (typeof database.transaction === 'function') return database.transaction(work)();
-  // node:sqlite fixtures do not expose better-sqlite3's transaction helper.
-  // SAVEPOINT preserves identical atomicity and remains valid inside an outer
-  // transaction, unlike a raw BEGIN/COMMIT fallback.
-  const savepoint = `calendar_occurrence_${++fallbackTransactionId}`;
-  database.exec(`SAVEPOINT ${savepoint}`);
-  try {
-    const result = work();
-    database.exec(`RELEASE SAVEPOINT ${savepoint}`);
-    return result;
-  } catch (error) {
-    database.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-    database.exec(`RELEASE SAVEPOINT ${savepoint}`);
-    throw error;
-  }
+  return withTx(database, work);
 }
 
 function loadSeriesForMutation(database, seriesId, actorId, isAdmin, authorizeActor = true) {

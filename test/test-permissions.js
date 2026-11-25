@@ -263,6 +263,20 @@ test('replaceSubjectPermissions ersetzt atomar (kein Merge)', () => {
   assert.deepEqual(stored.modules, { health: 'read' }); // budget-Sperre ist weg
 });
 
+test('replaceSubjectPermissions: scheitert ein Schreiben mitten drin, bleibt der alte Satz stehen', () => {
+  const db = freshDb();
+  addUser(db, { id: 11, role: 'member', family_role: 'relative' });
+  replaceSubjectPermissions(db, 'role', 'relative', { modules: { budget: 'none' } });
+  // Das DELETE des alten Satzes und das erste INSERT laufen durch, das zweite INSERT scheitert.
+  db.exec(`CREATE TEMP TRIGGER fail_health BEFORE INSERT ON access_permissions
+    WHEN NEW.resource_key = 'health' BEGIN SELECT RAISE(ABORT, 'forced insert failure'); END`);
+  assert.throws(() => replaceSubjectPermissions(db, 'role', 'relative', { modules: { notes: 'read', health: 'none' } }),
+    /forced insert failure/);
+  db.exec('DROP TRIGGER fail_health');
+  assert.deepEqual(getSubjectPermissions(db, 'role', 'relative').modules, { budget: 'none' });
+  db.close();
+});
+
 test('replaceSubjectPermissions erhält Capability-Zeilen beim Speichern von Modulen', () => {
   const db = freshDb();
   db.prepare(`

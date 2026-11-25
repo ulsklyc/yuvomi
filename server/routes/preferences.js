@@ -37,6 +37,7 @@ import { rekeyForHouseholdZoneChange } from '../services/calendar-occurrence-ove
 import { readSetting, readSettings, writeSettings } from '../settings/registry.ts';
 import { remoteFailure } from '../utils/http.js';
 import { validateRequest } from '../api/validate-request.ts';
+import { withTx } from '../db/tx.ts';
 
 const log = createLogger('Preferences');
 
@@ -162,61 +163,60 @@ router.get('/', validateRequest(), (req, res) => {
 // GANZE PATCH ODER NICHTS (#1622). Das Register prueft und schreibt Feld fuer
 // Feld in seiner Reihenfolge, und das erste abgelehnte Feld beendet den
 // Handler mit seiner Absage (400, 401, 403). Damit die Felder davor dann nicht
-// stehen bleiben, laeuft die ganze Feldfolge in EINER Transaktion: COMMIT steht
-// genau einmal, hinter dem letzten Feld und der fertig gebauten Erfolgsantwort,
-// unmittelbar vor dem Senden; jeder andere Ausgang
-// (400, 401, 403, geworfener Fehler) findet im finally eine offene Transaktion
-// vor und rollt sie zurueck. Ein geworfener Fehler laeuft nach dem finally
-// weiter an den zentralen Fehlerhandler (500, #2810 Gruppe 11b). Ein neues
-// Feld im Register ist damit von selbst abgedeckt - es muss dafuer nichts nach
-// oben gezogen werden.
+// stehen bleiben, laeuft die ganze Feldfolge in EINER Transaktion (withTx):
+// das COMMIT kommt genau einmal, hinter dem letzten Feld und der fertig
+// gebauten Erfolgsantwort, unmittelbar vor dem Senden; jeder andere Ausgang
+// (400, 401, 403, geworfener Fehler) rollt sie zurueck. Ein geworfener Fehler
+// laeuft danach weiter an den zentralen Fehlerhandler (500, #2810 Gruppe 11b),
+// auch ein scheiterndes ROLLBACK. Ein neues Feld im Register ist damit von
+// selbst abgedeckt - es muss dafuer nichts nach oben gezogen werden.
 //
-// BEGIN/COMMIT von Hand statt `db.transaction(fn)`: der Helfer committet bei
-// jedem normalen Ruecksprung, ein `return res.status(400)` waere fuer ihn ein
-// Erfolg. Verschachtelte `transaction()`-Aufrufe im Register bleiben
-// richtig - der Treiber macht aus ihnen Savepoints, sobald eine Transaktion
-// offen ist. Der Treiber ist synchron und zwischen BEGIN und COMMIT steht kein
-// `await`; kaeme eines dazu, laege die offene Transaktion ueber fremden Requests.
+// Eine Absage ist fuer withTx() kein Fehler, sondern eine normale Rueckkehr,
+// und die wuerde committen. Deshalb wird sie IN der Transaktion als
+// SettingsRefused geworfen und direkt dahinter gefangen: erst nach dem
+// Rollback geht sie hinaus. Verschachtelte `transaction()`-Aufrufe im Register
+// bleiben richtig - sie werden Savepoints, sobald eine Transaktion offen ist.
+// Der Treiber ist synchron und in der Transaktion steht kein `await`; kaeme
+// eines dazu, laege die offene Transaktion ueber fremden Requests.
 // --------------------------------------------------------
 
+/** Eine Absage des Registers, als Fehler durch withTx() getragen (nur hier). */
+class SettingsRefused extends Error {
+  /** @param {unknown} refusal */
+  constructor(refusal) {
+    super('settings patch refused');
+    this.refusal = refusal;
+  }
+}
+
 router.put('/', validateRequest(), (req, res) => {
-  let database = null;
   try {
-    database = db.get();
-    database.exec('BEGIN');
-    const refusal = writeSettings(database, actorFromRequest(req), req.body, SETTINGS_EFFECTS);
-    if (refusal) return sendRefusal(req, res, refusal);
+    const database = db.get();
+    let payload;
+    try {
+      payload = withTx(database, () => {
+        const refusal = writeSettings(database, actorFromRequest(req), req.body, SETTINGS_EFFECTS);
+        if (refusal) throw new SettingsRefused(refusal);
 
-    // DIE ANTWORT WIRD NOCH IN DER TRANSAKTION GEBAUT (#1622, Review zu #1627).
-    // Sie liest aus der Datenbank zurueck, und manche dieser Lesewege fragen
-    // weitere Tabellen ab (der Filter der Notiz-Kachel den Kategorien-Katalog).
-    // Wirft einer davon NACH dem COMMIT, sagt die Antwort 500 und die Patch steht
-    // trotzdem. Hier oben sieht das Lesen dieselben Werte - dieselbe Verbindung
-    // liest ihre eigenen, noch nicht committeten Schreibungen -, und ein Wurf
-    // findet die Transaktion noch offen.
-    const payload = { data: settingsAnswer(database, req.authUserId) };
-
-    // Alle Felder sind durch und die Antwort steht - erst jetzt wird die Patch
-    // wirksam. Hinter dem COMMIT kommt nur noch das Senden: kein Datenbankzugriff
-    // und keine Berechnung, die einen 500 ueber eine gespeicherte Patch legen
-    // koennte.
-    database.exec('COMMIT');
-    res.json(payload);
-  } finally {
-    // Noch offen heisst: der Handler ist NICHT ueber das COMMIT gegangen - ein
-    // Feld wurde abgelehnt oder etwas hat geworfen. Dann gilt nichts aus dieser
-    // Patch (#1622). Eine Absage ist zu diesem Zeitpunkt schon abgeschickt und
-    // bleibt, wie sie ist; ein Fehler erreicht den zentralen Handler erst nach
-    // diesem Block, also nach dem Rollback. Dazwischen liegt kein Yield-Punkt,
-    // an dem ein anderer Request den halben Stand lesen koennte.
-    if (database?.inTransaction) {
-      try {
-        database.exec('ROLLBACK');
-      } catch (err) {
-        log.error('PUT / - Rollback fehlgeschlagen', err);
-      }
+        // DIE ANTWORT WIRD NOCH IN DER TRANSAKTION GEBAUT (#1622, Review zu #1627).
+        // Sie liest aus der Datenbank zurueck, und manche dieser Lesewege fragen
+        // weitere Tabellen ab (der Filter der Notiz-Kachel den Kategorien-Katalog).
+        // Wirft einer davon NACH dem COMMIT, sagt die Antwort 500 und die Patch steht
+        // trotzdem. Hier sieht das Lesen dieselben Werte - dieselbe Verbindung
+        // liest ihre eigenen, noch nicht committeten Schreibungen -, und ein Wurf
+        // rollt die Transaktion noch zurueck.
+        return { data: settingsAnswer(database, req.authUserId) };
+      });
+    } catch (err) {
+      if (err instanceof SettingsRefused) return sendRefusal(req, res, err.refusal);
+      throw err;
     }
 
+    // Alle Felder sind durch und die Antwort steht - die Patch ist wirksam.
+    // Hinter dem COMMIT kommt nur noch das Senden: kein Datenbankzugriff und
+    // keine Berechnung, die einen 500 ueber eine gespeicherte Patch legen koennte.
+    res.json(payload);
+  } finally {
     // Gespeicherte Geburtstags-Termine an die geltende Datensprache angleichen.
     //
     // Unbedingt statt nur bei erkannter Verschiebung: retitleBirthdayEvents

@@ -185,7 +185,9 @@ household's zone), no catch block that answers 500 itself, no `async` function o
 `db.transaction()` or `withTx()` body, no manual `BEGIN`/`COMMIT` (`withTx()` from
 `server/db/tx.ts` writes them once, for both drivers), and oxlint's `correctness` category. The
 `innerHTML` rule and the two rules on a transaction body are hard: they have no baseline and fail
-at the first finding; a manual `BEGIN`/`COMMIT` is counted against the baseline.
+at the first finding; a manual `BEGIN`/`COMMIT` (`TX-MANUAL`: `exec` or `prepare`, string or
+template literal) stands only as a listed exception with its reason in
+`lint-baseline-reasons.json` - the implementation, the instance lock and a few test instruments.
 The same script runs dependency-cruiser with the layer rules in `.dependency-cruiser.mjs`: no
 import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
 named files import `server/services/push.js`, and only that file imports `web-push`; the server
