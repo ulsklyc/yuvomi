@@ -673,3 +673,36 @@ test('reset-password: wird das Konto waehrend des Hashens deaktiviert, schreibt 
   // Wie beim Ablehnen vor dem Hashen ist der Token danach verbraucht.
   assert.equal(resetRows(db), 0);
 });
+
+test('reset-password: laeuft der Token waehrend des Hashens ab, schreibt das Einloesen nichts (#2938)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  // Die Uhr des Reset-Service steht in der Hand des Tests (Naht `now`).
+  let clock = 1_000_000;
+  const resetService = createPasswordResetService(/** @type {any} */ ({ db, now: () => clock }));
+  const { token, expiresAt } = resetService.createToken(1);
+  const { buildResetRoutes } = await import('../server/auth.js');
+  const router = express.Router();
+  buildResetRoutes(router, /** @type {any} */ ({
+    database: db,
+    emailService: { isConfigured: () => true, sendMail: async () => {} },
+    resetService,
+    baseUrl: 'https://oikos.test',
+    limiter: (/** @type {any} */ _req, /** @type {any} */ _res, /** @type {() => void} */ next) => next(),
+  }));
+  const app = await createAuthApp({ routers: [router] });
+  const before = passwordHashOf(db);
+  const server = await listen(app);
+  const hold = holdArgon2();
+  try {
+    const a = server.post('/auth/reset-password', { token, password: 'password-of-a' });
+    await hold.started(1);
+    clock = expiresAt; // abgelaufen: expires_at <= now
+    hold.release(0);
+    assert.deepEqual(await a, { status: 400, json: { error: 'Invalid or expired token.', code: 400 } });
+  } finally {
+    hold.restore();
+    server.close();
+  }
+  assert.equal(passwordHashOf(db), before);
+});
