@@ -5312,7 +5312,11 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
   // Einkaufsartikel löscht, lässt die Zutaten für immer als „schon übertragen"
   // zurück - weder auf der Liste noch erneut übertragbar.
   const shoppingRoute = read('../server/routes/shopping.js');
-  const undoBlock = shoppingRoute.slice(shoppingRoute.indexOf("router.post('/items/undo-transfer'"));
+  // Nur die Undo-Route selbst: bis zum naechsten `router.` danach, sonst treffen
+  // die Pruefungen unten auch spaetere Routen der Datei.
+  const undoStart = shoppingRoute.indexOf("router.post('/items/undo-transfer'");
+  const undoEnd = shoppingRoute.indexOf('router.', undoStart + 1);
+  const undoBlock = shoppingRoute.slice(undoStart, undoEnd === -1 ? undefined : undoEnd);
   assert.match(undoBlock, /UPDATE meal_ingredients SET on_shopping_list = 0/,
     'das Undo muss das Zutaten-Flag mit zurücknehmen');
   assert.match(undoBlock, /withTx\(db\.get\(\),/,
