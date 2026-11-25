@@ -76,8 +76,10 @@ test('die Rechte bleiben eng: lesen, und PRs nur kommentieren', () => {
   assert.match(rechte, /contents: read/);
   assert.match(rechte, /pull-requests: write/);
   assert.doesNotMatch(rechte, /contents: write|issues: write|actions: write|id-token/);
-  assert.match(ohneKommentare, /gh pr review "\$PR" --repo "\$REPO" --event COMMENT/);
-  assert.doesNotMatch(ohneKommentare, /--event (APPROVE|REQUEST_CHANGES)|--approve|--request-changes/);
+  // `gh pr review` kennt nur --comment/--approve/--request-changes; ein
+  // `--event` bricht den Schritt mit "unknown flag" ab (Wirkprobe #2965).
+  assert.match(ohneKommentare, /gh pr review "\$PR" --repo "\$REPO" --comment --body-file /);
+  assert.doesNotMatch(ohneKommentare, /gh pr review[^\n]*(--event|--approve|--request-changes|\s-a\b|\s-r\b)/);
 });
 
 test('der Prompt behandelt Titel und Beschreibung als Angaben, nicht als Anweisungen', () => {

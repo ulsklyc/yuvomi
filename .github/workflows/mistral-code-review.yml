@@ -158,5 +158,5 @@ jobs:
         run: |
           set -euo pipefail
           # COMMENT statt APPROVE/CHANGES: das Review blockiert nie den PR.
-          gh pr review "$PR" --repo "$REPO" --event COMMENT --body-file "$RUNNER_TEMP/review.md"
+          gh pr review "$PR" --repo "$REPO" --comment --body-file "$RUNNER_TEMP/review.md"
           echo "::notice::Mistral Code Review fuer PR #$PR gepostet."
