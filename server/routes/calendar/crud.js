@@ -369,6 +369,37 @@ async function sendNonMemberAssignment(res, err, staged) {
 }
 
 /**
+ * Eine Absage, die erst gegen die Zeile beim Schreiben faellt (#2940): der
+ * Termin ist weg, nicht mehr sichtbar oder aenderbar, oder eine Pruefung des
+ * PUT faellt gegen den neuen Stand anders aus. Eigene Klasse wie die beiden
+ * darueber: gestagte Uploads wegraeumen, dann dieselbe Antwort wie vor dem
+ * Upload (`respond` ist die Antwortfunktion der Pruefung).
+ */
+class RefusedAfterUploadError extends Error {
+  /** @param {(res: any) => any} respond */
+  constructor(respond) {
+    super('Refused against the row the write found.');
+    this.respond = respond;
+  }
+}
+
+/**
+ * @param {any} res
+ * @param {(res: any) => any} respond
+ * @param {any[]} staged
+ */
+async function sendRefusalAfterUpload(res, respond, staged) {
+  if (staged.length > 0) {
+    try {
+      await cleanupCalendarUploads(staged);
+    } catch (cleanupError) {
+      return sendStorageError(res, cleanupError, 'Calendar attachment storage cleanup failed.');
+    }
+  }
+  return respond(res);
+}
+
+/**
  * Der Ort, der nach einer Bearbeitung gilt (#2202).
  *
  * Ein ueber die Apple-Ortssuche gewaehlter Ort steht mehrzeilig in der Zeile
@@ -540,6 +571,17 @@ router.get('/:id', validateRequest(), (req, res) => {
 
 // --------------------------------------------------------
 const SERIES_ENDS_BEFORE_START = 'recurrence_rule: the series ends before the start date.';
+
+/**
+ * Die beiden Absagen der Seriengrenzen im PUT (#960, #1607), aus einer Stelle,
+ * damit die Absage nach dem Upload (#2940) dieselbe ist wie die davor.
+ * @param {any} res
+ * @param {string} refusal
+ */
+function sendSeriesRefusal(res, refusal) {
+  if (refusal === 'no_occurrence') return sendSeriesWithoutOccurrence(res);
+  return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400, reason: 'calendar_series_ends_before_start' });
+}
 
 // POST /api/v1/calendar
 // Neuen Termin anlegen.
@@ -867,176 +909,260 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     // Das Dokumente-Schreibrecht fragt `refuseUploadWithoutDocumentsWrite` vor
     // der Suche: die Absage verraet nicht, ob es den Termin gibt.
     const id    = pathId(req);
-    const event = loadVisibleEvent(id, req);
-    if (!event) return sendEventGone(res);
-    if (refuseForeignEvent(req, res, event)) return;
-    if (rejectLinkedOccurrenceResource(res, event, req)) return;
     const rights = attachmentRights(req);
-
-    const checks = [];
-    // GESPEICHERT WIRD DER GEPRUEFTE WERT, NICHT DER ROHE (#1364). Bis hierher
-    // pruefte PUT mit `datetime()` und schrieb dann `req.body.start_datetime`:
-    // dieselbe Eingabe landete per POST gekuerzt und per PUT roh in der Zeile,
-    // und eine Serie mit rohem `Z`-Start wiederholte ihren UTC-Suffix und
-    // rutschte ueber die Zeitumstellung um eine Stunde. Ganztaegig ist, was der
-    // Body sagt, sonst was schon gespeichert ist.
-    //
-    // DER START IST PFLICHT, AUCH HIER. Mitgeschickt als '' oder `null` ist er
-    // ein 400 mit derselben Meldung wie bei POST: '' landete bis v2.68.0 roh in
-    // der Zeile, und mit dem geprueften Wert haette es den Start still stehen
-    // lassen - eine Anfrage, die leeren will, bekaeme 200, und nichts geschaehe.
-    // Das Ende ist optional und darf geleert werden (ein Termin ohne Ende ist
-    // gueltig, das Formular schickt dann `null`).
-    const zoneOpts = {
-      to: 'wall',
-      zone: householdTimeZone(db.get()),
-      allDay: req.body.all_day !== undefined ? !!req.body.all_day : !!event.all_day,
-    };
-    const vStart = req.body.start_datetime !== undefined
-      ? datetime(req.body.start_datetime, 'start_datetime', true, zoneOpts) : null;
-    const vEnd = req.body.end_datetime !== undefined
-      ? datetime(req.body.end_datetime, 'end_datetime', false, zoneOpts) : null;
-    // Ein mitgeschickter Titel muss Text sein und darf nicht leer sein: eine Zahl
-    // lief in `.trim()` auf einen 500, '' wurde gespeichert, und `null` blieb
-    // still ohne Wirkung. Fehlt er, bleibt der alte (Kuerzen einer Serie).
-    // Die Form von Beschreibung und Ort prueft das Schema davor (#2810); die
-    // des Titels bleibt, weil das Update unten `title.trim()` auf dem Rohwert
-    // ruft (Senke, nicht Route).
-    checks.push(textShape(req.body.title, 'title'));
-    if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: typeof req.body.title === 'string' }));
-    if (req.body.description    !== undefined) checks.push(str(req.body.description, 'description', { max: MAX_TEXT, required: false }));
-    if (vStart) checks.push(vStart);
-    if (vEnd)   checks.push(vEnd);
-    if (req.body.color          !== undefined) checks.push(color(req.body.color, 'color'));
-    if (req.body.location       !== undefined) checks.push(str(req.body.location, 'location', { max: MAX_TITLE, required: false }));
-    // Der unveränderte Bestandswert kommt ohne Prüfung durch: Die Regel steht
-    // bereits so in der Datenbank, und der Validator kennt nur das Vokabular der
-    // eigenen Oberfläche (FREQ/INTERVAL/BYDAY/UNTIL/COUNT, ohne „RRULE:"-Präfix).
-    // Eine aus CalDAV eingelesene Serie trägt regelmäßig mehr als das - Präfix,
-    // WKST, BYMONTHDAY. Ohne diese Ausnahme scheiterte jede Änderung an einem
-    // anderen Feld (Zuweisung, Titel) an der Wiederholung, die der Nutzer gar
-    // nicht angefasst hat (#756). Geändert wird weiterhin nur, was der Validator
-    // zulässt.
-    if (req.body.recurrence_rule !== undefined
-        && req.body.recurrence_rule !== event.recurrence_rule) {
-      checks.push(rrule(req.body.recurrence_rule, 'recurrence_rule'));
-    }
-    // CalDAV-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
-    const caldavProvided = req.body.target_caldav_account_id !== undefined
-      || req.body.target_caldav_calendar_url !== undefined;
-    const vCaldav = caldavProvided ? caldavTarget(req.body) : null;
-    if (vCaldav) checks.push(vCaldav);
-    // Ein NEUES Ziel muss angeboten sein; das unveränderte kommt durch (#1860).
-    if (vCaldav && !vCaldav.error) checks.push(caldavTargetOffered(db.get(), vCaldav.value, event));
-    // Google-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
-    const googleProvided = req.body.target_google_calendar_id !== undefined;
-    const vGoogle = googleProvided ? googleTarget(req.body) : null;
-    if (vGoogle) checks.push(vGoogle);
-    // Outlook-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
-    const outlookProvided = req.body.target_outlook_account_id !== undefined
-      || req.body.target_outlook_calendar_id !== undefined;
-    const vOutlook = outlookProvided ? outlookTarget(req.body) : null;
-    if (vOutlook) checks.push(vOutlook);
-    const localCalendarProvided = req.body.local_calendar_id !== undefined;
-    if (localCalendarProvided && resolveLocalCalendarId(db.get(), event.id) === null) {
-      return res.status(400).json({ error: 'Local calendars can only hold local events.', code: 400 });
-    }
-    const vLocalCalendar = localCalendarProvided
-      ? validateCalendarId(db.get(), req.body.local_calendar_id, { required: true })
-      : null;
-    if (vLocalCalendar) checks.push(vLocalCalendar);
-    // Eine Person ohne Konto und ein unlesbarer Anhang endeten als 500 (#2810).
-    if (req.body.assigned_to !== undefined) checks.push(validateOccurrenceAssignments(db.get(), req.body.assigned_to));
-    const vAttachment = parseAttachment(req.body.attachment_data);
-    checks.push(vAttachment);
-    if (collectErrors(checks).length) return sendValidationErrors(res, checks);
-    const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : event.icon;
-    if (!vIcon) return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
     const {
       title, description,
       all_day, color: colorVal, recurrence_rule,
     } = req.body;
-    const location = locationAfterEdit(req.body.location, event.location);
-    // `undefined` = nicht mitgeschickt. Ein Start ist danach nie leer (siehe
-    // oben), ein Ende mit '' oder `null` kommt als null an und leert es.
-    const start_datetime = vStart ? vStart.value : undefined;
-    const end_datetime   = vEnd ? vEnd.value : undefined;
+    const attachmentDataProvided = Object.hasOwn(req.body, 'attachment_data');
+    const replacementRequested = typeof req.body.attachment_data === 'string'
+      && req.body.attachment_data.trim() !== '';
+    const removalRequested = req.body.remove_attachment === true
+      || (attachmentDataProvided && req.body.attachment_data === null);
+    const vAttachment = parseAttachment(req.body.attachment_data);
 
-    // AUCH BEIM BEARBEITEN DARF KEINE LEERE SERIE ENTSTEHEN (#960) - aber nur
-    // dann abweisen, wenn DIESE Anfrage sie leer macht.
-    //
-    // NICHT DIE ANWESENHEIT DER FELDER PRUEFEN, SONDERN IHRE WERTE. Beide
-    // Formulare schicken bei jedem Speichern das ganze Objekt mit
-    // (`public/pages/calendar.js`, `public/pages/tasks.js`); "hat der Aufrufer
-    // das Feld geschickt?" ist deshalb immer wahr und taugt nicht als Frage.
-    // Wer nur den Titel aendert, wuerde sonst an einer eingelesenen Serie
-    // scheitern, die schon vorher kein Vorkommen hatte - ein Datensatz, den
-    // niemand mehr bearbeiten koennte.
-    //
-    // Ein leerer Start kommt hier nicht mehr an, er ist oben schon ein 400
-    // (#1364); fehlt das Feld, gilt der gespeicherte. Der Tagesvergleich
-    // reicht, weil `hasAnyOccurrence` ohnehin nur den Tag liest.
-    // DIESELBE FORMEL WIE DAS UPDATE UNTEN, sonst prueft der Guard einen
-    // Zustand, den es nie geben wird. `recurrence_rule` steht NICHT unter
-    // COALESCE: `null` loescht die Regel, statt sie stehen zu lassen. Wer die
-    // Wiederholung abschaltet und dabei das Startdatum aendert, wurde sonst
-    // gegen die ALTE Regel geprueft und mit 400 abgewiesen - fuer eine Serie,
-    // die es nach dem Speichern gar nicht mehr gibt.
-    const regelDanach = recurrence_rule !== undefined
-      ? (recurrence_rule || null)
-      : event.recurrence_rule;
-    const startDanach = start_datetime !== undefined && start_datetime !== null
-      ? start_datetime
-      : event.start_datetime;
-    const serieBeruehrt = regelDanach !== event.recurrence_rule
-      || String(startDanach ?? '').slice(0, 10) !== String(event.start_datetime ?? '').slice(0, 10);
-    // DER GUARD MUSS DENSELBEN KALENDERTAG MEINEN WIE DIE EXPANSION. Ein
-    // eingelesener Termin kann eine eigene Zone tragen: 31. Januar 20:00 in New
-    // York steht als 1. Februar 01:00 UTC in der Zeile. Fuer "am letzten Tag des
-    // Monats" zaehlt der Ortstag, also der 31. - ohne den Hinweis sah der Guard
-    // den Ersten, hielt die Serie fuer leer und wies eine gueltige Bearbeitung
-    // mit 400 ab. `expandRecurringEvents` nimmt die Pruefung im selben Fall
-    // zurueck (`zonenUnsicher`); nur `tzid` kann diesen Zustand erzeugen, die
-    // Route selbst nimmt das Feld nicht entgegen.
-    // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
-    const wandUhr = event.tzid ? storedToWall(String(startDanach ?? ''), event.tzid, zoneOpts.zone) : null;
-    const zonenUnsicher = storedDayDiffersFromSeriesDay(String(startDanach ?? ''), event.tzid, zoneOpts.zone);
-    if (serieBeruehrt
-      && !hasAnyOccurrence(startDanach, regelDanach, { utcDiffersFromLocal: zonenUnsicher })) {
-      return sendSeriesWithoutOccurrence(res);
-    }
-    // EIN ENDE VOR DEM START (#1607): nur wenn DIESE Anfrage Regel oder
-    // Starttag aendert. Eine eingelesene Serie, die schon so in der Zeile
-    // steht, bleibt bearbeitbar.
-    //
-    // "STARTTAG GEAENDERT" WIRD IN EINER DARSTELLUNG VERGLICHEN, anders als
-    // `serieBeruehrt` oben. Das Formular schickt die Wanduhrzeit des Haushalts;
-    // ein synchronisierter Termin liegt als Instant in der Zeile, und dessen
-    // UTC-Tag kann der Nachbartag sein. Am rohen Text verglichen waere ein
-    // reiner Titel-Edit dort eine Startaenderung. Fuer die Pruefung darueber
-    // ist das unschaedlich (sie wird dadurch nur OEFTER gefragt und nimmt sich
-    // im Zweifel selbst zurueck), hier wuerde es eine Bearbeitung abweisen.
-    const gespeicherterStart = String(event.start_datetime ?? '');
-    const gespeicherterTag = hasExplicitZone(gespeicherterStart)
-      ? (utcToWall(gespeicherterStart, zoneOpts.zone)?.date ?? gespeicherterStart.slice(0, 10))
-      : gespeicherterStart.slice(0, 10);
-    const startTag = String(startDanach ?? '').slice(0, 10);
-    const regelGeaendert = regelDanach !== event.recurrence_rule;
-    const startTagGeaendert = start_datetime !== undefined && start_datetime !== null
-      && startTag !== gespeicherterTag;
-    // WO DER STARTTAG VON DER LESART ABHAENGT, WIRD NICHT GERATEN - ABER AUCH
-    // NICHT WEGGESEHEN. Ein Termin mit eigener Zone hat zwei Kandidaten (der
-    // UTC-Tag der Zeile und der Ortstag); ohne aufloesbare Zone liegt der Ortstag
-    // hoechstens einen Tag daneben. Abgewiesen wird dort nur ein Ende, das vor
-    // JEDEM Kandidaten liegt, und nur bei geaenderter REGEL: die ist in jeder
-    // Darstellung dieselbe Zeichenkette.
-    const startKandidaten = zonenUnsicher
-      ? [startTag, wandUhr?.date ?? shiftDateKey(startTag, -1)]
-      : [startTag];
-    const endeGefragt = zonenUnsicher ? regelGeaendert : (regelGeaendert || startTagGeaendert);
-    if (endeGefragt && startKandidaten.every((tag) => endsBeforeStart(tag, regelDanach))) {
-      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400, reason: 'calendar_series_ends_before_start' });
-    }
+    // EINE PRUEFUNG, ZWEI STAENDE (#2940). Jede Pruefung und jeder Wert, der an
+    // der Zeile haengt, steht in `evaluate(row)`: einmal gegen den geladenen
+    // Termin fuer die schnelle Absage vor dem Upload, einmal im synchronen Teil
+    // des Schreibens gegen die Zeile, die es vorfindet - waehrend des Uploads
+    // (await) kann eine zweite Anfrage sie geaendert oder geloescht haben. Eine
+    // Absage ist eine Antwortfunktion: davor wird sie gesendet, danach als
+    // `RefusedAfterUploadError` geworfen, der catch raeumt den Upload weg und
+    // sendet dieselbe Antwort.
+    /** @param {(r: any) => any} respond */
+    const refuse = (respond) => ({ refuse: respond });
+    const evaluate = (/** @type {any} */ row) => {
+      if (!row) return refuse((r) => sendEventGone(r));
+      if (!mayChangeRecord(db.get(), req, 'calendar_edit_others', ownsEvent(row, req))) {
+        return refuse((r) => sendNotOwner(r));
+      }
+      // Ein verknuepftes Vorkommen hat seinen eigenen Weg; die Absage (404, 403
+      // oder 400) liest die Serie selbst.
+      if (row.recurrence_parent_id != null) {
+        return refuse((r) => rejectLinkedOccurrenceResource(r, row, req));
+      }
+
+      /** @type {any[]} */
+      const checks = [];
+      // GESPEICHERT WIRD DER GEPRUEFTE WERT, NICHT DER ROHE (#1364). Bis hierher
+      // pruefte PUT mit `datetime()` und schrieb dann `req.body.start_datetime`:
+      // dieselbe Eingabe landete per POST gekuerzt und per PUT roh in der Zeile,
+      // und eine Serie mit rohem `Z`-Start wiederholte ihren UTC-Suffix und
+      // rutschte ueber die Zeitumstellung um eine Stunde. Ganztaegig ist, was der
+      // Body sagt, sonst was schon gespeichert ist.
+      //
+      // DER START IST PFLICHT, AUCH HIER. Mitgeschickt als '' oder `null` ist er
+      // ein 400 mit derselben Meldung wie bei POST: '' landete bis v2.68.0 roh in
+      // der Zeile, und mit dem geprueften Wert haette es den Start still stehen
+      // lassen - eine Anfrage, die leeren will, bekaeme 200, und nichts geschaehe.
+      // Das Ende ist optional und darf geleert werden (ein Termin ohne Ende ist
+      // gueltig, das Formular schickt dann `null`).
+      const zoneOpts = {
+        to: 'wall',
+        zone: householdTimeZone(db.get()),
+        allDay: req.body.all_day !== undefined ? !!req.body.all_day : !!row.all_day,
+      };
+      const vStart = req.body.start_datetime !== undefined
+        ? datetime(req.body.start_datetime, 'start_datetime', true, zoneOpts) : null;
+      const vEnd = req.body.end_datetime !== undefined
+        ? datetime(req.body.end_datetime, 'end_datetime', false, zoneOpts) : null;
+      // Ein mitgeschickter Titel muss Text sein und darf nicht leer sein: eine Zahl
+      // lief in `.trim()` auf einen 500, '' wurde gespeichert, und `null` blieb
+      // still ohne Wirkung. Fehlt er, bleibt der alte (Kuerzen einer Serie).
+      // Die Form von Beschreibung und Ort prueft das Schema davor (#2810); die
+      // des Titels bleibt, weil das Update unten `title.trim()` auf dem Rohwert
+      // ruft (Senke, nicht Route).
+      checks.push(textShape(req.body.title, 'title'));
+      if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: typeof req.body.title === 'string' }));
+      if (req.body.description    !== undefined) checks.push(str(req.body.description, 'description', { max: MAX_TEXT, required: false }));
+      if (vStart) checks.push(vStart);
+      if (vEnd)   checks.push(vEnd);
+      if (req.body.color          !== undefined) checks.push(color(req.body.color, 'color'));
+      if (req.body.location       !== undefined) checks.push(str(req.body.location, 'location', { max: MAX_TITLE, required: false }));
+      // Der unveränderte Bestandswert kommt ohne Prüfung durch: Die Regel steht
+      // bereits so in der Datenbank, und der Validator kennt nur das Vokabular der
+      // eigenen Oberfläche (FREQ/INTERVAL/BYDAY/UNTIL/COUNT, ohne „RRULE:"-Präfix).
+      // Eine aus CalDAV eingelesene Serie trägt regelmäßig mehr als das - Präfix,
+      // WKST, BYMONTHDAY. Ohne diese Ausnahme scheiterte jede Änderung an einem
+      // anderen Feld (Zuweisung, Titel) an der Wiederholung, die der Nutzer gar
+      // nicht angefasst hat (#756). Geändert wird weiterhin nur, was der Validator
+      // zulässt.
+      if (req.body.recurrence_rule !== undefined
+          && req.body.recurrence_rule !== row.recurrence_rule) {
+        checks.push(rrule(req.body.recurrence_rule, 'recurrence_rule'));
+      }
+      // CalDAV-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
+      const caldavProvided = req.body.target_caldav_account_id !== undefined
+        || req.body.target_caldav_calendar_url !== undefined;
+      const vCaldav = caldavProvided ? caldavTarget(req.body) : null;
+      if (vCaldav) checks.push(vCaldav);
+      // Ein NEUES Ziel muss angeboten sein; das unveränderte kommt durch (#1860).
+      if (vCaldav && !vCaldav.error) checks.push(caldavTargetOffered(db.get(), vCaldav.value, row));
+      // Google-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
+      const googleProvided = req.body.target_google_calendar_id !== undefined;
+      const vGoogle = googleProvided ? googleTarget(req.body) : null;
+      if (vGoogle) checks.push(vGoogle);
+      // Outlook-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
+      const outlookProvided = req.body.target_outlook_account_id !== undefined
+        || req.body.target_outlook_calendar_id !== undefined;
+      const vOutlook = outlookProvided ? outlookTarget(req.body) : null;
+      if (vOutlook) checks.push(vOutlook);
+      const localCalendarProvided = req.body.local_calendar_id !== undefined;
+      if (localCalendarProvided && resolveLocalCalendarId(db.get(), row.id) === null) {
+        return refuse((r) => r.status(400).json({ error: 'Local calendars can only hold local events.', code: 400 }));
+      }
+      const vLocalCalendar = localCalendarProvided
+        ? validateCalendarId(db.get(), req.body.local_calendar_id, { required: true })
+        : null;
+      if (vLocalCalendar) checks.push(vLocalCalendar);
+      // Eine Person ohne Konto und ein unlesbarer Anhang endeten als 500 (#2810).
+      if (req.body.assigned_to !== undefined) checks.push(validateOccurrenceAssignments(db.get(), req.body.assigned_to));
+      checks.push(vAttachment);
+      if (collectErrors(checks).length) return refuse((r) => sendValidationErrors(r, checks));
+      const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : row.icon;
+      if (!vIcon) return refuse((r) => r.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 }));
+      // `undefined` = nicht mitgeschickt. Ein Start ist danach nie leer (siehe
+      // oben), ein Ende mit '' oder `null` kommt als null an und leert es.
+      const start_datetime = vStart ? vStart.value : undefined;
+      const end_datetime   = vEnd ? vEnd.value : undefined;
+
+      // AUCH BEIM BEARBEITEN DARF KEINE LEERE SERIE ENTSTEHEN (#960) - aber nur
+      // dann abweisen, wenn DIESE Anfrage sie leer macht.
+      //
+      // NICHT DIE ANWESENHEIT DER FELDER PRUEFEN, SONDERN IHRE WERTE. Beide
+      // Formulare schicken bei jedem Speichern das ganze Objekt mit
+      // (`public/pages/calendar.js`, `public/pages/tasks.js`); "hat der Aufrufer
+      // das Feld geschickt?" ist deshalb immer wahr und taugt nicht als Frage.
+      // Wer nur den Titel aendert, wuerde sonst an einer eingelesenen Serie
+      // scheitern, die schon vorher kein Vorkommen hatte - ein Datensatz, den
+      // niemand mehr bearbeiten koennte.
+      //
+      // Ein leerer Start kommt hier nicht mehr an, er ist oben schon ein 400
+      // (#1364); fehlt das Feld, gilt der gespeicherte. Der Tagesvergleich
+      // reicht, weil `hasAnyOccurrence` ohnehin nur den Tag liest.
+      // DIESELBE FORMEL WIE DAS UPDATE UNTEN, sonst prueft der Guard einen
+      // Zustand, den es nie geben wird. `recurrence_rule` steht NICHT unter
+      // COALESCE: `null` loescht die Regel, statt sie stehen zu lassen. Wer die
+      // Wiederholung abschaltet und dabei das Startdatum aendert, wurde sonst
+      // gegen die ALTE Regel geprueft und mit 400 abgewiesen - fuer eine Serie,
+      // die es nach dem Speichern gar nicht mehr gibt.
+      // SERIENGRENZEN gegen eine Zeile (#2940): hier gegen den geladenen
+      // Termin, in applyUpdate noch einmal gegen die Zeile, die das Schreiben
+      // vorfindet - waehrend des Uploads kann eine zweite Anfrage Regel oder
+      // Start geaendert haben.
+      const seriesCheck = (/** @type {any} */ row) => {
+        const regelDanach = recurrence_rule !== undefined
+          ? (recurrence_rule || null)
+          : row.recurrence_rule;
+        const startDanach = start_datetime !== undefined && start_datetime !== null
+          ? start_datetime
+          : row.start_datetime;
+        const serieBeruehrt = regelDanach !== row.recurrence_rule
+          || String(startDanach ?? '').slice(0, 10) !== String(row.start_datetime ?? '').slice(0, 10);
+        // DER GUARD MUSS DENSELBEN KALENDERTAG MEINEN WIE DIE EXPANSION. Ein
+        // eingelesener Termin kann eine eigene Zone tragen: 31. Januar 20:00 in New
+        // York steht als 1. Februar 01:00 UTC in der Zeile. Fuer "am letzten Tag des
+        // Monats" zaehlt der Ortstag, also der 31. - ohne den Hinweis sah der Guard
+        // den Ersten, hielt die Serie fuer leer und wies eine gueltige Bearbeitung
+        // mit 400 ab. `expandRecurringEvents` nimmt die Pruefung im selben Fall
+        // zurueck (`zonenUnsicher`); nur `tzid` kann diesen Zustand erzeugen, die
+        // Route selbst nimmt das Feld nicht entgegen.
+        // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
+        const wandUhr = row.tzid ? storedToWall(String(startDanach ?? ''), row.tzid, zoneOpts.zone) : null;
+        const zonenUnsicher = storedDayDiffersFromSeriesDay(String(startDanach ?? ''), row.tzid, zoneOpts.zone);
+        if (serieBeruehrt
+          && !hasAnyOccurrence(startDanach, regelDanach, { utcDiffersFromLocal: zonenUnsicher })) {
+          return { regelDanach, startDanach, refusal: 'no_occurrence' };
+        }
+        // EIN ENDE VOR DEM START (#1607): nur wenn DIESE Anfrage Regel oder
+        // Starttag aendert. Eine eingelesene Serie, die schon so in der Zeile
+        // steht, bleibt bearbeitbar.
+        //
+        // "STARTTAG GEAENDERT" WIRD IN EINER DARSTELLUNG VERGLICHEN, anders als
+        // `serieBeruehrt` oben. Das Formular schickt die Wanduhrzeit des Haushalts;
+        // ein synchronisierter Termin liegt als Instant in der Zeile, und dessen
+        // UTC-Tag kann der Nachbartag sein. Am rohen Text verglichen waere ein
+        // reiner Titel-Edit dort eine Startaenderung. Fuer die Pruefung darueber
+        // ist das unschaedlich (sie wird dadurch nur OEFTER gefragt und nimmt sich
+        // im Zweifel selbst zurueck), hier wuerde es eine Bearbeitung abweisen.
+        const gespeicherterStart = String(row.start_datetime ?? '');
+        const gespeicherterTag = hasExplicitZone(gespeicherterStart)
+          ? (utcToWall(gespeicherterStart, zoneOpts.zone)?.date ?? gespeicherterStart.slice(0, 10))
+          : gespeicherterStart.slice(0, 10);
+        const startTag = String(startDanach ?? '').slice(0, 10);
+        const regelGeaendert = regelDanach !== row.recurrence_rule;
+        const startTagGeaendert = start_datetime !== undefined && start_datetime !== null
+          && startTag !== gespeicherterTag;
+        // WO DER STARTTAG VON DER LESART ABHAENGT, WIRD NICHT GERATEN - ABER AUCH
+        // NICHT WEGGESEHEN. Ein Termin mit eigener Zone hat zwei Kandidaten (der
+        // UTC-Tag der Zeile und der Ortstag); ohne aufloesbare Zone liegt der Ortstag
+        // hoechstens einen Tag daneben. Abgewiesen wird dort nur ein Ende, das vor
+        // JEDEM Kandidaten liegt, und nur bei geaenderter REGEL: die ist in jeder
+        // Darstellung dieselbe Zeichenkette.
+        const startKandidaten = zonenUnsicher
+          ? [startTag, wandUhr?.date ?? shiftDateKey(startTag, -1)]
+          : [startTag];
+        const endeGefragt = zonenUnsicher ? regelGeaendert : (regelGeaendert || startTagGeaendert);
+        if (endeGefragt && startKandidaten.every((tag) => endsBeforeStart(tag, regelDanach))) {
+          return { regelDanach, startDanach, refusal: 'ends_before_start' };
+        }
+        return { regelDanach, startDanach, refusal: null };
+      };
+      const { regelDanach, startDanach, refusal: seriesRefusal } = seriesCheck(row);
+      if (seriesRefusal) return refuse((r) => sendSeriesRefusal(r, seriesRefusal));
+
+      if (replacementRequested && removalRequested) {
+        return refuse((r) => r.status(400).json({
+          error: 'attachment_data and remove_attachment contradict each other.',
+          code: 400,
+        }));
+      }
+      if ((replacementRequested || removalRequested)
+          && storedAttachmentLocked(req, db.get(), row.attachment_document_id)) {
+        return refuse((r) => r.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' }));
+      }
+
+      // WER START ODER REGEL IN YUVOMI AENDERT, HAT SIE VERFASST (#1935) - auch
+      // an einer eingelesenen Serie. Die Marke entscheidet, ob der ausgehende
+      // Weg den Start auf die eigene Regel ausrichtet (services/outbound-dtstart.js).
+      // Verglichen wird der BEGINN, nicht der Text: das Formular schickt die
+      // Wanduhrzeit des Haushalts, ein eingelesener Termin liegt als Zeitpunkt in
+      // der Zeile. Am Text gemessen setzte jede Titelaenderung die Marke, und die
+      // eingelesene Serie ginge danach mit einem anderen DTSTART zurueck (#756).
+      const seriesAuthoredHere = startOrRuleChanged(row, {
+        start_datetime: startDanach,
+        all_day: all_day !== undefined ? all_day : row.all_day,
+        recurrence_rule: regelDanach,
+      }, zoneOpts.zone);
+
+      // NICHT MITGESCHICKT HEISST: WIE DIE ZEILE (#2940).
+      const targetsOf = () => {
+        const caldavAccountId = vCaldav ? vCaldav.value.accountId : row.target_caldav_account_id;
+        const googleTargetId = vGoogle ? vGoogle.value : row.target_google_calendar_id;
+        return {
+          caldavAccountId,
+          caldavCalendarUrl: vCaldav ? vCaldav.value.calendarUrl : row.target_caldav_calendar_url,
+          googleTargetId,
+          outlookAccountId: vOutlook ? vOutlook.value.accountId : row.target_outlook_account_id,
+          outlookCalendarId: vOutlook ? vOutlook.value.calendarId : row.target_outlook_calendar_id,
+          localCalendarId: (caldavAccountId || googleTargetId) ? null
+            : vLocalCalendar ? vLocalCalendar.value : row.local_calendar_id,
+        };
+      };
+      const targets = targetsOf();
+      if (localCalendarProvided && (targets.caldavAccountId || targets.googleTargetId)) {
+        return refuse((r) => r.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 }));
+      }
+
+      return {
+        row, vIcon, start_datetime, end_datetime, regelDanach, startDanach,
+        seriesAuthoredHere, targets, caldavProvided, googleProvided, outlookProvided,
+        localCalendarProvided, locationNow: locationAfterEdit(req.body.location, row.location),
+      };
+    };
+    const checked = evaluate(loadVisibleEvent(id, req));
+    if ('refuse' in checked) return checked.refuse(res);
+    const event = checked.row;
 
     // JEDE ABWEISUNG GEHOERT VOR DAS STAGING. Ab hier laedt
     // `stageDocumentUpload` den Anhang in den Speicher (lokaler Ordner, WebDAV
@@ -1044,21 +1170,6 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     // fruehes `return` dazwischen laesst die hochgeladene Datei als Waise
     // liegen - sichtbar wird das nie, weil der Aufrufer seine 400 bekommt.
     // Der Serien-Guard oben stand genau deshalb schon einmal falsch herum.
-    const attachmentDataProvided = Object.hasOwn(req.body, 'attachment_data');
-    const replacementRequested = typeof req.body.attachment_data === 'string'
-      && req.body.attachment_data.trim() !== '';
-    const removalRequested = req.body.remove_attachment === true
-      || (attachmentDataProvided && req.body.attachment_data === null);
-    if (replacementRequested && removalRequested) {
-      return res.status(400).json({
-        error: 'attachment_data and remove_attachment contradict each other.',
-        code: 400,
-      });
-    }
-    if ((replacementRequested || removalRequested)
-        && storedAttachmentLocked(req, db.get(), event.attachment_document_id)) {
-      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
-    }
     // Ein Befund ist oben schon eine 400 geworden.
     const attachment = replacementRequested
       ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
@@ -1077,10 +1188,9 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     const colorTouched = Object.hasOwn(req.body, 'color');
 
     const assignedTouched = req.body.assigned_to !== undefined;
-    const userIds  = assignedTouched
-      ? parseAssignedTo(req.body.assigned_to)
-      : db.get().prepare('SELECT user_id FROM event_assignments WHERE event_id = ?')
-          .all(id).map((r) => r.user_id);
+    // Nicht mitgeschickt: die Zuweisungen liest applyUpdate aus der Zeile, die
+    // es vorfindet (#2940).
+    const userIds = assignedTouched ? parseAssignedTo(req.body.assigned_to) : undefined;
 
     // `assigned_to` ist die PRIMAERE Zuweisung, nicht bloss die erste Zeile: das
     // Formular schickt seine Reihenfolge mit, und `userIds[0]` traegt sie. Beim
@@ -1094,11 +1204,9 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     // `assigned_to` genannten Person, ein Termin ohne eigene Farbe wechselt also
     // die Farbe, ohne dass jemand die Zuweisung angefasst hat. Dieselbe Regel wie
     // bei `color`: nicht mitgeschickt heisst nicht angefasst.
-    const firstUid = assignedTouched
-      ? (userIds[0] ?? null)
-      : (userIds.includes(event.assigned_to) ? event.assigned_to : (userIds[0] ?? null));
-
-    const userModified = event.external_source !== 'local' ? 1 : event.user_modified;
+    const firstUidOf = (/** @type {any} */ row, /** @type {number[]} */ ids) => (assignedTouched
+      ? (ids[0] ?? null)
+      : (ids.includes(row.assigned_to) ? row.assigned_to : (ids[0] ?? null)));
 
     // Die Farbe führt ihren eigenen Zustand (#899). `user_modified` bedeutet
     // "an diesem Termin wurde etwas bearbeitet" und wird oben bei JEDEM Feld
@@ -1118,72 +1226,61 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     // aufeinander - der Sync legt seinen Hex in Großbuchstaben ab
     // (`utils/ical-color.js`). Der Farbwähler im Client vergleicht aus
     // demselben Grund über `sameColor()`.
-    // WER START ODER REGEL IN YUVOMI AENDERT, HAT SIE VERFASST (#1935) - auch
-    // an einer eingelesenen Serie. Die Marke entscheidet, ob der ausgehende
-    // Weg den Start auf die eigene Regel ausrichtet (services/outbound-dtstart.js).
-    // Verglichen wird der BEGINN, nicht der Text: das Formular schickt die
-    // Wanduhrzeit des Haushalts, ein eingelesener Termin liegt als Zeitpunkt in
-    // der Zeile. Am Text gemessen setzte jede Titelaenderung die Marke, und die
-    // eingelesene Serie ginge danach mit einem anderen DTSTART zurueck (#756).
-    const seriesAuthoredHere = startOrRuleChanged(event, {
-      start_datetime: startDanach,
-      all_day: all_day !== undefined ? all_day : event.all_day,
-      recurrence_rule: regelDanach,
-    }, zoneOpts.zone);
-
     const asColorKey = (c) => (c == null ? null : String(c).toLowerCase());
-    const colorChanged = colorTouched && asColorKey(colorVal) !== asColorKey(event.color);
-    const colorModified = colorChanged ? 1 : event.color_modified;
+    const colorChangedFrom = (/** @type {any} */ row) => colorTouched && asColorKey(colorVal) !== asColorKey(row.color);
 
-    const caldavAccountId = vCaldav ? vCaldav.value.accountId : event.target_caldav_account_id;
-    const caldavCalendarUrl = vCaldav ? vCaldav.value.calendarUrl : event.target_caldav_calendar_url;
-    const googleTargetId = vGoogle ? vGoogle.value : event.target_google_calendar_id;
-    const outlookAccountId = vOutlook ? vOutlook.value.accountId : event.target_outlook_account_id;
-    const outlookCalendarId = vOutlook ? vOutlook.value.calendarId : event.target_outlook_calendar_id;
-    if (localCalendarProvided && (caldavAccountId || googleTargetId)) {
-      return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
-    }
-    const localCalendarId = (caldavAccountId || googleTargetId) ? null
-      : vLocalCalendar ? vLocalCalendar.value : event.local_calendar_id;
-
+    /** @type {any} */
+    let rowBeforeWrite = null;
     const applyUpdate = () => {
       // Der Anhang gegen den Stand, den dieses Schreiben vorfindet (#1358) -
       // und die Sichtbarkeit davor, gegen die setEventAssignments() prueft, ob
       // sich das Publikum des Anhangs aendert (#1443).
-      const stored = db.get().prepare('SELECT attachment_document_id, visibility FROM calendar_events WHERE id = ?').get(id);
-      assertAttachmentStillChangeable(req, db.get(), stored?.attachment_document_id,
-        { replacementRequested, removalRequested });
+      // Und jedes Feld, das diese Anfrage nicht mitschickt (#2940): es gilt,
+      // wie es JETZT in der Zeile steht. `event` wurde vor dem Upload geladen;
+      // ein PUT, das in der Zwischenzeit Beschreibung oder Ort aenderte, ginge
+      // sonst still verloren. Ist der Termin inzwischen geloescht, antwortet
+      // die Route 404 und schreibt nichts nach.
+      // Dieselbe Pruefung wie vor dem Upload, gegen die Zeile von jetzt.
+      const fresh = evaluate(loadVisibleEvent(id, req));
+      if ('refuse' in fresh) throw new RefusedAfterUploadError(fresh.refuse);
+      const stored = fresh.row;
+      rowBeforeWrite = stored;
+      const storedAssignees = storedEventAssignees(db.get(), id);
       // Neu nur Haushaltsmitglieder (#1207), gegen den Stand, den dieses Schreiben vorfindet.
-      if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
+      if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedAssignees);
+      const assignees = assignedTouched ? userIds : storedAssignees;
+      const firstUid = firstUidOf(stored, assignees);
+      const colorChanged = colorChangedFrom(stored);
+      const { targets, locationNow } = fresh;
       const documentId = replacementRequested
         ? rights.createAttachmentDocument(
             db.get(),
             attachment,
             stagedUpload,
             req.body,
-            event.created_by
+            stored.created_by
           )
         : removalRequested
           ? null
-          : event.attachment_document_id;
+          : stored.attachment_document_id;
       const attachmentName = replacementRequested
         ? (req.body.attachment_name || 'Attachment')
         : removalRequested
           ? null
-          : event.attachment_name;
+          : stored.attachment_name;
       const attachmentMime = replacementRequested
         ? attachment.mime
         : removalRequested
           ? null
-          : event.attachment_mime;
+          : stored.attachment_mime;
       const attachmentSize = replacementRequested
         ? attachment.size
         : removalRequested
           ? null
-          : event.attachment_size;
+          : stored.attachment_size;
       const attachmentData = replacementRequested || removalRequested
         ? null
-        : event.attachment_data;
+        : stored.attachment_data;
       db.get().prepare(`
         UPDATE calendar_events
         SET title           = COALESCE(?, title),
@@ -1230,50 +1327,54 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
         WHERE id = ?
       `).run(
         title?.trim()  ?? null,
-        description !== undefined ? (description || null) : event.description,
-        start_datetime ?? null,
-        end_datetime !== undefined ? (end_datetime || null) : event.end_datetime,
+        description !== undefined ? (description || null) : stored.description,
+        fresh.start_datetime ?? null,
+        fresh.end_datetime !== undefined ? (fresh.end_datetime || null) : stored.end_datetime,
         all_day !== undefined ? (all_day ? 1 : 0) : null,
-        location !== undefined ? (location || null) : event.location,
+        locationNow !== undefined ? (locationNow || null) : stored.location,
         colorTouched ? 1 : 0, colorVal ?? null,
-        req.body.icon !== undefined ? vIcon : null,
-        firstUid !== undefined ? firstUid : event.assigned_to,
-        recurrence_rule !== undefined ? (recurrence_rule || null) : event.recurrence_rule,
+        req.body.icon !== undefined ? fresh.vIcon : null,
+        firstUid,
+        recurrence_rule !== undefined ? (recurrence_rule || null) : stored.recurrence_rule,
         attachmentName,
         attachmentMime,
         attachmentSize,
         attachmentData,
         documentId,
-        caldavAccountId,
-        caldavCalendarUrl,
-        googleTargetId,
-        outlookAccountId,
-        outlookCalendarId,
-        localCalendarId,
+        targets.caldavAccountId,
+        targets.caldavCalendarUrl,
+        targets.googleTargetId,
+        targets.outlookAccountId,
+        targets.outlookCalendarId,
+        targets.localCalendarId,
         req.body.visibility !== undefined
-          ? normalizeVisibility(req.body.visibility, event.visibility)
-          : event.visibility,
-        req.body.countdown !== undefined ? (req.body.countdown ? 1 : 0) : event.countdown,
-        userModified,
-        colorModified,
-        seriesAuthoredHere ? 1 : 0,
+          ? normalizeVisibility(req.body.visibility, stored.visibility)
+          : stored.visibility,
+        req.body.countdown !== undefined ? (req.body.countdown ? 1 : 0) : stored.countdown,
+        stored.external_source !== 'local' ? 1 : stored.user_modified,
+        colorChanged ? 1 : stored.color_modified,
+        fresh.seriesAuthoredHere ? 1 : 0,
         id
       );
       // Eine lokale Farbwahl macht einen gespiegelten Termin dauerhaft zu
       // keiner Altlast der Farb-Heilung mehr (#1270), auch wenn er spaeter
       // wieder die alte Farbe bekommt oder die Wahl den Server nie erreicht.
-      if (colorChanged && event.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
-      setEventAssignments(db.get(), id, userIds, {
+      if (colorChanged && stored.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
+      setEventAssignments(db.get(), id, assignees, {
         mayWidenAttachment: rights.mayWidenAttachment,
-        previous: { visibility: stored?.visibility },
+        previous: { visibility: stored.visibility },
         attachmentSet: replacementRequested,
       });
+      return stored;
     };
 
+    // Der Weg (Serie mit Ausnahmen oder einfaches Update) nach der Zeile von
+    // jetzt, nicht der von vor dem Upload.
+    const current = loadVisibleEvent(id, req) ?? event;
     const linkedOverrideCount = db.get().prepare(`
       SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
     `).get(id).count;
-    const occurrenceBoundaryTouched = Boolean(event.recurrence_rule) && [
+    const occurrenceBoundaryTouched = Boolean(current.recurrence_rule) && [
       'start_datetime',
       'recurrence_rule',
       'target_google_calendar_id',
@@ -1285,64 +1386,81 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     const canUseOccurrenceTransaction = occurrenceBoundaryTouched
       && isEligibleLocalSeries(
         db.get(),
-        event,
+        current,
         getUserId(req),
       ).eligible;
     if (linkedOverrideCount > 0
-        || (event.recurrence_rule && Object.hasOwn(req.body, 'confirmed_orphan_count'))
+        || (current.recurrence_rule && Object.hasOwn(req.body, 'confirmed_orphan_count'))
         || canUseOccurrenceTransaction) {
-      const seriesChanges = {};
-      if (title !== undefined) seriesChanges.title = title?.trim() || null;
-      if (description !== undefined) seriesChanges.description = description || null;
-      if (start_datetime !== undefined) seriesChanges.start_datetime = start_datetime;
-      if (end_datetime !== undefined) seriesChanges.end_datetime = end_datetime || null;
-      if (all_day !== undefined) seriesChanges.all_day = all_day ? 1 : 0;
-      if (location !== undefined) seriesChanges.location = location || null;
-      if (colorTouched) seriesChanges.color = colorVal ?? null;
-      if (req.body.icon !== undefined) seriesChanges.icon = vIcon;
-      if (recurrence_rule !== undefined) seriesChanges.recurrence_rule = recurrence_rule || null;
-      if (caldavProvided) {
-        seriesChanges.target_caldav_account_id = caldavAccountId;
-        seriesChanges.target_caldav_calendar_url = caldavCalendarUrl;
-      }
-      if (googleProvided) seriesChanges.target_google_calendar_id = googleTargetId;
-      if (outlookProvided) {
-        seriesChanges.target_outlook_account_id = outlookAccountId;
-        seriesChanges.target_outlook_calendar_id = outlookCalendarId;
-      }
-      if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = localCalendarId;
-      if (req.body.visibility !== undefined) {
-        seriesChanges.visibility = normalizeVisibility(req.body.visibility, event.visibility);
-      }
-      if (req.body.countdown !== undefined) seriesChanges.countdown = req.body.countdown ? 1 : 0;
+      // WAS AN DIE AUSNAHMEN GEHT, KOMMT AUS DER ZEILE BEIM SCHREIBEN (#2940),
+      // wie beim Master in applyUpdate: Kalender, Ort und Sichtbarkeit haengen
+      // an ihr, und waehrend des Uploads kann eine zweite Anfrage die Serie in
+      // einen anderen Kalender gelegt haben. Geprueft und gelesen wird im
+      // Aufruf unten, nach dem letzten await und vor der Transaktion, ohne
+      // await dazwischen.
+      const seriesChangesFor = (/** @type {any} */ v) => {
+        const { targets, locationNow, row, start_datetime, end_datetime, vIcon } = v;
+        const { caldavProvided, googleProvided, outlookProvided, localCalendarProvided } = v;
+        /** @type {Record<string, any>} */
+        const seriesChanges = {};
+        if (title !== undefined) seriesChanges.title = title?.trim() || null;
+        if (description !== undefined) seriesChanges.description = description || null;
+        if (start_datetime !== undefined) seriesChanges.start_datetime = start_datetime;
+        if (end_datetime !== undefined) seriesChanges.end_datetime = end_datetime || null;
+        if (all_day !== undefined) seriesChanges.all_day = all_day ? 1 : 0;
+        if (locationNow !== undefined) seriesChanges.location = locationNow || null;
+        if (colorTouched) seriesChanges.color = colorVal ?? null;
+        if (req.body.icon !== undefined) seriesChanges.icon = vIcon;
+        if (recurrence_rule !== undefined) seriesChanges.recurrence_rule = recurrence_rule || null;
+        if (caldavProvided) {
+          seriesChanges.target_caldav_account_id = targets.caldavAccountId;
+          seriesChanges.target_caldav_calendar_url = targets.caldavCalendarUrl;
+        }
+        if (googleProvided) seriesChanges.target_google_calendar_id = targets.googleTargetId;
+        if (outlookProvided) {
+          seriesChanges.target_outlook_account_id = targets.outlookAccountId;
+          seriesChanges.target_outlook_calendar_id = targets.outlookCalendarId;
+        }
+        if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = targets.localCalendarId;
+        if (req.body.visibility !== undefined) {
+          seriesChanges.visibility = normalizeVisibility(req.body.visibility, row.visibility);
+        }
+        if (req.body.countdown !== undefined) seriesChanges.countdown = req.body.countdown ? 1 : 0;
+        return seriesChanges;
+      };
       await runWithAttachmentClonePlan(
         db.get(),
         stagedClones,
-        (cloneOptions) => updateSeriesWithOverrides(db.get(), {
-          mayWidenAttachment: rights.mayWidenAttachment,
-          seriesId: id,
-          actorId: getUserId(req),
-          isAdmin: isAdminRequest(req),
-          changes: seriesChanges,
-          assignments: assignedTouched ? userIds : undefined,
-          confirmedOrphanCount: req.body.confirmed_orphan_count,
-          applyUpdate,
-          authorizeActor: false,
-          ...cloneOptions,
-        }),
+        (cloneOptions) => {
+          const now = evaluate(loadVisibleEvent(id, req));
+          if ('refuse' in now) throw new RefusedAfterUploadError(now.refuse);
+          return updateSeriesWithOverrides(db.get(), {
+            mayWidenAttachment: rights.mayWidenAttachment,
+            seriesId: id,
+            actorId: getUserId(req),
+            isAdmin: isAdminRequest(req),
+            changes: seriesChangesFor(now),
+            assignments: assignedTouched ? userIds : undefined,
+            confirmedOrphanCount: req.body.confirmed_orphan_count,
+            applyUpdate,
+            authorizeActor: false,
+            ...cloneOptions,
+          });
+        },
         { mayClone: rights.mayCloneAttachment },
       );
     } else {
       withTx(db.get(), () => {
-        applyUpdate();
+        const before = applyUpdate();
         // Ausnahmen tragen den Originalstart (#2034, Format A): aendert sich
         // die Uhr der Serie, wandern sie in derselben Transaktion mit.
-        if (event.recurrence_rule) {
+        if (before.recurrence_rule) {
           const after = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
-          rekeySeriesAfterUpdate(db.get(), event, after, householdTimeZone(db.get()));
+          rekeySeriesAfterUpdate(db.get(), before, after, householdTimeZone(db.get()));
         }
       });
     }
+    stagedUpload = null;
     stagedUpload = null;
 
     // Änderung an einem synchronisierten Termin beim Provider nachziehen (#593):
@@ -1352,7 +1470,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     // anstehenden Umzug, und ohne ihn filterte die Seite den Termin bis zum
     // nächsten Laden weiter als Teil des alten Kalenders (#1064).
     const pending = markEventOutbound(
-      event,
+      rowBeforeWrite ?? event,
       db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id),
     );
 
@@ -1404,7 +1522,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
       return sendCalendarOccurrenceError(res, err);
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
-    if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
+    if (err instanceof RefusedAfterUploadError) return sendRefusalAfterUpload(res, err.respond, staged);
     if (err instanceof StorageError && staged.length === 0) {
       log.error('PUT /:id storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');

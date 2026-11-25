@@ -1972,6 +1972,263 @@ test('PUT /:id — partielles Update lässt andere Felder unberührt', async () 
   assert.equal(res.body.data.color, '#111111', 'Farbe unverändert');
 });
 
+// LESEN, AWAIT, SCHREIBEN (#2940). Ein PUT mit neuem Anhang wartet auf den
+// Upload; was die Anfrage nicht mitschickt, gilt danach so, wie die Zeile beim
+// Schreiben steht - nicht so, wie sie vor dem Upload geladen wurde. Die Naht
+// ist der Drive-Client: sein `files.create` haelt, bis der Test ihn loslaesst,
+// dazwischen laeuft die zweite Anfrage. Keine Wartezeit als Taktgeber.
+/**
+ * @param {string} fileId
+ * @param {(held: { started: Promise<unknown>, release: () => void, deleted: string[] }) => Promise<void>} probe
+ */
+async function withHeldDriveUpload(fileId, probe) {
+  const driveStorage = await import('../server/services/google-drive-storage.js');
+  const configKeys = [
+    'document_storage_selected_backend',
+    'document_storage_google_drive_refresh_token',
+    'document_storage_google_drive_folder_id',
+  ];
+  const previousConfig = new Map(configKeys.map((key) => [
+    key,
+    db.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value,
+  ]));
+  /** @type {Array<[string, string | undefined]>} */
+  const previousEnv = [
+    ['DOCUMENT_STORAGE_LOCAL_ENABLED', process.env.DOCUMENT_STORAGE_LOCAL_ENABLED],
+    ['GOOGLE_DRIVE_CLIENT_ID', process.env.GOOGLE_DRIVE_CLIENT_ID],
+    ['GOOGLE_DRIVE_CLIENT_SECRET', process.env.GOOGLE_DRIVE_CLIENT_SECRET],
+    ['GOOGLE_DRIVE_REDIRECT_URI', process.env.GOOGLE_DRIVE_REDIRECT_URI],
+  ];
+  let uploadStarted = () => {};
+  const started = new Promise((resolve) => { uploadStarted = () => resolve(undefined); });
+  let release = () => {};
+  const gate = new Promise((resolve) => { release = () => resolve(undefined); });
+  /** @type {string[]} */
+  const deleted = [];
+  try {
+    process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'false';
+    process.env.GOOGLE_DRIVE_CLIENT_ID = 'held-drive-client';
+    process.env.GOOGLE_DRIVE_CLIENT_SECRET = 'held-drive-secret';
+    process.env.GOOGLE_DRIVE_REDIRECT_URI = 'https://example.test/drive-callback';
+    db.exec(`
+      INSERT OR REPLACE INTO sync_config (key, value)
+      VALUES
+        ('document_storage_selected_backend', 'google_drive'),
+        ('document_storage_google_drive_refresh_token', 'held-refresh'),
+        ('document_storage_google_drive_folder_id', 'held-folder');
+    `);
+    driveStorage.__setGoogleApiFactoryForTests({
+      createOAuth2: () => ({ setCredentials() {}, on() {} }),
+      createDrive: () => ({
+        files: {
+          get: async (/** @type {{ fileId: string }} */ { fileId: id }) => ({
+            data: { id, name: 'Documents', mimeType: 'application/vnd.google-apps.folder', trashed: false },
+          }),
+          create: async () => {
+            uploadStarted();
+            await gate;
+            return { data: { id: fileId } };
+          },
+          delete: async (/** @type {{ fileId: string }} */ { fileId: id }) => {
+            deleted.push(id);
+            return { data: {} };
+          },
+        },
+      }),
+    });
+    await probe({ started, release, deleted });
+  } finally {
+    release();
+    driveStorage.__setGoogleApiFactoryForTests();
+    db.prepare(`DELETE FROM sync_config WHERE key IN (${configKeys.map(() => '?').join(', ')})`).run(...configKeys);
+    for (const [key, value] of previousConfig) {
+      if (value !== undefined) db.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(key, value);
+    }
+    for (const [name, value] of previousEnv) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
+test('PUT /:id - a change made during the attachment upload stays (#2940)', async () => {
+  const id = insertEvent({
+    title: 'PUT-UPLOAD-RACE', start_datetime: '2041-02-03T09:00',
+    description: 'alt', location: 'Ort alt', end_datetime: '2041-02-03T10:00',
+  });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('neuer Anhang').toString('base64')}`;
+  await withHeldDriveUpload('drive-2940-stays', async ({ started, release }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: { attachment_data: dataUrl, attachment_name: 'neu.txt' } }));
+    await started;
+    const second = await call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      description: 'neu', location: 'Ort neu', end_datetime: '2041-02-03T11:00', countdown: true,
+    } }));
+    assert.equal(second.status, 200);
+    release();
+    const replaced = await first;
+    assert.equal(replaced.status, 200);
+  });
+  const row = db.prepare('SELECT description, location, end_datetime, countdown, attachment_name FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.attachment_name, 'neu.txt', 'der Anhang der ersten Anfrage ist da');
+  assert.equal(row.description, 'neu', 'die Beschreibung der zweiten Anfrage bleibt');
+  assert.equal(row.location, 'Ort neu', 'der Ort der zweiten Anfrage bleibt');
+  assert.equal(row.end_datetime, '2041-02-03T11:00', 'das Ende der zweiten Anfrage bleibt');
+  assert.equal(row.countdown, 1, 'der Countdown der zweiten Anfrage bleibt');
+});
+
+test('PUT /:id - an event deleted during the attachment upload answers 404 (#2940)', async () => {
+  const id = insertEvent({ title: 'PUT-UPLOAD-GONE', start_datetime: '2041-02-04T09:00' });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('verwaist').toString('base64')}`;
+  /** @type {any} */
+  let gone;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-gone', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      attachment_data: dataUrl, attachment_name: 'weg.txt', assigned_to: [MARIA.id],
+    } }));
+    await started;
+    assert.equal((await call('DELETE', `/${id}`)).status, 204);
+    release();
+    gone = await first;
+    uploadsDeleted = deleted;
+  });
+  assert.equal(gone.status, 404);
+  assert.deepEqual(gone.body, { error: 'Event not found.', code: 404, reason: 'calendar_event_not_found' });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE id = ?').get(id).n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_assignments WHERE event_id = ?').get(id).n, 0,
+    'keine Zuweisung fuer einen Termin, den es nicht mehr gibt');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = 'drive-2940-gone'").get().n, 0,
+    'kein Dokument fuer den verworfenen Anhang');
+  assert.deepEqual(uploadsDeleted, ['drive-2940-gone'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+test('PUT /:id - the series limits are checked against the row the upload save finds (#2940)', async () => {
+  const id = insertEvent({
+    title: 'PUT-UPLOAD-SERIES', start_datetime: '2041-03-01T09:00', recurrence_rule: 'FREQ=DAILY',
+  });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('serie').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-series', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      start_datetime: '2041-03-10T09:00', attachment_data: dataUrl, attachment_name: 'serie.txt',
+    } }));
+    await started;
+    const rule = await call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=DAILY;UNTIL=20410305',
+    } }));
+    assert.equal(rule.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  // Dieselbe Absage wie ohne Upload gegen denselben Stand.
+  const direct = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { start_datetime: '2041-03-10T09:00' } }));
+  assert.equal(direct.status, 400);
+  assert.equal(refused.status, 400, 'der Start nach dem Serienende wird abgewiesen');
+  assert.deepEqual(refused.body, direct.body);
+  const row = db.prepare('SELECT start_datetime, recurrence_rule, attachment_name FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.start_datetime, '2041-03-01T09:00');
+  assert.equal(row.recurrence_rule, 'FREQ=DAILY;UNTIL=20410305');
+  assert.equal(row.attachment_name, null);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = 'drive-2940-series'").get().n, 0);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-series'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+test('PUT /:id - the linked occurrences follow the calendar the upload save finds (#2940)', async () => {
+  const kalenderA = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 A')").run().lastInsertRowid);
+  const kalenderB = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 B')").run().lastInsertRowid);
+  const created = await call('POST', '/', /** @type {any} */ ({ body: {
+    title: 'PUT-UPLOAD-CHILDREN', start_datetime: '2041-04-01T09:00', recurrence_rule: 'FREQ=DAILY',
+    local_calendar_id: kalenderA,
+  } }));
+  assert.equal(created.status, 201);
+  const seriesId = Number(created.body.data.id);
+  const child = await call('PUT', `/${seriesId}/occurrences/2041-04-03`, /** @type {any} */ ({ body: { title: 'Ausnahme 2940' } }));
+  assert.equal(child.status, 200);
+  const childId = Number(child.body.data.id);
+  assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderA);
+  const dataUrl = `data:text/plain;base64,${Buffer.from('kinder').toString('base64')}`;
+  await withHeldDriveUpload('drive-2940-children', async ({ started, release }) => {
+    const first = call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      target_google_calendar_id: null, attachment_data: dataUrl, attachment_name: 'kinder.txt',
+    } }));
+    await started;
+    const moved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: { local_calendar_id: kalenderB } }));
+    assert.equal(moved.status, 200);
+    assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderB);
+    release();
+    assert.equal((await first).status, 200);
+  });
+  const master = db.prepare('SELECT local_calendar_id AS c, attachment_name AS a FROM calendar_events WHERE id = ?').get(seriesId);
+  assert.equal(master.a, 'kinder.txt');
+  assert.equal(master.c, kalenderB, 'die Serie bleibt in B');
+  assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderB,
+    'die Ausnahme bleibt bei der Serie in B');
+});
+
+test('PUT /:id - a local calendar next to a sync target set during the upload is refused (#2940)', async () => {
+  const kalenderB = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 exklusiv')").run().lastInsertRowid);
+  const id = insertEvent({ title: 'PUT-UPLOAD-EXCLUSIVE', start_datetime: '2041-05-01T09:00' });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('exklusiv').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-exclusive', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      local_calendar_id: kalenderB, attachment_data: dataUrl, attachment_name: 'exklusiv.txt',
+    } }));
+    await started;
+    const google = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { target_google_calendar_id: 'family@group.calendar.google.com' } }));
+    assert.equal(google.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  const direct = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { local_calendar_id: kalenderB } }));
+  assert.equal(direct.status, 400);
+  assert.equal(refused.status, 400, 'lokaler Kalender neben dem inzwischen gesetzten Google-Ziel');
+  assert.deepEqual(refused.body, direct.body);
+  const row = db.prepare('SELECT target_google_calendar_id AS g, local_calendar_id AS c, attachment_name AS a FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.g, 'family@group.calendar.google.com');
+  assert.notEqual(row.c, kalenderB);
+  assert.equal(row.a, null);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-exclusive'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+test('PUT /:id - an event made private during the upload answers 404 to the other member (#2940)', async () => {
+  const id = insertEvent({ title: 'PUT-UPLOAD-PRIVATE', start_datetime: '2041-05-02T09:00', created_by: TOM.id, visibility: 'all' });
+  // Gegenprobe: Maria darf diesen Termin ohne Wettlauf bearbeiten.
+  assert.equal((await call('PUT', `/${id}`, /** @type {any} */ ({ actor: MARIA, body: { description: 'vorher' } }))).status, 200);
+  const dataUrl = `data:text/plain;base64,${Buffer.from('privat').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-private', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ actor: MARIA, body: {
+      description: 'Maria', attachment_data: dataUrl, attachment_name: 'privat.txt',
+    } }));
+    await started;
+    const hidden = await call('PUT', `/${id}`, /** @type {any} */ ({ actor: TOM, body: { visibility: 'private' } }));
+    assert.equal(hidden.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  assert.equal(refused.status, 404);
+  assert.deepEqual(refused.body, { error: 'Event not found.', code: 404, reason: 'calendar_event_not_found' });
+  const row = db.prepare('SELECT description, visibility, attachment_name FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.description, 'vorher');
+  assert.equal(row.visibility, 'private');
+  assert.equal(row.attachment_name, null);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-private'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
 test('PUT /:id — Sichtbarkeit, Serie und Zuweisungen aktualisieren', async () => {
   const id = insertEvent({ title: 'PUT-FULL', start_datetime: '2041-03-01T09:00' });
   const res = await call('PUT', `/${id}`, { body: {
