@@ -63,7 +63,7 @@ const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
 const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'CHANNEL-SEND', 'PUSH-SEND',
   'push-service-importers', 'web-push-only-in-push-service', 'channel-delivery-importers', 'providers-only-in-channel-delivery',
   'RIGHTS-MODULE', 'rights-only-through-authorize', 'authorize-not-to-db', 'settings-is-a-leaf',
-  'blanket-disable', 'disable-no-restricted-syntax', 'SYNC-ONLY', 'TX-DRIVER'];
+  'blanket-disable', 'disable-no-restricted-syntax', 'SYNC-ONLY', 'TX-DRIVER', 'DOC-CONTENT'];
 
 /** The real rule set for a directory outside the repo: no fixture ignore, plugin by absolute URL. */
 function portableConfig() {
@@ -514,7 +514,7 @@ function serverSelectors() {
 /** @param {string} tag @returns {(s: Selector) => boolean} */
 const tagged = (tag) => (s) => s.message.startsWith(`${tag}:`);
 
-const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW', 'SQL-IN-LIST', 'TX-DRIVER'];
+const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW', 'SQL-IN-LIST', 'TX-DRIVER', 'DOC-CONTENT'];
 /** @param {Selector} s */
 const serverOnly = (s) => SERVER_ONLY.some((tag) => tagged(tag)(s));
 
@@ -710,7 +710,8 @@ test('no server/ file loses a sender, area or other selector it is not exempt fr
     if (file === 'server/services/push.js') return push;
     if (PUSH_SENDERS.includes(file)) return push.filter((s) => s.selector.includes('sendPushToUser'));
     if (file === 'server/utils/timezone.js') return byTags(['UTC-DAY-KEY']);
-    if (file === 'server/db.js' || file.startsWith('server/migrations/')) return byTags([...RIGHTS_TAGS, 'SQL-IN-LIST']);
+    // The migrations may move document content (#2956: DOC-CONTENT).
+    if (file === 'server/db.js' || file.startsWith('server/migrations/')) return byTags([...RIGHTS_TAGS, 'SQL-IN-LIST', 'DOC-CONTENT']);
     if (RIGHTS_HOME.some((h) => file.startsWith(h.slice(0, -2)))) return byTags(RIGHTS_TAGS);
     return [];
   };
@@ -1046,6 +1047,37 @@ test('TX-DRIVER is hard: a driver transaction in the server is red even with --i
     const r = run(dir, '--init');
     assert.equal(r.code, 1, r.out);
     assert.match(r.out, /Hard rules[\s\S]*server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-DRIVER\s+1/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the DOC-CONTENT fixture gives exactly its marked lines, migrations and tests stay silent (#2956)', () => {
+  const dir = tempDir('yuvomi-doc-content-fixture-');
+  try {
+    cpSync(join(FIXTURE, 'doc-content'), dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    const files = readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(js|ts)$/.test(f)).map((f) => f.split('\\').join('/'));
+    // The mark sits in a comment on the line where the string starts (a multi-line
+    // template string is reported there, not at its end).
+    const marked = files.flatMap((file) => readFileSync(join(dir, file), 'utf8').split('\n')
+      .flatMap((line, i) => (/(\/\/|\/\*) doc-\d+/.test(line) ? [`${file}:${i + 1} DOC-CONTENT`] : []))).sort();
+    assert.equal(marked.length, 14, 'the fixture marks fourteen spellings');
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .filter((/** @type {{ code: string }} */ d) => d.code.includes('no-restricted-syntax'))
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    // Silent: a metadata update, a content column in WHERE, another table, an
+    // interpolated table name, a comment, a migration and a file under test/.
+    assert.deepEqual(found, marked);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('DOC-CONTENT is hard: rewriting the content of a document row is red even with --init (#2956)', () => {
+  const dir = project("export function f(db) { return db.prepare('UPDATE family_documents SET storage_key = ? WHERE id = ?').run(1, 2); }\n");
+  try {
+    const r = run(dir, '--init');
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /Hard rules[\s\S]*server\/x\.js\s+oxlint\/no-restricted-syntax\/DOC-CONTENT\s+1/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

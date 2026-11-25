@@ -140,6 +140,41 @@ const SQL_LIST_SELECTORS = [
 // is a member read, not a call, and its later call `t(fn)` names no `transaction`).
 const TX_DRIVER = 'TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten.';
 const TX_DRIVER_SELECTOR = { selector: "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']", message: TX_DRIVER };
+// #2956 (hard): DOC-CONTENT keeps the content of a document row fixed once it is created.
+// The calendar's attachment copies reuse a read buffer and staged files across planning
+// rounds (runWithAttachmentClonePlan in server/routes/calendar/crud.js); that holds because
+// nothing in the server rewrites storage_key, storage_backend, storage_provider,
+// content_data, mime_type or file_size of a family_documents row. The selectors read the SQL
+// text of a string or of one template part (also multi-line) and find three forms:
+//   - `UPDATE [OR x] [schema.]family_documents [[AS] alias] SET ... <column> =` before any
+//     WHERE, the table, schema and column names bare, quoted or bracketed, also a column in a
+//     row-value list (`SET (name, storage_key) = (...)`);
+//   - an upsert `INSERT [OR x] INTO [schema.]family_documents ... DO UPDATE SET ... <column> =`
+//     before any WHERE;
+//   - `INSERT OR REPLACE INTO` / `REPLACE INTO` [schema.]family_documents, which replaces a
+//     whole row with the same key.
+// Silent: another table (also one whose name starts with family_documents), a content column
+// in a WHERE clause or on the right of `=`. The migrations stay outside (SCHEMA_HOME).
+// Blind, by design of a text rule: the table, schema or column name interpolated
+// (`UPDATE ${table}`, `SET ${column} = ?`); SQL split over several strings or template parts
+// joined with `+`, `.join()` or an interpolation before the SET clause; SQL built outside a
+// string literal (a query builder, a variable holding the column list); a write through a
+// view or a trigger; a row deleted and inserted again with its old id (AUTOINCREMENT does not
+// hand out an old id by itself, an explicit id can); the file itself changed in storage
+// without touching the row.
+const DOC_CONTENT = 'DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956).';
+const DOC_Q = '["`\\[]?';
+const DOC_QE = '["`\\]]?';
+const DOC_TABLE = `(${DOC_Q}\\w+${DOC_QE}\\.)?${DOC_Q}family_documents${DOC_QE}`;
+const DOC_COLUMNS = '(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)';
+const DOC_SET_COLUMN = `SET((?!\\bWHERE\\b)[\\s\\S])*?\\b${DOC_COLUMNS}${DOC_QE}(\\s*=|[\\w\\s,"\`\\[\\]]*\\)\\s*=)`;
+const DOC_CONTENT_RE = `/UPDATE\\s+(OR\\s+\\w+\\s+)?${DOC_TABLE}(\\s+(AS\\s+)?${DOC_Q}\\w+${DOC_QE})?\\s+${DOC_SET_COLUMN}`
+  + `|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+${DOC_TABLE}\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+${DOC_SET_COLUMN}`
+  + `|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+${DOC_TABLE}\\b/i`;
+const DOC_CONTENT_SELECTORS = [
+  { selector: `Literal[value=${DOC_CONTENT_RE}]`, message: DOC_CONTENT },
+  { selector: `TemplateElement[value.raw=${DOC_CONTENT_RE}]`, message: DOC_CONTENT },
+];
 // The schema and its migrations write SQL that is frozen once applied.
 const SCHEMA_HOME = ['server/db.js', 'server/migrations/**'];
 
@@ -281,7 +316,7 @@ export function checkNesting(overrides, mayDrop) {
  */
 export function buildOverrides(config, senders) {
   const [severity, ...base] = config.rules[RULE];
-  const server = [...base, ...CHANNEL_SELECTORS, PUSH_SELECTOR, WEBPUSH_SELECTOR, ...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS, TX_DRIVER_SELECTOR];
+  const server = [...base, ...CHANNEL_SELECTORS, PUSH_SELECTOR, WEBPUSH_SELECTOR, ...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS, TX_DRIVER_SELECTOR, ...DOC_CONTENT_SELECTORS];
   const utc = base.filter((/** @type {{ message: string }} */ s) => s.message.startsWith('UTC-DAY-KEY:'));
   // Areas add selectors to every file under them; exceptions drop selectors from their files.
   /** @type {{ files: string[], add: object[] }[]} */
@@ -293,7 +328,7 @@ export function buildOverrides(config, senders) {
     { files: senders, drop: [PUSH_SELECTOR] },
     { files: [PUSH_SERVICE], drop: [PUSH_SELECTOR, WEBPUSH_SELECTOR] },
     { files: RIGHTS_HOME, drop: RIGHTS_SELECTORS },
-    { files: SCHEMA_HOME, drop: [...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS] },
+    { files: SCHEMA_HOME, drop: [...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS, ...DOC_CONTENT_SELECTORS] },
     ...SYNC_EXEMPT_GROUPS,
   ];
   // Exceptions never overlap one another: what a file may drop is named in one place.

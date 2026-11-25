@@ -246,6 +246,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           }
         ]
       }
@@ -400,6 +408,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           }
         ]
       }
@@ -555,6 +571,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           }
         ]
       }
@@ -681,6 +705,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           },
           {
             "selector": ":function[async=true]",
@@ -823,6 +855,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           }
         ]
       }
@@ -1090,6 +1130,14 @@
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           },
           {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
             "selector": ":function[async=true]",
             "message": "SYNC-ONLY: the database driver is synchronous and every await is a yield point between a read and its write; server/authorize/, server/migrations/, server/db/ (backup.ts and restore.ts apart), server/db.js and the read slices server/services/*-slices.ts stay without async/await."
           },
@@ -1260,6 +1308,14 @@
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           },
           {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
             "selector": "CallExpression[arguments.length=0][callee.type='MemberExpression'][callee.computed=false][callee.property.name='get'][callee.object.type='Identifier'][callee.object.name=/^(db|dbModule)$/]",
             "message": "DB-SINGLETON: a service reads the module-wide connection with db.get(); take the connection as the first parameter (resolvePermissions(db, ...), withTx(db, fn)) and leave db.get() to routes and entry points. The baseline only sinks."
           }
@@ -1400,6 +1456,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           },
           {
             "selector": "CallExpression[arguments.length=0][callee.type='MemberExpression'][callee.computed=false][callee.property.name='get'][callee.object.type='Identifier'][callee.object.name=/^(db|dbModule)$/]",
@@ -1561,6 +1625,14 @@
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
           },
           {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
             "selector": "CallExpression[arguments.length=0][callee.type='MemberExpression'][callee.computed=false][callee.property.name='get'][callee.object.type='Identifier'][callee.object.name=/^(db|dbModule)$/]",
             "message": "DB-SINGLETON: a service reads the module-wide connection with db.get(); take the connection as the first parameter (resolvePermissions(db, ...), withTx(db, fn)) and leave db.get() to routes and entry points. The baseline only sinks."
           }
@@ -1713,6 +1785,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           },
           {
             "selector": "CallExpression[arguments.length=0][callee.type='MemberExpression'][callee.computed=false][callee.property.name='get'][callee.object.type='Identifier'][callee.object.name=/^(db|dbModule)$/]",
@@ -1876,6 +1956,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           }
         ]
       }
@@ -2034,6 +2122,14 @@
           {
             "selector": "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']",
             "message": "TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten."
+          },
+          {
+            "selector": "Literal[value=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
+          },
+          {
+            "selector": "TemplateElement[value.raw=/UPDATE\\s+(OR\\s+\\w+\\s+)?([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?(\\s+(AS\\s+)?[\"`\\[]?\\w+[\"`\\]]?)?\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|INSERT\\s+(OR\\s+\\w+\\s+)?INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b[\\s\\S]*?\\bDO\\s+UPDATE\\s+SET((?!\\bWHERE\\b)[\\s\\S])*?\\b(storage_key|storage_backend|storage_provider|content_data|mime_type|file_size)[\"`\\]]?(\\s*=|[\\w\\s,\"`\\[\\]]*\\)\\s*=)|(INSERT\\s+OR\\s+REPLACE|REPLACE)\\s+INTO\\s+([\"`\\[]?\\w+[\"`\\]]?\\.)?[\"`\\[]?family_documents[\"`\\]]?\\b/i]",
+            "message": "DOC-CONTENT: the content of a document row (storage_key, storage_backend, storage_provider, content_data, mime_type, file_size) is fixed once it is created; a new file is a new document row. The calendar attachment copies rely on it (#2956)."
           },
           {
             "selector": ":function[async=true]",

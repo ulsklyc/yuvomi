@@ -29,6 +29,7 @@ import {
   isOccurrenceKey, occurrenceSlotOf, SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN,
 } from '../../services/calendar-events.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
+import { documentDeleteIsActive } from '../../services/document-deletion-lock.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
   mayChangeRecord,
@@ -167,35 +168,94 @@ function attachmentRights(req) {
   };
 }
 
+/**
+ * Der Plan der Kopien gilt nicht mehr (#2956): das zweite Speichern verlangt
+ * eine Kopie, die vor dem await niemand verlangt hatte. Die Transaktion rollt
+ * zurueck, und der Plan wird gegen die Zeile von jetzt neu gemacht.
+ */
+class ClonePlanChangedError extends Error {}
+
+/** Wie oft der Plan neu gemacht wird, bevor die Anfrage aufgibt. */
+const CLONE_PLAN_ROUNDS = 3;
+
 async function runWithAttachmentClonePlan(database, stagedClones, operation, { mayClone = () => false } = {}) {
+  let requests;
   try {
     return operation({});
   } catch (error) {
     if (!(error instanceof CalendarAttachmentCloneRequiredError)) throw error;
+    requests = error.requests;
+  }
 
-    const contents = new Map();
+  // LESEN, AWAIT, SCHREIBEN (#2956). Zwischen dem Plan (welche Ausnahme
+  // braucht welche Kopie) und dem zweiten Speichern liegen Lesen und Hochladen
+  // der Kopien (await); eine zweite Anfrage kann in dieser Zeit die Ausnahmen
+  // der Serie austauschen. Das zweite Speichern fragt deshalb wieder die Zeile
+  // von jetzt; verlangt es eine Kopie, die nicht bereitliegt, wird neu geplant.
+  // Bereitgestellte Dateien derselben Quelle werden dabei wiederverwendet.
+  // Puffer und Dateien gelten ueber alle Runden: den Inhalt einer Dokument-ID
+  // (storage_key, storage_backend, storage_provider, content_data, mime_type,
+  // file_size) schreibt nach dem Anlegen
+  // niemand mehr um - die Dokument-Route aendert nur Metadaten, und die nimmt
+  // `consume` aus der frisch gelesenen Zeile. Erzwungen von der harten
+  // Lint-Regel DOC-CONTENT (scripts/generate-oxlint-overrides.mjs): ein UPDATE
+  // auf eine Inhaltsspalte von family_documents unter server/ ist rot, die
+  // Migrationen ausgenommen. Eine geloeschte ID kommt nicht
+  // wieder: family_documents zaehlt mit AUTOINCREMENT (baseline.sql).
+  const contents = new Map();
+  /** @type {{ sourceDocumentId: number, staged: any, written?: boolean }[]} */
+  const files = [];
+  for (let round = 1; ; round += 1) {
     const prepared = [];
-    for (const request of error.requests) {
-      // Keine Kopie ohne Recht: weder gelesen noch gestaged, `consume` liefert `null`.
-      if (!mayClone(request.sourceDocumentId)) {
+    const reserved = new Set();
+    for (const request of requests) {
+      const sourceId = Number(request.sourceDocumentId);
+      // Keine Kopie ohne Recht und keine ohne Quelle: weder gelesen noch
+      // gestaged, `consume` liefert `null`. Die Zeile wird nach den awaits der
+      // Anfragen davor gelesen; ein inzwischen geloeschtes Dokument ist wie
+      // eine verweigerte Kopie, nicht ein Serverfehler (wie `fresh` in `consume`).
+      // Ebenso eines, dessen Loeschung laeuft: DELETE /documents/:id sperrt es,
+      // loescht erst die Datei (await) und dann die Zeile.
+      const sourceGone = () => !database.prepare('SELECT 1 FROM family_documents WHERE id = ?').get(sourceId)
+        || !mayClone(request.sourceDocumentId)
+        || documentDeleteIsActive(sourceId);
+      const sourceDocument = database.prepare('SELECT * FROM family_documents WHERE id = ?')
+        .get(request.sourceDocumentId);
+      if (!sourceDocument || sourceGone()) {
         prepared.push({ request, refused: true, used: false });
         continue;
       }
-      const sourceDocument = database.prepare('SELECT * FROM family_documents WHERE id = ?')
-        .get(request.sourceDocumentId);
-      if (!sourceDocument) throw new Error('Attachment clone source document no longer exists.');
-      if (!contents.has(request.sourceDocumentId)) {
-        contents.set(request.sourceDocumentId, await readDocumentContent(sourceDocument));
+      let file = files.find((entry) => entry.sourceDocumentId === sourceId && !reserved.has(entry));
+      if (!file) {
+        // Kategorie und Name bestimmen hier nur den Speicherpfad der Datei;
+        // was die Kopie zeigt (Name, Kategorie, Dateiname, Typ, Groesse),
+        // nimmt cloneAttachmentDocument aus der frisch gelesenen Zeile.
+        let staged;
+        try {
+          if (!contents.has(sourceId)) {
+            contents.set(sourceId, await readDocumentContent(sourceDocument));
+          }
+          const content = contents.get(sourceId);
+          staged = await stageDocumentUpload({
+            buffer: content.buffer,
+            mime: content.mime,
+            category: sourceDocument.category,
+            originalName: sourceDocument.original_name,
+          });
+        } catch (error) {
+          // Ist die Quelle waehrend des Lesens oder Bereitstellens verschwunden
+          // (oder in Loeschung), ist das dieselbe verweigerte Kopie wie davor;
+          // gefragt synchron nach dem await. Sonst bleibt es der Speicherfehler.
+          if (!sourceGone()) throw error;
+          prepared.push({ request, refused: true, used: false });
+          continue;
+        }
+        stagedClones.push(staged);
+        file = { sourceDocumentId: sourceId, staged };
+        files.push(file);
       }
-      const content = contents.get(request.sourceDocumentId);
-      const staged = await stageDocumentUpload({
-        buffer: content.buffer,
-        mime: content.mime,
-        category: sourceDocument.category,
-        originalName: sourceDocument.original_name,
-      });
-      stagedClones.push(staged);
-      prepared.push({ request, sourceDocument, staged, used: false });
+      reserved.add(file);
+      prepared.push({ request, file, staged: file.staged, used: false });
     }
 
     const consume = (owner, childId, sourceDocumentId) => {
@@ -203,7 +263,7 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
         && entry.request.owner === owner
         && (owner !== 'detached' || Number(entry.request.childId) === Number(childId))
         && Number(entry.request.sourceDocumentId) === Number(sourceDocumentId));
-      if (!clone) throw new Error('No staged attachment clone matches the detached owner.');
+      if (!clone) throw new ClonePlanChangedError('No staged attachment clone matches the owner.');
       clone.used = true;
       if (clone.refused) return null;
       // KEIN AWAIT ZWISCHEN LESEN UND SCHREIBEN (CLAUDE.md, #1358). Die Quelle
@@ -226,19 +286,46 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
       };
     };
 
-    const result = operation({
-      cloneAttachment: (sourceDocumentId) =>
-        consume('successor', null, sourceDocumentId),
-      cloneDetachedAttachment: (childId, sourceDocumentId) =>
-        consume('detached', childId, sourceDocumentId),
-    });
-    for (const clone of prepared) {
-      if (clone.refused) continue;
-      const index = stagedClones.indexOf(clone.staged);
+    /** @type {Set<any>} */
+    let written;
+    let result;
+    try {
+      result = operation({
+        cloneAttachment: (sourceDocumentId) =>
+          consume('successor', null, sourceDocumentId),
+        cloneDetachedAttachment: (childId, sourceDocumentId) =>
+          consume('detached', childId, sourceDocumentId),
+      });
+      written = new Set(prepared.filter((clone) => clone.written).map((clone) => clone.file));
+    } catch (error) {
+      if (!(error instanceof ClonePlanChangedError)) throw error;
+      // Nach der letzten Runde ist es ein Konflikt mit dem Stand der Serie,
+      // kein Serverfehler: 409, gespeichert ist nichts (die Transaktion ist
+      // zurueckgerollt), die Kopien raeumt der catch der Route weg, und die
+      // Anfrage darf wiederholt werden.
+      if (round >= CLONE_PLAN_ROUNDS) {
+        throw new CalendarOccurrenceError('The series changed while attachment copies were uploaded.', {
+          status: 409,
+          code: 'calendar_series_changed',
+        });
+      }
+      // Neu planen gegen die Zeile von jetzt, synchron: braucht sie gar keine
+      // Kopie mehr, ist dieser Aufruf schon das Speichern.
+      try {
+        result = operation({});
+        written = new Set();
+      } catch (replan) {
+        if (!(replan instanceof CalendarAttachmentCloneRequiredError)) throw replan;
+        requests = replan.requests;
+        continue;
+      }
+    }
+    for (const file of files) {
+      const index = stagedClones.indexOf(file.staged);
       if (index >= 0) stagedClones.splice(index, 1);
-      if (!clone.written) {
+      if (!written.has(file)) {
         try {
-          await cleanupStagedUpload(clone.staged);
+          await cleanupStagedUpload(file.staged);
         } catch (cleanupError) {
           log.warn('Unused attachment clone cleanup failed after calendar commit:', cleanupError);
         }
@@ -683,10 +770,20 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
       });
     }
 
-    const calendarCheck = validateCalendarId(db.get(), vLocalCalendar.value);
-    if (calendarCheck.error) {
+    // Was an der Datenbank haengt, gilt nach dem Upload wieder (#2956): der
+    // Kalender, das angebotene CalDAV-Ziel und die Personen koennen sich in
+    // der Zwischenzeit geaendert haben. Dieselbe Absage wie ohne Upload.
+    const checksNow = [
+      validateCalendarId(db.get(), vLocalCalendar.value),
+      ...(vCaldavForm.error ? [] : [caldavTargetOffered(db.get(), /** @type {any} */ (vCaldavForm.value))]),
+      validateOccurrenceAssignments(db.get(), req.body.assigned_to),
+    ];
+    const checkErrorsNow = collectErrors(checksNow).length > 0;
+    const strangersNow = checkErrorsNow ? [] : newNonMembers(parseAssignedTo(req.body.assigned_to));
+    if (checkErrorsNow || strangersNow.length) {
       if (stagedUpload) await cleanupStagedUpload(stagedUpload);
-      return sendValidationErrors(res, [calendarCheck]);
+      if (strangersNow.length) return res.status(400).json({ error: nonMemberMessage(strangersNow), code: 400 });
+      return sendValidationErrors(res, checksNow);
     }
     const rights = attachmentRights(req);
     const eventId = withTx(db.get(), () => {
@@ -857,6 +954,7 @@ const CALENDAR_OCCURRENCE_ERRORS = {
   calendar_occurrence_route_required: 'Use the occurrence endpoint to change a linked recurring occurrence.',
   empty_successor_series: 'The successor series has no occurrence on or after its start date.',
   invalid_successor_override: 'An occurrence override does not fit the successor series.',
+  calendar_series_changed: 'The series changed while attachment copies were uploaded. Nothing was saved; send the request again.',
 };
 
 function sendCalendarOccurrenceError(res, error) {
@@ -870,15 +968,20 @@ function sendCalendarOccurrenceError(res, error) {
   });
 }
 
-function rejectLinkedOccurrenceResource(res, event, req) {
-  if (event.recurrence_parent_id == null) return false;
+/**
+ * Die Absage fuer ein verknuepftes Vorkommen (404, 403 oder 400), gebaut aus
+ * der Serie, wie sie JETZT steht. Synchron gelesen, damit eine Absage nach
+ * einem await beschreibt, was die Pruefung sah (#2956).
+ * @param {any} event
+ * @param {any} req
+ */
+function linkedOccurrenceRefusal(event, req) {
   const parent = loadVisibleEvent(Number(event.recurrence_parent_id), req);
   if (!parent) {
-    sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
+    return new CalendarOccurrenceError(
       'Calendar series not found.',
       { status: 404, code: 'calendar_series_not_found' },
-    ));
-    return true;
+    );
   }
   const eligibility = isEligibleLocalSeries(
     db.get(),
@@ -887,16 +990,70 @@ function rejectLinkedOccurrenceResource(res, event, req) {
   );
   if (!eligibility.eligible) {
     const unauthorized = eligibility.reason === 'not_authorized';
-    sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
+    return new CalendarOccurrenceError(
       unauthorized ? 'Not authorized.' : 'This calendar series cannot use occurrence overrides.',
       { status: unauthorized ? 403 : 400, code: eligibility.reason },
-    ));
-    return true;
+    );
   }
-  sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
+  return new CalendarOccurrenceError(
     'Use the occurrence endpoint to modify a linked recurring occurrence.',
     { status: 400, code: 'calendar_occurrence_route_required' },
-  ));
+  );
+}
+
+/**
+ * Die Serie, wie sie nach dem letzten await steht (#2956): geloescht oder fuer
+ * die Person nicht mehr sichtbar ist dieselbe 404 wie vor dem Upload. Synchron
+ * gelesen; den Upload raeumt der catch der Route weg.
+ * @param {number} seriesId
+ * @param {any} req
+ */
+function seriesAfterUpload(seriesId, req) {
+  const current = loadVisibleEvent(seriesId, req);
+  if (!current) {
+    throw new CalendarOccurrenceError('Calendar series not found.', {
+      status: 404,
+      code: 'calendar_series_not_found',
+    });
+  }
+  return current;
+}
+
+const LOCAL_NEXT_TO_TARGET = 'Choose either a sync target or a local calendar.';
+
+/**
+ * Die Folge-Route je Lauf (#2956): die Serie von jetzt, ob sie Ausnahmen
+ * tragen kann und Sync-Ziel gegen lokalen Kalender - in der Reihenfolge der
+ * Pruefung vor dem Upload. Gibt die Serie und die Aenderungen dieses Laufs
+ * zurueck (`local_calendar_id` nach dem Ziel), ohne `baseChanges` anzufassen.
+ * @param {{ seriesId: number, req: any, actorId: any, baseChanges: Record<string, any>, syncTargetOf: (row: any) => any }} args
+ * @returns {{ now: any, changes: Record<string, any> }}
+ */
+function followingSeriesNow({ seriesId, req, actorId, baseChanges, syncTargetOf }) {
+  const now = seriesAfterUpload(seriesId, req);
+  const eligibility = isEligibleLocalSeries(db.get(), now, actorId);
+  if (!eligibility.eligible) {
+    const unauthorized = eligibility.reason === 'not_authorized';
+    throw new CalendarOccurrenceError(
+      unauthorized ? 'Not authorized.' : 'This calendar series cannot use occurrence overrides.',
+      { status: unauthorized ? 403 : 400, code: eligibility.reason },
+    );
+  }
+  const syncTarget = syncTargetOf(now);
+  const localAsked = Object.hasOwn(req.body, 'local_calendar_id');
+  if (localAsked && syncTarget) {
+    throw new RefusedAfterUploadError((r) => r.status(400).json({ error: LOCAL_NEXT_TO_TARGET, code: 400 }));
+  }
+  // Je Lauf eine eigene Kopie der Aenderungen: das Ziel dieses Laufs entscheidet
+  // ueber den lokalen Kalender, nichts davon bleibt fuer den naechsten Lauf stehen.
+  const runChanges = { ...baseChanges };
+  if (syncTarget) runChanges.local_calendar_id = null;
+  return { now, changes: runChanges };
+}
+
+function rejectLinkedOccurrenceResource(res, event, req) {
+  if (event.recurrence_parent_id == null) return false;
+  sendCalendarOccurrenceError(res, linkedOccurrenceRefusal(event, req));
   return true;
 }
 
@@ -941,9 +1098,11 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
         return refuse((r) => sendNotOwner(r));
       }
       // Ein verknuepftes Vorkommen hat seinen eigenen Weg; die Absage (404, 403
-      // oder 400) liest die Serie selbst.
+      // oder 400) liest die Serie hier, nicht erst beim Senden: nach dem Upload
+      // liegt davor noch das Aufraeumen (await, #2956).
       if (row.recurrence_parent_id != null) {
-        return refuse((r) => rejectLinkedOccurrenceResource(r, row, req));
+        const answer = linkedOccurrenceRefusal(row, req);
+        return refuse((r) => sendCalendarOccurrenceError(r, answer));
       }
 
       /** @type {any[]} */
@@ -1373,98 +1532,105 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     };
 
     // Der Weg (Serie mit Ausnahmen oder einfaches Update) nach der Zeile von
-    // jetzt, nicht der von vor dem Upload.
-    const current = loadVisibleEvent(id, req) ?? event;
-    const linkedOverrideCount = db.get().prepare(`
-      SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
-    `).get(id).count;
-    const occurrenceBoundaryTouched = Boolean(current.recurrence_rule) && [
-      'start_datetime',
-      'recurrence_rule',
-      'target_google_calendar_id',
-      'target_caldav_account_id',
-      'target_caldav_calendar_url',
-      'target_outlook_account_id',
-      'target_outlook_calendar_id',
-    ].some((field) => Object.hasOwn(req.body, field));
-    const canUseOccurrenceTransaction = occurrenceBoundaryTouched
-      && isEligibleLocalSeries(
-        db.get(),
-        current,
-        getUserId(req),
-      ).eligible;
-    if (linkedOverrideCount > 0
-        || (current.recurrence_rule && Object.hasOwn(req.body, 'confirmed_orphan_count'))
-        || canUseOccurrenceTransaction) {
-      // WAS AN DIE AUSNAHMEN GEHT, KOMMT AUS DER ZEILE BEIM SCHREIBEN (#2940),
-      // wie beim Master in applyUpdate: Kalender, Ort und Sichtbarkeit haengen
-      // an ihr, und waehrend des Uploads kann eine zweite Anfrage die Serie in
-      // einen anderen Kalender gelegt haben. Geprueft und gelesen wird im
-      // Aufruf unten, nach dem letzten await und vor der Transaktion, ohne
-      // await dazwischen.
-      const seriesChangesFor = (/** @type {any} */ v) => {
-        const { targets, locationNow, row, start_datetime, end_datetime, vIcon } = v;
-        const { caldavProvided, googleProvided, outlookProvided, localCalendarProvided } = v;
-        /** @type {Record<string, any>} */
-        const seriesChanges = {};
-        if (title !== undefined) seriesChanges.title = title?.trim() || null;
-        if (description !== undefined) seriesChanges.description = description || null;
-        if (start_datetime !== undefined) seriesChanges.start_datetime = start_datetime;
-        if (end_datetime !== undefined) seriesChanges.end_datetime = end_datetime || null;
-        if (all_day !== undefined) seriesChanges.all_day = all_day ? 1 : 0;
-        if (locationNow !== undefined) seriesChanges.location = locationNow || null;
-        if (colorTouched) seriesChanges.color = colorVal ?? null;
-        if (req.body.icon !== undefined) seriesChanges.icon = vIcon;
-        if (recurrence_rule !== undefined) seriesChanges.recurrence_rule = recurrence_rule || null;
-        if (caldavProvided) {
-          seriesChanges.target_caldav_account_id = targets.caldavAccountId;
-          seriesChanges.target_caldav_calendar_url = targets.caldavCalendarUrl;
-        }
-        if (googleProvided) seriesChanges.target_google_calendar_id = targets.googleTargetId;
-        if (outlookProvided) {
-          seriesChanges.target_outlook_account_id = targets.outlookAccountId;
-          seriesChanges.target_outlook_calendar_id = targets.outlookCalendarId;
-        }
-        if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = targets.localCalendarId;
-        if (req.body.visibility !== undefined) {
-          seriesChanges.visibility = normalizeVisibility(req.body.visibility, row.visibility);
-        }
-        if (req.body.countdown !== undefined) seriesChanges.countdown = req.body.countdown ? 1 : 0;
-        return seriesChanges;
-      };
-      await runWithAttachmentClonePlan(
-        db.get(),
-        stagedClones,
-        (cloneOptions) => {
-          const now = evaluate(loadVisibleEvent(id, req));
-          if ('refuse' in now) throw new RefusedAfterUploadError(now.refuse);
-          return updateSeriesWithOverrides(db.get(), {
-            mayWidenAttachment: rights.mayWidenAttachment,
-            seriesId: id,
-            actorId: getUserId(req),
-            isAdmin: isAdminRequest(req),
-            changes: seriesChangesFor(now),
-            assignments: assignedTouched ? userIds : undefined,
-            confirmedOrphanCount: req.body.confirmed_orphan_count,
-            applyUpdate,
-            authorizeActor: false,
-            ...cloneOptions,
+    // jetzt, nicht der von vor dem Upload - und nicht der von vor den Kopien:
+    // braucht eine Ausnahme eine eigene Kopie des Anhangs, speichert
+    // runWithAttachmentClonePlan nach deren Upload (await) ein zweites Mal,
+    // und dieses Speichern waehlt den Weg wieder selbst (#2956).
+    const usesSeriesPath = (/** @type {any} */ current) => {
+      const linkedOverrideCount = db.get().prepare(`
+        SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
+      `).get(id).count;
+      const occurrenceBoundaryTouched = Boolean(current.recurrence_rule) && [
+        'start_datetime',
+        'recurrence_rule',
+        'target_google_calendar_id',
+        'target_caldav_account_id',
+        'target_caldav_calendar_url',
+        'target_outlook_account_id',
+        'target_outlook_calendar_id',
+      ].some((field) => Object.hasOwn(req.body, field));
+      const canUseOccurrenceTransaction = occurrenceBoundaryTouched
+        && isEligibleLocalSeries(
+          db.get(),
+          current,
+          getUserId(req),
+        ).eligible;
+      return linkedOverrideCount > 0
+        || Boolean(current.recurrence_rule && Object.hasOwn(req.body, 'confirmed_orphan_count'))
+        || canUseOccurrenceTransaction;
+    };
+    // WAS AN DIE AUSNAHMEN GEHT, KOMMT AUS DER ZEILE BEIM SCHREIBEN (#2940),
+    // wie beim Master in applyUpdate: Kalender, Ort und Sichtbarkeit haengen
+    // an ihr, und waehrend des Uploads kann eine zweite Anfrage die Serie in
+    // einen anderen Kalender gelegt haben. Geprueft und gelesen wird im
+    // Aufruf unten, nach dem letzten await und vor der Transaktion, ohne
+    // await dazwischen.
+    const seriesChangesFor = (/** @type {any} */ v) => {
+      const { targets, locationNow, row, start_datetime, end_datetime, vIcon } = v;
+      const { caldavProvided, googleProvided, outlookProvided, localCalendarProvided } = v;
+      /** @type {Record<string, any>} */
+      const seriesChanges = {};
+      if (title !== undefined) seriesChanges.title = title?.trim() || null;
+      if (description !== undefined) seriesChanges.description = description || null;
+      if (start_datetime !== undefined) seriesChanges.start_datetime = start_datetime;
+      if (end_datetime !== undefined) seriesChanges.end_datetime = end_datetime || null;
+      if (all_day !== undefined) seriesChanges.all_day = all_day ? 1 : 0;
+      if (locationNow !== undefined) seriesChanges.location = locationNow || null;
+      if (colorTouched) seriesChanges.color = colorVal ?? null;
+      if (req.body.icon !== undefined) seriesChanges.icon = vIcon;
+      if (recurrence_rule !== undefined) seriesChanges.recurrence_rule = recurrence_rule || null;
+      if (caldavProvided) {
+        seriesChanges.target_caldav_account_id = targets.caldavAccountId;
+        seriesChanges.target_caldav_calendar_url = targets.caldavCalendarUrl;
+      }
+      if (googleProvided) seriesChanges.target_google_calendar_id = targets.googleTargetId;
+      if (outlookProvided) {
+        seriesChanges.target_outlook_account_id = targets.outlookAccountId;
+        seriesChanges.target_outlook_calendar_id = targets.outlookCalendarId;
+      }
+      if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = targets.localCalendarId;
+      if (req.body.visibility !== undefined) {
+        seriesChanges.visibility = normalizeVisibility(req.body.visibility, row.visibility);
+      }
+      if (req.body.countdown !== undefined) seriesChanges.countdown = req.body.countdown ? 1 : 0;
+      return seriesChanges;
+    };
+    // Der einfache Weg braucht keine Kopie und laeuft im ersten Aufruf, ohne
+    // await davor; der Serienweg kann einen zweiten Aufruf nach den Kopien
+    // brauchen. Beide fragen Pruefung und Weg gegen die Zeile von jetzt.
+    await runWithAttachmentClonePlan(
+      db.get(),
+      stagedClones,
+      (cloneOptions) => {
+        const now = evaluate(loadVisibleEvent(id, req));
+        if ('refuse' in now) throw new RefusedAfterUploadError(now.refuse);
+        if (!usesSeriesPath(now.row)) {
+          withTx(db.get(), () => {
+            const before = applyUpdate();
+            // Ausnahmen tragen den Originalstart (#2034, Format A): aendert sich
+            // die Uhr der Serie, wandern sie in derselben Transaktion mit.
+            if (before.recurrence_rule) {
+              const after = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+              rekeySeriesAfterUpdate(db.get(), before, after, householdTimeZone(db.get()));
+            }
           });
-        },
-        { mayClone: rights.mayCloneAttachment },
-      );
-    } else {
-      withTx(db.get(), () => {
-        const before = applyUpdate();
-        // Ausnahmen tragen den Originalstart (#2034, Format A): aendert sich
-        // die Uhr der Serie, wandern sie in derselben Transaktion mit.
-        if (before.recurrence_rule) {
-          const after = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
-          rekeySeriesAfterUpdate(db.get(), before, after, householdTimeZone(db.get()));
+          return undefined;
         }
-      });
-    }
-    stagedUpload = null;
+        return updateSeriesWithOverrides(db.get(), {
+          mayWidenAttachment: rights.mayWidenAttachment,
+          seriesId: id,
+          actorId: getUserId(req),
+          isAdmin: isAdminRequest(req),
+          changes: seriesChangesFor(now),
+          assignments: assignedTouched ? userIds : undefined,
+          confirmedOrphanCount: req.body.confirmed_orphan_count,
+          applyUpdate,
+          authorizeActor: false,
+          ...cloneOptions,
+        });
+      },
+      { mayClone: rights.mayCloneAttachment },
+    );
     stagedUpload = null;
 
     // Änderung an einem synchronisierten Termin beim Provider nachziehen (#593):
@@ -1648,10 +1814,12 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
     }
     if (vIcon !== undefined) changes.icon = vIcon;
 
-    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), master, req.params.recurrenceId));
-    // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
+    // Synchron nach dem letzten await: die Serie, Bestandsliste und Anhang,
+    // wie sie JETZT stehen (#1358, #2956) - nicht die Zeile von vor dem Upload.
+    const current = seriesAfterUpload(seriesId, req);
+    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), current, req.params.recurrenceId));
     assertAttachmentStillChangeable(req, db.get(),
-      storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
+      storedOccurrenceAttachmentDocument(db.get(), current, req.params.recurrenceId),
       { replacementRequested, removalRequested });
     const rights = attachmentRights(req);
     const result = upsertOccurrenceOverride(db.get(), {
@@ -1674,7 +1842,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
               parsedAttachment,
               stagedUpload,
               req.body,
-              master.created_by,
+              current.created_by,
             ),
           })
         : undefined,
@@ -1689,7 +1857,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
         database: db.get(),
         actorId,
         isAdmin,
-        master,
+        master: current,
       }),
     });
   } catch (err) {
@@ -1815,6 +1983,10 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
         && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
       return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
+    // Ziel oder lokaler Kalender: hier gegen die geladene Zeile, je Lauf gegen die von jetzt (#2956).
+    const syncTargetOf = (/** @type {any} */ row) => (caldavProvided ? vCaldav.value.accountId : row.target_caldav_account_id)
+      || (googleProvided ? vGoogle.value : row.target_google_calendar_id);
+    if (Object.hasOwn(req.body, 'local_calendar_id') && syncTargetOf(master)) return res.status(400).json({ error: LOCAL_NEXT_TO_TARGET, code: 400 });
     // Ein Befund ist oben schon eine 400 geworden.
     const parsedAttachment = replacementRequested
       ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
@@ -1847,14 +2019,9 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
       changes.target_outlook_account_id = vOutlook.value.accountId;
       changes.target_outlook_calendar_id = vOutlook.value.calendarId;
     }
-    const syncTarget = (caldavProvided ? vCaldav.value.accountId : master.target_caldav_account_id)
-      || (googleProvided ? vGoogle.value : master.target_google_calendar_id);
-    if (Object.hasOwn(req.body, 'local_calendar_id') && syncTarget) {
-      return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
-    }
-    if (syncTarget) changes.local_calendar_id = null;
     if (vIcon !== undefined) changes.icon = vIcon;
     const rights = attachmentRights(req);
+    let seriesNow = /** @type {any} */ (master);
     const commonOptions = {
       mayWidenAttachment: rights.mayWidenAttachment,
       seriesId,
@@ -1875,7 +2042,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
               parsedAttachment,
               stagedUpload,
               req.body,
-              master.created_by,
+              seriesNow.created_by,
             ),
           })
         : undefined,
@@ -1888,12 +2055,13 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
       db.get(),
       stagedClones,
       (cloneOptions) => {
-        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), master, req.params.recurrenceId));
-        // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
+        // Je Lauf, synchron nach dem letzten await: alles, wie es JETZT steht (#1358, #2956).
+        const run = followingSeriesNow({ seriesId, req, actorId, baseChanges: changes, syncTargetOf }); seriesNow = run.now;
+        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesNow, req.params.recurrenceId));
         assertAttachmentStillChangeable(req, db.get(),
-          storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
+          storedOccurrenceAttachmentDocument(db.get(), seriesNow, req.params.recurrenceId),
           { replacementRequested, removalRequested });
-        return splitSeries(db.get(), { ...commonOptions, ...cloneOptions });
+        return splitSeries(db.get(), { ...commonOptions, changes: run.changes, ...cloneOptions });
       },
       { mayClone: rights.mayCloneAttachment },
     );
@@ -1916,6 +2084,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
     if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
+    if (err instanceof RefusedAfterUploadError) return sendRefusalAfterUpload(res, err.respond, staged);
     // Ein unerwarteter Fehler geht an den zentralen Handler (#2810) - aber
     // erst, wenn Anhang und Kopien wieder weg sind.
     if (staged.length > 0) {

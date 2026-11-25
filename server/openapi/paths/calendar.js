@@ -79,6 +79,12 @@ const RECURRENCE_ID_PARAM = 'Original occurrence, as the calendar reads return i
 const AMBIGUOUS_RECURRENCE_ID = apiError('A date-only recurrence_id matches two occurrences (reason `ambiguous_recurrence_id`); send the exact recurrence_id');
 // #2946: an attachment uploaded while the document storage settings changed.
 const STORAGE_CHANGED_TEXT = 'the document storage settings changed while an attachment was uploaded (`storage_code` `DOCUMENT_STORAGE_CONFIG_CHANGED`); nothing is saved, the uploaded file is removed again and the request may be sent again';
+// #2956: linked replacements need their own attachment copies, and the series
+// kept changing while they were uploaded.
+const SERIES_CHANGED_TEXT = 'the series changed several times while the attachment copies for its linked replacements were uploaded (reason `calendar_series_changed`); nothing is saved, the copies are removed again and the request may be sent again';
+const SERIES_CHANGED_REASON = '`calendar_series_changed` (409, the series changed several times while attachment copies were uploaded; nothing is saved, the request may be sent again)';
+// #2956: the series is looked up again after an attachment upload.
+const SERIES_NOT_FOUND_AFTER_UPLOAD = apiError('Calendar series not found (reason `calendar_series_not_found`), also when it was deleted or made invisible to the caller while an attachment was uploaded; nothing is saved and the uploaded file is removed again');
 
 /**
  * Gilt fuer POST und PUT gleich (#1364), deshalb einmal: ein Offset wird
@@ -480,7 +486,7 @@ export function calendarPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
-          404: apiError('Calendar series not found'),
+          404: SERIES_NOT_FOUND_AFTER_UPLOAD,
           409: apiError(`A date-only recurrence_id matches two occurrences (reason \`ambiguous_recurrence_id\`; send the exact recurrence_id), or ${STORAGE_CHANGED_TEXT}`),
           500: { $ref: '#/components/responses/InternalServerError' },
         },
@@ -528,9 +534,9 @@ export function calendarPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
-          404: apiError('Calendar series not found'),
+          404: SERIES_NOT_FOUND_AFTER_UPLOAD,
           409: {
-            description: `Linked occurrence replacements require exact-count orphan confirmation, or a date-only recurrence_id matches two occurrences (reason \`ambiguous_recurrence_id\`), or ${STORAGE_CHANGED_TEXT}`,
+            description: `Linked occurrence replacements require exact-count orphan confirmation, or a date-only recurrence_id matches two occurrences (reason \`ambiguous_recurrence_id\`), or ${STORAGE_CHANGED_TEXT}, or ${SERIES_CHANGED_TEXT}`,
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarOverrideOrphanConflict' } } },
           },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -591,7 +597,7 @@ export function calendarPaths() {
           403: apiError('A new attachment without write access to the Documents module, or a change to an attachment whose document the caller cannot read.'),
           404: { description: 'Calendar event not found' },
           409: {
-            description: `Linked occurrence replacements require exact-count orphan confirmation, or ${STORAGE_CHANGED_TEXT}`,
+            description: `Linked occurrence replacements require exact-count orphan confirmation, or ${STORAGE_CHANGED_TEXT}, or ${SERIES_CHANGED_TEXT}`,
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarOverrideOrphanConflict' } } },
           },
           500: { $ref: '#/components/responses/InternalServerError' },
@@ -725,7 +731,7 @@ const CASE_REASONS = {
   '/api/v1/calendar': { post: `${SELECTED_CALENDAR_GONE}, ${SERIES_CASES}` },
   '/api/v1/calendar/{id}': {
     get: EVENT_GONE,
-    put: `${NOT_OWNER}, ${EVENT_GONE}, ${SELECTED_CALENDAR_GONE}, ${SERIES_CASES}`,
+    put: `${NOT_OWNER}, ${EVENT_GONE}, ${SELECTED_CALENDAR_GONE}, ${SERIES_CASES}, ${SERIES_CHANGED_REASON}`,
     delete: `${NOT_OWNER}, ${EVENT_GONE}`,
   },
   '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}': {
@@ -734,7 +740,8 @@ const CASE_REASONS = {
   },
   '/api/v1/calendar/{seriesId}/occurrences/{recurrenceId}/following': {
     put: `${NOT_OWNER}, ${SERIES_GONE}, ${SELECTED_CALENDAR_GONE}, `
-      + '`empty_successor_series` (400, the successor series has no occurrence on or after its start date)',
+      + '`empty_successor_series` (400, the successor series has no occurrence on or after its start date), '
+      + SERIES_CHANGED_REASON,
     delete: `${NOT_OWNER}, ${SERIES_GONE}`,
   },
   '/api/v1/calendar/{id}/reset': { post: EVENT_GONE },
