@@ -369,6 +369,28 @@ async function sendNonMemberAssignment(res, err, staged) {
 }
 
 /**
+ * Der Termin ist waehrend des Uploads verschwunden (#2940). Eigene Klasse wie
+ * die beiden darueber: gestagte Uploads wegraeumen, dann dieselbe 404 wie die
+ * fruehe Suche.
+ */
+class CalendarEventGoneError extends Error {}
+
+/**
+ * @param {any} res
+ * @param {any[]} staged
+ */
+async function sendEventGoneAfterUpload(res, staged) {
+  if (staged.length > 0) {
+    try {
+      await cleanupCalendarUploads(staged);
+    } catch (cleanupError) {
+      return sendStorageError(res, cleanupError, 'Calendar attachment storage cleanup failed.');
+    }
+  }
+  return sendEventGone(res);
+}
+
+/**
  * Der Ort, der nach einer Bearbeitung gilt (#2202).
  *
  * Ein ueber die Apple-Ortssuche gewaehlter Ort steht mehrzeilig in der Zeile
@@ -1077,10 +1099,9 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     const colorTouched = Object.hasOwn(req.body, 'color');
 
     const assignedTouched = req.body.assigned_to !== undefined;
-    const userIds  = assignedTouched
-      ? parseAssignedTo(req.body.assigned_to)
-      : db.get().prepare('SELECT user_id FROM event_assignments WHERE event_id = ?')
-          .all(id).map((r) => r.user_id);
+    // Nicht mitgeschickt: die Zuweisungen liest applyUpdate aus der Zeile, die
+    // es vorfindet (#2940).
+    const userIds = assignedTouched ? parseAssignedTo(req.body.assigned_to) : undefined;
 
     // `assigned_to` ist die PRIMAERE Zuweisung, nicht bloss die erste Zeile: das
     // Formular schickt seine Reihenfolge mit, und `userIds[0]` traegt sie. Beim
@@ -1094,11 +1115,9 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     // `assigned_to` genannten Person, ein Termin ohne eigene Farbe wechselt also
     // die Farbe, ohne dass jemand die Zuweisung angefasst hat. Dieselbe Regel wie
     // bei `color`: nicht mitgeschickt heisst nicht angefasst.
-    const firstUid = assignedTouched
-      ? (userIds[0] ?? null)
-      : (userIds.includes(event.assigned_to) ? event.assigned_to : (userIds[0] ?? null));
-
-    const userModified = event.external_source !== 'local' ? 1 : event.user_modified;
+    const firstUidOf = (/** @type {any} */ row, /** @type {number[]} */ ids) => (assignedTouched
+      ? (ids[0] ?? null)
+      : (ids.includes(row.assigned_to) ? row.assigned_to : (ids[0] ?? null)));
 
     // Die Farbe führt ihren eigenen Zustand (#899). `user_modified` bedeutet
     // "an diesem Termin wurde etwas bearbeitet" und wird oben bei JEDEM Feld
@@ -1132,58 +1151,84 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     }, zoneOpts.zone);
 
     const asColorKey = (c) => (c == null ? null : String(c).toLowerCase());
-    const colorChanged = colorTouched && asColorKey(colorVal) !== asColorKey(event.color);
-    const colorModified = colorChanged ? 1 : event.color_modified;
+    const colorChangedFrom = (/** @type {any} */ row) => colorTouched && asColorKey(colorVal) !== asColorKey(row.color);
 
-    const caldavAccountId = vCaldav ? vCaldav.value.accountId : event.target_caldav_account_id;
-    const caldavCalendarUrl = vCaldav ? vCaldav.value.calendarUrl : event.target_caldav_calendar_url;
-    const googleTargetId = vGoogle ? vGoogle.value : event.target_google_calendar_id;
-    const outlookAccountId = vOutlook ? vOutlook.value.accountId : event.target_outlook_account_id;
-    const outlookCalendarId = vOutlook ? vOutlook.value.calendarId : event.target_outlook_calendar_id;
+    // NICHT MITGESCHICKT HEISST: WIE DIE ZEILE BEIM SCHREIBEN (#2940). Die
+    // Ziele rechnet dieselbe Funktion zweimal: hier gegen den geladenen Termin
+    // fuer die Abweisung, in applyUpdate gegen die Zeile, die das Schreiben
+    // vorfindet - dazwischen liegt der Upload (await), in dem eine zweite
+    // Anfrage die Zeile aendern kann.
+    const targetsOf = (/** @type {any} */ row) => {
+      const caldavAccountId = vCaldav ? vCaldav.value.accountId : row.target_caldav_account_id;
+      const googleTargetId = vGoogle ? vGoogle.value : row.target_google_calendar_id;
+      return {
+        caldavAccountId,
+        caldavCalendarUrl: vCaldav ? vCaldav.value.calendarUrl : row.target_caldav_calendar_url,
+        googleTargetId,
+        outlookAccountId: vOutlook ? vOutlook.value.accountId : row.target_outlook_account_id,
+        outlookCalendarId: vOutlook ? vOutlook.value.calendarId : row.target_outlook_calendar_id,
+        localCalendarId: (caldavAccountId || googleTargetId) ? null
+          : vLocalCalendar ? vLocalCalendar.value : row.local_calendar_id,
+      };
+    };
+    const {
+      caldavAccountId, caldavCalendarUrl, googleTargetId,
+      outlookAccountId, outlookCalendarId, localCalendarId,
+    } = targetsOf(event);
     if (localCalendarProvided && (caldavAccountId || googleTargetId)) {
       return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
     }
-    const localCalendarId = (caldavAccountId || googleTargetId) ? null
-      : vLocalCalendar ? vLocalCalendar.value : event.local_calendar_id;
 
     const applyUpdate = () => {
       // Der Anhang gegen den Stand, den dieses Schreiben vorfindet (#1358) -
       // und die Sichtbarkeit davor, gegen die setEventAssignments() prueft, ob
       // sich das Publikum des Anhangs aendert (#1443).
-      const stored = db.get().prepare('SELECT attachment_document_id, visibility FROM calendar_events WHERE id = ?').get(id);
-      assertAttachmentStillChangeable(req, db.get(), stored?.attachment_document_id,
+      // Und jedes Feld, das diese Anfrage nicht mitschickt (#2940): es gilt,
+      // wie es JETZT in der Zeile steht. `event` wurde vor dem Upload geladen;
+      // ein PUT, das in der Zwischenzeit Beschreibung oder Ort aenderte, ginge
+      // sonst still verloren. Ist der Termin inzwischen geloescht, antwortet
+      // die Route 404 und schreibt nichts nach.
+      const stored = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+      if (!stored) throw new CalendarEventGoneError();
+      assertAttachmentStillChangeable(req, db.get(), stored.attachment_document_id,
         { replacementRequested, removalRequested });
+      const storedAssignees = storedEventAssignees(db.get(), id);
       // Neu nur Haushaltsmitglieder (#1207), gegen den Stand, den dieses Schreiben vorfindet.
-      if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
+      if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedAssignees);
+      const assignees = assignedTouched ? userIds : storedAssignees;
+      const firstUid = firstUidOf(stored, assignees);
+      const colorChanged = colorChangedFrom(stored);
+      const targets = targetsOf(stored);
+      const locationNow = locationAfterEdit(req.body.location, stored.location);
       const documentId = replacementRequested
         ? rights.createAttachmentDocument(
             db.get(),
             attachment,
             stagedUpload,
             req.body,
-            event.created_by
+            stored.created_by
           )
         : removalRequested
           ? null
-          : event.attachment_document_id;
+          : stored.attachment_document_id;
       const attachmentName = replacementRequested
         ? (req.body.attachment_name || 'Attachment')
         : removalRequested
           ? null
-          : event.attachment_name;
+          : stored.attachment_name;
       const attachmentMime = replacementRequested
         ? attachment.mime
         : removalRequested
           ? null
-          : event.attachment_mime;
+          : stored.attachment_mime;
       const attachmentSize = replacementRequested
         ? attachment.size
         : removalRequested
           ? null
-          : event.attachment_size;
+          : stored.attachment_size;
       const attachmentData = replacementRequested || removalRequested
         ? null
-        : event.attachment_data;
+        : stored.attachment_data;
       db.get().prepare(`
         UPDATE calendar_events
         SET title           = COALESCE(?, title),
@@ -1230,44 +1275,45 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
         WHERE id = ?
       `).run(
         title?.trim()  ?? null,
-        description !== undefined ? (description || null) : event.description,
+        description !== undefined ? (description || null) : stored.description,
         start_datetime ?? null,
-        end_datetime !== undefined ? (end_datetime || null) : event.end_datetime,
+        end_datetime !== undefined ? (end_datetime || null) : stored.end_datetime,
         all_day !== undefined ? (all_day ? 1 : 0) : null,
-        location !== undefined ? (location || null) : event.location,
+        locationNow !== undefined ? (locationNow || null) : stored.location,
         colorTouched ? 1 : 0, colorVal ?? null,
         req.body.icon !== undefined ? vIcon : null,
-        firstUid !== undefined ? firstUid : event.assigned_to,
-        recurrence_rule !== undefined ? (recurrence_rule || null) : event.recurrence_rule,
+        firstUid,
+        recurrence_rule !== undefined ? (recurrence_rule || null) : stored.recurrence_rule,
         attachmentName,
         attachmentMime,
         attachmentSize,
         attachmentData,
         documentId,
-        caldavAccountId,
-        caldavCalendarUrl,
-        googleTargetId,
-        outlookAccountId,
-        outlookCalendarId,
-        localCalendarId,
+        targets.caldavAccountId,
+        targets.caldavCalendarUrl,
+        targets.googleTargetId,
+        targets.outlookAccountId,
+        targets.outlookCalendarId,
+        targets.localCalendarId,
         req.body.visibility !== undefined
-          ? normalizeVisibility(req.body.visibility, event.visibility)
-          : event.visibility,
-        req.body.countdown !== undefined ? (req.body.countdown ? 1 : 0) : event.countdown,
-        userModified,
-        colorModified,
+          ? normalizeVisibility(req.body.visibility, stored.visibility)
+          : stored.visibility,
+        req.body.countdown !== undefined ? (req.body.countdown ? 1 : 0) : stored.countdown,
+        stored.external_source !== 'local' ? 1 : stored.user_modified,
+        colorChanged ? 1 : stored.color_modified,
         seriesAuthoredHere ? 1 : 0,
         id
       );
       // Eine lokale Farbwahl macht einen gespiegelten Termin dauerhaft zu
       // keiner Altlast der Farb-Heilung mehr (#1270), auch wenn er spaeter
       // wieder die alte Farbe bekommt oder die Wahl den Server nie erreicht.
-      if (colorChanged && event.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
-      setEventAssignments(db.get(), id, userIds, {
+      if (colorChanged && stored.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
+      setEventAssignments(db.get(), id, assignees, {
         mayWidenAttachment: rights.mayWidenAttachment,
-        previous: { visibility: stored?.visibility },
+        previous: { visibility: stored.visibility },
         attachmentSet: replacementRequested,
       });
+      return stored;
     };
 
     const linkedOverrideCount = db.get().prepare(`
@@ -1334,12 +1380,12 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
       );
     } else {
       withTx(db.get(), () => {
-        applyUpdate();
+        const before = applyUpdate();
         // Ausnahmen tragen den Originalstart (#2034, Format A): aendert sich
         // die Uhr der Serie, wandern sie in derselben Transaktion mit.
-        if (event.recurrence_rule) {
+        if (before.recurrence_rule) {
           const after = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
-          rekeySeriesAfterUpdate(db.get(), event, after, householdTimeZone(db.get()));
+          rekeySeriesAfterUpdate(db.get(), before, after, householdTimeZone(db.get()));
         }
       });
     }
@@ -1405,6 +1451,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
     if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
+    if (err instanceof CalendarEventGoneError) return sendEventGoneAfterUpload(res, staged);
     if (err instanceof StorageError && staged.length === 0) {
       log.error('PUT /:id storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
