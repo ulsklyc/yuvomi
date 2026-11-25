@@ -11,7 +11,7 @@
  * verwaiste Link-Zeilen sind Tombstones für Remote-Deletes.
  */
 
-import { runExternalJob } from '../utils/restore-state.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { createLogger } from '../logger.js';
 const log = createLogger('Outlook');
 
@@ -690,8 +690,11 @@ const ASSIGNEE_NAMES_SQL = `(
  *    typischerweise schon nativ in Outlook und würden Duplikate erzeugen.
  * b) Explizites Ziel-pro-Termin — gewinnt bei Kollision mit a).
  */
-function collectCandidates(conn, account) {
+function collectCandidates(conn, account, eventId = null) {
   const candidates = new Map();
+  // Mit eventId nur dieser eine Termin: die Probe direkt vor seinem Schreiben (#2943).
+  const onlyOne = eventId == null ? '' : 'AND e.id = ?';
+  const onlyOneArgs = eventId == null ? [] : [eventId];
 
   if (account.auto_sync_calendar_id && account.owner_user_id) {
     const rows = conn.prepare(`
@@ -700,7 +703,8 @@ function collectCandidates(conn, account) {
       WHERE e.external_source = 'local'
         AND e.recurrence_parent_id IS NULL
         AND ${visibleWhere('events', 'e', '?')}
-    `).all(account.owner_user_id, account.owner_user_id);
+        ${onlyOne}
+    `).all(account.owner_user_id, account.owner_user_id, ...onlyOneArgs);
     for (const event of rows) {
       candidates.set(event.id, { event, calendarId: account.auto_sync_calendar_id });
     }
@@ -712,7 +716,8 @@ function collectCandidates(conn, account) {
     WHERE e.external_source = 'local'
       AND e.recurrence_parent_id IS NULL
       AND e.target_outlook_account_id = ?
-  `).all(account.id);
+      ${onlyOne}
+  `).all(account.id, ...onlyOneArgs);
   for (const event of explicit) {
     candidates.set(event.id, { event, calendarId: event.target_outlook_calendar_id });
   }
@@ -756,7 +761,13 @@ async function fetchRemoteEventStates(calendarId, accessToken, fetchImpl = fetch
  * er nicht, und ein laufender wird abgewartet (Codex-Befund in #1431).
  */
 function sync(options = {}) {
-  return runExternalJob(() => runOutlookSync(options));
+  // Ein Lauf zur Zeit (#2943): Stundenlauf, "Jetzt synchronisieren" und der
+  // OAuth-Callback starten je einen. Zwei gleichzeitige lasen beide "noch kein
+  // Link", legten den Termin beide in Outlook an, und nur der zweite Link
+  // blieb - die erste Kopie hing dort fuer immer. Ein Aufruf waehrend eines
+  // Laufs wartet auf genau einen Nachlauf; runSerialized nimmt auch die
+  // Restore-Sperre mit (server/utils/sync-lock.js).
+  return runSerialized('outlook', 'sync', () => runOutlookSync(options));
 }
 
 async function runOutlookSync({ fetchImpl = fetch } = {}) {
@@ -850,19 +861,28 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
       // ------------------------------------------------
       // 2) Create/Update: Kandidatenmenge dieses Kontos.
       // ------------------------------------------------
-      const enabledCalendars = new Map(
-        conn.prepare(`
-          SELECT calendar_id, can_edit FROM outlook_calendar_selection
-          WHERE account_id = ? AND enabled = 1
-        `).all(account.id).map((r) => [r.calendar_id, r.can_edit === 1])
-      );
+      const selCalendar = conn.prepare(`
+        SELECT can_edit FROM outlook_calendar_selection
+        WHERE account_id = ? AND calendar_id = ? AND enabled = 1
+      `);
 
-      for (const { event, calendarId } of candidates.values()) {
-        if (!enabledCalendars.has(calendarId)) {
+      for (const candidateId of candidates.keys()) {
+        // Die Menge oben stammt von vor den Netzaufrufen; jeder Create oder
+        // Patch davor ist ein await, in dem eine Anfrage den Termin privat
+        // macht, loescht, sein Ziel aendert oder den Kalender abschaltet
+        // (#2943). Deshalb hier, im synchronen Abschnitt vor dem Schreiben
+        // dieses Termins, Konto, Termin und Zielkalender neu lesen. Faellt er
+        // heraus, raeumt der naechste Lauf einen vorhandenen Link als Waise ab.
+        const current = getAccountById(account.id);
+        const candidate = current ? collectCandidates(conn, current, candidateId).get(candidateId) : null;
+        if (!candidate) continue;
+        const { event, calendarId } = candidate;
+        const selection = selCalendar.get(account.id, calendarId);
+        if (!selection) {
           log.warn(`Target calendar not enabled for account ${account.id}, skipping event ${event.id}.`);
           continue;
         }
-        if (!enabledCalendars.get(calendarId)) {
+        if (selection.can_edit !== 1) {
           log.warn(`Target calendar is read-only, skipping event ${event.id}.`);
           continue;
         }
