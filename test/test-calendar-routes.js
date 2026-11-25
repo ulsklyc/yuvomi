@@ -2170,6 +2170,65 @@ test('PUT /:id - the linked occurrences follow the calendar the upload save find
     'die Ausnahme bleibt bei der Serie in B');
 });
 
+test('PUT /:id - a local calendar next to a sync target set during the upload is refused (#2940)', async () => {
+  const kalenderB = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 exklusiv')").run().lastInsertRowid);
+  const id = insertEvent({ title: 'PUT-UPLOAD-EXCLUSIVE', start_datetime: '2041-05-01T09:00' });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('exklusiv').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-exclusive', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      local_calendar_id: kalenderB, attachment_data: dataUrl, attachment_name: 'exklusiv.txt',
+    } }));
+    await started;
+    const google = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { target_google_calendar_id: 'family@group.calendar.google.com' } }));
+    assert.equal(google.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  const direct = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { local_calendar_id: kalenderB } }));
+  assert.equal(direct.status, 400);
+  assert.equal(refused.status, 400, 'lokaler Kalender neben dem inzwischen gesetzten Google-Ziel');
+  assert.deepEqual(refused.body, direct.body);
+  const row = db.prepare('SELECT target_google_calendar_id AS g, local_calendar_id AS c, attachment_name AS a FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.g, 'family@group.calendar.google.com');
+  assert.notEqual(row.c, kalenderB);
+  assert.equal(row.a, null);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-exclusive'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+test('PUT /:id - an event made private during the upload answers 404 to the other member (#2940)', async () => {
+  const id = insertEvent({ title: 'PUT-UPLOAD-PRIVATE', start_datetime: '2041-05-02T09:00', created_by: TOM.id, visibility: 'all' });
+  // Gegenprobe: Maria darf diesen Termin ohne Wettlauf bearbeiten.
+  assert.equal((await call('PUT', `/${id}`, /** @type {any} */ ({ actor: MARIA, body: { description: 'vorher' } }))).status, 200);
+  const dataUrl = `data:text/plain;base64,${Buffer.from('privat').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-private', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ actor: MARIA, body: {
+      description: 'Maria', attachment_data: dataUrl, attachment_name: 'privat.txt',
+    } }));
+    await started;
+    const hidden = await call('PUT', `/${id}`, /** @type {any} */ ({ actor: TOM, body: { visibility: 'private' } }));
+    assert.equal(hidden.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  assert.equal(refused.status, 404);
+  assert.deepEqual(refused.body, { error: 'Event not found.', code: 404, reason: 'calendar_event_not_found' });
+  const row = db.prepare('SELECT description, visibility, attachment_name FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.description, 'vorher');
+  assert.equal(row.visibility, 'private');
+  assert.equal(row.attachment_name, null);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-private'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
 test('PUT /:id — Sichtbarkeit, Serie und Zuweisungen aktualisieren', async () => {
   const id = insertEvent({ title: 'PUT-FULL', start_datetime: '2041-03-01T09:00' });
   const res = await call('PUT', `/${id}`, { body: {
