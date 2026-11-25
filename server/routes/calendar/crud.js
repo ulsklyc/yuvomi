@@ -195,7 +195,8 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
   // Puffer und Dateien gelten ueber alle Runden: den Inhalt einer Dokument-ID
   // (storage_key, storage_backend, content_data) schreibt nach dem Anlegen
   // niemand mehr um - die Dokument-Route aendert nur Metadaten, und die nimmt
-  // `consume` aus der frisch gelesenen Zeile.
+  // `consume` aus der frisch gelesenen Zeile. Eine geloeschte ID kommt nicht
+  // wieder: family_documents zaehlt mit AUTOINCREMENT (baseline.sql).
   const contents = new Map();
   /** @type {{ sourceDocumentId: number, staged: any, written?: boolean }[]} */
   const files = [];
@@ -749,10 +750,19 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
       });
     }
 
-    const calendarCheck = validateCalendarId(db.get(), vLocalCalendar.value);
-    if (calendarCheck.error) {
+    // Was an der Datenbank haengt, gilt nach dem Upload wieder (#2956): der
+    // Kalender, das angebotene CalDAV-Ziel und die Personen koennen sich in
+    // der Zwischenzeit geaendert haben. Dieselbe Absage wie ohne Upload.
+    const checksNow = [
+      validateCalendarId(db.get(), vLocalCalendar.value),
+      ...(vCaldavForm.error ? [] : [caldavTargetOffered(db.get(), /** @type {any} */ (vCaldavForm.value))]),
+      validateOccurrenceAssignments(db.get(), req.body.assigned_to),
+    ];
+    const strangersNow = collectErrors(checksNow).length ? [] : newNonMembers(parseAssignedTo(req.body.assigned_to));
+    if (collectErrors(checksNow).length || strangersNow.length) {
       if (stagedUpload) await cleanupStagedUpload(stagedUpload);
-      return sendValidationErrors(res, [calendarCheck]);
+      if (strangersNow.length) return res.status(400).json({ error: nonMemberMessage(strangersNow), code: 400 });
+      return sendValidationErrors(res, checksNow);
     }
     const rights = attachmentRights(req);
     const eventId = withTx(db.get(), () => {
@@ -968,6 +978,52 @@ function linkedOccurrenceRefusal(event, req) {
     'Use the occurrence endpoint to modify a linked recurring occurrence.',
     { status: 400, code: 'calendar_occurrence_route_required' },
   );
+}
+
+/**
+ * Die Serie, wie sie nach dem letzten await steht (#2956): geloescht oder fuer
+ * die Person nicht mehr sichtbar ist dieselbe 404 wie vor dem Upload. Synchron
+ * gelesen; den Upload raeumt der catch der Route weg.
+ * @param {number} seriesId
+ * @param {any} req
+ */
+function seriesAfterUpload(seriesId, req) {
+  const current = loadVisibleEvent(seriesId, req);
+  if (!current) {
+    throw new CalendarOccurrenceError('Calendar series not found.', {
+      status: 404,
+      code: 'calendar_series_not_found',
+    });
+  }
+  return current;
+}
+
+const LOCAL_NEXT_TO_TARGET = 'Choose either a sync target or a local calendar.';
+
+/**
+ * Die Folge-Route je Lauf (#2956): die Serie von jetzt, ob sie Ausnahmen
+ * tragen kann und Sync-Ziel gegen lokalen Kalender - in der Reihenfolge der
+ * Pruefung vor dem Upload. Setzt `changes.local_calendar_id` nach dem Ziel.
+ * @param {{ seriesId: number, req: any, actorId: any, changes: Record<string, any>, syncTargetOf: (row: any) => any }} args
+ */
+function followingSeriesNow({ seriesId, req, actorId, changes, syncTargetOf }) {
+  const now = seriesAfterUpload(seriesId, req);
+  const eligibility = isEligibleLocalSeries(db.get(), now, actorId);
+  if (!eligibility.eligible) {
+    const unauthorized = eligibility.reason === 'not_authorized';
+    throw new CalendarOccurrenceError(
+      unauthorized ? 'Not authorized.' : 'This calendar series cannot use occurrence overrides.',
+      { status: unauthorized ? 403 : 400, code: eligibility.reason },
+    );
+  }
+  const syncTarget = syncTargetOf(now);
+  const localAsked = Object.hasOwn(req.body, 'local_calendar_id');
+  if (localAsked && syncTarget) {
+    throw new RefusedAfterUploadError((r) => r.status(400).json({ error: LOCAL_NEXT_TO_TARGET, code: 400 }));
+  }
+  if (syncTarget) changes.local_calendar_id = null;
+  else if (!localAsked) delete changes.local_calendar_id;
+  return now;
 }
 
 function rejectLinkedOccurrenceResource(res, event, req) {
@@ -1733,10 +1789,12 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
     }
     if (vIcon !== undefined) changes.icon = vIcon;
 
-    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), master, req.params.recurrenceId));
-    // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
+    // Synchron nach dem letzten await: die Serie, Bestandsliste und Anhang,
+    // wie sie JETZT stehen (#1358, #2956) - nicht die Zeile von vor dem Upload.
+    const current = seriesAfterUpload(seriesId, req);
+    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), current, req.params.recurrenceId));
     assertAttachmentStillChangeable(req, db.get(),
-      storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
+      storedOccurrenceAttachmentDocument(db.get(), current, req.params.recurrenceId),
       { replacementRequested, removalRequested });
     const rights = attachmentRights(req);
     const result = upsertOccurrenceOverride(db.get(), {
@@ -1759,7 +1817,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
               parsedAttachment,
               stagedUpload,
               req.body,
-              master.created_by,
+              current.created_by,
             ),
           })
         : undefined,
@@ -1774,7 +1832,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
         database: db.get(),
         actorId,
         isAdmin,
-        master,
+        master: current,
       }),
     });
   } catch (err) {
@@ -1900,6 +1958,10 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
         && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
       return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
+    // Ziel oder lokaler Kalender: hier gegen die geladene Zeile, je Lauf gegen die von jetzt (#2956).
+    const syncTargetOf = (/** @type {any} */ row) => (caldavProvided ? vCaldav.value.accountId : row.target_caldav_account_id)
+      || (googleProvided ? vGoogle.value : row.target_google_calendar_id);
+    if (Object.hasOwn(req.body, 'local_calendar_id') && syncTargetOf(master)) return res.status(400).json({ error: LOCAL_NEXT_TO_TARGET, code: 400 });
     // Ein Befund ist oben schon eine 400 geworden.
     const parsedAttachment = replacementRequested
       ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
@@ -1932,14 +1994,10 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
       changes.target_outlook_account_id = vOutlook.value.accountId;
       changes.target_outlook_calendar_id = vOutlook.value.calendarId;
     }
-    const syncTarget = (caldavProvided ? vCaldav.value.accountId : master.target_caldav_account_id)
-      || (googleProvided ? vGoogle.value : master.target_google_calendar_id);
-    if (Object.hasOwn(req.body, 'local_calendar_id') && syncTarget) {
-      return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
-    }
-    if (syncTarget) changes.local_calendar_id = null;
     if (vIcon !== undefined) changes.icon = vIcon;
     const rights = attachmentRights(req);
+    /** @type {any} */
+    let seriesNow = master;
     const commonOptions = {
       mayWidenAttachment: rights.mayWidenAttachment,
       seriesId,
@@ -1960,7 +2018,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
               parsedAttachment,
               stagedUpload,
               req.body,
-              master.created_by,
+              seriesNow.created_by,
             ),
           })
         : undefined,
@@ -1973,10 +2031,12 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
       db.get(),
       stagedClones,
       (cloneOptions) => {
-        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), master, req.params.recurrenceId));
-        // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
+        // Je Lauf, synchron nach dem letzten await: die Serie, Bestandsliste,
+        // Anhang und Ziel, wie sie JETZT stehen (#1358, #2956).
+        seriesNow = followingSeriesNow({ seriesId, req, actorId, changes, syncTargetOf });
+        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesNow, req.params.recurrenceId));
         assertAttachmentStillChangeable(req, db.get(),
-          storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
+          storedOccurrenceAttachmentDocument(db.get(), seriesNow, req.params.recurrenceId),
           { replacementRequested, removalRequested });
         return splitSeries(db.get(), { ...commonOptions, ...cloneOptions });
       },
@@ -2001,6 +2061,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithout
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
     if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
+    if (err instanceof RefusedAfterUploadError) return sendRefusalAfterUpload(res, err.respond, staged);
     // Ein unerwarteter Fehler geht an den zentralen Handler (#2810) - aber
     // erst, wenn Anhang und Kopien wieder weg sind.
     if (staged.length > 0) {

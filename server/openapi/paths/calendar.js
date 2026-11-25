@@ -83,6 +83,8 @@ const STORAGE_CHANGED_TEXT = 'the document storage settings changed while an att
 // kept changing while they were uploaded.
 const SERIES_CHANGED_TEXT = 'the series changed several times while the attachment copies for its linked replacements were uploaded (reason `calendar_series_changed`); nothing is saved, the copies are removed again and the request may be sent again';
 const SERIES_CHANGED_REASON = '`calendar_series_changed` (409, the series changed several times while attachment copies were uploaded; nothing is saved, the request may be sent again)';
+// #2956: the series is looked up again after an attachment upload.
+const SERIES_NOT_FOUND_AFTER_UPLOAD = apiError('Calendar series not found (reason `calendar_series_not_found`), also when it was deleted or made invisible to the caller while an attachment was uploaded; nothing is saved and the uploaded file is removed again');
 
 /**
  * Gilt fuer POST und PUT gleich (#1364), deshalb einmal: ein Offset wird
@@ -484,7 +486,7 @@ export function calendarPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
-          404: apiError('Calendar series not found'),
+          404: SERIES_NOT_FOUND_AFTER_UPLOAD,
           409: apiError(`A date-only recurrence_id matches two occurrences (reason \`ambiguous_recurrence_id\`; send the exact recurrence_id), or ${STORAGE_CHANGED_TEXT}`),
           500: { $ref: '#/components/responses/InternalServerError' },
         },
@@ -532,7 +534,7 @@ export function calendarPaths() {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
-          404: apiError('Calendar series not found'),
+          404: SERIES_NOT_FOUND_AFTER_UPLOAD,
           409: {
             description: `Linked occurrence replacements require exact-count orphan confirmation, or a date-only recurrence_id matches two occurrences (reason \`ambiguous_recurrence_id\`), or ${STORAGE_CHANGED_TEXT}, or ${SERIES_CHANGED_TEXT}`,
             content: { 'application/json': { schema: { $ref: '#/components/schemas/CalendarOverrideOrphanConflict' } } },
