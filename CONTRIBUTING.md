@@ -188,6 +188,13 @@ household's zone), no catch block that answers 500 itself, no `async` function o
 at the first finding; a manual `BEGIN`/`COMMIT` (`TX-MANUAL`: `exec` or `prepare`, string or
 template literal) stands only as a listed exception with its reason in
 `lint-baseline-reasons.json` - the implementation, the instance lock and a few test instruments.
+`server/authorize/`, `server/migrations/`, `server/db/` (`backup.ts` and `restore.ts` apart),
+`server/db.js` and the read slices `server/services/*-slices.ts` stay synchronous, without
+`async`, `await` or `for await` (`SYNC-ONLY`, hard): the driver is synchronous, and every `await`
+is a yield point where another request runs between a read and its write. `db.get()` in
+`server/services/` and `server/authorize/` is a debt that only sinks (`DB-SINGLETON`): a new or
+rebuilt module takes the connection as its first parameter (`withTx(db, fn)`,
+`resolvePermissions(db, ...)`), and `db.get()` stays the facade of routes and entry points.
 The same script runs dependency-cruiser with the layer rules in `.dependency-cruiser.mjs`: no
 import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
 named files import `server/services/push.js`, and only that file imports `web-push`; the server
