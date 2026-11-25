@@ -8,8 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import * as noteCategoryNameContract from '../public/utils/note-category-name.js';
 import {
   categoryNameKey,
@@ -21,14 +20,7 @@ import {
 } from '../server/services/note-categories.js';
 
 function database() {
-  const db = new DatabaseSync(':memory:');
-  db.exec('PRAGMA foreign_keys = ON');
-  db.exec(MIGRATIONS_SQL[1]);
-  db.exec(MIGRATIONS_SQL[2]);
-  db.exec(MIGRATIONS_SQL[74]);
-  db.exec(MIGRATIONS_SQL[175]);
-  db.exec(MIGRATIONS_SQL[176]);
-  return db;
+  return openSchemaDb();
 }
 
 test('migration 176 creates scoped note categories without seed data', () => {

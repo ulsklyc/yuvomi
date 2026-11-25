@@ -1,6 +1,5 @@
-import { DatabaseSync } from 'node:sqlite';
 import { readdirSync, readFileSync } from 'node:fs';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { migrateTo, openSchemaDb } from './helpers/schema-db.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -9,24 +8,16 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion failed'); }
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE users (deactivated_at TEXT, 
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL,
-  password_hash TEXT NOT NULL, avatar_color TEXT NOT NULL DEFAULT '#007AFF',
-  avatar_data TEXT, avatar_key TEXT,
-  role TEXT NOT NULL DEFAULT 'member',
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[10]); // ics_subscriptions
-db.exec(MIGRATIONS_SQL[11]); // calendar_events ics columns
-db.exec(MIGRATIONS_SQL[61]); // feed token
+// Altzustand aus den echten Migrationen: users vor Migration 61 (Feed-Token)
+// und vor 80 (calendar_feed_show_assignees); die Tests fahren beide selbst.
+const db = openSchemaDb({ upTo: 60 });
 
 console.log('\n[ICS-Export-Test]\n');
 
 test('Migration 61 fügt calendar_feed_token hinzu', () => {
+  const before = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
+  assert(!before.includes('calendar_feed_token'), 'Spalte darf vor 61 nicht existieren');
+  migrateTo(db, 61);
   const cols = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
   assert(cols.includes('calendar_feed_token'), 'Spalte fehlt');
 });
@@ -46,7 +37,9 @@ test('Mehrere NULL-Token erlaubt (Partial-Index)', () => {
 });
 
 test('Migration 80 fügt calendar_feed_show_assignees hinzu (Default 0)', () => {
-  db.exec(MIGRATIONS_SQL[80]);
+  assert(!db.prepare(`PRAGMA table_info(users)`).all().some(c => c.name === 'calendar_feed_show_assignees'),
+    'Spalte darf vor 80 nicht existieren');
+  migrateTo(db, 80);
   const col = db.prepare(`PRAGMA table_info(users)`).all()
     .find(c => c.name === 'calendar_feed_show_assignees');
   assert(col, 'Spalte fehlt');
@@ -55,33 +48,8 @@ test('Migration 80 fügt calendar_feed_show_assignees hinzu (Default 0)', () => 
 
 import { buildFeed, escapeICSText, foldLine } from '../server/services/ics-export.js';
 
-// Frische DB mit calendar_events + ics_subscriptions
-const d2 = new DatabaseSync(':memory:');
-d2.exec('PRAGMA foreign_keys = ON;');
-d2.exec(`CREATE TABLE users (deactivated_at TEXT, 
-  id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
-  display_name TEXT NOT NULL, password_hash TEXT NOT NULL,
-  avatar_color TEXT NOT NULL DEFAULT '#007AFF', avatar_data BLOB, avatar_key TEXT,
-  role TEXT NOT NULL DEFAULT 'member',
-  created_at TEXT DEFAULT '', updated_at TEXT DEFAULT '');`);
-d2.exec(MIGRATIONS_SQL[10]);
-d2.exec(MIGRATIONS_SQL[11]);
-d2.exec(`CREATE VIRTUAL TABLE search_index USING fts5(
-  entity UNINDEXED, entity_id UNINDEXED, title, body
-);`); // migration 194 rebuilds the event slice
-d2.exec(MIGRATIONS_SQL[27]); // legacy calendar attachment bodies
-d2.exec(MIGRATIONS_SQL[61]);
-d2.exec("ALTER TABLE calendar_events ADD COLUMN visibility TEXT NOT NULL DEFAULT 'all';");
-d2.exec(MIGRATIONS_SQL[80]);
-d2.exec(MIGRATIONS_SQL[249]); // birthday token and default-on calendar inclusion
-d2.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions (EXDATE, #489)
-d2.exec(MIGRATIONS_SQL[97]); // calendar_events.tzid (DST-Export, #549)
-d2.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
-d2.exec(`CREATE TABLE IF NOT EXISTS event_assignments (
-  event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
-  user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  PRIMARY KEY (event_id, user_id)
-);`);
+// Frische DB mit dem heutigen Schema
+const d2 = openSchemaDb(); // volles Schema aus der Baseline (test/helpers/schema-db.js)
 const u1 = d2.prepare(`INSERT INTO users (username,display_name,password_hash,role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
 const u2 = d2.prepare(`INSERT INTO users (username,display_name,password_hash) VALUES ('maria','Maria','x')`).run().lastInsertRowid;
 

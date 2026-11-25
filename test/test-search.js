@@ -5,9 +5,8 @@
  * Ausführen: node test/test-search.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import {
   runSearch, buildMatchQuery, runTableSearch, escapeLike, INFIX_TERM_CAP, searchExcerpt,
 } from '../server/services/search.js';
@@ -28,31 +27,9 @@ function assertCompactCalendarQueries(statements) {
     `Attachment-Body in kompakter Kalenderabfrage: ${calendarReads.join('\n---\n')}`);
 }
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[1]);
-// Migration 44: FTS5 index + sync triggers. Must apply cleanly.
-db.exec(MIGRATIONS_SQL[44]);
-db.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions
-db.exec(MIGRATIONS_SQL[27]); // legacy calendar attachment body
-db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides
-// Migration 65: health tables (medications, health_activities) the search reads from.
-db.exec(MIGRATIONS_SQL[65]);
-// Migration 66: FTS triggers + backfill for medications and health activities.
-db.exec(MIGRATIONS_SQL[66]);
-// Migration 130: care grants - the health search asks the rule of the health lists.
-db.exec(MIGRATIONS_SQL[130]);
-// Migration 197: waste_types (only the table search reads from).
-db.exec(MIGRATIONS_SQL[197]);
-// Migration 206: FTS triggers + backfill for waste_types.
-db.exec(MIGRATIONS_SQL[206]);
-db.exec(MIGRATIONS_SQL[262]); // notes.visibility - die Notizsuche fragt sie seit #1514
-db.exec(MIGRATIONS_SQL[174]); // birthdays.name_day_calendar_event_id - Geburtstagsfelder der Termin-Treffer
-db.exec(MIGRATIONS_SQL[254]); // birthdays.year_unknown
+// Volles Schema aus der Baseline (test/helpers/schema-db.js): search_index und
+// alle Such-Trigger stehen, bevor die Fixture-Zeilen sie fuellen.
+const db = openSchemaDb();
 
 console.log('\n[Search-Test] FTS5-Volltextsuche\n');
 
@@ -83,11 +60,7 @@ db.prepare(`INSERT INTO calendar_events (title, description, start_datetime, cre
 
 // Sichtbarkeit in der globalen Suche (#474, Luecke aus dem #1055-Review): der
 // Events-Bucket traegt dieselben zwei Klauseln wie die Kalender-Suche. Die
-// Fixture braucht dafuer die Abo-Tabelle (Migration 10) und `subscription_id`;
-// der CHECK auf external_source kennt in Migration 1 kein 'ics', deshalb wird
-// er fuer die zwei Abo-Zeilen ausgesetzt - im echten Schema ist er erweitert.
-db.exec(MIGRATIONS_SQL[10]);
-db.exec('ALTER TABLE calendar_events ADD COLUMN subscription_id INTEGER REFERENCES ics_subscriptions(id) ON DELETE CASCADE;');
+// Fixture braucht dafuer Abo-Zeilen (ics_subscriptions, subscription_id).
 const insVisEvent = db.prepare(`INSERT INTO calendar_events
   (title, description, start_datetime, created_by, visibility, external_source, subscription_id)
   VALUES (?, ?, '2030-02-01T10:00:00Z', ?, ?, ?, ?)`);
@@ -100,10 +73,8 @@ const sharedSub = db.prepare(`INSERT INTO ics_subscriptions (name, url, shared, 
   VALUES ('Shared feed', 'https://feed.test/shared.ics', 1, ?)`).run(otherUid).lastInsertRowid;
 const privateSub = db.prepare(`INSERT INTO ics_subscriptions (name, url, shared, created_by)
   VALUES ('Private feed', 'https://feed.test/private.ics', 0, ?)`).run(otherUid).lastInsertRowid;
-db.exec('PRAGMA ignore_check_constraints = ON;');
 insVisEvent.run('Cake from shared feed', 'ics row', otherUid, 'all', 'ics', sharedSub);
 insVisEvent.run('Cake from private feed', 'ics row', otherUid, 'all', 'ics', privateSub);
-db.exec('PRAGMA ignore_check_constraints = OFF;');
 
 // Health medications: own (private), foreign family-visible, foreign private.
 db.prepare(`INSERT INTO medications (user_id, name, dosage_text, visibility)
@@ -125,11 +96,19 @@ db.prepare(`INSERT INTO health_activities (user_id, type, performed_at, note, vi
 db.prepare(`INSERT INTO waste_types (name, color) VALUES ('Cake-day recycling', '#22C55E')`).run();
 db.prepare(`INSERT INTO waste_types (name, color, archived) VALUES ('Cake-day organic (retired)', '#A16207', 1)`).run();
 
-test('Migration 44 legt FTS5-Tabelle und Trigger an, Backfill leer (Seed danach)', () => {
+test('search_index und die Such-Trigger jeder durchsuchten Tabelle stehen', () => {
   const tbl = db.prepare(`SELECT name FROM sqlite_master WHERE name = 'search_index'`).get();
   assert(tbl, 'search_index sollte existieren');
-  const triggers = db.prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_search_%'`).get();
-  assert(triggers.n === 24, `Erwartet 24 Trigger (15 aus Mig. 44 + 6 aus Mig. 66 + 3 aus Mig. 199), erhalten ${triggers.n}`);
+  const triggers = db.prepare(`SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_search_%'`).all();
+  /** @type {Record<string, string[]>} */
+  const kinds = {};
+  for (const t of triggers) (kinds[t.tbl_name] ??= []).push(t.name.slice(t.name.lastIndexOf('_') + 1));
+  // Jede Tabelle, aus der runSearch liest, haelt den Index bei Einfuegen,
+  // Aendern und Loeschen aktuell (Migrationen 44, 66, 206).
+  for (const table of ['tasks', 'notes', 'contacts', 'calendar_events', 'shopping_items', 'medications', 'health_activities', 'waste_types']) {
+    assert(['ai', 'au', 'ad'].every((k) => kinds[table]?.includes(k)), `${table}: Such-Trigger ai/au/ad, erhalten ${JSON.stringify(kinds[table])}`);
+  }
+  assert(triggers.every((t) => /_(ai|au|ad)$/.test(t.name)), 'jeder trg_search_-Trigger ist ein ai/au/ad-Trigger');
 });
 
 test('buildMatchQuery erzeugt sichere Präfix-Phrasen, ignoriert Sonderzeichen', () => {
@@ -246,12 +225,6 @@ test('globale Suche liefert den aufgelösten verschobenen Termin mit Originalide
 // STAMMZEILE - ein Geburtstag von 1990 oeffnete den Kalender im Jahr 1990,
 // waehrend die Kalendersuche dieselbe Serie laengst an ihrem naechsten Termin
 // zeigte. Uhr und Zone stehen im Test: `todayKey` fragt beide.
-// Die Suite baut ihr Schema aus einzelnen Migrationen; `sync_config` (Traeger
-// der Haushaltszone) ist nicht dabei. Dieselbe Form wie in der Migration.
-db.exec(`CREATE TABLE IF NOT EXISTS sync_config (
-  key TEXT PRIMARY KEY, value TEXT NOT NULL,
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
 const searchModule = await import('../server/services/search.js');
 
 function mitUhr(isoNow, zone, fn) {

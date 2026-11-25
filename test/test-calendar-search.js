@@ -7,8 +7,8 @@
  * Ausführen: node test/test-calendar-search.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { migrateTo, openSchemaDb } from './helpers/schema-db.js';
+import { MIGRATIONS } from '../server/migrations/index.ts';
 import { buildMatchQuery, resolveEventSearchRows } from '../server/services/search.js';
 
 let passed = 0;
@@ -20,14 +20,12 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[1]);
-db.exec(MIGRATIONS_SQL[44]); // FTS5-Index + Event-Trigger (nur Titel/Beschreibung)
+// Altzustand aus den echten Migrationen: Stand vor 76, die Event-Trigger
+// (Migration 44) indexieren nur Titel und Beschreibung.
+const db = openSchemaDb({ upTo: 75 });
+const NEWEST = Math.max(...MIGRATIONS.map((m) => m.version));
+/** Der Event-Backfill aus Migration 194, so wie sie ausgeliefert ist. */
+const MIGRATION_194 = /** @type {string} */ (MIGRATIONS.find((m) => m.version === 194)?.up);
 
 console.log('\n[Calendar-Search-Test] FTS über Titel/Beschreibung/Ort (#471)\n');
 
@@ -67,15 +65,17 @@ test('vor Migration 76 ist der Ort nicht indexiert', () => {
 });
 
 // Migration 76 anwenden: Trigger neu, Ort in den Body, Bestandszeilen backfillen.
-db.exec(MIGRATIONS_SQL[76]);
-db.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions
-db.exec(MIGRATIONS_SQL[194]); // linked occurrence overrides + occurrence-aware FTS
+migrateTo(db, 76);
 
 test('Migration 76 backfillt bestehende Termine mit ihrem Ort', () => {
   const hits = search('Zahnarztpraxis');
   assert(hits.length === 1, `erwartet 1 Treffer, erhielt ${hits.length}`);
   assert(hits[0].id === Number(preId), 'falscher Treffer');
 });
+
+// Weiter bis zum heutigen Stand (u. a. 194: verknuepfte Overrides und die
+// occurrence-bewusste FTS).
+migrateTo(db, NEWEST);
 
 // Neue Termine nach 76: ai-Trigger indexiert Titel + Beschreibung + Ort.
 const dentist = addEvent({ title: 'Zahnreinigung', description: 'Prophylaxe', location: 'Dr. Meier, Hauptstraße 5', start: '2030-04-10T08:30:00Z' });
@@ -213,7 +213,7 @@ test('JSON-escaped override field names remain searchable after insert, update a
     assert(search(keyword).length === 0, `${field}: stale INSERT value remains indexed`);
     assert(search(`Updated${keyword}`).some(({ id }) => id === Number(childId)), `${field}: escaped UPDATE value is missing`);
   }
-  const migration = MIGRATIONS_SQL[194];
+  const migration = MIGRATION_194;
   db.exec(migration.slice(migration.lastIndexOf("DELETE FROM search_index WHERE entity = 'event';")));
   for (const [field, , keyword] of cases) {
     assert(search(`Updated${keyword}`).length === 1, `${field}: escaped backfill value is missing`);
@@ -233,7 +233,7 @@ test('invalid or non-array override metadata neither aborts FTS writes nor index
   }
   assert(search('Qzxinvalidmetadata').length === 0, 'invalid metadata indexed an inherited INSERT value');
   assert(search('Qzxinvalidupdated').length === 0, 'invalid metadata indexed an inherited UPDATE value');
-  const migration = MIGRATIONS_SQL[194];
+  const migration = MIGRATION_194;
   db.exec(migration.slice(migration.lastIndexOf("DELETE FROM search_index WHERE entity = 'event';")));
   assert(search('Qzxinvalidupdated').length === 0, 'invalid metadata indexed inherited text during backfill');
 });

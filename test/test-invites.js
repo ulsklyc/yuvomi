@@ -16,8 +16,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import express from 'express';
 import { createAuthApp } from './auth-app.js';
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 
 const { createInviteService } = await import('../server/services/invites.js');
 
@@ -27,11 +26,7 @@ const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const AFTER_TTL = T0 + TTL_MS + 1;
 
 function makeDb() {
-  const db = new DatabaseSync(':memory:');
-  db.exec('PRAGMA foreign_keys = ON;');
-  db.exec(MIGRATIONS_SQL[1]);   // users
-  db.exec(MIGRATIONS_SQL[121]); // invites
-  db.exec(MIGRATIONS_SQL[171]); // invites.permissions (#869)
+  const db = openSchemaDb();
   db.prepare(`INSERT INTO users (id, username, display_name, password_hash)
     VALUES (1, 'alice', 'Alice', 'x'), (2, 'bob', 'Bob', 'x')`).run();
   return db;
