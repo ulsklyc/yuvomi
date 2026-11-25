@@ -7,14 +7,20 @@
  *        weiter an den Aufrufer, der ihn fangen oder die aeussere Ebene mit
  *        fallen lassen kann.
  *
- * Warum nicht `db.transaction()`: den Helfer hat nur der Produktionstreiber
- * (better-sqlite3-multiple-ciphers). Module, die `db` als Parameter nehmen,
- * laufen in Suiten auch auf node:sqlite, und schrieben ihr BEGIN/COMMIT/ROLLBACK
+ * withTx ist der einzige Weg zu einer Transaktion im Server; die Lint-Regel
+ * TX-DRIVER meldet jeden Aufruf `*.transaction(...)` unter server/.
+ *
+ * Warum nicht das `transaction()` des Treibers: den Helfer hat nur der
+ * Produktionstreiber (better-sqlite3-multiple-ciphers), und er braucht einen
+ * zweiten Aufruf - `conn.transaction(fn)` allein baut die Funktion nur, ohne
+ * ihn laeuft lautlos nichts. Module, die `db` als Parameter nehmen, laufen in
+ * Suiten auch auf node:sqlite, und schrieben ihr BEGIN/COMMIT/ROLLBACK
  * deshalb bisher jedes fuer sich von Hand - ohne Savepoint und ohne den Riegel
  * gegen ein Promise. Hier steht dieselbe Folge einmal, fuer beide Treiber auf
- * demselben Weg; sie ist `db.transaction()` des Treibers nachgebaut
+ * demselben Weg; sie ist dem `transaction()` des Treibers nachgebaut
  * (lib/methods/transaction.js) und vertraegt sich mit ihm in beiden
- * Richtungen, weil beide die Ebene am Zustand der Verbindung ablesen.
+ * Richtungen (Tests benutzen den Treiber weiter), weil beide die Ebene am
+ * Zustand der Verbindung ablesen.
  *
  * `fn` MUSS synchron sein. Der Treiber ist synchron, und jedes `await` ist ein
  * Yield-Punkt: was danach laeuft, laeuft nach dem Commit und ausserhalb der
@@ -66,17 +72,36 @@ function isThenable(value: unknown): boolean {
 }
 
 /**
+ * `immediate`: die aeusserste Ebene beginnt mit BEGIN IMMEDIATE statt BEGIN.
+ * Fuer eine schreibende Transaktion, die die Schreibsperre sofort haben will,
+ * statt sie erst beim ersten Schreiben anzufordern: eine aufgeschobene
+ * Transaktion, die liest und dann schreibt, kann beim Hochstufen an einer
+ * anderen Verbindung scheitern (SQLITE_BUSY), statt am BEGIN zu warten
+ * (https://sqlite.org/lang_transaction.html). Kein globaler Standard: die
+ * meisten Transaktionen brauchen die Sperre nicht frueher als beim Schreiben.
+ * Verschachtelt bleibt es ein SAVEPOINT (wie `.immediate()` des Treibers, der
+ * die Art innen ebenfalls nicht beachtet).
+ */
+export type TxOptions = { readonly immediate?: boolean };
+
+/**
  * `fn` in einer Transaktion von `db` fahren und seine Rueckgabe liefern.
- * Aeusserste Ebene: BEGIN, dann COMMIT oder ROLLBACK. Innere Ebene: SAVEPOINT,
+ * Aeusserste Ebene: BEGIN (mit `{ immediate: true }` BEGIN IMMEDIATE), dann
+ * COMMIT oder ROLLBACK. Innere Ebene: SAVEPOINT,
  * dann RELEASE oder ROLLBACK TO und RELEASE. Der Fehler von `fn` kommt als
  * derselbe Fehler an; scheitert das Aufraeumen selbst, kommt dessen Fehler an
  * (wie beim Treiber).
  */
-export function withTx<Result>(db: TxDatabase, fn: (() => Result) & SyncOnly<Result>): Result {
+export function withTx<Result>(
+  db: TxDatabase,
+  fn: (() => Result) & SyncOnly<Result>,
+  options?: TxOptions,
+): Result {
   const nested = isOpen(db);
   // Ein fester Name genuegt: Savepoints gleichen Namens stapeln sich, RELEASE
   // und ROLLBACK TO treffen den juengsten.
   if (nested) db.exec('SAVEPOINT yuvomi_tx');
+  else if (options?.immediate === true) db.exec('BEGIN IMMEDIATE');
   else db.exec('BEGIN');
   try {
     const result = fn();

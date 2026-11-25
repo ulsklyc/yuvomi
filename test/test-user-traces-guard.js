@@ -264,11 +264,7 @@ function recording(database) {
           });
         };
       }
-      if (prop === 'transaction') {
-        // Die Transaktion der ECHTEN Verbindung, mit dem Proxy als Empfaenger
-        // der Aufrufe darin.
-        return (fn) => target.transaction(fn);
-      }
+      // exec und inTransaction (withTx) gehen an die ECHTE Verbindung.
       const value = target[prop];
       return typeof value === 'function' ? value.bind(target) : value;
     },

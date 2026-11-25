@@ -33,7 +33,8 @@ export type SqliteDatabase = {
   prepare(sql: string): SqliteStatement;
   exec(sql: string): unknown;
   pragma(source: string, options?: { simple?: boolean }): unknown;
-  transaction<Args extends unknown[], Result>(fn: (...args: Args) => Result): (...args: Args) => Result;
+  /** Steht eine Transaktion offen? (withTx liest daran die Ebene ab) */
+  readonly inTransaction: boolean;
   backup?: (destinationPath: string) => Promise<unknown>;
   close(): void;
 };

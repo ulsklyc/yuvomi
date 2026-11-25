@@ -8,6 +8,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('CalDAV');
 
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { upsertExternalCalendar } from './external-calendars.js';
 import {
   legacyColorSnapshotKey, forgetLegacyColorSnapshot, legacyColorChosenIds,
@@ -468,7 +469,7 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
   // Konto, Kalenderauswahl und die Entscheidung ueber die Farb-Heilung
   // (#1270) in EINEM Zug: ein Konto ohne diese Entscheidung heilte, obwohl es
   // nichts zu heilen gibt, und eine Entscheidung ohne Konto zeigte ins Leere.
-  const insertAccount = db.get().transaction(() => {
+  const { accountId, calendarData } = withTx(db.get(), () => {
     const result = db.get().prepare(`
       INSERT INTO caldav_accounts (name, caldav_url, username, password)
       VALUES (?, ?, ?, ?)
@@ -502,7 +503,6 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
     decideLegacyHeal(db.get(), accountId);
     return { accountId, calendarData };
   });
-  const { accountId, calendarData } = insertAccount();
 
   log.info(`Added CalDAV account "${name}" with ${calendarData.length} calendars.`);
 
@@ -618,7 +618,7 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
   const rehomed = (caldavUrl && !sameAccountUrl(caldavUrl, account.caldav_url))
     || (username && username !== account.username);
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare(`
       UPDATE caldav_accounts SET ${updates.join(', ')} WHERE id = ?
     `).run(...values);
@@ -642,7 +642,7 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
       // entschieden.
       decideLegacyHeal(db.get(), accountId);
     }
-  })();
+  });
 
   log.info(`Updated CalDAV account ${accountId}.`);
 
@@ -680,7 +680,7 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
   // lokal nicht mehr löschen, während die entfernte Kopie ohne Konto ohnehin
   // unerreichbar ist. Also entkoppeln, bevor das Konto verschwindet - beides in
   // einem Zug, damit keine Hälfte allein stehen bleibt.
-  const { detached, removed } = db.get().transaction(() => {
+  const { detached, removed } = withTx(db.get(), () => {
     // Ohne deleteEvents bleiben die Termine sichtbar stehen, verlieren aber ihre
     // Kalenderzuordnung - das war bis #732 der einzige Ausgang und ist jetzt der
     // ausdruecklich gewaehlte.
@@ -713,7 +713,7 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
     db.get().prepare('DELETE FROM sync_config WHERE key IN (?, ?)')
       .run(legacyColorHealKey(accountId), legacyColorSnapshotKey(accountId));
     return { detached: rows, removed: cleared };
-  })();
+  });
 
   log.info(
     `Deleted CalDAV account ${accountId} ("${account.name}"), detached ${detached} mirrored row(s).`

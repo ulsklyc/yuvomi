@@ -16,6 +16,7 @@
 import crypto from 'node:crypto';
 
 import { generatePairingCode, normalizePairingCode } from './display-accounts.js';
+import { withTx } from '../db/tx.ts';
 
 /** Fuenf Minuten statt der 15 beim Display: dieser Code oeffnet ein persoenliches Konto. */
 export const DEVICE_PAIRING_CODE_TTL_MS = 5 * 60 * 1000;
@@ -39,12 +40,12 @@ function isoNow() {
 export function issueDevicePairingCode(database, userId) {
   const code = generatePairingCode();
   const expiresAt = new Date(Date.now() + DEVICE_PAIRING_CODE_TTL_MS).toISOString().replace(/\.\d{3}Z$/, 'Z');
-  database.transaction(() => {
+  withTx(database, () => {
     endDevicePairingCodes(database, userId);
     database.prepare(`
       INSERT INTO device_pairing_codes (user_id, code_hash, expires_at) VALUES (?, ?, ?)
     `).run(userId, hash(code), expiresAt);
-  })();
+  });
   return { code, expiresAt };
 }
 

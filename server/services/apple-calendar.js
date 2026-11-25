@@ -18,6 +18,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('Apple');
 
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { assignNewOverride, calendarDefaultAssignees, reassignDefaultOnCalendarMove } from './sync-assignment.js';
 import { pruneDeletedEvents, countSourceEvents, deleteSourceEvents } from './calendar-prune.js';
 import { readSyncOutcome, withSyncOutcome } from './sync-outcome.js';
@@ -159,7 +160,7 @@ function saveCredentials(url, username, password) {
 function clearCredentials({ deleteEvents = false } = {}) {
   // In einer Transaktion, damit nicht die Termine fallen und die Verbindung
   // stehen bleibt (oder umgekehrt).
-  return db.get().transaction(() => {
+  return withTx(db.get(), () => {
     const removed = deleteEvents ? clearMirroredEvents() : 0;
     ['apple_caldav_url', 'apple_username', 'apple_app_password', 'apple_last_sync',
      // Der Fehlerstand gehoert zur Verbindung (#820).
@@ -171,7 +172,7 @@ function clearCredentials({ deleteEvents = false } = {}) {
     if (!getCredentials()) dropUploadAttemptsOf({ source: 'apple' });
     log.info('Disconnected.' + (removed ? ` ${removed} mirrored event(s) removed.` : ''));
     return { removed };
-  })();
+  });
 }
 
 /**

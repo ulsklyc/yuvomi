@@ -37,7 +37,9 @@
  *          server/services/ and server/authorize/, and every server/ file gets the server list
  *          plus its areas minus its named exemptions; the generator's nesting check refuses
  *          two entries of one rank; the fixtures sync-only/ and db-singleton/ give exactly
- *          their marked lines.
+ *          their marked lines. Phase 2, F6d: TX-DRIVER (hard) holds in server/ only; the fixture
+ *          tx-driver/ gives exactly its marked driver calls and the withTx lines with options
+ *          under TX-ASYNC-FN and TX-AWAIT-INSIDE, and nothing under test/.
  * Run:     npm run test:lint-baseline
  */
 
@@ -61,7 +63,7 @@ const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
 const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'CHANNEL-SEND', 'PUSH-SEND',
   'push-service-importers', 'web-push-only-in-push-service', 'channel-delivery-importers', 'providers-only-in-channel-delivery',
   'RIGHTS-MODULE', 'rights-only-through-authorize', 'authorize-not-to-db', 'settings-is-a-leaf',
-  'blanket-disable', 'disable-no-restricted-syntax', 'SYNC-ONLY'];
+  'blanket-disable', 'disable-no-restricted-syntax', 'SYNC-ONLY', 'TX-DRIVER'];
 
 /** The real rule set for a directory outside the repo: no fixture ignore, plugin by absolute URL. */
 function portableConfig() {
@@ -512,7 +514,7 @@ function serverSelectors() {
 /** @param {string} tag @returns {(s: Selector) => boolean} */
 const tagged = (tag) => (s) => s.message.startsWith(`${tag}:`);
 
-const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW', 'SQL-IN-LIST'];
+const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW', 'SQL-IN-LIST', 'TX-DRIVER'];
 /** @param {Selector} s */
 const serverOnly = (s) => SERVER_ONLY.some((tag) => tagged(tag)(s));
 
@@ -1013,6 +1015,38 @@ test('the DB-SINGLETON fixture gives exactly its four marked lines, and nothing 
   assert.equal(marked.length, 4, 'the fixture marks db.get(), dbModule.get(), a chained db.get() and one in server/authorize/');
   // Silent: map.get(key), db.get(1), calendar.colors.get(), database.prepare(...).get(), a string, a route.
   assert.deepEqual(found, marked);
+});
+
+test('the TX-DRIVER fixture gives exactly its marked lines, withTx with options stays under the async rules (phase 2, F6d)', () => {
+  const dir = tempDir('yuvomi-tx-driver-fixture-');
+  try {
+    cpSync(join(FIXTURE, 'tx-driver'), dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    const file = 'server/routes/tx.js';
+    const tags = { tx: 'TX-DRIVER', async: 'TX-ASYNC-FN', await: 'TX-AWAIT-INSIDE' };
+    const marked = readFileSync(join(dir, file), 'utf8').split('\n').flatMap((line, i) => {
+      const m = /\/\/ (tx|async|await)-\d+$/.exec(line);
+      return m ? [`${file}:${i + 1} ${tags[/** @type {'tx' | 'async' | 'await'} */ (m[1])]}`] : [];
+    }).sort();
+    assert.equal(marked.filter((m) => m.endsWith('TX-DRIVER')).length, 4, 'the fixture marks four driver spellings');
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .filter((/** @type {{ code: string }} */ d) => d.code.includes('no-restricted-syntax'))
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    // Silent: withTx(db, fn) with and without options, idb.transactions, transaction as a
+    // name, in a string and a comment, and the driver call under test/.
+    assert.deepEqual(found, marked);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('TX-DRIVER is hard: a driver transaction in the server is red even with --init (phase 2, F6d)', () => {
+  const dir = project('export function f(db) { return db.get().transaction(() => 1)(); }\n');
+  try {
+    const r = run(dir, '--init');
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /Hard rules[\s\S]*server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-DRIVER\s+1/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('SYNC-ONLY is hard, DB-SINGLETON an ordinary baseline that only sinks (phase 2, F6c)', () => {

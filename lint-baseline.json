@@ -142,7 +142,7 @@
  "server/auth.js\toxlint/max-lines": 1,
  "server/auth.js\toxlint/no-restricted-syntax/ERROR-TEXT": 7,
  "server/db/migrate.ts\toxlint/no-unsafe-finally": 1,
- "server/db/tx.ts\toxlint/no-restricted-syntax/TX-MANUAL": 7,
+ "server/db/tx.ts\toxlint/no-restricted-syntax/TX-MANUAL": 8,
  "server/mcp/protocol.js\tknip/exports": 5,
  "server/mcp/server.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 1,
  "server/middleware/error-handler.js\toxlint/no-restricted-syntax/ERROR-TEXT": 2,

@@ -1126,16 +1126,6 @@ function get() {
   return db;
 }
 
-/**
- * Transaktion-Helfer: Funktion wird atomar ausgeführt.
- * Bei Fehler wird automatisch rollback ausgeführt.
- * @param {Function} fn
- * @returns {any}
- */
-function transaction(fn) {
-  return get().transaction(fn)();
-}
-
 let _originalDb = null;
 
 /**
@@ -1182,4 +1172,4 @@ if (globalThis[CHECK_ONLY_HANDSHAKE] !== true) {
   }
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, closeForShutdown, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, adoptOrphanPantryBatches, _setTestDatabase, _resetTestDatabase };
+export { init, get, currentVersion, getPath, backupToFile, restoreFromFile, checkBackupFile, isRestoreRunning, isDatabaseOpen, closeForShutdown, unknownMigrationVersions, MIGRATIONS, migrate, MIGRATION_BUSY_ATTEMPTS, reconcileCriticalSchema, adoptOrphanPantryBatches, _setTestDatabase, _resetTestDatabase };

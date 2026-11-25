@@ -4,7 +4,8 @@
  * Purpose: Writes the `overrides` of .oxlintrc.json: `server/**` gets the base
  *          no-restricted-syntax list plus the sender selectors CHANNEL-SEND and PUSH-SEND
  *          and the rights selectors RIGHTS-SQL, RIGHTS-MODULE (phase 2, B5) and RIGHTS-ROW
- *          (phase 2, B8c) and the list rule SQL-IN-LIST (Refs #2810), and a few
+ *          (phase 2, B8c), the list rule SQL-IN-LIST (Refs #2810) and the transaction rule
+ *          TX-DRIVER (phase 2, F6d), and a few
  *          files get the same list minus what they are allowed to do. Areas (phase 2, F6c:
  *          SYNC-ONLY, DB-SINGLETON) add selectors to the files under them; every pattern gets
  *          one entry with the server list + the additions of its areas - its drops, the
@@ -130,6 +131,15 @@ const SQL_LIST_SELECTORS = [
   { selector: `CallExpression[callee.property.name='repeat'][callee.object.value=${marks}]`, message: SQL_LIST },
   { selector: `CallExpression[callee.property.name='join'][arguments.0.value=${marks}]`, message: SQL_LIST },
 ];
+// Phase 2, F6d (hard): TX-DRIVER finds a call of a method named `transaction` in the server:
+// the driver's `conn.transaction(fn)` (which builds the function and runs nothing without the
+// second call), `.immediate()` and friends behind it, and the old facade `db.transaction(fn)`.
+// A transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers.
+// test/ is outside the rule (tests use the driver on purpose). Blind: a computed key
+// (`conn['transaction']`), the method under another name (`const t = conn.transaction`
+// is a member read, not a call, and its later call `t(fn)` names no `transaction`).
+const TX_DRIVER = 'TX-DRIVER: a transaction is withTx(db, fn) from server/db/tx.ts, one way for both SQLite drivers, without the second call that conn.transaction(fn) needs and that runs nothing when it is forgotten.';
+const TX_DRIVER_SELECTOR = { selector: "CallExpression[callee.type='MemberExpression'][callee.computed=false][callee.property.name='transaction']", message: TX_DRIVER };
 // The schema and its migrations write SQL that is frozen once applied.
 const SCHEMA_HOME = ['server/db.js', 'server/migrations/**'];
 
@@ -178,7 +188,7 @@ const AREAS = [
 /** @type {{ files: string[], drop: object[] }[]} */
 const SYNC_EXEMPT_GROUPS = [{ files: SYNC_EXEMPT, drop: SYNC_SELECTORS }];
 
-const isSend =":matches([callee.property.name='send'], [callee.property.value='send'])";
+const isSend = ":matches([callee.property.name='send'], [callee.property.value='send'])";
 const CHANNEL_SELECTORS = [
   // provider.send(...), providers.send(...)
   { selector: `CallExpression${isSend}[callee.object.type='Identifier'][callee.object.name=/^providers?$/]`, message: CHANNEL },
@@ -271,7 +281,7 @@ export function checkNesting(overrides, mayDrop) {
  */
 export function buildOverrides(config, senders) {
   const [severity, ...base] = config.rules[RULE];
-  const server = [...base, ...CHANNEL_SELECTORS, PUSH_SELECTOR, WEBPUSH_SELECTOR, ...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS];
+  const server = [...base, ...CHANNEL_SELECTORS, PUSH_SELECTOR, WEBPUSH_SELECTOR, ...RIGHTS_SELECTORS, ...SQL_LIST_SELECTORS, TX_DRIVER_SELECTOR];
   const utc = base.filter((/** @type {{ message: string }} */ s) => s.message.startsWith('UTC-DAY-KEY:'));
   // Areas add selectors to every file under them; exceptions drop selectors from their files.
   /** @type {{ files: string[], add: object[] }[]} */

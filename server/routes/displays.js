@@ -23,6 +23,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { createLogger } from '../logger.js';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
@@ -285,7 +286,7 @@ router.post('/', validateRequest(), (req, res) => {
   }
 
   let userId = null;
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     // Der Benutzername ist technisch und taucht nirgends auf: ein Display
     // meldet sich nie an. Er muss nur eindeutig sein, und die UNIQUE-Spalte
     // haelt das - ein Zaehler waere eine zweite Buchfuehrung darueber.
@@ -305,7 +306,7 @@ router.post('/', validateRequest(), (req, res) => {
     userId = Number(ins.lastInsertRowid);
     db.get().prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)')
       .run(userId, req.authUserId || null);
-  })();
+  });
 
   return res.status(201).json({ data: { id: userId, display_name: displayName, show_screensaver: false, device_settings: null, devices: [] } });
 });

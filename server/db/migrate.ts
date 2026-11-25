@@ -202,7 +202,7 @@ function startFromBaseline(database: SqliteDatabase, load: () => Baseline): numb
     return null;
   }
 
-  const run = database.transaction(() => applyBaseline(database, baseline));
+  const run = () => withTx(database, () => applyBaseline(database, baseline));
   for (let attempt = 1; ; attempt++) {
     try {
       run();
@@ -275,7 +275,7 @@ export function migrate(
 
   if (pending.length === 0) return { baseline: startedFrom };
 
-  const runMigration = database.transaction((migration: Migration) => {
+  const runMigration = (migration: Migration) => withTx(database, () => {
     if (typeof migration.up === 'function') {
       migration.up(database);
     } else {
@@ -307,7 +307,7 @@ export function migrate(
    * Jeder andere Fehler fliegt sofort weiter, SQLITE_BUSY nach dem letzten
    * Versuch unverändert.
    *
-   * Kein `runMigration.immediate`: das nähme die Sperre schon am Anfang, säße
+   * Kein `{ immediate: true }`: das nähme die Sperre schon am Anfang, säße
    * aber im Startpfad jeder Installation - der Neuversuch ändert nur den
    * Fehlerpfad.
    */

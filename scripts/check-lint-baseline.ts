@@ -69,11 +69,14 @@ const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.
 // off, so it is hard as well. SYNC-ONLY (phase 2, F6c) keeps async/await out of the
 // permission module, the migrations, the database core and the read slices: the driver is
 // synchronous, and an await between a read and its write lets another request in.
+// TX-DRIVER (phase 2, F6d) keeps every server transaction on withTx(db, fn): no call of a
+// `transaction` method under server/, so the driver's forgotten second call cannot happen.
 const HARD = new Set([
   'oxlint/no-restricted-syntax/SYNC-ONLY',
   'oxlint/no-restricted-syntax/HTML-STRING-WRITE',
   'oxlint/no-restricted-syntax/TX-ASYNC-FN',
   'oxlint/no-restricted-syntax/TX-AWAIT-INSIDE',
+  'oxlint/no-restricted-syntax/TX-DRIVER',
   'oxlint/no-restricted-syntax/CHANNEL-SEND',
   'oxlint/no-restricted-syntax/PUSH-SEND',
   'depcruise/push-service-importers',

@@ -25,6 +25,7 @@
  * neue Sichtbarkeits-Vokabel fuer sie erfinden.
  */
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import {
   str, date, collectErrors, MAX_SHORT, MAX_TEXT,
 } from '../../api/formats.ts';
@@ -184,21 +185,21 @@ function maybeAdvanceItemOdometer(itemId, performedOn, odometer) {
 }
 
 function createServiceLogEntry({ itemId, values, userId }) {
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     const inserted = db.get().prepare(`
       INSERT INTO inventory_item_service_log (item_id, label, performed_on, odometer, vendor, note, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(itemId, values.label, values.performed_on, values.odometer, values.vendor, values.note, userId);
     maybeAdvanceItemOdometer(itemId, values.performed_on, values.odometer);
     return inserted;
-  })();
+  });
   return loadServiceLogEntry(itemId, result.lastInsertRowid);
 }
 
 function updateServiceLogEntry({ itemId, logId, values }) {
   const existing = loadServiceLogEntry(itemId, logId);
   if (!existing) return null;
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     // Vor dem Schreiben pruefen, ob DIESE Zeile (mit ihrem ALTEN Wert) die
     // Quelle des zwischengespeicherten Stands war - derselbe Guard wie
     // deleteServiceLogEntry(), nur fuer UPDATE statt DELETE (Review #1257).
@@ -222,7 +223,7 @@ function updateServiceLogEntry({ itemId, logId, values }) {
     } else {
       maybeAdvanceItemOdometer(itemId, values.performed_on, values.odometer);
     }
-  })();
+  });
   return loadServiceLogEntry(itemId, logId);
 }
 
@@ -292,7 +293,7 @@ function odometerBaselineExcluding(item, itemId, excludeLogId) {
 }
 
 function deleteServiceLogEntry({ itemId, logId }) {
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     // Vor dem Loeschen pruefen, ob DIESE Zeile ueberhaupt den aktuell
     // zwischengespeicherten Kilometerstand gesetzt hat - eine rueckdatierte
     // oder sonst nicht fuehrende Zeile darf einen unabhaengig (z. B. im
@@ -309,7 +310,7 @@ function deleteServiceLogEntry({ itemId, logId }) {
       }
     }
     return changes;
-  })();
+  });
   return result;
 }
 
@@ -391,7 +392,7 @@ function completeTrackedDate({ item, dateId, values, userId }) {
     };
   }
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     const inserted = db.get().prepare(`
       INSERT INTO inventory_item_service_log
         (item_id, item_date_id, label, performed_on, odometer, vendor, note, created_by)
@@ -410,7 +411,7 @@ function completeTrackedDate({ item, dateId, values, userId }) {
     }
 
     return inserted;
-  })();
+  });
 
   return { ok: true };
 }

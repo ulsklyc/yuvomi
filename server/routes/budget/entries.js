@@ -8,6 +8,7 @@ import { validateRequest } from '../../api/validate-request.ts';
 import { SAVINGS_CHART_CATEGORY } from '../../../public/utils/budget-chart-category.js';
 import { transferPair, mirrorTransfer, deleteTransfer } from '../../services/budget-transfers.js';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { str, oneOf, date as validateDate, num, rrule, MAX_TITLE, MONTH_RE } from '../../api/formats.ts';
 import { normalizeBudgetVisibility, BUDGET_MASKED_CATEGORY } from '../../authorize/index.ts';
 import { todayKey } from '../../utils/timezone.js';
@@ -740,7 +741,7 @@ router.put('/:id/series', validateRequest(), (req, res) => {
     || finalRecurring !== parent.is_recurring
     || startChanged;
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     // 0. DIE VERGANGENHEIT EINFRIEREN, solange das alte Raster noch gilt
     //    (Entscheidung in #1585). Ab Schritt 4 entsteht vor heute nichts mehr
     //    (grid_from); ein Monat, der nie aufgeschlagen wurde, bekommt seine
@@ -857,7 +858,7 @@ router.put('/:id/series', validateRequest(), (req, res) => {
         UPDATE budget_entries SET visibility = ? WHERE recurrence_parent_id = ?
       `).run(nextVisibility, parentId);
     }
-  })();
+  });
 
   // Belege bleiben hier bewusst unberuehrt (#583): sie gehoeren zur einzelnen
   // Buchung, nicht zur Serie - eine Stromrechnung hat je Monat einen eigenen
@@ -879,14 +880,14 @@ router.put('/:id/series', validateRequest(), (req, res) => {
   // sieht dort also die neue zustaendige Person, so wie er dort auch den
   // neuen Titel saehe.
   if (req.body.responsible_user_ids !== undefined) {
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       replaceSeriesResponsibles(parentId, req.body.responsible_user_ids);
       if (anchorAhead) replaceResponsibles(parentId, req.body.responsible_user_ids);
       const future = db.get().prepare(
         'SELECT id FROM budget_entries WHERE recurrence_parent_id = ? AND date >= ?'
       ).all(parentId, cutoffDate);
       for (const row of future) replaceResponsibles(row.id, req.body.responsible_user_ids);
-    })();
+    });
   }
 
   const updated = entryWithLoanMeta(parentId);
@@ -921,10 +922,10 @@ router.delete('/:id/series', validateRequest(), (req, res) => {
     return res.status(204).end();
   }
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare('DELETE FROM budget_entries WHERE recurrence_parent_id = ?').run(parentId);
     db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(parentId);
-  })();
+  });
 
   res.status(204).end();
 });
@@ -1090,7 +1091,7 @@ router.put('/:id', validateRequest(), (req, res) => {
       || finalRrule !== entry.recurrence_rule);
     const cutoffDate = gridChanged ? todayKey(db.get()) : null;
 
-    const tx = db.get().transaction(() => {
+    withTx(db.get(), () => {
       if (gridChanged) freezeSeriesPast(db.get(), id, cutoffDate);
 
       db.get().prepare(`
@@ -1151,7 +1152,6 @@ router.put('/:id', validateRequest(), (req, res) => {
         db.get().prepare('UPDATE budget_series SET grid_from = ? WHERE anchor_id = ?').run(cutoffDate, id);
       }
     });
-    tx();
 
     // Belege (#583): nur anfassen, wenn das Feld mitkommt. Ein PUT, das nur den
     // Betrag korrigiert, darf die angehaengten Belege nicht stillschweigend
@@ -1216,7 +1216,7 @@ router.patch('/:id/confirm', validateRequest(), (req, res) => {
     ? entry.amount
     : entry.transfer_entry_id ? (entry.amount < 0 ? -corrected : corrected) : cents(entry.amount < 0 ? -corrected : corrected);
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
   db.get().prepare(`
     UPDATE budget_entries
        SET is_pending = 0,
@@ -1228,7 +1228,7 @@ router.patch('/:id/confirm', validateRequest(), (req, res) => {
     if (!nextAmount) throw new Error('A transfer cannot have a zero amount');
     mirrorTransfer(db.get(), id);
   }
-  })();
+  });
 
   const updated = entryWithLoanMeta(id);
   res.json({ data: { ...updated, attachments: attachmentsFor(id, documentViewer(req)) } });
@@ -1254,14 +1254,13 @@ router.delete('/:id', validateRequest(), (req, res) => {
     SELECT * FROM budget_loan_payments WHERE budget_entry_id = ?
   `).get(id);
 
-  const tx = db.get().transaction(() => {
+  withTx(db.get(), () => {
     if (linkedPayment) {
       db.get().prepare('DELETE FROM budget_loan_payments WHERE id = ?').run(linkedPayment.id);
     }
     db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(id);
     if (linkedPayment) refreshLoanStatus(linkedPayment.loan_id);
   });
-  tx();
 
   // Wenn eine Instanz gelöscht wird: genau diesen Fälligkeitstag als
   // übersprungen vermerken. Am Monat festgemacht (bis #636) hätte das Löschen

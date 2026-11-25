@@ -6,6 +6,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { str, oneOf, num, color as validateColor, MAX_SHORT } from '../../api/formats.ts';
 import { resyncSubscriptionBookings } from '../subscriptions.js';
 import { CURRENCY_CODES } from '../../../public/utils/currency-codes.js';
@@ -214,7 +215,7 @@ router.delete('/accounts/:id', validateRequest(), async (req, res) => {
   }
 
   const affected = subscriptionsOn(id);
-  const tx = db.get().transaction(() => {
+  withTx(db.get(), () => {
     // Zuordnung explizit leeren (unabhängig vom FK-Pragma), Einträge bleiben
     // bestehen - aber nur die, die der Aufrufer sieht: ueber fremde private
     // entscheidet er nicht (Critique R23).
@@ -241,7 +242,6 @@ router.delete('/accounts/:id', validateRequest(), async (req, res) => {
       db.get().prepare('DELETE FROM budget_accounts WHERE id = ?').run(id);
     }
   });
-  tx();
   await resyncSubscriptionBookings(affected);
 
   res.status(204).end();

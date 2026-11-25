@@ -12,6 +12,7 @@ import { createLogger } from '../logger.js';
 const log = createLogger('CalDAV-Reminders');
 
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { parseVTODO } from './ics-parser.js';
 import { createCalDAVClient, supportsComponent, writableColumn, writableFromColumn, collectionUrlOf } from '../utils/caldav-client.js';
 import { createdHere } from './calendar-prune.js';
@@ -374,7 +375,7 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
   // Zeile und Tags in einer Transaktion. Der STATUS einer schon gespiegelten
   // Zeile gehört nicht dazu: er wird zusammen mit seinem Erledigungseintrag in
   // applySyncedCompletions geschrieben (#1836, siehe unten).
-  return d.transaction(() => {
+  return withTx(d, () => {
     const { row: existing, foreign } = rowForTodoUid(d, 'tasks', 'priority, status, external_rrule', todo.uid, accountId);
     // Ein anderes Konto führt die Aufgabe schon (#1906): nichts anlegen, nichts ändern.
     if (foreign) return null;
@@ -470,7 +471,7 @@ function upsertTask(todo, accountId, createdBy, objectUrl = null, { completions 
     // Aufrufer überspringt dirty markierte Einträge (#617).
     setTags(d, taskId, todo.tags);
     return taskId;
-  })();
+  });
 }
 
 /**
@@ -509,7 +510,7 @@ function applySyncedCompletions(d, pending, reparented = null) {
     SELECT parent_task_id FROM tasks
      WHERE id = ? AND status = ? AND COALESCE(outbound_dirty, 0) = 0
   `);
-  d.transaction(() => {
+  withTx(d, () => {
     for (const { taskId, oldStatus, newStatus, completedAt } of entries) {
       if (oldStatus === newStatus) {
         if (!reparented?.has(taskId)) continue;
@@ -524,7 +525,7 @@ function applySyncedCompletions(d, pending, reparented = null) {
       if (write.run(newStatus, taskId, oldStatus).changes === 0) continue;
       syncTaskCompletion(d, taskId, oldStatus, newStatus, null, null, { source: 'caldav', completedAt });
     }
-  })();
+  });
 }
 
 /**
@@ -1054,11 +1055,11 @@ async function runSync({ createClient: makeClient } = {}) {
       // Lauf dazwischen, sähe der nächste den neuen Elternteil als
       // unverändert, und der Eintrag bliebe für immer falsch. Jede Hälfte
       // ist ein eigener Savepoint, ein Fehler in einer lässt die andere stehen.
-      db.get().transaction(() => {
+      withTx(db.get(), () => {
         let reparented = new Set();
         if (taskRelations.size > 0) {
           try {
-            reparented = db.get().transaction(() => applyTaskRelations(taskRelations))();
+            reparented = withTx(db.get(), () => applyTaskRelations(taskRelations));
           } catch (err) {
             log.error(`Failed to apply VTODO relations for account ${account.id}:`, err.message);
           }
@@ -1068,7 +1069,7 @@ async function runSync({ createClient: makeClient } = {}) {
         } catch (err) {
           log.error(`Failed to record synced task completions for account ${account.id}:`, err.message);
         }
-      })();
+      });
 
       // Prune locally-stored caldav items that vanished remotely.
       // Module mit einer nicht abgerufenen Liste werden übersprungen (#508).

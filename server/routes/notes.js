@@ -6,6 +6,7 @@
 
 import express from 'express';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import { str, collectErrors, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
@@ -214,8 +215,7 @@ router.patch('/categories/reorder', validateRequest(), (req, res) => {
     return res.status(400).json({ error: 'Categories can only be reordered within one scope.', code: 400 });
   }
   const update = db.get().prepare('UPDATE note_categories SET sort_order = ? WHERE id = ?');
-  const transaction = db.get().transaction(() => ids.forEach((id, index) => update.run(index, id)));
-  transaction();
+  withTx(db.get(), () => ids.forEach((id, index) => update.run(index, id)));
   res.json({
     data: listVisibleCategories(db.get(), actorId(req)).map(categoryPayload),
     meta: { can_manage_household: canManageHousehold(req) },
@@ -248,11 +248,10 @@ router.delete('/categories/:id', validateRequest(), (req, res) => {
   const verdict = editableCategory(req, id);
   if (!verdict.category) return categoryRefusal(res, verdict);
   const database = db.get();
-  const remove = database.transaction(() => {
+  withTx(database, () => {
     database.prepare('DELETE FROM note_categories WHERE id = ?').run(id);
     pruneCategoryFromDashboardConfigs(database, id);
   });
-  remove();
   res.status(204).end();
 });
 
@@ -290,7 +289,7 @@ router.post('/', validateRequest(), (req, res) => {
     const access = readAccessFields(req.body);
 
     const database = db.get();
-    const create = database.transaction(() => {
+    const result = withTx(database, () => {
       const result = database.prepare(`
         INSERT INTO notes (content, title, color, pinned, created_by, visibility, locked)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -305,7 +304,6 @@ router.post('/', validateRequest(), (req, res) => {
       }
       return result;
     });
-    const result = create();
 
     const note = db.get().prepare(`
       SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar
@@ -356,7 +354,7 @@ router.put('/:id', validateRequest(), (req, res) => {
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const database = db.get();
-    const update = database.transaction(() => {
+    withTx(database, () => {
       database.prepare(`
       UPDATE notes
       SET content = COALESCE(?, content),
@@ -385,7 +383,6 @@ router.put('/:id', validateRequest(), (req, res) => {
         });
       }
     });
-    update();
 
     const updated = db.get().prepare(`
       SELECT n.*, u.display_name AS creator_name, u.avatar_color AS creator_color, ${personAvatarUrlSql('u')} AS creator_avatar

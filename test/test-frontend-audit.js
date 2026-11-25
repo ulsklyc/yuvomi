@@ -5315,7 +5315,7 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
   const undoBlock = shoppingRoute.slice(shoppingRoute.indexOf("router.post('/items/undo-transfer'"));
   assert.match(undoBlock, /UPDATE meal_ingredients SET on_shopping_list = 0/,
     'das Undo muss das Zutaten-Flag mit zurücknehmen');
-  assert.match(undoBlock, /db\.get\(\)\.transaction\(/,
+  assert.match(undoBlock, /withTx\(db\.get\(\),/,
     'die Rücknahme ist eine Handlung und gehört in eine Transaktion');
 
   // Seitenbestand: jeder Transfer meldet über den geteilten Baustein - damit

@@ -1,6 +1,7 @@
 import express from 'express';
 import birthdayFeedRouter from './birthday-feed.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import { collectErrors, date as validateDate, oneOf, str, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
@@ -334,7 +335,7 @@ router.post('/', validateRequest(), (req, res) => {
     );
 
     const birthday = loadBirthday(result.lastInsertRowid);
-    const synced = db.transaction(() => syncBirthdayArtifacts(db.get(), birthday));
+    const synced = withTx(db.get(), () => syncBirthdayArtifacts(db.get(), birthday));
     res.status(201).json({ data: hydrateBirthday(db.get(), loadBirthday(synced.id)) });
   } catch (err) {
     if (isContactLinkConflict(err)) return refuseContactLink(res, 'taken');
@@ -383,7 +384,7 @@ router.post('/import', validateRequest(), (req, res) => {
   const userId = req.authUserId || req.session.userId;
   // 1 bis 500 ganze Zahlen: das Schema (BirthdayImportInput) prueft sie.
   const ids = req.body.contact_ids;
-  const result = db.transaction(() => importBirthdaysFromContacts(db.get(), ids, userId));
+  const result = withTx(db.get(), () => importBirthdaysFromContacts(db.get(), ids, userId));
   res.status(201).json({ data: result });
 });
 
@@ -450,7 +451,7 @@ router.put('/:id', validateRequest(), (req, res) => {
     );
 
     const updated = loadBirthday(id);
-    db.transaction(() => syncBirthdayArtifacts(db.get(), updated));
+    withTx(db.get(), () => syncBirthdayArtifacts(db.get(), updated));
     res.json({ data: hydrateBirthday(db.get(), loadBirthday(id)) });
   } catch (err) {
     if (isContactLinkConflict(err)) return refuseContactLink(res, 'taken');
@@ -464,7 +465,7 @@ router.delete('/:id', validateRequest(), (req, res) => {
   const existing = loadBirthday(id);
   if (!existing) return res.status(404).json({ error: 'Birthday not found.', code: 404, reason: 'birthdays_birthday_not_found' });
 
-  db.transaction(() => {
+  withTx(db.get(), () => {
     deleteBirthdayArtifacts(db.get(), existing);
     db.get().prepare('DELETE FROM birthdays WHERE id = ?').run(id);
   });

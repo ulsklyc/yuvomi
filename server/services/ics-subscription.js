@@ -14,6 +14,7 @@ import dns from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { assignDefaultToEvent, settlePastInheritedReminders } from './sync-assignment.js';
 import { assigneeFields, readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
 import { setEventAssignments } from './event-assignments.ts';
@@ -266,7 +267,7 @@ async function syncOne(sub, { rethrowFetch = false } = {}) {
     // im Regelfall aber keine einzige Änderung.
     let changedEvents = 0;
 
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       for (const ev of flatEvents) {
         try {
           // NUR die Eigenfarbe des Termins (RFC 7986 COLOR); die Abo-Farbe ist
@@ -324,7 +325,7 @@ async function syncOne(sub, { rethrowFetch = false } = {}) {
 
       db.get().prepare(`UPDATE ics_subscriptions SET last_sync = ?, etag = ?, last_modified = ? WHERE id = ?`)
         .run(new Date().toISOString(), newEtag, newLastModified, sub.id);
-    })();
+    });
 
     // Ein Lauf, der nichts verändert hat, gehört nicht ins Standard-Log: er
     // wiederholt sich bei jedem Scheduler-Tick.
@@ -534,7 +535,7 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   let assigned = 0;
   const total  = rawEvents.length;
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     for (const ev of rawEvents) {
       if (!ev.dtstart) { skipped++; continue; }
       // Ein abgesagter Termin wird gar nicht erst uebernommen (#2499): ohne
@@ -583,7 +584,7 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
         skipped++;
       }
     }
-  })();
+  });
 
   log.info(`Imported ${imported}/${total} events for user ${userId} (${skipped} skipped, ${assigned} assigned).`);
   return { imported, skipped, assigned, total };
@@ -594,14 +595,14 @@ async function create(userId, { name, url, color, shared, default_assignee_user_
   await checkSSRF(normalizedUrl);
   // Die Zuweisung steht VOR dem ersten syncOne() in der Zeile - danach gesetzt
   // hätte sie die eben eingelesenen Termine nicht mehr erreicht (#730).
-  const subId = db.get().transaction(() => {
+  const subId = withTx(db.get(), () => {
     const id = Number(db.get().prepare(
       `INSERT INTO ics_subscriptions (name,url,color,shared,created_by)
        VALUES (?,?,?,?,?)`
     ).run(name, normalizedUrl, color, shared ? 1 : 0, userId).lastInsertRowid);
     writeDefaultAssignees(db.get(), 'subscription', id, default_assignee_user_ids);
     return id;
-  })();
+  });
   const newSub = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
   // Das Abo steht; ein gescheiterter erster Abruf ist eine Warnung, kein
   // Fehlschlag des Anlegens. `syncError` ist der Fehler selbst, die Route
@@ -618,13 +619,13 @@ function update(userId, subId, fields, isAdmin) {
   const name   = fields.name   !== undefined ? fields.name   : sub.name;
   const color  = fields.color  !== undefined ? fields.color  : sub.color;
   const shared = fields.shared !== undefined ? (fields.shared ? 1 : 0) : sub.shared;
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare(`UPDATE ics_subscriptions SET name = ?, color = ?, shared = ? WHERE id = ?`)
       .run(name, color, shared, subId);
     if (fields.default_assignee_user_ids !== undefined) {
       writeDefaultAssignees(db.get(), 'subscription', subId, fields.default_assignee_user_ids);
     }
-  })();
+  });
   return withAssignees(db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId));
 }
 

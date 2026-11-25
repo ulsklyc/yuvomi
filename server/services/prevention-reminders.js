@@ -56,6 +56,7 @@ import { createLogger } from '../logger.js';
 import { computeDueForUser } from './prevention-due.js';
 import { lacksHealth } from './cycle-reminders.js';
 import { householdDisabledModules } from './household-modules.js';
+import { withTx } from '../db/tx.ts';
 
 const log = createLogger('PreventionReminders');
 const ENTITY_TYPE = 'health_prevention_due';
@@ -182,7 +183,7 @@ function clearPendingWhileSwitchedOff(database, subjectId = null) {
  * @param {Date} [now]
  */
 export function syncPreventionRemindersForSubject(database, subjectId, now = new Date()) {
-  database.transaction(() => {
+  withTx(/** @type {import('../db/tx.ts').TxDatabase} */ (database), () => {
     // Haushaltsweit abgeschaltet: nichts anlegen, Ausstehendes abraeumen -
     // siehe clearPendingWhileSwitchedOff(). Hier und nicht nur im Voll-Sync,
     // weil die Schreibwege (Datensatz, Betreuung, Opt-in) diesen Einzelweg
@@ -225,7 +226,7 @@ export function syncPreventionRemindersForSubject(database, subjectId, now = new
     for (const item of items) {
       syncRecordReminder(database, item, subjectId, subjectHasHealth, caregiverIds);
     }
-  })();
+  });
 }
 
 /**

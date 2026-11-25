@@ -27,6 +27,7 @@ import {
 import { qrToDataUrl } from '../utils/qrcode.js';
 import { createLogger } from '../logger.js';
 import { activeAccountSql } from './account-state.js';
+import { withTx } from '../db/tx.ts';
 
 const log = createLogger('2fa');
 
@@ -164,7 +165,7 @@ export function confirmSetup(db, userId, code, { nowMs = Date.now() } = {}) {
   const codes = generateRecoveryCodes();
   const insert = db.prepare('INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?)');
 
-  db.transaction(() => {
+  withTx(/** @type {import('../db/tx.ts').TxDatabase} */ (db), () => {
     db.prepare(`
       UPDATE user_totp
          SET confirmed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), last_step = ?
@@ -172,7 +173,7 @@ export function confirmSetup(db, userId, code, { nowMs = Date.now() } = {}) {
     `).run(result.step, userId);
     db.prepare('DELETE FROM user_recovery_codes WHERE user_id = ?').run(userId);
     for (const plain of codes) insert.run(userId, hashRecoveryCode(plain));
-  })();
+  });
 
   log.info('Two-factor authentication enabled', { userId });
   return { recovery_codes: codes };
@@ -237,10 +238,10 @@ function countRecovery(db, userId) {
  * @param {number} userId
  */
 export function disable(db, userId) {
-  db.transaction(() => {
+  withTx(/** @type {import('../db/tx.ts').TxDatabase} */ (db), () => {
     db.prepare('DELETE FROM user_totp WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM user_recovery_codes WHERE user_id = ?').run(userId);
-  })();
+  });
   log.info('Two-factor authentication disabled', { userId });
 }
 
@@ -260,10 +261,10 @@ export function regenerateRecoveryCodes(db, userId) {
   }
   const codes = generateRecoveryCodes(RECOVERY_CODE_COUNT);
   const insert = db.prepare('INSERT INTO user_recovery_codes (user_id, code_hash) VALUES (?, ?)');
-  db.transaction(() => {
+  withTx(/** @type {import('../db/tx.ts').TxDatabase} */ (db), () => {
     db.prepare('DELETE FROM user_recovery_codes WHERE user_id = ?').run(userId);
     for (const plain of codes) insert.run(userId, hashRecoveryCode(plain));
-  })();
+  });
   log.info('Two-factor recovery codes regenerated', { userId });
   return { recovery_codes: codes };
 }

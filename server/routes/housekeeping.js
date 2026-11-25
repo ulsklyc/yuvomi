@@ -8,6 +8,7 @@ import express from 'express';
 import crypto from 'node:crypto';
 import { hashPassword } from '../utils/password.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
 import { collectErrors, color, date, datetime, num, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
@@ -989,7 +990,7 @@ router.post('/worker', requireAdmin, validateRequest(), async (req, res) => {
       actorUserId: actorId,
     });
 
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare(`
         UPDATE users
         SET username = ?, display_name = ?, avatar_color = ?, avatar_data = ?
@@ -1021,7 +1022,7 @@ router.post('/worker', requireAdmin, validateRequest(), async (req, res) => {
         avatarData: avatarData ?? null,
         actorUserId: actorId,
       });
-    })();
+    });
 
     const saved = existing ? loadWorkerById(existing.id) : loadWorkers().find((worker) => worker.user_id === targetUserId);
     res.status(existing ? 200 : 201).json({ data: publicWorker(saved, localDayContext(), receiptAccess(req)) });
@@ -1148,7 +1149,7 @@ router.post('/work-sessions/check-in', validateRequest(), (req, res) => {
   // Termin und Zahlungsaufgabe liegen am Tag des Check-ins - gelesen an
   // derselben Uhr wie "heute" auf der Seite (#1556).
   const context = localDayContext(req.body, new Date(checkIn));
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     const eventId = createVisitCalendarEvent(db.get(), worker, checkIn, actorId, vEventTitle.value, context.localDate);
     const totalAmount = Number(vDailyRate.value || 0) + Number(vExtras.value || 0);
     const taskId = housekeepingPaymentTasksEnabled(db.get())
@@ -1158,7 +1159,7 @@ router.post('/work-sessions/check-in', validateRequest(), (req, res) => {
       INSERT INTO housekeeping_work_sessions (worker_id, check_in, check_out, daily_rate, extras, calendar_event_id, payment_task_id, created_by, rate_type, hourly_rate)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(worker.id, checkIn, null, vDailyRate.value, vExtras.value ?? 0, eventId, taskId, actorId, workerRateType, workerHourlyRate);
-  })();
+  });
   const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json({ data: publicSession(row, viewer), summary: monthlySummary(currentMonth(), viewer) });
 });
@@ -1295,7 +1296,7 @@ router.put('/visits/:id', validateRequest(), (req, res) => {
       checkIn = new Date(localToUTCPrecise(`${vDate.value}T09:00:00`, tz)).toISOString();
     }
     const worker = existing.worker_id ? loadWorkerById(existing.worker_id) : null;
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare(`
         UPDATE housekeeping_work_sessions
         SET check_in = ?, check_out = ?, daily_rate = ?, extras = ?, receipt_document_id = ?, minutes_worked = ?
@@ -1320,7 +1321,7 @@ router.put('/visits/:id', validateRequest(), (req, res) => {
         vPaymentTitle.value,
         vPaymentDescription.value,
       );
-    })();
+    });
     const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
     res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
   } catch (err) {
@@ -1339,7 +1340,7 @@ router.post('/visits/:id/pay', validateRequest(), (req, res) => {
   const viewer = receiptAccess(req);
   if (!viewer.amounts) return payment403(res);
   const paidAt = nowIso();
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = ? WHERE id = ?').run(paidAt, existing.id);
     if (existing.payment_task_id) {
       const prev = db.get().prepare('SELECT status FROM tasks WHERE id = ?').get(existing.payment_task_id);
@@ -1349,7 +1350,7 @@ router.post('/visits/:id/pay', validateRequest(), (req, res) => {
       if (prev) syncTaskCompletion(db.get(), existing.payment_task_id, prev.status, 'done', userId(req));
       normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
     }
-  })();
+  });
   const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
   res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
 });
@@ -1369,14 +1370,14 @@ router.post('/visits/:id/unpay', validateRequest(), (req, res) => {
   const viewer = receiptAccess(req);
   if (!viewer.amounts) return payment403(res);
   if (existing.paid_at) {
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare('UPDATE housekeeping_work_sessions SET paid_at = NULL WHERE id = ?').run(existing.id);
       if (existing.payment_task_id) {
         const reopened = db.get().prepare('UPDATE tasks SET status = ? WHERE id = ? AND status = ?').run('open', existing.payment_task_id, 'done');
         if (reopened.changes > 0) syncTaskCompletion(db.get(), existing.payment_task_id, 'done', 'open', userId(req));
         normalizePaymentTaskAudience(db.get(), existing.payment_task_id);
       }
-    })();
+    });
   }
   const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(existing.id);
   res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
@@ -1388,10 +1389,10 @@ router.delete('/visits/:id', validateRequest(), (req, res) => {
   const existing = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(vId.value);
   if (!existing) return res.status(404).json({ error: 'Visit not found.', code: 404, reason: 'housekeeping_visit_not_found' });
   if (!assertMayTouchSettled(existing, req, res)) return;
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     deleteVisitLinks(db.get(), existing);
     db.get().prepare('DELETE FROM housekeeping_work_sessions WHERE id = ?').run(existing.id);
-  })();
+  });
   res.json({ data: { summary: monthlySummary(currentMonth(), receiptAccess(req)) } });
 });
 
@@ -1421,14 +1422,14 @@ router.post('/work-sessions/check-out', validateRequest(), (req, res) => {
     minutesWorked = minutesBetween(session.check_in, checkOut);
     updateRate = computeHourlyAmount(minutesWorked ?? 0, worker.hourly_rate);
   }
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare(`
       UPDATE housekeeping_work_sessions
       SET check_out = ?, extras = ?, daily_rate = ?, minutes_worked = ?, rate_type = ?, hourly_rate = ?
       WHERE id = ?
     `).run(checkOut, extras ?? session.extras, updateRate, minutesWorked, sessionRateType, sessionHourlyRate, session.id);
     normalizePaymentTaskAudience(db.get(), session.payment_task_id);
-  })();
+  });
   const row = db.get().prepare('SELECT * FROM housekeeping_work_sessions WHERE id = ?').get(session.id);
   res.json({ data: publicSession(row, viewer), summary: monthlySummary(householdMonthOf(row.check_in) ?? currentMonth(), viewer) });
 });
@@ -1582,7 +1583,7 @@ router.post('/supply-requests', requireShoppingWrite, validateRequest(), (req, r
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
   const actorId = userId(req);
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     const listId = defaultShoppingList(actorId);
     const item = db.get().prepare(`
       INSERT INTO shopping_items (list_id, name, quantity, category)
@@ -1596,7 +1597,7 @@ router.post('/supply-requests', requireShoppingWrite, validateRequest(), (req, r
       requestId: request.lastInsertRowid,
       shoppingItemId: item.lastInsertRowid,
     };
-  })();
+  });
 
   const row = db.get().prepare('SELECT * FROM housekeeping_supply_requests WHERE id = ?').get(result.requestId);
   res.status(201).json({ data: row, shopping_item_id: result.shoppingItemId });

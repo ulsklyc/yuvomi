@@ -14,6 +14,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import * as v from '../../api/formats.ts';
 import { requireAdmin } from '../../middleware/require-admin.js';
 import { todayKey } from '../../utils/timezone.js';
@@ -104,14 +105,14 @@ router.delete('/prevention/types/:id', requireAdmin, validateRequest(), (req, re
     'SELECT DISTINCT user_id FROM health_prevention_records WHERE type_id = ?'
   ).all(id).map((r) => r.user_id);
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     // Momentaufnahme JETZT ziehen - danach ist der Typname weg, der
     // FK-ON-DELETE-SET-NULL nullt type_id automatisch, kennt aber keinen Namen.
     db.get().prepare(
       "UPDATE health_prevention_records SET name = ? WHERE type_id = ? AND (name IS NULL OR name = '')"
     ).run(type.name, id);
     db.get().prepare('DELETE FROM health_prevention_types WHERE id = ?').run(id);
-  })();
+  });
 
   for (const userId of affectedUserIds) {
     try { syncPreventionRemindersForSubject(db.get(), userId); } catch (err) {
@@ -257,7 +258,7 @@ router.delete('/prevention/records/:id', validateRequest(), (req, res) => {
   const existing = db.get().prepare(`SELECT * FROM health_prevention_records WHERE id = ? AND ${w.sql}`).get(id, ...w.params);
   if (!existing) return res.status(404).json({ error: 'Record not found.', code: 404, reason: 'health_prevention_record_not_found' });
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     // Explizit abraeumen statt sich allein auf den periodischen Sync zu
     // verlassen (reminders.entity_id hat keine FK) - gleiches Muster wie
     // documents.js und item-dates.js#removeTrackedDateReminders folgen demselben Muster.
@@ -265,7 +266,7 @@ router.delete('/prevention/records/:id', validateRequest(), (req, res) => {
       DELETE FROM reminders WHERE entity_type = 'health_prevention_due' AND entity_id = ?
     `).run(id);
     db.get().prepare('DELETE FROM health_prevention_records WHERE id = ?').run(id);
-  })();
+  });
 
   try { syncPreventionRemindersForSubject(db.get(), existing.user_id); } catch (err) {
     log.error('Error syncing prevention reminders after delete:', err.message);

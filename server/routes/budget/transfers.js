@@ -2,6 +2,7 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { str, num, date as validateDate, MAX_TITLE } from '../../api/formats.ts';
 import { normalizeBudgetVisibility } from '../../authorize/index.ts';
 import { todayKey } from '../../utils/timezone.js';
@@ -130,7 +131,7 @@ router.put('/transfers/:id', validateRequest(), (req, res) => {
     && (k === 'recurrence_interval' ? v[k] !== entry[k] : Number(v[k]) !== Number(entry[k])))) {
     return res.status(400).json({ error: 'Change the recurrence through the transfer series.', reason: 'transfer_series_required', code: 400 });
   }
-  db.get().transaction(() => writeBooking(entry, v))();
+  withTx(db.get(), () => writeBooking(entry, v));
   res.json({ data: response(load(entry.id)) });
 });
 router.put('/transfers/:id/series', validateRequest(), (req, res) => {
@@ -144,7 +145,7 @@ router.put('/transfers/:id/series', validateRequest(), (req, res) => {
   const cutoff = todayKey(db.get());
   const gridChanged = v.date !== definition.start_date || v.recurrence_interval !== anchor.recurrence_interval || v.recurrence_interval_count !== anchor.recurrence_interval_count;
   if (gridChanged && anchor.date < cutoff && v.date.slice(0, 7) < anchor.date.slice(0, 7)) return res.status(400).json({ error: 'Series start cannot precede its first booked month.', code: 400 });
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     if (gridChanged) freezeSeriesPast(db.get(), anchor.id, cutoff);
     for (const [row, sign, account, category, subcategory] of [
       [anchor, -1, v.from_account_id, v.category, v.subcategory],
@@ -170,7 +171,7 @@ router.put('/transfers/:id/series', validateRequest(), (req, res) => {
     // Visibility is a permission choice for the whole series, including its past.
     db.get().prepare('UPDATE budget_entries SET visibility = ? WHERE id IN (?, ?) OR recurrence_parent_id IN (?, ?)')
       .run(v.visibility, anchor.id, partner.id, anchor.id, partner.id);
-  })();
+  });
   res.json({ data: response(load(anchor.id)) });
 });
 export default router;

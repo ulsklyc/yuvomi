@@ -17,6 +17,7 @@ const log = createLogger('Outlook');
 
 import crypto from 'node:crypto';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { parseRRule } from './recurrence.js';
 import { outboundEvent } from './outbound-dtstart.js';
 import { visibleWhere } from '../authorize/index.ts';
@@ -223,7 +224,7 @@ function updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId } = {}
 
   if (updates.length === 0) throw new Error('No fields to update.');
   values.push(accountId);
-  conn.transaction(() => {
+  withTx(conn, () => {
     if (calendarToEnable) {
       conn.prepare(`
         UPDATE outlook_calendar_selection SET enabled = 1
@@ -235,7 +236,7 @@ function updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId } = {}
         && proposedAutoSyncCalendarId && proposedOwnerUserId) {
       assertSyncTargetsSafe(conn, getAccountById(accountId));
     }
-  })();
+  });
   return { success: true };
 }
 
@@ -449,7 +450,7 @@ async function refreshCalendarSelection(accountId, accessToken, fetchImpl = fetc
   }
 
   const conn = db.get();
-  conn.transaction(() => {
+  withTx(conn, () => {
     // enabled-Zustand bekannter Kalender überlebt den Refresh.
     const enabledMap = new Map(
       conn.prepare('SELECT calendar_id, enabled FROM outlook_calendar_selection WHERE account_id = ?')
@@ -473,7 +474,7 @@ async function refreshCalendarSelection(accountId, accessToken, fetchImpl = fetc
         enabledMap.get(cal.id) ?? 0
       );
     }
-  })();
+  });
 
   log.info(`Refreshed ${calendars.length} calendars for Outlook account ${accountId}.`);
   return listCalendarSelection(accountId);
@@ -504,7 +505,7 @@ async function listCalendars(accountId, { refresh = false } = {}, fetchImpl = fe
 
 function setCalendarEnabled(accountId, calendarId, enabled) {
   const conn = db.get();
-  conn.transaction(() => {
+  withTx(conn, () => {
     const result = conn.prepare(`
       UPDATE outlook_calendar_selection SET enabled = ?
       WHERE account_id = ? AND calendar_id = ?
@@ -513,7 +514,7 @@ function setCalendarEnabled(accountId, calendarId, enabled) {
       throw new Error(`Calendar not found for account ${accountId}.`);
     }
     if (enabled) assertSyncTargetsSafe(conn, getAccountById(accountId));
-  })();
+  });
   return { success: true };
 }
 

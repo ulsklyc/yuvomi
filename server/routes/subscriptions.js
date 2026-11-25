@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { createLogger } from '../logger.js';
 import { color, collectErrors, date, num, str, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import {
@@ -383,8 +384,13 @@ function writeLinkedBooking(row, budgetCur, amount) {
  * Lesen, entscheiden, schreiben - synchron, aus der frischen Zeile. Liefert
  * `{ row }` nach dem Schreiben oder `{ needs }` mit der Waehrung, deren Kurs
  * fehlt; dann ist nichts geschrieben.
+ *
+ * `any` wie vor dem Umzug auf withTx: die beiden Zweige liefern verschiedene
+ * Formen, und der Aufrufer prueft `row` bzw. `needs` (wie
+ * runTransaction() in services/calendar-occurrence-overrides.js).
+ * @returns {any}
  */
-const applyBooking = (id, fetched) => db.get().transaction(() => {
+const applyBooking = (id, fetched) => withTx(db.get(), () => {
   const row = loadSubscription(id);
   // GIBT ES DAS ABO NOCH? (#1909) Sonst entstuende eine Buchung ohne Abo.
   if (!row) throw new SubscriptionGoneError();
@@ -433,7 +439,7 @@ const applyBooking = (id, fetched) => db.get().transaction(() => {
   }
   writeLinkedBooking(row, budgetCur, amount);
   return { row: loadSubscription(id) };
-})();
+});
 
 /**
  * Bringt die verknuepfte Buchung auf den Stand der Zeile. `fetched` ist ein
@@ -495,7 +501,7 @@ export async function resyncSubscriptionBookings(ids) {
  * nicht, steht in keiner Vorschau, und die Karte zeigt es nicht als faellig.
  * Reaktivieren ohne spaeteres Ende lehnt endConfigErrors ab.
  */
-const renewBooking = (current, { completed, nextDate, occurrencesDone }) => db.get().transaction(() => {
+const renewBooking = (current, { completed, nextDate, occurrencesDone }) => withTx(db.get(), () => {
   const database = db.get();
   if (completed) {
     database.prepare(`
@@ -546,7 +552,7 @@ const renewBooking = (current, { completed, nextDate, occurrencesDone }) => db.g
   }
   if (!completed) writeLinkedBooking({ ...current, next_payment_date: nextDate, budget_entry_id: null }, budgetCur, known);
   return { paid: linked && paidAmount === undefined ? { id: linked.id, budgetCurrency: paidCur } : null };
-})();
+});
 
 function validatePayload(body, { partial = false } = {}) {
   const checks = [];
@@ -669,7 +675,7 @@ router.post('/categories', validateRequest(), (req, res) => {
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
   try {
     const database = db.get();
-    const category = database.transaction(() => {
+    const category = withTx(database, () => {
       const order = database.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM subscription_categories').get().n;
       const result = database.prepare('INSERT INTO subscription_categories (name, color, sort_order) VALUES (?, ?, ?)')
         .run(name.value, categoryColor.value, order);
@@ -681,7 +687,7 @@ router.post('/categories', validateRequest(), (req, res) => {
         VALUES (?, 'subscriptions', ?, ?)
       `).run(budgetKey, name.value, order);
       return database.prepare('SELECT * FROM subscription_categories WHERE id = ?').get(result.lastInsertRowid);
-    })();
+    });
     res.status(201).json({ data: category });
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'subscriptions_category_exists' });
@@ -714,13 +720,13 @@ router.put('/meta/order', validateRequest(), (req, res) => {
     WHERE key = (SELECT budget_subcategory_key FROM subscription_categories WHERE id = ?)
   `);
   const updateMethods = db.get().prepare('UPDATE subscription_payment_methods SET sort_order = ? WHERE id = ?');
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     categories?.forEach((id, index) => {
       updateCategories.run(index, id);
       updateBudgetSubcategories.run(index, id);
     });
     methods?.forEach((id, index) => updateMethods.run(index, id));
-  })();
+  });
   res.json({ data: { updated: true } });
 });
 
@@ -734,7 +740,7 @@ router.put('/categories/:id', validateRequest(), (req, res) => {
     const errors = collectErrors([name, categoryColor]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
     const database = db.get();
-    database.transaction(() => {
+    withTx(database, () => {
       // UMBENENNEN macht eine Vorgabe zur eigenen Zeile: `label_key` faellt
       // weg, damit der eingegebene Name gilt statt weiterhin uebersetzt zu
       // werden. Dasselbe tun tasks.js, contacts.js und inventory/categories.js.
@@ -757,7 +763,7 @@ router.put('/categories/:id', validateRequest(), (req, res) => {
         database.prepare('UPDATE budget_subcategories SET name = ? WHERE key = ?')
           .run(name.value, existing.budget_subcategory_key);
       }
-    })();
+    });
     res.json({ data: database.prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id) });
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'subscriptions_category_exists' });
@@ -770,7 +776,7 @@ router.delete('/categories/:id', validateRequest(), (req, res) => {
   const existing = db.get().prepare('SELECT * FROM subscription_categories WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'subscriptions_category_not_found' });
   const database = db.get();
-  const affected = database.transaction(() => {
+  const affected = withTx(database, () => {
     const count = database.prepare('SELECT COUNT(*) AS n FROM budget_subscriptions WHERE category_id = ?').get(id).n;
     if (existing.budget_subcategory_key) {
       // Verknüpfte Ausgaben-Einträge lösen ihre - gleich mitentfernte - Subkategorie,
@@ -782,7 +788,7 @@ router.delete('/categories/:id', validateRequest(), (req, res) => {
     // FK ON DELETE SET NULL setzt category_id der betroffenen Abos auf NULL.
     database.prepare('DELETE FROM subscription_categories WHERE id = ?').run(id);
     return count;
-  })();
+  });
   res.json({ data: { deleted: true, affected } });
 });
 
@@ -1199,7 +1205,7 @@ router.post('/:id/renew/undo', validateRequest(), async (req, res) => {
     const prevDone = saved.occurrences_done;
     const b = { enabled: saved.enabled };
     // Bis hierher kein await: Pruefen und Zuruecksetzen in einem synchronen Schritt.
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       if (current.budget_entry_id) db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(current.budget_entry_id);
       db.get().prepare(`
         UPDATE budget_subscriptions
@@ -1208,7 +1214,7 @@ router.post('/:id/renew/undo', validateRequest(), async (req, res) => {
             completed_at = CASE WHEN ? THEN NULL ELSE completed_at END
         WHERE id = ?
       `).run(prevDate.value, prevDone, paid?.id ?? null, step.completed ? 1 : 0, b.enabled ? 1 : 0, step.completed ? 1 : 0, id);
-    })();
+    });
     let row;
     try {
       row = await syncBudgetExpense(id);
@@ -1233,14 +1239,14 @@ router.delete('/:id', validateRequest(), (req, res) => {
   const existing = loadSubscription(id);
   if (!existing) return subscriptionGone(res);
   if (!mayEditSub(req, existing)) return res.status(403).json({ error: 'You cannot modify this subscription.', code: 403 });
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     const subscription = loadSubscription(id);
     db.get().prepare("DELETE FROM reminders WHERE entity_type = 'subscription' AND entity_id = ?").run(id);
     db.get().prepare('DELETE FROM budget_subscriptions WHERE id = ?').run(id);
     if (subscription?.budget_entry_id) {
       db.get().prepare('DELETE FROM budget_entries WHERE id = ?').run(subscription.budget_entry_id);
     }
-  })();
+  });
   res.status(204).end();
 });
 
