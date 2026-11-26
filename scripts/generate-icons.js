@@ -2,6 +2,7 @@
  * Icon Generator for Yuvomi PWA
  * Generates icons from docs/logo.svg
  * Sizes: 192px and 512px, both "any" and "maskable" variants
+ * Plus the notification badge (96px): the three circles alone, white on transparent
  * Maskable icons: full-bleed background, logo content stays within 80% safe zone
  *
  * Usage: node scripts/generate-icons.js
@@ -71,6 +72,28 @@ function createFaviconSvg() {
   return createLogoSvg(32);
 }
 
+/**
+ * Notification badge (Android status bar): the mark without its tile.
+ * Android keeps only the alpha channel of a badge and paints it in one colour,
+ * so a coloured tile with rounded corners shows up as a white square. What it
+ * needs is the shape alone: the three circles, white on transparent. They are
+ * fully opaque here (the mark's 0.82 would read as grey seams where they
+ * overlap once the colour is gone), and the square viewBox is centred on them
+ * with some margin, because the status bar draws the badge small.
+ * The circles span x 37-125 and y 45-130 on the 160 grid.
+ *
+ * @param {number} size
+ */
+function createBadgeSvg(size) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="28.5 35 105 105" fill="none">
+  <g fill="#fff">
+    <circle cx="64" cy="72" r="27"/>
+    <circle cx="100" cy="78" r="25"/>
+    <circle cx="80" cy="106" r="24"/>
+  </g>
+</svg>`;
+}
+
 const icons = [
   { name: 'icon-192.png',          size: 192, svg: createLogoSvg(192)         },
   { name: 'icon-512.png',          size: 512, svg: createLogoSvg(512)         },
@@ -78,6 +101,7 @@ const icons = [
   { name: 'icon-maskable-512.png', size: 512, svg: createMaskableLogoSvg(512) },
   { name: 'apple-touch-icon.png',  size: 180, svg: createAppleTouchSvg()      },
   { name: 'favicon-32.png',        size: 32,  svg: createFaviconSvg()         },
+  { name: 'badge-96.png',          size: 96,  svg: createBadgeSvg(96)         },
 ];
 
 for (const icon of icons) {
