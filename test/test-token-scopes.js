@@ -13,8 +13,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import {
   parseScopes, normalizeScopes, serializeScopes,
   requiredAccess, moduleForPath, tokenAllows, MODULE_KEYS, ALL_SCOPES,
@@ -103,18 +102,8 @@ test('ALL_SCOPES deckt jedes Modul in beiden Zugriffsarten ab', () => {
 
 // ── MCP-Enforcement über handleMcpRequest ────────────────────────────────────
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[1]);
-// v41 traegt `tasks.start_date` nach: Migration 1 legt `tasks` in der Fassung
-// von damals an, und `list_tasks` liest die Spalte seit #825. Eine Auswahl
-// einzelner Migrationen ist kein Schema - wer eine MCP-Abfrage um ein spaeter
-// ergaenztes Feld erweitert, traegt dessen Migration hier nach.
-db.exec(MIGRATIONS_SQL[41]);
+// volles Schema aus der Baseline (test/helpers/schema-db.js)
+const db = openSchemaDb();
 
 const uid = db.prepare(
   `INSERT INTO users (username, display_name, password_hash, avatar_color, role)

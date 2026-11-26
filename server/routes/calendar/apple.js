@@ -5,9 +5,10 @@
 import { createLogger } from '../../logger.js';
 import { integrationDetailsVisible } from '../../scopes.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
 import * as appleCalendar from '../../services/apple-calendar.js';
 import { requireAdmin } from '../../auth.js';
-import { secret } from '../../middleware/validate.js';
+import { secret } from '../../api/formats.ts';
 import { remoteFailure } from '../../utils/http.js';
 
 const log = createLogger('Calendar');
@@ -16,15 +17,16 @@ const router = express.Router();
 /**
  * The answer once the route's own named cases are handled (Phase 0 section H):
  * a refusal of iCloud or the network as its class (502, `reason` + `detail`
- * such as `HTTP 401`, which the settings page shows the admin), anything local
- * as a fixed sentence. Never the text of iCloud or tsdav.
+ * such as `HTTP 401`, which the settings page shows the admin). Never the text
+ * of iCloud or tsdav. Anything local (a database error, which remoteFailure()
+ * does not take for a refusal) goes on to the central error handler (#2810,
+ * group 10b).
  */
-function sendAppleFailure(res, err, status, sentence) {
+function sendAppleFailure(res, err) {
   const failure = remoteFailure(err);
-  if (failure) {
-    return res.status(502).json({ error: 'iCloud refused the request or could not be reached.', code: 502, ...failure });
-  }
-  return res.status(status).json({ error: sentence, code: status });
+  if (!failure) throw err;
+  log.error('', err);
+  return res.status(502).json({ error: 'iCloud refused the request or could not be reached.', code: 502, ...failure });
 }
 
 // --------------------------------------------------------
@@ -35,20 +37,15 @@ function sendAppleFailure(res, err, status, sentence) {
  * GET /api/v1/calendar/apple/status
  * Response: { configured, lastSync }
  */
-router.get('/apple/status', (req, res) => {
-  try {
-    const status = appleCalendar.getStatus();
-    // DER FEHLERTEXT DES LETZTEN LAUFS IST VERWALTUNGSDATEN. Er kommt vom
-    // Gegenueber und traegt regelmaessig dessen Adresse oder eine Kontokennung
-    // in sich - `calendar:read` reicht bis hierher, weil der Pfad-Guard am
-    // ersten Segment urteilt. Dieselbe Regel wie bei /caldav/status und
-    // /outlook/status, an den Scopes gemessen und nicht am Kontotyp.
-    const { lastError, lastErrorAt, ...rest } = status;
-    res.json(integrationDetailsVisible(req) ? status : rest);
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.get('/apple/status', validateRequest(), (req, res) => {
+  const status = appleCalendar.getStatus();
+  // DER FEHLERTEXT DES LETZTEN LAUFS IST VERWALTUNGSDATEN. Er kommt vom
+  // Gegenueber und traegt regelmaessig dessen Adresse oder eine Kontokennung
+  // in sich - `calendar:read` reicht bis hierher, weil der Pfad-Guard am
+  // ersten Segment urteilt. Dieselbe Regel wie bei /caldav/status und
+  // /outlook/status, an den Scopes gemessen und nicht am Kontotyp.
+  const { lastError, lastErrorAt, ...rest } = status;
+  res.json(integrationDetailsVisible(req) ? status : rest);
 });
 
 /**
@@ -56,17 +53,17 @@ router.get('/apple/status', (req, res) => {
  * Manueller Sync-Trigger.
  * Response: { ok: true, lastSync: string }
  */
-router.post('/apple/sync', requireAdmin, async (req, res) => {
+router.post('/apple/sync', requireAdmin, validateRequest(), async (req, res) => {
   try {
     await appleCalendar.sync();
     const { lastSync } = appleCalendar.getStatus();
     res.json({ ok: true, lastSync });
   } catch (err) {
-    log.error('', err);
     if (err.code === 'apple_not_configured') {
+      log.error('', err);
       return res.status(409).json({ error: 'No Apple calendar is connected.', code: 409, reason: 'apple_not_configured' });
     }
-    sendAppleFailure(res, err, 500, 'Apple calendar sync failed.');
+    sendAppleFailure(res, err);
   }
 });
 
@@ -76,7 +73,7 @@ router.post('/apple/sync', requireAdmin, async (req, res) => {
  * Body: { url, username, password }
  * Response: { ok: true, calendarCount: number }
  */
-router.post('/apple/connect', requireAdmin, async (req, res) => {
+router.post('/apple/connect', requireAdmin, validateRequest(), async (req, res) => {
   const { url, username, password } = req.body;
   if (!url || typeof url !== 'string' || !url.startsWith('http')) {
     return res.status(400).json({ error: 'url must be a valid HTTP(S) URL.', code: 400, reason: 'apple_url_invalid' });
@@ -97,16 +94,17 @@ router.post('/apple/connect', requireAdmin, async (req, res) => {
     const result = await appleCalendar.testConnection();
     res.json({ ok: true, calendarCount: result.calendarCount });
   } catch (err) {
-    // Bei Fehler: gespeicherte Credentials wieder löschen
+    // Bei Fehler: gespeicherte Credentials wieder löschen - auch vor dem Weg
+    // zum zentralen Fehlerhandler.
     appleCalendar.clearCredentials();
-    log.error('', err);
     // Verbunden, aber ohne Kalender, ist der eine Fall, den die App kennt
     // (#1909); sonst ist es eine Absage von iCloud, deren Klasse die Seite dem
     // Admin zeigt.
     if (err.code === 'apple_no_calendars') {
+      log.error('', err);
       return res.status(400).json({ error: err.message.replace('[Apple] ', ''), code: 400, reason: 'apple_no_calendars' });
     }
-    sendAppleFailure(res, err, 500, 'Connecting the Apple calendar failed.');
+    sendAppleFailure(res, err);
   }
 });
 
@@ -119,16 +117,11 @@ router.post('/apple/connect', requireAdmin, async (req, res) => {
  * und ein 204 → 200 wäre für Bestandsclients ein Bruch ohne Gegenwert. Wer die
  * Zahl braucht, nimmt DELETE /apple/mirrored-events.
  */
-router.delete('/apple/disconnect', requireAdmin, (req, res) => {
-  try {
-    appleCalendar.clearCredentials({
-      deleteEvents: req.query.deleteEvents === 'true',
-    });
-    res.status(204).end();
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.delete('/apple/disconnect', requireAdmin, validateRequest(), (req, res) => {
+  appleCalendar.clearCredentials({
+    deleteEvents: req.query.deleteEvents === 'true',
+  });
+  res.status(204).end();
 });
 
 /**
@@ -137,13 +130,8 @@ router.delete('/apple/disconnect', requireAdmin, (req, res) => {
  * anzufassen (#820). Der iCloud-Kalender bleibt unberührt.
  * Response: { data: { removed: number } }
  */
-router.delete('/apple/mirrored-events', requireAdmin, (req, res) => {
-  try {
-    res.json({ data: { removed: appleCalendar.clearMirroredEvents() } });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal server error.', code: 500 });
-  }
+router.delete('/apple/mirrored-events', requireAdmin, validateRequest(), (req, res) => {
+  res.json({ data: { removed: appleCalendar.clearMirroredEvents() } });
 });
 
 export default router;

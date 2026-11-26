@@ -6,8 +6,7 @@
  * Ausführen: node test/test-visibility.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { normalizeVisibility, VISIBILITY_VALUES } from '../server/authorize/index.ts';
 // The single-type fragment behind visibleWhere('tasks' | 'events', ...): an inner
 // seam, not exported from index.ts since B3.
@@ -21,12 +20,7 @@ function test(name, fn) {
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 function eq(a, b, msg) { assert(JSON.stringify(a) === JSON.stringify(b), `${msg}: ${JSON.stringify(a)} !== ${JSON.stringify(b)}`); }
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')));`);
-db.exec(MIGRATIONS_SQL[1]);
+const db = openSchemaDb();
 
 // Anna (admin), Ben, Cara
 const anna = db.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color, role) VALUES ('anna','Anna','x','#007AFF','admin')`).run().lastInsertRowid;

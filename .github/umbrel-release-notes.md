@@ -1,10 +1,12 @@
-<!-- version: 2.94.0 -->
-This update is mostly about the API. If you use it with your own scripts or integrations: shared expenses, backup, health, contacts, the meal plan, the shopping list, documents and the budget with its subscriptions now check every request against the published API description, like the modules before them. Input that was quietly accepted or reinterpreted before, such as an id like "1abc", a month 13, a number sent as text or an empty amount, is now refused with a 400 that names the field. The app itself sends nothing that is refused.
+<!-- version: 2.96.0 -->
+This update is mostly about reliability when two things happen at the same moment. Several actions check something, wait for a server or a file upload, and only then save; a change made in that moment could be lost, overruled or saved twice. That is fixed across the app: a sync no longer undoes an edit made while it runs, a reminder is no longer sent twice when a push service answers slowly, Outlook, CardDAV and recipe provider syncs of one account no longer get in each other's way, and a calendar attachment upload no longer writes back an older version of the event. A password reset link now works exactly once, and rights count at the moment of saving, not only when the request arrived.
 
-Some requests could change data by accident and are refused now instead. Editing a document without its access list removed everyone it was shared with, saving the cycle settings with a field left out reset it, editing a shared expense with fields left out cleared its exchange rate and split it equally, and renaming a contact with only some name parts dropped the others. These requests now need the whole record.
+When a recurring event or a CalDAV account is changed elsewhere while you save it, the app now says "changed elsewhere, please save again" instead of showing a general error.
 
-In the app, saving a contact keeps its middle name, title and suffix, and shared expenses converted into a currency with other decimal places show and accept the converted amount correctly.
+Large shopping lists, calendars and task lists change quickly again; renaming or clearing thousands of items no longer takes seconds.
 
-This update does not change the database. No action is needed from you.
+Under the hood, the database code was reorganised: every migration is now its own file, and a new installation starts from a schema baseline instead of replaying all migrations. Existing installations are not affected by this part.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.94.0
+This update changes the database once on start and rebuilds the search index. No action is needed from you.
+
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.96.0

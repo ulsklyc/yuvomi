@@ -30,7 +30,7 @@ process.env.OIDC_REDIRECT_URI = 'http://127.0.0.1/api/v1/auth/oidc/callback';
 
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createAuthApp } from './auth-app.js';
 
 /** Was der Anbieter beim naechsten Callback liefert. */
 let idp = { claims: {}, userinfo: {} };
@@ -63,25 +63,29 @@ const ADMIN = Number(database.prepare(`
   VALUES ('staff-test-admin', 'Admin', 'x', 'admin')
 `).run().lastInsertRowid);
 
-const app = express();
-app.use(express.json());
-// The admin stub stands in front of the real prefix: validateRequest() finds
-// its operation by the mount (#2810).
-app.use('/api/v1/housekeeping', (req, _res, next) => {
-  req.authUserId = ADMIN;
-  req.authRole = 'admin';
-  req.session = { userId: ADMIN, role: 'admin' };
-  next();
-}, housekeepingRouter);
-app.use(sessionMiddleware);
-// Nur fuer die Abwehr in setupAuthSession: legt den Wartezustand des zweiten
-// Faktors direkt an, so wie ihn ein kuenftiger dritter Anmeldeweg anlegen
-// koennte, der die Personal-Regel vergisst.
-app.post('/__test/pending-two-factor/:userId', (req, res) => {
-  req.session.pendingTwoFactor = { userId: Number(req.params.userId), expiresAt: Date.now() + 60_000 };
-  req.session.save(() => res.json({ ok: true }));
+const app = await createAuthApp({
+  // The housekeeping stub stands in front of the session, as before: it sets
+  // a plain req.session the session middleware would try to save.
+  before: [
+    // The admin stub stands in front of the real prefix: validateRequest() finds
+    // its operation by the mount (#2810).
+    ['/api/v1/housekeeping', (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    }, housekeepingRouter],
+    [sessionMiddleware],
+    // Nur fuer die Abwehr in setupAuthSession: legt den Wartezustand des zweiten
+    // Faktors direkt an, so wie ihn ein kuenftiger dritter Anmeldeweg anlegen
+    // koennte, der die Personal-Regel vergisst.
+    ['/__test/pending-two-factor/:userId', (req, res) => {
+      req.session.pendingTwoFactor = { userId: Number(req.params.userId), expiresAt: Date.now() + 60_000 };
+      req.session.save(() => res.json({ ok: true }));
+    }],
+  ],
+  routers: [authRouter],
 });
-app.use('/api/v1/auth', authRouter);
 const server = app.listen(0, '127.0.0.1');
 const base = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

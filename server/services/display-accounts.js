@@ -34,6 +34,7 @@
 import { parseDisplayDeviceSettings } from '../../public/utils/display-device-settings.js';
 import crypto from 'node:crypto';
 import * as dbModule from '../db.js';
+import { withTx } from '../db/tx.ts';
 
 // Die reinen Listen liegen in server/display-scopes.js - OHNE Abhaengigkeiten,
 // damit server/authorize/catalog.ts sie lesen kann, ohne ueber diese Datei
@@ -282,7 +283,7 @@ export function issuePairingCode(userId, createdBy, { db } = {}) {
   const database = db || dbModule.get();
   const code = generatePairingCode();
   const expiresAt = new Date(Date.now() + PAIRING_CODE_TTL_MS).toISOString().replace(/\.\d{3}Z$/, 'Z');
-  database.transaction(() => {
+  withTx(database, () => {
     database.prepare(`
       UPDATE display_pairing_codes SET used_at = ?
        WHERE user_id = ? AND used_at IS NULL
@@ -291,7 +292,7 @@ export function issuePairingCode(userId, createdBy, { db } = {}) {
       INSERT INTO display_pairing_codes (user_id, code_hash, expires_at, created_by)
       VALUES (?, ?, ?, ?)
     `).run(userId, hash(code), expiresAt, createdBy || null);
-  })();
+  });
   return { code, expiresAt };
 }
 
@@ -323,7 +324,7 @@ export function redeemPairingCode(rawCode, { label = null, db } = {}) {
   const token = DEVICE_TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
   let result = null;
 
-  database.transaction(() => {
+  withTx(database, () => {
     const now = nowIso();
     const row = database.prepare(`
       SELECT id, user_id FROM display_pairing_codes
@@ -348,7 +349,7 @@ export function redeemPairingCode(rawCode, { label = null, db } = {}) {
       'INSERT INTO display_devices (user_id, token_hash, label) VALUES (?, ?, ?)',
     ).run(row.user_id, hash(token), label || null);
     result = { token, deviceId: Number(ins.lastInsertRowid), userId: row.user_id };
-  })();
+  });
 
   return result;
 }

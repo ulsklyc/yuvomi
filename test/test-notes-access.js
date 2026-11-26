@@ -17,6 +17,7 @@ import express from 'express';
 const dbmod = await import('../server/db.js');
 const { default: notesRouter } = await import('../server/routes/notes.js');
 const { createErrorHandler } = await import('../server/middleware/error-handler.js');
+const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
 const { runSearch } = await import('../server/services/search.js');
@@ -32,6 +33,8 @@ let actor = { id: PARENT, role: 'member' };
 const as = (id, role = 'member') => { actor = { id, role }; };
 const app = express();
 app.use(express.json());
+// As server/index.js: a missing body is `{}` (#2810).
+app.use(defaultEmptyBody);
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;

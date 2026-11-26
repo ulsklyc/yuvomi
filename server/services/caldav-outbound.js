@@ -617,7 +617,11 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
     });
 
     // ── Wechsel des Zielkalenders: anlegen im Ziel, löschen in der Quelle ──────
-    const moveTo = event.outbound_move_to;
+    // Aus `fresh`, nicht aus der Liste: während der Termine davor kann der Nutzer
+    // ein anderes Ziel gewählt oder den Umzug zurückgenommen haben (#2944).
+    const moveTo = fresh.outbound_move_to;
+    // Nach einem await gilt: es fällt nur die Vormerkung, über die entschieden wurde.
+    const dropMove = (/** @type {number} */ id) => outbound.clearOutboundMove(id, moveTo);
     if (moveTo && moveTo !== known.calendarUrl) {
       // Kalenderliste unbekannt (Auflistung gescheitert): der Umzug bleibt
       // vorgemerkt, der Sync-Lauf entscheidet mit einer echten Liste.
@@ -625,7 +629,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
       const destCal = calendarsByUrl.get(moveTo);
       if (!destCal) {
         log.warn(`[${label(source)}] Destination calendar ${moveTo} is not available, keeping event ${event.id} where it is.`);
-        outbound.clearOutboundMove(event.id);
+        dropMove(event.id);
       } else if (stop.blocks(destCal.url)) {
         continue;
       } else {
@@ -707,7 +711,7 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
               // wie jeder gescheiterte Umzug wieder (die Kopie im Ziel wird
               // dabei übernommen) - bis die Quelle fort ist oder aufgegeben wird.
               log.warn(`[${label(source)}] Event ${event.id} was copied to ${moveTo} but could not be removed from its old calendar (${sourceRefusal.message}), and another account already has a pending deletion for that entry; the move stays pending.`);
-              outbound.handleUpdateError(sourceRefusal, event, 'move', label(source), outbound.clearOutboundMove, dav(collectionUrlOf(url)));
+              outbound.handleUpdateError(sourceRefusal, event, 'move', label(source), dropMove, dav(collectionUrlOf(url)));
               continue;
             }
           }
@@ -737,18 +741,18 @@ export async function processPendingUpdates(client, source, objectIndex, calenda
           // im bisherigen Kalender hinaus. handleUpdateError läse es als
           // "erledigt" und nähme die Bearbeitung mit.
           if (outbound.classifyOutboundError(err) !== 'settled') {
-            outbound.handleUpdateError(err, event, 'move', label(source), outbound.clearOutboundMove, dav(destCal.url));
+            outbound.handleUpdateError(err, event, 'move', label(source), dropMove, dav(destCal.url));
             continue;
           }
           log.warn(`[${label(source)}] Destination calendar ${moveTo} no longer accepts event ${event.id} (${err.message}), keeping it where it is.`);
-          outbound.clearOutboundMove(event.id);
+          dropMove(event.id);
         }
       }
     } else if (moveTo) {
-      outbound.clearOutboundMove(event.id);
+      dropMove(event.id);
     }
 
-    if (!event.outbound_dirty) continue;
+    if (!fresh.outbound_dirty) continue;
 
     try {
       await client.updateCalendarObject({

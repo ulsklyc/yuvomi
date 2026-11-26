@@ -4,21 +4,19 @@ import test, { beforeEach, after } from 'node:test';
 import express from '../server/utils/http-router.ts';
 import { filterVisible, visibleWhere, resolveRequestModuleAccess } from '../server/authorize/index.ts';
 import { createErrorHandler } from '../server/middleware/error-handler.js';
-import { createRequire } from 'node:module';
-const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
-import { buildMigratedDatabase } from './helpers/migrated-database.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { savedViewParams, PaperlessViewError } from '../server/services/dms/paperless-views.js';
 import { PaperlessAdapter } from '../server/services/dms/paperless.js';
 
 process.env.DB_PATH = ':memory:';
-const { MIGRATIONS, _setTestDatabase, _resetTestDatabase } = await import('../server/db.js');
+const { _setTestDatabase, _resetTestDatabase } = await import('../server/db.js');
 const { default: router, _setAdapterFactory } = await import('../server/routes/paperless-folders.js');
-const database = buildMigratedDatabase(Database, MIGRATIONS);
+const database = openSchemaDb();
 _setTestDatabase(database);
 const insertUser = database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'test', ?)");
-const adminId = insertUser.run('paperless-admin', 'Admin', 'admin').lastInsertRowid;
-const memberId = insertUser.run('paperless-member', 'Member', 'member').lastInsertRowid;
-const otherId = insertUser.run('paperless-other', 'Other', 'admin').lastInsertRowid;
+const adminId = Number(insertUser.run('paperless-admin', 'Admin', 'admin').lastInsertRowid);
+const memberId = Number(insertUser.run('paperless-member', 'Member', 'member').lastInsertRowid);
+const otherId = Number(insertUser.run('paperless-other', 'Other', 'admin').lastInsertRowid);
 /** @type {{id: number, role: string, cookieSession?: {userId?: number, role?: string}, access?: Record<string, 'none' | 'read'> | null, method?: string}} */
 let identity;
 /** @type {Record<string, (...args: any[]) => Promise<any>>} */
@@ -66,7 +64,7 @@ beforeEach(() => {
   database.prepare('DELETE FROM family_documents').run();
   database.prepare('DELETE FROM paperless_view_folders').run();
   database.prepare('DELETE FROM dms_accounts').run();
-  accountId = database.prepare("INSERT INTO dms_accounts (provider, name, base_url, api_token) VALUES ('paperless','DMS','https://paperless.example','never-return-this-token')").run().lastInsertRowid;
+  accountId = Number(database.prepare("INSERT INTO dms_accounts (provider, name, base_url, api_token) VALUES ('paperless','DMS','https://paperless.example','never-return-this-token')").run().lastInsertRowid);
   mediaCalls = 0;
   adapter = {
     async getSavedView(id) { return { id, filter_rules: [] }; },
@@ -273,7 +271,7 @@ test('the same Paperless document may appear in multiple independent folders wit
   const first = await create('family', 5);
   const second = await create('family', 6);
   assert.notEqual(first.id, second.id);
-  assert.equal(database.prepare("SELECT count(*) AS n FROM family_documents WHERE storage_backend = 'dms'").get().n, 0);
+  assert.equal(database.prepare("SELECT count(*) AS n FROM family_documents WHERE storage_backend = 'dms'").get()?.n, 0);
   assert.equal((await call('GET', `/folders/${second.id}/documents/99/preview`)).status, 200);
 });
 
@@ -318,11 +316,11 @@ test('preview and thumbnails reject active MIME types but downloads remain avail
 
 test('disconnect removes only the binding, not Paperless content or existing Yuvomi links', async () => {
   const folder = await create();
-  const local = database.prepare(`INSERT INTO family_documents
+  const local = Number(database.prepare(`INSERT INTO family_documents
     (name, category, visibility, original_name, mime_type, file_size, content_data,
      storage_provider, storage_backend, storage_key, dms_account_id, created_by)
     VALUES ('Existing link', 'other', 'private', '99.pdf', 'application/pdf', 0, '', 'external', 'dms', '99', ?, ?)`)
-    .run(accountId, adminId).lastInsertRowid;
+    .run(accountId, adminId).lastInsertRowid);
   const remove = await call('DELETE', `/folders/${folder.id}`);
   assert.equal(remove.status, 204);
   assert.ok(database.prepare('SELECT id FROM family_documents WHERE id = ?').get(local));
@@ -334,7 +332,7 @@ test('account deletion cascades bindings, leaving the remote documents alone', a
   const folder = await create();
   database.prepare('DELETE FROM dms_accounts WHERE id = ?').run(accountId);
   assert.equal((await call('GET', `/folders/${folder.id}/documents`)).status, 404);
-  assert.equal(database.prepare('SELECT count(*) AS n FROM paperless_view_folders').get().n, 0);
+  assert.equal(database.prepare('SELECT count(*) AS n FROM paperless_view_folders').get()?.n, 0);
 });
 
 test('malformed pages and IDs fail rather than falling back to an unfiltered request', async () => {
@@ -375,7 +373,7 @@ test('new API paths inherit Documents token/scope requirements for reads and wri
   assert.equal(tokenAllows(['tasks:read'], read.moduleKey, read.access), false);
 });
 
-test('remote reads are refused while restoring, preserving the old database identity', async () => {
+test('remote reads and folder creation are refused while restoring', async () => {
   const folder = await create();
   const { setRestoreRunning } = await import('../server/utils/restore-state.js');
   setRestoreRunning(true);
@@ -385,13 +383,17 @@ test('remote reads are refused while restoring, preserving the old database iden
       assert.equal(response.status, 503);
       assert.equal(response.body.reason, 'restore_in_progress');
     }
+    adapter.getSavedView = async () => { assert.fail('Folder creation must not contact Paperless during restore'); };
+    const created = await call('POST', '/folders', { name: 'During restore', account_id: accountId, view_id: 5 });
+    assert.equal(created.status, 503);
+    assert.equal(created.body.reason, 'restore_in_progress');
     assert.equal(mediaCalls, 0);
   } finally { setRestoreRunning(false); }
 });
 
 test('a local write failure is 500, not a Paperless connection failure', async () => {
   adapter.getSavedView = async () => {
-    database.pragma('query_only = ON');
+    database.exec('PRAGMA query_only = ON');
     return { filter_rules: [] };
   };
   try {
@@ -399,7 +401,7 @@ test('a local write failure is 500, not a Paperless connection failure', async (
     assert.equal(response.status, 500);
     assert.equal(response.body.error, 'Internal server error.');
     assert.equal(response.body.reason, undefined);
-  } finally { database.pragma('query_only = OFF'); }
+  } finally { database.exec('PRAGMA query_only = OFF'); }
 });
 
 
@@ -420,7 +422,7 @@ test('restricted folders use selected-member access for listing and media; widen
   assert.equal((await call('PUT', `/folders/${folder.id}`, body)).status, 200, 'same audience needs no new consent');
   assert.equal((await call('PUT', `/folders/${folder.id}`, { ...body, allowed_member_ids: [memberId, otherId] })).status, 400);
   assert.equal((await call('PUT', `/folders/${folder.id}`, { name: 'Private', visibility: 'private' })).status, 200);
-  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access').get().n, 0);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access').get()?.n, 0);
   member();
   assert.equal((await call('GET', `/folders/${folder.id}/documents/99/download`)).status, 404);
 });
@@ -436,6 +438,36 @@ test('revoking a selected member during media fetch prevents disclosure', async 
   const result = await call('GET', `/folders/${folder.id}/documents/99/download`);
   assert.equal(result.status, 404);
   assert.ok(!JSON.stringify(result.body).includes('SECRET'));
+});
+
+test('restricted folder creation and updates refuse staff and split guests', async () => {
+  const staff = insertUser.run('paperless-staff', 'Staff', 'member').lastInsertRowid;
+  const guest = insertUser.run('paperless-guest', 'Guest', 'member').lastInsertRowid;
+  database.prepare('INSERT INTO housekeeping_workers (user_id) VALUES (?)').run(staff);
+  database.prepare('INSERT INTO split_expense_guest_users (user_id) VALUES (?)').run(guest);
+  const folder = await create();
+  const body = { name: 'Restricted', visibility: 'restricted', allowed_member_ids: [memberId, staff, guest], confirm_share: true };
+  for (const result of [
+    await call('POST', '/folders', { ...body, account_id: accountId, view_id: 5 }),
+    await call('PUT', `/folders/${folder.id}`, body),
+  ]) {
+    assert.equal(result.status, 400);
+    assert.deepEqual(result.body, { code: 400, error: `Only household members can be chosen here - user ${staff}, ${guest} is not a household member.` });
+  }
+  assert.deepEqual((await call('GET', '/folders')).body.data.map((/** @type {{visibility: string}} */ row) => row.visibility), ['private']);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access').get()?.n, 0);
+});
+
+test('a recipient who leaves the household while creation awaits Paperless is refused', async () => {
+  const recipient = insertUser.run('paperless-departed', 'Departed', 'member').lastInsertRowid;
+  adapter.getSavedView = async () => {
+    database.prepare('INSERT INTO housekeeping_workers (user_id) VALUES (?)').run(recipient);
+    return { id: 5, filter_rules: [] };
+  };
+  const result = await call('POST', '/folders', { name: 'Restricted', account_id: accountId, view_id: 5,
+    visibility: 'restricted', allowed_member_ids: [recipient], confirm_share: true });
+  assert.equal(result.status, 400);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folders').get()?.n, 0);
 });
 
 test('family-to-restricted narrowing needs no consent and rejects nonexistent recipients', async () => {
@@ -471,7 +503,7 @@ test('central Paperless row visibility and filterVisible agree with private, sel
   const ids = [own.id, family.id, selected.id];
   const sql = visibleWhere('paperless_folders', 'f', '@viewer');
   const direct = database.prepare(`SELECT f.id FROM paperless_view_folders f WHERE ${sql} ORDER BY f.id`).all({viewer: memberId})
-    .map((/** @type {{id: number}} */ row) => row.id);
+    .map((row) => Number(row.id));
   assert.deepEqual(direct, [family.id, selected.id]);
   assert.deepEqual(filterVisible(database, 'paperless_folders', ids, memberId), direct);
   assert.deepEqual(filterVisible(database, 'paperless_folders', ids, adminId), ids);
@@ -515,7 +547,7 @@ test('empty, ambiguous, malformed and inaccessible tag filters cannot create fol
   }
   assert.equal((await call('POST', '/folders', { name: 'Ambiguous', account_id: accountId, view_id: 5,
     tag_filter: { match: 'all', tag_ids: [7] } })).status, 400);
-  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folders').get().n, 0);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folders').get()?.n, 0);
 });
 
 test('filter catalogue and creation use personal credentials without a shared fallback', async () => {
@@ -588,5 +620,5 @@ test('OpenAPI refuses invalid folder sources before contacting Paperless', async
     assert.ok(result.body.fields.some((/** @type {{path: string}} */ field) => field.path.startsWith('body')));
   }
   assert.equal(sourceCalls, 0);
-  assert.equal(database.prepare('SELECT count(*) AS n FROM paperless_view_folders').get().n, 0);
+  assert.equal(database.prepare('SELECT count(*) AS n FROM paperless_view_folders').get()?.n, 0);
 });

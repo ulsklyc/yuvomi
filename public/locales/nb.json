@@ -127,7 +127,8 @@
         "transferUndone": "Fjernet fra handlelisten.",
         "transferSkipped": "{{count}} var allerede på det.",
         "transferSkipped_one": "{{count}} var allerede på den.",
-        "transferAllPresent": "Alle ingredienser er allerede på listen."
+        "transferAllPresent": "Alle ingredienser er allerede på listen.",
+        "errorTransferTooLarge": "Det er for mange ingredienser på en gang. Høyst {{limit}} kan overføres, og angres, samlet."
     },
     "nav": {
         "dashboard": "Oversikt",
@@ -1272,7 +1273,8 @@
         "localCalendarEdit": "Rediger kalender",
         "localCalendarNew": "Ny kalender",
         "manageSubscriptionsLink": "Abonnementer og synkronisering",
-        "cancelled": "Avlyst"
+        "cancelled": "Avlyst",
+        "errorSeriesChanged": "Serien ble nettopp endret et annet sted. Lagre på nytt."
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -3638,7 +3640,8 @@
         "remoteErrorAuthFailed": "Serveren avviste påloggingen. Sjekk brukernavn og passord.",
         "remoteErrorStatus": "Serveren svarte med status {{status}}.",
         "remoteErrorUnreachable": "Serveren kan ikke nås. Sjekk adressen og om serveren kjører.",
-        "remoteErrorFailed": "Forespørselen til serveren mislyktes."
+        "remoteErrorFailed": "Forespørselen til serveren mislyktes.",
+        "caldavErrorAccountChanged": "Kontoen ble nettopp endret et annet sted. Lagre på nytt."
     },
     "login": {
         "tagline": "Velkommen tilbake. Hjemmet ditt samlet på ett sted.",

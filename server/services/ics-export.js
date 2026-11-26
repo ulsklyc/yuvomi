@@ -23,6 +23,7 @@ import {
 } from './calendar-event-reader.js';
 import { baseOccurrenceFor, isLinkedOccurrence } from './calendar-occurrence-overrides.js';
 import { occurrenceSlotOf } from './calendar-events.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 function escapeICSText(s) {
   if (s == null) return '';
@@ -380,10 +381,10 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
   const recurringIds = rows.filter(ev => ev.recurrence_rule).map(ev => ev.id);
   const exceptionsByEvent = new Map();
   if (recurringIds.length) {
-    const placeholders = recurringIds.map(() => '?').join(',');
+    const recurringIdList = sqlInList(recurringIds);
     const exRows = conn.prepare(
-      `SELECT event_id, exception_date FROM calendar_event_exceptions WHERE event_id IN (${placeholders})`
-    ).all(...recurringIds);
+      `SELECT event_id, exception_date FROM calendar_event_exceptions WHERE event_id IN (${recurringIdList.sql})`
+    ).all(recurringIdList.param);
     for (const r of exRows) {
       if (!exceptionsByEvent.has(r.event_id)) exceptionsByEvent.set(r.event_id, []);
       exceptionsByEvent.get(r.event_id).push(r.exception_date);
@@ -428,13 +429,14 @@ function buildFeed(conn, userId, now = new Date(), tz = householdTimeZone(conn),
       .map((event) => Number(event.assignment_owner_id ?? event.id))
       .filter((id) => Number.isInteger(id) && id > 0))];
     if (ownerIds.length) {
+      const ownerIdList = sqlInList(ownerIds);
       const nameRows = conn.prepare(`
         SELECT ea.event_id, u.display_name
         FROM event_assignments ea
         JOIN users u ON u.id = ea.user_id
-        WHERE ea.event_id IN (${ownerIds.map(() => '?').join(',')})
+        WHERE ea.event_id IN (${ownerIdList.sql})
         ORDER BY ea.event_id, u.display_name
-      `).all(...ownerIds);
+      `).all(ownerIdList.param);
       const namesByOwner = new Map();
       for (const row of nameRows) {
         if (!namesByOwner.has(row.event_id)) namesByOwner.set(row.event_id, []);

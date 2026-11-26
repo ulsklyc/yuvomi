@@ -11,12 +11,13 @@
  * verwaiste Link-Zeilen sind Tombstones für Remote-Deletes.
  */
 
-import { runExternalJob } from '../utils/restore-state.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { createLogger } from '../logger.js';
 const log = createLogger('Outlook');
 
 import crypto from 'node:crypto';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { parseRRule } from './recurrence.js';
 import { outboundEvent } from './outbound-dtstart.js';
 import { visibleWhere } from '../authorize/index.ts';
@@ -99,6 +100,18 @@ function getAccountById(accountId) {
 
 function getAllAccounts() {
   return db.get().prepare('SELECT * FROM outlook_accounts').all();
+}
+
+/**
+ * Whether the account exists (#2810, group 10b): the routes with an account in
+ * the path ask this before the service, so an unknown account is a 404 of its
+ * own instead of the plain Error the service throws for it (500, or 502
+ * `remote_failed` as if the server had refused).
+ * @param {number} accountId
+ * @returns {boolean}
+ */
+function accountExists(accountId) {
+  return db.get().prepare('SELECT 1 FROM outlook_accounts WHERE id = ?').get(accountId) !== undefined;
 }
 
 function listAccounts() {
@@ -211,7 +224,7 @@ function updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId } = {}
 
   if (updates.length === 0) throw new Error('No fields to update.');
   values.push(accountId);
-  conn.transaction(() => {
+  withTx(conn, () => {
     if (calendarToEnable) {
       conn.prepare(`
         UPDATE outlook_calendar_selection SET enabled = 1
@@ -223,7 +236,7 @@ function updateAccount(accountId, { name, autoSyncCalendarId, ownerUserId } = {}
         && proposedAutoSyncCalendarId && proposedOwnerUserId) {
       assertSyncTargetsSafe(conn, getAccountById(accountId));
     }
-  })();
+  });
   return { success: true };
 }
 
@@ -437,7 +450,7 @@ async function refreshCalendarSelection(accountId, accessToken, fetchImpl = fetc
   }
 
   const conn = db.get();
-  conn.transaction(() => {
+  withTx(conn, () => {
     // enabled-Zustand bekannter Kalender überlebt den Refresh.
     const enabledMap = new Map(
       conn.prepare('SELECT calendar_id, enabled FROM outlook_calendar_selection WHERE account_id = ?')
@@ -461,7 +474,7 @@ async function refreshCalendarSelection(accountId, accessToken, fetchImpl = fetc
         enabledMap.get(cal.id) ?? 0
       );
     }
-  })();
+  });
 
   log.info(`Refreshed ${calendars.length} calendars for Outlook account ${accountId}.`);
   return listCalendarSelection(accountId);
@@ -492,7 +505,7 @@ async function listCalendars(accountId, { refresh = false } = {}, fetchImpl = fe
 
 function setCalendarEnabled(accountId, calendarId, enabled) {
   const conn = db.get();
-  conn.transaction(() => {
+  withTx(conn, () => {
     const result = conn.prepare(`
       UPDATE outlook_calendar_selection SET enabled = ?
       WHERE account_id = ? AND calendar_id = ?
@@ -501,7 +514,7 @@ function setCalendarEnabled(accountId, calendarId, enabled) {
       throw new Error(`Calendar not found for account ${accountId}.`);
     }
     if (enabled) assertSyncTargetsSafe(conn, getAccountById(accountId));
-  })();
+  });
   return { success: true };
 }
 
@@ -582,7 +595,7 @@ function allDayEndToExclusive(dateStr) {
 
 /**
  * DB-Datetime → Graph {dateTime, timeZone}. Lokal angelegte Events sind naive
- * "YYYY-MM-DDTHH:MM" (validate.js) → Sekunden ergänzen, TZ Europe/Berlin.
+ * "YYYY-MM-DDTHH:MM" (api/formats.ts) → Sekunden ergänzen, TZ Europe/Berlin.
  * Importierte Events können Z/Offset tragen → nach UTC normalisieren.
  */
 function toGraphDateTime(dt, tz = outlookTimeZone()) {
@@ -677,8 +690,11 @@ const ASSIGNEE_NAMES_SQL = `(
  *    typischerweise schon nativ in Outlook und würden Duplikate erzeugen.
  * b) Explizites Ziel-pro-Termin — gewinnt bei Kollision mit a).
  */
-function collectCandidates(conn, account) {
+function collectCandidates(conn, account, eventId = null) {
   const candidates = new Map();
+  // Mit eventId nur dieser eine Termin: die Probe direkt vor seinem Schreiben (#2943).
+  const onlyOne = eventId == null ? '' : 'AND e.id = ?';
+  const onlyOneArgs = eventId == null ? [] : [eventId];
 
   if (account.auto_sync_calendar_id && account.owner_user_id) {
     const rows = conn.prepare(`
@@ -687,7 +703,8 @@ function collectCandidates(conn, account) {
       WHERE e.external_source = 'local'
         AND e.recurrence_parent_id IS NULL
         AND ${visibleWhere('events', 'e', '?')}
-    `).all(account.owner_user_id, account.owner_user_id);
+        ${onlyOne}
+    `).all(account.owner_user_id, account.owner_user_id, ...onlyOneArgs);
     for (const event of rows) {
       candidates.set(event.id, { event, calendarId: account.auto_sync_calendar_id });
     }
@@ -699,7 +716,8 @@ function collectCandidates(conn, account) {
     WHERE e.external_source = 'local'
       AND e.recurrence_parent_id IS NULL
       AND e.target_outlook_account_id = ?
-  `).all(account.id);
+      ${onlyOne}
+  `).all(account.id, ...onlyOneArgs);
   for (const event of explicit) {
     candidates.set(event.id, { event, calendarId: event.target_outlook_calendar_id });
   }
@@ -743,7 +761,13 @@ async function fetchRemoteEventStates(calendarId, accessToken, fetchImpl = fetch
  * er nicht, und ein laufender wird abgewartet (Codex-Befund in #1431).
  */
 function sync(options = {}) {
-  return runExternalJob(() => runOutlookSync(options));
+  // Ein Lauf zur Zeit (#2943): Stundenlauf, "Jetzt synchronisieren" und der
+  // OAuth-Callback starten je einen. Zwei gleichzeitige lasen beide "noch kein
+  // Link", legten den Termin beide in Outlook an, und nur der zweite Link
+  // blieb - die erste Kopie hing dort fuer immer. Ein Aufruf waehrend eines
+  // Laufs wartet auf genau einen Nachlauf; runSerialized nimmt auch die
+  // Restore-Sperre mit (server/utils/sync-lock.js).
+  return runSerialized('outlook', 'sync', () => runOutlookSync(options));
 }
 
 async function runOutlookSync({ fetchImpl = fetch } = {}) {
@@ -837,19 +861,65 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
       // ------------------------------------------------
       // 2) Create/Update: Kandidatenmenge dieses Kontos.
       // ------------------------------------------------
-      const enabledCalendars = new Map(
-        conn.prepare(`
-          SELECT calendar_id, can_edit FROM outlook_calendar_selection
-          WHERE account_id = ? AND enabled = 1
-        `).all(account.id).map((r) => [r.calendar_id, r.can_edit === 1])
-      );
+      const selCalendar = conn.prepare(`
+        SELECT can_edit FROM outlook_calendar_selection
+        WHERE account_id = ? AND calendar_id = ? AND enabled = 1
+      `);
+      const accountStillThere = conn.prepare('SELECT 1 FROM outlook_accounts WHERE id = ?');
+      let accountGone = false;
 
-      for (const { event, calendarId } of candidates.values()) {
-        if (!enabledCalendars.has(calendarId)) {
+      /**
+       * Legt den Termin im Zielkalender an und schreibt seinen Link - oder,
+       * wenn das Konto waehrend des POST geloescht wurde, entfernt die eben
+       * angelegte Kopie wieder (#2943): ein Link kann am Fremdschluessel auf
+       * das Konto nicht mehr entstehen, ohne ihn bliebe die Kopie dort fuer
+       * immer. Das DELETE nimmt den Token, den der Lauf schon haelt; scheitert
+       * es, steht es nur im Log. Alle POST-Stellen gehen hierueber.
+       * @param {number} eventId
+       * @param {string} calendarId
+       * @param {object} payload
+       * @param {string} hash
+       * @returns {Promise<boolean>} ob der Link geschrieben wurde
+       */
+      const createRemote = async (eventId, calendarId, payload, hash) => {
+        const created = await graphJson(
+          `/me/calendars/${encodeURIComponent(calendarId)}/events`,
+          accessToken, { method: 'POST', body: payload }, fetchImpl
+        );
+        if (!accountStillThere.get(account.id)) {
+          accountGone = true;
+          try {
+            const res = await graphRequest(
+              `/me/events/${encodeURIComponent(created.id)}`,
+              accessToken, { method: 'DELETE' }, fetchImpl
+            );
+            if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status}`);
+          } catch (err) {
+            log.warn(`Account ${account.id} was deleted during the sync; removing the Outlook copy of event ${eventId} failed:`, err.message);
+          }
+          return false;
+        }
+        insLink.run(eventId, account.id, calendarId, created.id, hash, created.changeKey ?? null);
+        return true;
+      };
+
+      for (const candidateId of candidates.keys()) {
+        // Die Menge oben stammt von vor den Netzaufrufen; jeder Create oder
+        // Patch davor ist ein await, in dem eine Anfrage den Termin privat
+        // macht, loescht, sein Ziel aendert oder den Kalender abschaltet
+        // (#2943). Deshalb hier, im synchronen Abschnitt vor dem Schreiben
+        // dieses Termins, Konto, Termin und Zielkalender neu lesen. Faellt er
+        // heraus, raeumt der naechste Lauf einen vorhandenen Link als Waise ab.
+        const current = getAccountById(account.id);
+        const candidate = current ? collectCandidates(conn, current, candidateId).get(candidateId) : null;
+        if (!candidate) continue;
+        const { event, calendarId } = candidate;
+        const selection = selCalendar.get(account.id, calendarId);
+        if (!selection) {
           log.warn(`Target calendar not enabled for account ${account.id}, skipping event ${event.id}.`);
           continue;
         }
-        if (!enabledCalendars.get(calendarId)) {
+        if (selection.can_edit !== 1) {
           log.warn(`Target calendar is read-only, skipping event ${event.id}.`);
           continue;
         }
@@ -869,12 +939,7 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
 
         try {
           if (!link) {
-            const created = await graphJson(
-              `/me/calendars/${encodeURIComponent(calendarId)}/events`,
-              accessToken, { method: 'POST', body: payload }, fetchImpl
-            );
-            insLink.run(event.id, account.id, calendarId, created.id, hash, created.changeKey ?? null);
-            pushed++;
+            if (await createRemote(event.id, calendarId, payload, hash)) pushed++;
           } else if (link.outlook_calendar_id !== calendarId) {
             // Zielkalender gewechselt → Delete + Create (Graph-"move" wäre ein
             // eigener Endpoint mit eigenen Fehlerpfaden — Delete+Create genügt).
@@ -883,38 +948,32 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
               accessToken, { method: 'DELETE' }, fetchImpl
             );
             if (!res.ok && res.status !== 404) throw new Error(`HTTP ${res.status} on delete`);
-            const created = await graphJson(
-              `/me/calendars/${encodeURIComponent(calendarId)}/events`,
-              accessToken, { method: 'POST', body: payload }, fetchImpl
-            );
-            insLink.run(event.id, account.id, calendarId, created.id, hash, created.changeKey ?? null);
-            updated++;
+            if (await createRemote(event.id, calendarId, payload, hash)) updated++;
           } else if (remoteMissing) {
             // In Outlook von Hand gelöscht → Yuvomi ist Source of Truth: neu anlegen.
-            const created = await graphJson(
-              `/me/calendars/${encodeURIComponent(calendarId)}/events`,
-              accessToken, { method: 'POST', body: payload }, fetchImpl
-            );
-            insLink.run(event.id, account.id, calendarId, created.id, hash, created.changeKey ?? null);
-            updated++;
+            if (await createRemote(event.id, calendarId, payload, hash)) updated++;
           } else if (link.content_hash !== hash || remoteDrifted) {
+            let written;
             try {
               const patched = await graphJson(
                 `/me/events/${encodeURIComponent(link.outlook_event_id)}`,
                 accessToken, { method: 'PATCH', body: payload }, fetchImpl
               );
-              insLink.run(event.id, account.id, calendarId, link.outlook_event_id, hash, patched.changeKey ?? null);
+              // Waehrend des PATCH geloescht: der Link ist mit dem Konto weg,
+              // die Kopie bleibt wie jede andere eines geloeschten Kontos.
+              written = !!accountStillThere.get(account.id);
+              if (written) {
+                insLink.run(event.id, account.id, calendarId, link.outlook_event_id, hash, patched.changeKey ?? null);
+              } else {
+                accountGone = true;
+              }
             } catch (err) {
               // Fallback ohne Drift-Erkennung (Listing fehlgeschlagen): Remote
               // von Hand gelöscht → neu anlegen.
               if (err.status !== 404) throw err;
-              const created = await graphJson(
-                `/me/calendars/${encodeURIComponent(calendarId)}/events`,
-                accessToken, { method: 'POST', body: payload }, fetchImpl
-              );
-              insLink.run(event.id, account.id, calendarId, created.id, hash, created.changeKey ?? null);
+              written = await createRemote(event.id, calendarId, payload, hash);
             }
-            updated++;
+            if (written) updated++;
           }
           // Hash unverändert + kein Drift → No-Op (keine weitere Anfrage).
         } catch (err) {
@@ -923,6 +982,8 @@ async function runOutlookSync({ fetchImpl = fetch } = {}) {
         }
       }
 
+      // Ein waehrend des Laufs geloeschtes Konto ist nicht synchronisiert.
+      if (accountGone || !accountStillThere.get(account.id)) continue;
       conn.prepare(`
         UPDATE outlook_accounts SET last_sync = ?, last_error = NULL WHERE id = ?
       `).run(new Date().toISOString(), account.id);
@@ -958,6 +1019,7 @@ function getStatus() {
 }
 
 export {
+  accountExists,
   getAuthUrl,
   handleCallback,
   sync,
@@ -969,6 +1031,7 @@ export {
   listCalendarSelection,
   setCalendarEnabled,
   assertConfigured,
+  ReauthRequiredError,
 };
 
 export const __test = {

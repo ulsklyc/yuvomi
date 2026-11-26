@@ -127,7 +127,8 @@
         "transferUndone": "買い物リストから削除しました。",
         "transferSkipped": "{{count}}件はすでに載っていました。",
         "transferSkipped_one": "{{count}}件はすでに載っていました。",
-        "transferAllPresent": "すべての材料はすでにリストにあります。"
+        "transferAllPresent": "すべての材料はすでにリストにあります。",
+        "errorTransferTooLarge": "一度に扱う材料が多すぎます。まとめて移して元に戻せるのは最大 {{limit}} 件です。"
     },
     "nav": {
         "dashboard": "ダッシュボード",
@@ -1272,7 +1273,8 @@
         "localCalendarEdit": "カレンダーを編集",
         "localCalendarNew": "新しいカレンダー",
         "manageSubscriptionsLink": "購読と同期",
-        "cancelled": "キャンセル済み"
+        "cancelled": "キャンセル済み",
+        "errorSeriesChanged": "このシリーズは別の場所で変更されたばかりです。もう一度保存してください。"
     },
     "noteCategories": {
         "categories": "カテゴリー",
@@ -3638,7 +3640,8 @@
         "remoteErrorAuthFailed": "サーバーがサインインを拒否しました。ユーザー名とパスワードを確認してください。",
         "remoteErrorStatus": "サーバーはステータス {{status}} で応答しました。",
         "remoteErrorUnreachable": "サーバーに接続できません。アドレスとサーバーが稼働しているかを確認してください。",
-        "remoteErrorFailed": "サーバーへのリクエストに失敗しました。"
+        "remoteErrorFailed": "サーバーへのリクエストに失敗しました。",
+        "caldavErrorAccountChanged": "このアカウントは別の場所で変更されたばかりです。もう一度保存してください。"
     },
     "login": {
         "tagline": "おかえりなさい。暮らしのことを一か所に。",

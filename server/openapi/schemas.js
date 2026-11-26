@@ -1,16 +1,33 @@
 import { NOTE_CATEGORY_NAME_MAX_LENGTH } from '../../public/utils/note-category-name.js';
 import { MAX_QUICK_LINK_URL_LENGTH } from '../../public/utils/quick-link-url.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { DATETIME_PATTERN } from '../utils/datetime-pattern.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
+import { COLOR_PATTERN, DATETIME_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
+import { MAX_AVATAR_DATA_LENGTH } from '../utils/avatar-limits.js';
 import { ORIGIN_MODULE } from '../services/reminder-origins.js';
 import { wasteInputSchemas } from './waste-inputs.js';
 import {
+  MAX_ATTACHMENTS, MAX_BACKFILL_MOVES, MAX_KEYS, MAX_MEMBER_IDS, MAX_ORDER_ROWS, MAX_QUICK_LINK_ORDER, MAX_RAW_ENTRIES,
+  MAX_REMINDER_INSTANTS, MAX_SHOPPING_ITEMS, MAX_TOKEN_SCOPES,
+} from './array-limits.js';
+import {
   DMS_PROVIDERS, DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_UPLOAD_BACKENDS, DOCUMENT_VISIBILITIES,
 } from '../services/document-fields.js';
+import {
+  CALENDAR_NAME_MAX, EVENT_VISIBILITY, EXTERNAL_CALENDAR_SOURCES, ICS_SUBSCRIPTION_NAME_MAX, MAX_REMINDER_OFFSETS,
+  REMINDER_LIST_TARGETS,
+} from '../services/calendar-fields.js';
+import {
+  MAX_BULK_TASKS, MAX_ROTATION_POOL, ROTATION_MODES, TASK_MAX_POINTS, TASK_PRIORITIES, TASK_REAL_STATUSES, TASK_STATUSES,
+  TASK_VISIBILITY,
+} from '../services/task-fields.js';
+import {
+  CODE_MAX, DEVICE_ID_PATTERN, DEVICE_NAME_MAX, DEVICE_PLATFORM_PATTERN, DISPLAY_NAME_MAX, FAMILY_ROLES, INVITE_PRESETS,
+  LOGIN_USERNAME_MAX, PASSWORD_MAX,
+} from '../services/auth-fields.js';
 
 /**
  * A reminder time as the handlers accept it (`datetime()` in
- * server/middleware/validate.js reads the same pattern): no `format:
+ * server/api/formats.ts reads the same pattern): no `format:
  * date-time`, which needs seconds and a zone the app does not send.
  */
 // Create and update of a notification channel share their fields (#2810); the
@@ -32,6 +49,7 @@ const notificationChannelInputProperties = {
   },
   clearSecrets: {
     type: 'array',
+    maxItems: MAX_KEYS,
     items: { type: 'string' },
     description: 'Explicit secret field names to clear.',
   },
@@ -241,18 +259,19 @@ const calendarOccurrenceMutationProperties = {
       { type: 'integer', minimum: 1 },
       {
         type: 'array',
+        maxItems: MAX_MEMBER_IDS,
         uniqueItems: true,
         items: { type: 'integer', minimum: 1 },
       },
       { type: 'null' },
     ],
   },
-  visibility: { type: 'string', enum: ['all', 'assignees', 'private'] },
+  visibility: { type: 'string', enum: [...EVENT_VISIBILITY] },
   countdown: { type: 'boolean' },
   attachment_name: { type: ['string', 'null'] },
   attachment_data: {
     type: ['string', 'null'],
-    description: 'A base64 data URL for a replacement attachment, or null to remove it.',
+    description: 'A base64 data URL for a replacement attachment, or null to remove it. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files up to the upload limit; the bytes have to match the type. Any other value answers 400 with the sentence of its case and nothing is written.',
   },
   remove_attachment: { type: 'boolean' },
   document_folder_name: { type: 'string' },
@@ -260,7 +279,7 @@ const calendarOccurrenceMutationProperties = {
   document_description: { type: ['string', 'null'] },
   reminder_offsets: {
     type: 'array',
-    maxItems: 5,
+    maxItems: MAX_REMINDER_OFFSETS,
     uniqueItems: true,
     items: { type: 'integer', minimum: 0 },
   },
@@ -279,6 +298,10 @@ const calendarProviderTargetProperties = {
 const { reminder_offsets: _occurrenceOnly, ...calendarEventMutationProperties } = {
   ...calendarOccurrenceMutationProperties,
   ...calendarProviderTargetProperties,
+  assigned_to: {
+    description: 'One user id, a list with the primary assignee first, or null for nobody. New assignees have to be household members; an id without an account answers 400 `An assigned person no longer exists.` and nothing is written.',
+    ...calendarOccurrenceMutationProperties.assigned_to,
+  },
   icon: {
     type: 'string',
     description: 'One of the icon names of the event editor; an unknown name answers 400. Omitted, empty or blank means `calendar` on create and leaves it untouched on update.',
@@ -286,7 +309,7 @@ const { reminder_offsets: _occurrenceOnly, ...calendarEventMutationProperties } 
   attachment_name: { type: ['string', 'null'], description: 'File name for a new attachment; falls back to `Attachment`. MIME type and size are read from `attachment_data`.' },
   attachment_data: {
     type: ['string', 'null'],
-    description: 'A base64 data URL (`data:<mime>;base64,<bytes>`) for a new attachment. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files; the bytes have to match the type.',
+    description: 'A base64 data URL (`data:<mime>;base64,<bytes>`) for a new attachment. PNG, JPEG, WebP, GIF, PDF, plain text, Word and Excel files; the bytes have to match the type, and the file has to be non-empty and within the upload limit. Text that is no base64 data URL answers 400 `attachment_data must be a base64 data URL.`, every other case its own 400 sentence, and nothing is written.',
   },
   recurrence_rule: {
     type: ['string', 'null'],
@@ -300,8 +323,10 @@ const utcStamp = (description) => ({ type: 'string', format: 'date-time', descri
 const flag = (description) => ({ type: 'integer', enum: [0, 1], description });
 const SYNC_BOOKKEEPING = 'Bookkeeping of the sync; says nothing a client acts on.';
 
-const taskPriority = { type: 'string', enum: ['none', 'low', 'medium', 'high', 'urgent'] };
-const taskVisibility = { type: 'string', enum: ['all', 'assignees', 'private'] };
+// The value lists of a task come from server/services/task-fields.js, which
+// the task routes read too (#2810, group 11a).
+const taskPriority = { type: 'string', enum: [...TASK_PRIORITIES] };
+const taskVisibility = { type: 'string', enum: [...TASK_VISIBILITY] };
 
 const avatarField = (description) => ({
   type: ['string', 'null'],
@@ -319,7 +344,7 @@ const taskProperties = {
   priority: taskPriority,
   status: {
     type: 'string',
-    enum: ['open', 'in_progress', 'done'],
+    enum: [...TASK_REAL_STATUSES],
     description: 'The state of the task. `archived` is not a status here: filing away is the separate axis `archived_at`.',
   },
   start_date: isoDay('`YYYY-MM-DD`, a plain calendar day without a time zone.'),
@@ -333,7 +358,7 @@ const taskProperties = {
   recurrence_from_completion: flag('1 when the next occurrence counts from the day of completion instead of the due date.'),
   recurrence_origin_id: { type: ['integer', 'null'], description: 'The task this one followed in its series.' },
   recurrence_series_id: { type: ['integer', 'null'] },
-  points: { type: 'integer', minimum: 0, maximum: 10000 },
+  points: { type: 'integer', minimum: 0, maximum: TASK_MAX_POINTS },
   visibility: taskVisibility,
   countdown: flag('1 when the task shows as a countdown.'),
   locked: flag('1 when the definition of the task is closed to everyone but its creator and administrators (#830).'),
@@ -356,7 +381,7 @@ const taskProperties = {
   assigned_avatar: avatarField('Picture of `assigned_to`.'),
   assigned_users: { type: 'array', items: { $ref: '#/components/schemas/AssignedPerson' } },
   tags: { type: 'array', items: { type: 'string' }, description: 'Free-form labels, distinct from the single `category`.' },
-  rotation_mode: { type: ['string', 'null'], enum: ['round_robin', null], description: 'Rotation of a recurring series (#1763): `round_robin` hands every follow-up instance to the next member of `rotation_pool` in a fixed order, null without rotation.' },
+  rotation_mode: { type: ['string', 'null'], enum: [...ROTATION_MODES, null], description: 'Rotation of a recurring series (#1763): `round_robin` hands every follow-up instance to the next member of `rotation_pool` in a fixed order, null without rotation.' },
   rotation_last_user: { type: ['integer', 'null'], description: 'Informational: the member the pointer names. The order reads `rotation_last_position`, never this field.' },
   rotation_last_position: { type: ['integer', 'null'], minimum: 0, description: 'The pointer: the pool position that received the last occurrence, null before the first hand-over.' },
   rotation_pool: { type: ['array', 'null'], items: { type: 'integer' }, description: 'Member ids in delivery order, deactivated members included, null when the task does not rotate.' },
@@ -385,48 +410,75 @@ const DOCUMENT_COUNT_FIELD = {
   description: 'Linked documents the caller may see. Null without access to the Documents module: not told, which is not the same as 0.',
 };
 
+/**
+ * A switch of a task as the handlers read it (#2810, group 11a): `true`/`false`
+ * or `1`/`0` - the task form sends the numbers. Anything else (`null`,
+ * `"false"`, `5`) answers 400; a stored task reads back with 0 or 1.
+ * @param {string} description
+ */
+const taskFlag = (description) => ({
+  anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }],
+  description: `${description} \`true\`/\`false\` or \`1\`/\`0\` (the app sends the numbers).`,
+});
+
 const taskInputProperties = {
   title: { type: 'string', minLength: 1, maxLength: 200 },
   description: { type: ['string', 'null'], maxLength: 5000, description: 'Stored without leading and trailing whitespace; an empty or whitespace-only value is stored as `null`.' },
   category: { type: 'string', description: 'Key of a category of the household, see `GET /tasks/meta/options`; anything else answers 400. An empty string counts as not given. Defaults to `misc` on create.' },
-  priority: { ...taskPriority, description: 'An empty string counts as not given. Defaults to `none` on create.' },
-  start_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day.'),
-  due_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day.'),
-  due_time: { type: ['string', 'null'], pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: '`HH:MM` wall-clock time of the household.' },
+  priority: { type: 'string', enum: [...TASK_PRIORITIES, ''], description: 'An empty string counts as not given. Defaults to `none` on create.' },
+  start_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day. Null for none; an empty string answers 400.'),
+  due_date: isoDay('`YYYY-MM-DD`; has to be a real calendar day. Null for none; an empty string answers 400.'),
+  due_time: { type: ['string', 'null'], pattern: TIME_PATTERN, description: '`HH:MM` wall-clock time of the household. Null for none; an empty string answers 400.' },
   assigned_to: {
-    description: 'One user id, a list with the primary assignee first, or null for nobody. New assignees have to be household members (400 otherwise).',
+    description: 'One user id, a list with the primary assignee first, or null for nobody. New assignees have to be household members, and an id without an account is refused the same way (400).',
     ...calendarOccurrenceMutationProperties.assigned_to,
   },
   tags: {
     description: 'A list, or one string with the tags separated by commas. At most 32 tags of 64 characters; more is cut off without an error, and tags differing only in case collapse. Omitted on update, the tags stay; an empty list removes them.',
     oneOf: [
-      { type: 'array', items: { type: 'string' } },
+      { type: 'array', maxItems: MAX_RAW_ENTRIES, items: { type: 'string' } },
       { type: 'string' },
       { type: 'null' },
     ],
   },
-  is_recurring: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  is_recurring: taskFlag('Whether the task repeats.'),
   recurrence_rule: {
     type: ['string', 'null'],
     maxLength: 300,
     description: 'RRULE without the `RRULE:` prefix: `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY`, optional `INTERVAL`, `BYDAY`, for MONTHLY `BYMONTHDAY=-1`, and either `UNTIL` or `COUNT`. A value equal to the stored rule is accepted unchecked on update.',
   },
-  recurrence_from_completion: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
+  recurrence_from_completion: taskFlag('Whether the next occurrence counts from the day of completion.'),
   points: {
-    type: ['integer', 'null'],
-    minimum: 0,
-    maximum: 10000,
-    description: 'Cut to a whole number from 0 to 10000 rather than refused. Omitted on create, a top-level task takes the default of the household (`default_points`), a subtask 0.',
+    type: ['number', 'null'],
+    description: `Cut to a whole number from 0 to ${TASK_MAX_POINTS} rather than refused; null is 0. A text, a boolean or an empty string answers 400. Omitted on create, a top-level task takes the default of the household (\`default_points\`), a subtask 0.`,
   },
-  visibility: { ...taskVisibility, description: 'An unknown value falls back to `all` on create and keeps the stored one on update, without an error.' },
-  countdown: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
-  locked: { type: 'boolean', description: 'Read as true or false, so 0 and 1 work as well.' },
-  rotation_mode: { type: ['string', 'null'], enum: ['round_robin', null], description: 'Requires a recurring task and a pool of at least 2 household members (400 otherwise). Null clears mode, pool and pointer. Omitted on update, the rotation stays.' },
-  rotation_pool: { type: 'array', maxItems: 10, items: { type: 'integer', minimum: 1 }, description: 'Member ids, the list order is the delivery order. On update it is merged with the stored pool: a deactivated member left out keeps its place.' },
+  visibility: { ...taskVisibility, description: 'Who sees the task. Any other value answers 400.' },
+  countdown: taskFlag('Whether the task shows as a countdown.'),
+  locked: taskFlag('Whether the definition is closed to everyone but the creator and administrators (#830).'),
+  rotation_mode: { type: ['string', 'null'], enum: [...ROTATION_MODES, null], description: 'Requires a recurring task and a pool of at least 2 household members (400 otherwise). Null clears mode, pool and pointer. Omitted on update, the rotation stays.' },
+  rotation_pool: { type: 'array', maxItems: MAX_ROTATION_POOL, items: { type: 'integer', minimum: 1 }, description: 'Member ids, the list order is the delivery order. On update it is merged with the stored pool: a deactivated member left out keeps its place.' },
   sync_target: {
     type: ['string', 'null'],
     description: '`caldav:<accountId>|<listUrl>` from `GET /tasks/sync-targets`, or null or empty for local only. Ignored on a subtask, and on update once the task is on the server.',
   },
+};
+
+/** A list of task ids in a bulk request: at least one, at most MAX_BULK_TASKS. @param {string} description */
+const bulkTaskIds = (description) => ({
+  type: 'array',
+  minItems: 1,
+  maxItems: MAX_BULK_TASKS,
+  items: { type: 'integer', minimum: 1 },
+  description,
+});
+
+/** Tags to add or remove in one go: a list, or one string with the tags separated by commas. */
+const tagChange = {
+  oneOf: [
+    { type: 'array', maxItems: MAX_RAW_ENTRIES, items: { type: 'string' } },
+    { type: 'string' },
+    { type: 'null' },
+  ],
 };
 
 export const schemas = {
@@ -435,11 +487,13 @@ export const schemas = {
           description: 'Import an ICS document or URL into a household local calendar.',
           properties: {
             ics: { type: 'string', description: 'Raw ICS file text. Required when url is omitted.' },
-            url: { type: 'string', format: 'uri', description: 'Shared calendar URL. Required when ics is omitted.' },
+            // No `format: uri` (#2810): an address that does not parse answers the
+            // route's own `calendar_ics_url_invalid`, which the page translates.
+            url: { type: 'string', description: 'Shared calendar URL (https:// or webcal://). Required when ics is omitted.' },
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Fallback event color for imported events without their own color.' },
             local_calendar_id: { type: 'integer', minimum: 1, description: 'Target local calendar. Omit to use the default calendar.' },
             assignee_user_ids: {
-              type: 'array', uniqueItems: true, items: { type: 'integer', minimum: 1 },
+              type: 'array', maxItems: MAX_MEMBER_IDS, uniqueItems: true, items: { type: 'integer', minimum: 1 },
               description: 'People for this run (#1940), household members only; not stored. Every new event of the run is assigned to them (the first one primary). An event the caller already imported with the same UID - in any local calendar - is not created again: the people are added to the ones already on it, nobody is removed and nothing else changes. Omit for the behaviour without people.',
             },
             assignee_user_id: { type: 'integer', minimum: 1, description: 'One person, the short form of `assignee_user_ids`.' },
@@ -449,22 +503,195 @@ export const schemas = {
         LocalCalendarCreateInput: {
           type: 'object', required: ['name'],
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 80 },
-            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            // The length stays the route's check (#2810): an empty or too long
+            // name answers `calendar_name_invalid` with `params.limit`.
+            name: { type: 'string', description: `Trimmed, 1 to ${CALENDAR_NAME_MAX} characters; otherwise 400 with \`reason: calendar_name_invalid\` and \`params: { limit }\`.` },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$', description: 'Omitted: `#007AFF`.' },
           },
         },
         LocalCalendarReorderInput: {
           type: 'object', required: ['order'], properties: {
-            order: { type: 'array', uniqueItems: true, items: { type: 'integer', minimum: 1 } },
+            order: { type: 'array', maxItems: MAX_ORDER_ROWS, uniqueItems: true, items: { type: 'integer', minimum: 1 } },
           },
         },
         LocalCalendarUpdateInput: {
           type: 'object',
           minProperties: 1,
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 80 },
+            name: { type: 'string', description: `Trimmed, 1 to ${CALENDAR_NAME_MAX} characters; otherwise 400 with \`reason: calendar_name_invalid\` and \`params: { limit }\`.` },
             color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
             sort_order: { type: 'integer', minimum: 0 },
+          },
+        },
+        IcsSubscriptionCreateInput: {
+          type: 'object',
+          description: 'A new ICS subscription. Name, address and colour are required; name and address are the route\'s checks, each with its own answer: an empty or too long name carries `calendar_subscription_name_invalid`, an address that does not parse `calendar_ics_url_invalid`, another scheme `calendar_ics_url_scheme`.',
+          properties: {
+            name: { type: 'string', description: `Trimmed, 1 to ${ICS_SUBSCRIPTION_NAME_MAX} characters.` },
+            url: { type: 'string', description: 'https:// or webcal:// (with ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK also http://).' },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            shared: { type: 'boolean', description: 'Visible to the whole household; otherwise only to its creator. Default false.' },
+            default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS, items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
+          },
+        },
+        IcsSubscriptionUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional: what is left out stays as stored. The default assignees change only when one of the two assignee fields is sent.',
+          properties: {
+            name: { type: 'string', description: `Trimmed, 1 to ${ICS_SUBSCRIPTION_NAME_MAX} characters; otherwise 400 with \`reason: calendar_subscription_name_invalid\`.` },
+            color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+            shared: { type: 'boolean' },
+            default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS, items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
+          },
+        },
+        CalendarFeedOptionsInput: {
+          type: 'object',
+          description: 'At least one of the two switches; the one left out stays as stored.',
+          properties: {
+            showAssignees: { type: 'boolean', description: 'Name the assignees in the event description of the feed.' },
+            includeBirthdays: { type: 'boolean', description: 'Carry the birthday events; true by default.' },
+          },
+          anyOf: [
+            { properties: { showAssignees: { type: 'boolean' } }, required: ['showAssignees'] },
+            { properties: { includeBirthdays: { type: 'boolean' } }, required: ['includeBirthdays'] },
+          ],
+        },
+        GoogleCalendarSelectionInput: {
+          type: 'object',
+          required: ['calendarId', 'enabled'],
+          description: 'One calendar of the connected Google account switched on or off; a sync runs right after. An id that is blank after trimming answers 400 from the route.',
+          properties: {
+            calendarId: { type: 'string', description: 'The `id` from `GET /calendar/google/calendars`.' },
+            enabled: { type: 'boolean' },
+          },
+        },
+        GoogleReadonlyInput: {
+          type: 'object',
+          required: ['readonly'],
+          properties: {
+            readonly: { type: 'boolean', description: 'true: nothing is written to Google, events are only read.' },
+          },
+        },
+        ExternalCalendarAssigneesInput: {
+          type: 'object',
+          required: ['source', 'external_id'],
+          // One of the two is required (#2810 group 10b c): the route always
+          // writes the set, and a body without either emptied it silently.
+          // Each branch names its property (Ajv strictRequired); the full
+          // schema of both stays under `properties`.
+          anyOf: [
+            { properties: { default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS } }, required: ['default_assignee_user_ids'] },
+            { properties: { default_assignee_user_id: { type: ['integer', 'null'] } }, required: ['default_assignee_user_id'] },
+          ],
+          description: 'The calendar by provider and its id there, and its default assignees: `default_assignee_user_ids` replaces the set, the earlier form `default_assignee_user_id` sets it to one person or none. One of the two is required; `[]` or `null` clears the set. An `external_id` that is blank after trimming answers 400 from the route; a calendar that is neither synced nor offered by its account answers 404.',
+          properties: {
+            source: { type: 'string', enum: [...EXTERNAL_CALENDAR_SOURCES] },
+            external_id: { type: 'string', description: 'Google calendar id, CalDAV calendar URL or Apple calendar id.' },
+            default_assignee_user_ids: { type: 'array', maxItems: MAX_MEMBER_IDS, items: { type: 'integer', minimum: 1 } },
+            default_assignee_user_id: { type: ['integer', 'null'], minimum: 1 },
+          },
+        },
+        DefaultAssigneeBackfillInput: {
+          type: 'object',
+          required: ['expected_count'],
+          description: 'The count and token the confirmation was based on, and the picked moves. Each move names its event and both sets of people as the preview listed them (`from_user_ids`, `to_user_ids`) or, the earlier form, one person each (`from_user_id`, `to_user_id`); a move with neither form, an event listed twice or more entries than the preview shows answer 400 from the route.',
+          properties: {
+            expected_count: { type: 'integer', minimum: 0 },
+            expected_token: { type: ['string', 'null'], pattern: '^[0-9a-f]{64}$', description: 'The `token` of the count. Without it only the count is compared.' },
+            moves: {
+              type: ['array', 'null'],
+              maxItems: MAX_BACKFILL_MOVES,
+              items: {
+                type: 'object',
+                required: ['event_id'],
+                properties: {
+                  event_id: { type: 'integer', minimum: 1 },
+                  from_user_ids: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'integer', minimum: 1 } },
+                  to_user_ids: { type: 'array', minItems: 1, maxItems: 100, items: { type: 'integer', minimum: 1 } },
+                  from_user_id: { type: 'integer', minimum: 1 },
+                  to_user_id: { type: 'integer', minimum: 1 },
+                },
+              },
+            },
+          },
+        },
+        AppleConnectInput: {
+          type: 'object',
+          required: ['url', 'username', 'password'],
+          description: 'The iCloud CalDAV access; nothing of it is ever returned. A `url` that does not start with http(s) answers 400 with `reason: apple_url_invalid`; an empty or too long username or password answers 400 from the route.',
+          properties: {
+            url: { type: 'string', description: 'The CalDAV address, e.g. `https://caldav.icloud.com`.' },
+            username: { type: 'string', description: 'The Apple ID, at most 254 characters.' },
+            password: { type: 'string', writeOnly: true, description: 'An app-specific password, at most 4096 characters, not trimmed.' },
+          },
+        },
+        CaldavAccountCreateInput: {
+          type: 'object',
+          required: ['name', 'caldavUrl', 'username', 'password'],
+          description: 'A new CalDAV account; the connection is tested before it is saved. An empty field answers 400 from the route.',
+          properties: {
+            name: { type: 'string' },
+            caldavUrl: { type: 'string' },
+            username: { type: 'string' },
+            password: { type: 'string', writeOnly: true, description: 'At most 4096 characters, not trimmed.' },
+          },
+        },
+        CaldavAccountUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional; an omitted or empty `password` keeps the stored one (see the operation).',
+          properties: {
+            name: { type: 'string' },
+            caldavUrl: { type: 'string' },
+            username: { type: 'string' },
+            password: { type: 'string', writeOnly: true, description: 'At most 4096 characters, not trimmed.' },
+          },
+        },
+        CaldavCalendarSelectionInput: {
+          type: 'object',
+          required: ['calendarUrl', 'enabled'],
+          properties: {
+            calendarUrl: { type: 'string', description: 'The `calendarUrl` from `GET /calendar/caldav/accounts/{id}/calendars`.' },
+            enabled: { type: 'boolean' },
+            deleteEvents: { type: 'boolean', description: 'With `enabled: false`, also delete the events already taken over from this calendar. Default false.' },
+          },
+        },
+        CaldavReminderListUpdateInput: {
+          type: 'object',
+          required: ['listUrl'],
+          description: 'The list by its URL and at least one change: `enabled`, `targetModule` or the default assignees (otherwise 400 from the route). What is left out stays as stored.',
+          properties: {
+            listUrl: { type: 'string', description: 'The `listUrl` from `GET /calendar/caldav/accounts/{id}/reminder-lists`.' },
+            enabled: { type: 'boolean' },
+            targetModule: { type: 'string', enum: [...REMINDER_LIST_TARGETS] },
+            defaultAssigneeUserIds: { type: 'array', maxItems: MAX_MEMBER_IDS, items: { type: 'integer', minimum: 1 } },
+            defaultAssigneeUserId: { type: ['integer', 'null'], minimum: 1 },
+          },
+        },
+        OutlookAccountUpdateInput: {
+          type: 'object',
+          description: 'Every field is optional; what is left out stays as stored. Auto-sync is on once both the calendar and the owner are set.',
+          properties: {
+            name: { type: 'string' },
+            autoSyncCalendarId: { type: ['string', 'null'], description: 'A writable calendar of the account; `null` or `""` switches auto-sync off.' },
+            ownerUserId: { type: ['integer', 'null'], minimum: 1, description: 'The household member whose visible events are pushed; `null` clears it.' },
+          },
+        },
+        OutlookCalendarSelectionInput: {
+          type: 'object',
+          required: ['calendarId', 'enabled'],
+          properties: {
+            calendarId: { type: 'string', description: 'The `calendarId` from `GET /calendar/outlook/accounts/{id}/calendars`.' },
+            enabled: { type: 'boolean' },
+          },
+        },
+        CalendarExceptionInput: {
+          type: 'object',
+          description: 'The occurrence to exclude: `recurrence_id` as the calendar reads return it, or the former `date` (`YYYY-MM-DD`). Whether the value is an occurrence key is the route\'s check: otherwise 400 with `reason: malformed_recurrence_id`, also when both are missing.',
+          properties: {
+            recurrence_id: { type: ['string', 'null'] },
+            date: { type: ['string', 'null'] },
           },
         },
         ApiError: {
@@ -580,7 +807,7 @@ export const schemas = {
           type: 'object',
           required: ['ids'],
           properties: {
-            ids: { type: 'array', items: { type: 'integer' }, description: 'The complete new order. Ids the caller cannot see are ignored.' },
+            ids: { type: 'array', maxItems: MAX_QUICK_LINK_ORDER, items: { type: 'integer' }, description: 'The complete new order. Ids the caller cannot see are ignored.' },
           },
         },
         ReminderCreateInput: {
@@ -606,6 +833,7 @@ export const schemas = {
           properties: {
             remind_ats: {
               type: 'array',
+              maxItems: MAX_REMINDER_INSTANTS,
               items: reminderTime,
               description: 'The complete new set; an empty list removes every reminder of the entity. At most 5 different instants after conversion to UTC, repeated entries count once.',
             },
@@ -643,7 +871,7 @@ export const schemas = {
             // (public/components/category-manager.js) schickt ihre Schluessel als Text.
             order: {
               type: 'array',
-              maxItems: 100,
+              maxItems: MAX_ORDER_ROWS,
               uniqueItems: true,
               items: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^[1-9][0-9]*$' }] },
               description: 'Category ids as numbers or digit strings.',
@@ -733,6 +961,7 @@ export const schemas = {
             'DOCUMENT_STORAGE_TOO_LARGE',
             'DOCUMENT_STORAGE_CONNECTION_TEST_FAILED',
             'DOCUMENT_STORAGE_CONFIG_PROTECTED',
+            'DOCUMENT_STORAGE_CONFIG_CHANGED',
           ],
         },
         FamilyDocument: {
@@ -1230,7 +1459,7 @@ export const schemas = {
             statuses: {
               type: 'array',
               description: 'What the `status` filter and input take. `archived` stands for the archive here; a task never reads back with it.',
-              items: { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] },
+              items: { type: 'string', enum: [...TASK_STATUSES] },
             },
             categories: { type: 'array', items: { $ref: '#/components/schemas/TaskCategory' } },
             tags: {
@@ -1245,7 +1474,7 @@ export const schemas = {
                 },
               },
             },
-            default_points: { type: 'integer', minimum: 0, maximum: 10000, description: 'Points a new top-level task takes when the request names none. 0 means no default.' },
+            default_points: { type: 'integer', minimum: 0, maximum: TASK_MAX_POINTS, description: 'Points a new top-level task takes when the request names none. 0 means no default.' },
           },
         },
         TaskCreateInput: {
@@ -1255,8 +1484,8 @@ export const schemas = {
             ...taskInputProperties,
             status: {
               type: ['string', 'null'],
-              enum: ['open', 'in_progress', 'done', 'archived', null],
-              description: 'Defaults to `open`. `archived` and null fall back to `open`, see the operation.',
+              enum: [...TASK_STATUSES, null],
+              description: 'Defaults to `open`. `archived` and null fall back to `open`, see the operation; an empty string answers 400.',
             },
             parent_task_id: { type: ['integer', 'null'], minimum: 1, description: 'Creates a subtask. Its parent must be a top-level task the caller can see.' },
           },
@@ -1268,8 +1497,8 @@ export const schemas = {
             ...taskInputProperties,
             status: {
               type: 'string',
-              enum: ['open', 'in_progress', 'done', 'archived'],
-              description: '`archived` files the task away and leaves the status as it is.',
+              enum: [...TASK_STATUSES],
+              description: '`archived` files the task away and leaves the status as it is. Null or an empty string answers 400.',
             },
           },
         },
@@ -1277,7 +1506,7 @@ export const schemas = {
           type: 'object',
           required: ['status'],
           properties: {
-            status: { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] },
+            status: { type: 'string', enum: [...TASK_STATUSES] },
             done_by_user_id: {
               type: ['integer', 'null'],
               minimum: 1,
@@ -1292,6 +1521,154 @@ export const schemas = {
             line: { type: 'integer', minimum: 0, description: 'Line of the description, counted from 0.' },
             checked: { type: 'boolean' },
             expect: { type: ['string', 'null'], description: 'The line as the caller saw it, including `- [ ]`. A different line answers 409 with reason `stale`.' },
+          },
+        },
+        // The bodies of the other task routes (#2810, group 11a). Fields the
+        // schema does not name stay ignored, as before.
+        TaskTagsApplyInput: {
+          type: 'object',
+          required: ['ids'],
+          properties: {
+            ids: bulkTaskIds('The tasks to change. Ids the caller cannot see are skipped silently, locked ones are skipped and counted.'),
+            add: tagChange,
+            remove: tagChange,
+          },
+        },
+        TaskArchiveManyInput: {
+          type: 'object',
+          required: ['ids'],
+          properties: {
+            ids: bulkTaskIds('The tasks to archive. An id may repeat; it counts once.'),
+          },
+        },
+        TaskTagRenameInput: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string', description: 'The new tag, one tag even with a comma in it. Empty after trimming answers 400.' },
+          },
+        },
+        TaskCategoryNameInput: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string', description: 'Trimmed; empty or longer than 100 characters answers 400, a name in use (ignoring case) 409 `category_exists`.' },
+          },
+        },
+        TaskCategoryReorderInput: {
+          type: 'object',
+          required: ['order'],
+          properties: {
+            order: {
+              type: 'array',
+              maxItems: MAX_ORDER_ROWS,
+              items: { type: 'string' },
+              description: 'Category keys in the wanted order. An unknown key changes nothing; an empty list leaves the order as it is.',
+            },
+          },
+        },
+        TaskReorderInput: {
+          type: 'object',
+          required: ['order'],
+          properties: {
+            order: { ...bulkTaskIds('Task ids in the wanted order, each once.'), uniqueItems: true },
+          },
+        },
+        TaskReorderResetInput: {
+          type: 'object',
+          required: ['ids'],
+          properties: {
+            ids: { ...bulkTaskIds('The tasks whose rank is cleared, each once.'), uniqueItems: true },
+          },
+        },
+        // Group 11b (#2810): the preferences and push bodies.
+        PreferencesUpdateInput: {
+          type: 'object',
+          // No properties here (decision 9): the settings registry
+          // (server/settings/registry.ts) is the one place that knows every
+          // field, its shape, its range and who may write it. A second copy
+          // here would drift, and checking a field before the registry would
+          // answer 400 where the registry answers 403 to a member.
+          additionalProperties: true,
+          description: 'A patch of preferences, validated per field by the settings registry: every key the route knows is checked for shape, range and write right, unknown and read-only keys are ignored, and the first refused field answers 400 or 403 with nothing of the patch written.',
+        },
+        PushSubscribeInput: {
+          type: 'object',
+          required: ['endpoint', 'keys'],
+          // The browser's PushSubscription.toJSON() also carries
+          // `expirationTime`: further fields stay allowed and are ignored.
+          additionalProperties: true,
+          properties: {
+            endpoint: { type: 'string', minLength: 1, maxLength: 2048, description: 'The push service URL of the subscription, not empty. Must be a public https address (checked by the route, 400 otherwise).' },
+            keys: {
+              type: 'object',
+              required: ['p256dh', 'auth'],
+              additionalProperties: true,
+              properties: {
+                p256dh: { type: 'string', minLength: 1, description: 'The client public key of the subscription.' },
+                auth: { type: 'string', minLength: 1, description: 'The authentication secret of the subscription.' },
+              },
+            },
+          },
+        },
+        PushUnsubscribeInput: {
+          type: 'object',
+          required: ['endpoint'],
+          properties: {
+            endpoint: { type: 'string', minLength: 1, description: 'The push service URL of the subscription to remove, not empty. An unknown or foreign one changes nothing.' },
+          },
+        },
+        PushWallModeInput: {
+          type: 'object',
+          required: ['endpoint', 'active'],
+          properties: {
+            endpoint: { type: 'string', minLength: 1, description: 'The push service URL of this device\'s subscription, not empty. An unknown or foreign one changes nothing.' },
+            active: { type: 'boolean', description: '`true` pauses delivery to this device while it shows the wall, `false` resumes it.' },
+          },
+        },
+        PushTestInput: {
+          type: 'object',
+          description: 'Every field is optional; without a body the push carries the default title and an empty text.',
+          properties: {
+            title: { type: 'string', description: 'Title of the test push, `Yuvomi` by default.' },
+            body: { type: 'string', description: 'Text of the test push, empty by default.' },
+            endpoint: { type: 'string', description: 'The subscription of the calling device: its wall pause is lifted before sending. Without it every pause stays.' },
+          },
+        },
+        TaskArchiveInput: {
+          type: 'object',
+          description: 'Without a body, or without `archived`, the task is archived.',
+          properties: {
+            archived: { type: 'boolean', description: '`false` brings the task back, `true` (the default) archives it.' },
+          },
+        },
+        TaskDocumentsInput: {
+          type: 'object',
+          // Required (#2810 group 11a c): the route always replaces the
+          // visible links, and a body without the field emptied them silently.
+          required: ['document_ids'],
+          properties: {
+            document_ids: {
+              type: 'array',
+              maxItems: MAX_ATTACHMENTS,
+              items: { type: 'integer', minimum: 1 },
+              description: 'The documents to link, replacing the visible links. Required; an empty list removes them. Ids the caller cannot see are left out.',
+            },
+          },
+        },
+        TaskCommentInput: {
+          type: 'object',
+          required: ['comment'],
+          properties: {
+            comment: { type: 'string', description: 'Trimmed; empty or longer than 5000 characters answers 400. `@Name` mentions notify the members named.' },
+          },
+        },
+        TaskPointsRebaseInput: {
+          type: 'object',
+          required: ['from', 'to'],
+          properties: {
+            from: { type: 'integer', minimum: 1, maximum: TASK_MAX_POINTS, description: 'The previous default. 0 would take every task without points.' },
+            to: { type: 'integer', minimum: 0, maximum: TASK_MAX_POINTS, description: 'The new default.' },
           },
         },
         CalendarEventCreateInput: {
@@ -1311,6 +1688,14 @@ export const schemas = {
           description: 'Every field is optional: what is left out stays as stored. Null in `end_datetime`, `description` or `location` clears the field, null in `color` clears the event\'s own colour.',
           properties: {
             ...calendarEventMutationProperties,
+            // No `maxLength` here (#2810): a synced series stores its rule as
+            // the server sends it, without a limit, and the edit form sends
+            // the stored rule back unchanged. The route takes a rule equal to
+            // the stored one unchecked (#756) and checks the length of a new one.
+            recurrence_rule: {
+              type: ['string', 'null'],
+              description: 'As on create; a new rule may be at most 300 characters. A value equal to the stored rule is accepted unchecked, whatever its length, so an imported series that carries more stays editable.',
+            },
             local_calendar_id: {
               type: 'integer',
               minimum: 1,
@@ -1876,6 +2261,7 @@ export const schemas = {
             ids: {
               type: 'array',
               minItems: 1,
+              maxItems: MAX_SHOPPING_ITEMS,
               items: { type: 'integer', minimum: 1 },
               description: 'Leaving the field out means every checked item. An empty array is refused with 400, not read as "all of them".',
             },
@@ -1907,7 +2293,7 @@ export const schemas = {
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
             role: { type: 'string', enum: ['admin', 'member'] },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             access_scope: {
               type: 'string',
               description: 'What kind of account this is, for example `family`, `split_guest` or `display`.',
@@ -1962,7 +2348,7 @@ export const schemas = {
             display_name: { type: 'string' },
             avatar_color: { type: 'string' },
             avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
@@ -2022,6 +2408,7 @@ export const schemas = {
             order: {
               type: 'array',
               minItems: 1,
+              maxItems: MAX_MEMBER_IDS,
               uniqueItems: true,
               'x-reason': { uniqueItems: 'duplicate_member', default: 'invalid_order' },
               items: { type: 'integer', minimum: 1, 'x-reason': 'invalid_order' },
@@ -2042,8 +2429,12 @@ export const schemas = {
         LoginRequest: {
           type: 'object',
           properties: {
-            username: { type: 'string' },
-            password: { type: 'string' },
+            username: { type: 'string', maxLength: LOGIN_USERNAME_MAX },
+            password: {
+              type: 'string',
+              maxLength: PASSWORD_MAX,
+              description: 'An empty username or password is refused with 400 as well.',
+            },
           },
           required: ['username', 'password'],
         },
@@ -2084,10 +2475,12 @@ export const schemas = {
         },
         SetupRequest: {
           type: 'object',
+          description: 'Sent as JSON or form-encoded (`application/x-www-form-urlencoded`, as the YunoHost package does); '
+            + 'the fields are the same. Unknown fields are ignored.',
           properties: {
-            username: { type: 'string' },
-            display_name: { type: 'string' },
-            password: { type: 'string' },
+            username: { type: 'string', description: '3-64 letters, numbers, dots, hyphens or underscores, surrounding whitespace removed.' },
+            display_name: { type: 'string', description: `At most ${DISPLAY_NAME_MAX} characters, surrounding whitespace removed.` },
+            password: { type: 'string', maxLength: PASSWORD_MAX, description: 'At least 8 characters after Unicode normalization (NFC).' },
             language: {
               type: ['string', 'null'],
               description: 'Optional. Language code of a supported app locale (e.g. `de`, `pt`, `fil`). '
@@ -2106,27 +2499,37 @@ export const schemas = {
         PasswordChangeRequest: {
           type: 'object',
           properties: {
-            currentPassword: { type: 'string' },
-            newPassword: { type: 'string' },
+            current_password: { type: 'string' },
+            new_password: { type: 'string', maxLength: PASSWORD_MAX, description: 'At least 8 characters after Unicode normalization (NFC).' },
           },
-          required: ['currentPassword', 'newPassword'],
+          required: ['current_password', 'new_password'],
         },
         UserCreateRequest: {
           type: 'object',
+          description: 'Unknown fields are ignored, among them `role`: only `system_admin: true` makes an administrator.',
           properties: {
             username: { type: 'string' },
             display_name: { type: 'string' },
-            password: { type: 'string', description: 'Required unless sso_only is true.' },
+            password: {
+              type: 'string',
+              maxLength: PASSWORD_MAX,
+              description: 'Required unless sso_only is true. At least 8 characters after Unicode normalization (NFC).',
+            },
             sso_only: {
               type: 'boolean',
               description: 'Create the account without a password, so it can only be entered through SSO. '
                 + 'Requires OIDC to be configured, and rejects a password sent alongside it. '
                 + 'Deliberately explicit rather than inferred from a missing password.',
             },
-            avatar_color: { type: 'string' },
-            avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL.' },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
-            system_admin: { type: 'boolean' },
+            avatar_color: { type: 'string', pattern: COLOR_PATTERN, description: 'A HEX color `#RRGGBB`. Omitted: a color is picked at random.' },
+            avatar_data: {
+              type: ['string', 'null'],
+              minLength: 1,
+              maxLength: MAX_AVATAR_DATA_LENGTH,
+              description: 'PNG, JPEG, or WebP data URL.',
+            },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
+            system_admin: { type: 'boolean', description: 'Only true makes an administrator; omitted or false, a member.' },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
@@ -2136,20 +2539,30 @@ export const schemas = {
         },
         UserUpdateRequest: {
           type: 'object',
+          description: 'Every field is optional; a field left out stays as it is.',
           properties: {
             username: { type: 'string' },
             display_name: { type: 'string' },
-            password: { type: 'string', description: 'Write-only. Omit or leave empty to keep the current password.' },
+            password: {
+              type: 'string',
+              maxLength: PASSWORD_MAX,
+              description: 'Write-only. Omit or leave empty to keep the current password; otherwise at least 8 characters after Unicode normalization (NFC).',
+            },
             sso_only: {
               type: 'boolean',
               description: 'Switch the account between having a password and entering only through SSO. '
                 + 'true clears the password; false requires a password to be sent with it, otherwise the '
                 + 'account would be left with no way in at all. Omit to leave unchanged.',
             },
-            avatar_color: { type: 'string' },
-            avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL. Use null to remove.' },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
-            system_admin: { type: 'boolean' },
+            avatar_color: { type: 'string', pattern: COLOR_PATTERN, description: 'A HEX color `#RRGGBB`.' },
+            avatar_data: {
+              type: ['string', 'null'],
+              minLength: 1,
+              maxLength: MAX_AVATAR_DATA_LENGTH,
+              description: 'PNG, JPEG, or WebP data URL. Use null to remove.',
+            },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
+            system_admin: { type: 'boolean', description: 'true makes the account an administrator, false a member. Omit to leave unchanged.' },
             phone: { type: ['string', 'null'] },
             email: { type: ['string', 'null'] },
             birth_date: { type: ['string', 'null'], format: 'date' },
@@ -2158,10 +2571,24 @@ export const schemas = {
         },
         ProfileUpdateRequest: {
           type: 'object',
+          description: 'Every field is optional; a field left out stays as it is. Unknown fields, among them `role`, '
+            + '`family_role` and `username`, are ignored: an account does not set them on itself.',
           properties: {
-            display_name: { type: 'string' },
-            avatar_color: { type: 'string' },
-            avatar_data: { type: ['string', 'null'], description: 'PNG, JPEG, or WebP data URL. Use null to remove.' },
+            display_name: { type: 'string', description: `Not empty, at most ${DISPLAY_NAME_MAX} characters, surrounding whitespace removed.` },
+            avatar_color: { type: 'string', pattern: COLOR_PATTERN, description: 'A HEX color `#RRGGBB`.' },
+            avatar_data: {
+              type: ['string', 'null'],
+              minLength: 1,
+              maxLength: MAX_AVATAR_DATA_LENGTH,
+              description: 'PNG, JPEG, or WebP data URL. Use null to remove.',
+            },
+            phone: { type: ['string', 'null'], description: 'At most 100 characters; null or empty removes it.' },
+            email: {
+              type: ['string', 'null'],
+              description: 'At most 200 characters; null or empty removes it. An address of another account is refused with 409 (`email_in_use`) unless the caller is an admin.',
+            },
+            birth_date: { type: ['string', 'null'], format: 'date', description: 'The birthday as `YYYY-MM-DD`; null removes it.' },
+            birth_year_unknown: { type: 'boolean', description: 'Only day and month of `birth_date` are known (#2095); the server then stores the placeholder year 2000 whatever year is sent. Without it, the stored flag only goes when a different date arrives.' },
           },
         },
         Invite: {
@@ -2173,7 +2600,7 @@ export const schemas = {
             username: { type: ['string', 'null'], description: 'Pre-assigned username. When null, the invited person picks one.' },
             display_name: { type: ['string', 'null'] },
             role: { type: 'string', enum: ['admin', 'member'] },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             created_by: { type: ['integer', 'null'] },
             expires_at: { type: 'integer', description: 'Unix epoch milliseconds. Invitations are valid for 7 days.' },
             accepted_at: { type: ['string', 'null'], format: 'date-time' },
@@ -2185,13 +2612,19 @@ export const schemas = {
         },
         InviteCreateRequest: {
           type: 'object',
+          description: 'Every field is optional.',
           properties: {
             username: { type: 'string', description: 'Optional. When set, the invited person cannot choose a different one.' },
             display_name: { type: 'string' },
             email: { type: 'string', description: 'Required when send_email is true.' },
-            family_role: { type: 'string', enum: ['dad', 'mom', 'parent', 'child', 'grandparent', 'relative', 'other'] },
+            family_role: { type: 'string', enum: [...FAMILY_ROLES] },
             system_admin: { type: 'boolean', description: 'Only true grants the admin role; the value is taken from the invitation, never from the accept request.' },
             send_email: { type: 'boolean', description: 'Send the invitation by email. Requires SMTP and BASE_URL; check email_sent in the response.' },
+            permission_preset: {
+              type: 'string',
+              enum: [...INVITE_PRESETS],
+              description: 'The start rights of the new account: `restricted` (the narrow start, the default when omitted) or `role` (the rights of the family role).',
+            },
           },
         },
         InviteCreateResponse: {
@@ -2249,11 +2682,17 @@ export const schemas = {
           type: 'object',
           properties: {
             token: { type: 'string' },
-            password: { type: 'string', minLength: 8 },
+            password: {
+              type: 'string',
+              maxLength: PASSWORD_MAX,
+              description: 'At least 8 characters after Unicode normalization (NFC). Required while password sign-in is on; '
+                + 'with password sign-in turned off (SSO only) the account is created without one and a password sent is ignored '
+                + '(`password_required` of GET /invites/preview says which).',
+            },
             username: { type: 'string', description: 'Ignored when the invitation already carries one.' },
             display_name: { type: 'string', description: 'Ignored when the invitation already carries one.' },
           },
-          required: ['token', 'password'],
+          required: ['token'],
         },
         ApiToken: {
           type: 'object',
@@ -2285,6 +2724,7 @@ export const schemas = {
             subject_user_id: { type: 'integer', minimum: 1, description: 'Optional family-member subject. Defaults to the administrator creating the token. Split-expense guests and wall displays are not eligible - neither can sign in, so neither may carry a credential beside its own.' },
             scopes: {
               type: ['array', 'null'],
+              maxItems: MAX_TOKEN_SCOPES,
               items: { type: 'string' },
               description: 'Optional permission allow-list of "module:read"/"module:write" entries (e.g. ["calendar:write","tasks:read"]). Omit or null for a full-access token. When set, must be non-empty and only contain known scopes. Enforced on both REST and MCP; write implies read.',
             },
@@ -2322,11 +2762,11 @@ export const schemas = {
         SignedInDeviceCreateRequest: {
           type: 'object',
           properties: {
-            name: { type: 'string', minLength: 1, maxLength: 100 },
-            platform: { type: 'string', pattern: '^[a-z][a-z0-9-]{1,19}$' },
+            name: { type: 'string', minLength: 1, maxLength: DEVICE_NAME_MAX },
+            platform: { type: 'string', pattern: DEVICE_PLATFORM_PATTERN },
             device_id: {
               type: 'string',
-              pattern: '^[A-Za-z0-9._-]{8,128}$',
+              pattern: DEVICE_ID_PATTERN,
               description: 'Chosen by the client and stable per installation. Sending the same value again replaces the earlier credential.',
             },
           },
@@ -2405,9 +2845,40 @@ export const schemas = {
         TwoFactorVerifyRequest: {
           type: 'object',
           properties: {
-            code: { type: 'string', maxLength: 64, description: 'The six-digit TOTP code or a recovery code.' },
+            code: { type: 'string', maxLength: CODE_MAX, description: 'The six-digit TOTP code or a recovery code.' },
           },
           required: ['code'],
+        },
+        TwoFactorRequirementRequest: {
+          type: 'object',
+          properties: {
+            required: {
+              type: 'boolean',
+              description: 'Required. true requires two-factor authentication household-wide, false lifts it.',
+            },
+          },
+          required: ['required'],
+        },
+        TwoFactorCodeRequest: {
+          type: 'object',
+          description: 'A second factor that confirms a change of the caller\'s own two-factor authentication.',
+          properties: {
+            code: {
+              type: 'string',
+              maxLength: CODE_MAX,
+              description: 'A code from the authenticator app; to turn it off or to replace the recovery codes, a recovery code as well.',
+            },
+          },
+          required: ['code'],
+        },
+        ChangelogSeenRequest: {
+          type: 'object',
+          properties: {
+            latest: {
+              type: ['string', 'null'],
+              description: 'The last published version the client knows, at most 64 characters after trimming. Left out, null or empty keeps the stored value.',
+            },
+          },
         },
         TwoFactorVerifyResponse: {
           type: 'object',
@@ -3016,11 +3487,11 @@ export const schemas = {
           type: 'object',
           properties: {
             code: { type: 'string', description: 'Case, spaces and hyphens do not matter.' },
-            name: { type: 'string', minLength: 1, maxLength: 100 },
-            platform: { type: 'string', pattern: '^[a-z][a-z0-9-]{1,19}$' },
+            name: { type: 'string', minLength: 1, maxLength: DEVICE_NAME_MAX },
+            platform: { type: 'string', pattern: DEVICE_PLATFORM_PATTERN },
             device_id: {
               type: 'string',
-              pattern: '^[A-Za-z0-9._-]{8,128}$',
+              pattern: DEVICE_ID_PATTERN,
               description: 'Chosen by the client and stable per installation. Sending the same value again replaces the earlier credential.',
             },
           },

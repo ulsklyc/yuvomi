@@ -127,7 +127,8 @@
         "transferUndone": "Dihapus dari daftar belanja.",
         "transferSkipped": "{{count}} sudah ada di sana.",
         "transferSkipped_one": "{{count}} sudah ada di sana.",
-        "transferAllPresent": "Semua bahan sudah ada di daftar."
+        "transferAllPresent": "Semua bahan sudah ada di daftar.",
+        "errorTransferTooLarge": "Itu terlalu banyak bahan sekaligus. Paling banyak {{limit}} bahan dapat dipindahkan, dan dibatalkan, bersamaan."
     },
     "nav": {
         "dashboard": "Ringkasan",
@@ -1290,7 +1291,8 @@
         "localCalendarEdit": "Edit kalender",
         "localCalendarNew": "Kalender baru",
         "manageSubscriptionsLink": "Langganan dan sinkronisasi",
-        "cancelled": "Dibatalkan"
+        "cancelled": "Dibatalkan",
+        "errorSeriesChanged": "Seri baru saja diubah di tempat lain. Silakan simpan lagi."
     },
     "noteCategories": {
         "categories": "Kategori",
@@ -3656,7 +3658,8 @@
         "remoteErrorAuthFailed": "Server menolak proses masuk. Periksa nama pengguna dan kata sandi.",
         "remoteErrorStatus": "Server menjawab dengan status {{status}}.",
         "remoteErrorUnreachable": "Server tidak dapat dijangkau. Periksa alamat dan apakah server sedang berjalan.",
-        "remoteErrorFailed": "Permintaan ke server gagal."
+        "remoteErrorFailed": "Permintaan ke server gagal.",
+        "caldavErrorAccountChanged": "Akun baru saja diubah di tempat lain. Silakan simpan lagi."
     },
     "login": {
         "tagline": "Selamat datang kembali. Rumah Anda dalam satu tempat.",

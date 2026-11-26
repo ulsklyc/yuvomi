@@ -5,12 +5,11 @@
  * Ausführen: node test/test-contact-categories.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { createContactsMealsApp } from './contacts-meals-app.js';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { migrateTo, openSchemaDb } from './helpers/schema-db.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -26,20 +25,15 @@ function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlge
 console.log('\n[Contact-Categories-Test] Migration + CRUD-Routen\n');
 
 // --------------------------------------------------------
-// 1) Migration-Transform (raw MIGRATIONS_SQL[1] + [84])
+// 1) Migration-Transform: echte Migrationen bis 83, Altzeilen, dann 84
 // --------------------------------------------------------
 {
-  const db = new DatabaseSync(':memory:');
-  db.exec('PRAGMA foreign_keys = ON;');
-  db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-    applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')));`);
-  db.exec(MIGRATIONS_SQL[1]);
+  const db = openSchemaDb({ upTo: 83 });
   // Legacy-Kontakte VOR der Migration: deutsche Namen + ein freier Custom-Wert.
   db.prepare("INSERT INTO contacts (name, category) VALUES ('Dr. Meier', 'Arzt')").run();
   db.prepare("INSERT INTO contacts (name, category) VALUES ('Amt', 'Behörde')").run();
   db.prepare("INSERT INTO contacts (name, category) VALUES ('Nachbar', 'Nachbarschaft')").run();
-  db.exec(MIGRATIONS_SQL[84]);
+  migrateTo(db, 84);
 
   test('Seed: 7 Bestands-Keys mit label_key + Icon, name NULL', () => {
     const rows = db.prepare('SELECT key, name, label_key, icon FROM contact_categories WHERE label_key IS NOT NULL ORDER BY sort_order').all();
@@ -70,8 +64,8 @@ const database = db.get();
 
 // --------------------------------------------------------
 // 1b) Heilung der Migration v195 (#1140) - bewusst gegen die ECHTEN
-//     MIGRATIONS aus db.js gefahren, nicht gegen den Spiegel: die
-//     Spiegel-Schreibpfade (server/auth.js, server/routes/split-expenses.js)
+//     MIGRATIONS aus db.js gefahren: die
+//     Schreibpfade (server/auth.js, server/routes/split-expenses.js)
 //     schrieben bis v195 das rohe 'Sonstiges' statt des Keys 'misc', und ohne
 //     diese Probe haelt kein Test das UPDATE der Migration selbst fest.
 // --------------------------------------------------------
@@ -84,15 +78,13 @@ const database = db.get();
 
   // Vor-v195-Stand: Schema + Kategorien-Seed (v84), dann Zeilen, wie die
   // fehlerhaften Schreibpfade sie NACH v84 weiter hinterlassen haben.
-  const mig = new DatabaseSync(':memory:');
-  mig.exec(MIGRATIONS_SQL[1]);
-  mig.exec(MIGRATIONS_SQL[84]);
+  const mig = openSchemaDb({ upTo: 194 });
   mig.prepare("INSERT INTO contacts (name, category) VALUES ('Mitglied', 'Sonstiges')").run();
   mig.prepare("INSERT INTO contacts (name, category) VALUES ('Gast', 'Sonstiges')").run();
   mig.prepare("INSERT INTO contacts (name, category) VALUES ('Dr. Meier', 'doctor')").run();
 
   test('v195 heilt Sonstiges-Kontakte auf misc, andere Kategorien bleiben', () => {
-    mig.exec(V195.up);
+    migrateTo(mig, 195);
     const byName = Object.fromEntries(
       mig.prepare('SELECT name, category FROM contacts').all().map((r) => [r.name, r.category]));
     assert(byName['Mitglied'] === 'misc', `Mitglied: erwartet misc, war ${byName['Mitglied']}`);

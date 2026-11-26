@@ -51,6 +51,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHealthApp } from './health-app.js';
+import { assertArrayLimit } from './array-limit-cases.js';
+import { MAX_LAB_RESULTS } from '../server/openapi/array-limits.js';
 
 const dbmod = await import('../server/db.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
@@ -856,4 +858,12 @@ test('the own callers: the four replace calls of the health page send every requ
     const keys = literalKeys(literal);
     assert.deepEqual(missing(requiredOf('/medications/{id}/logs', 'post'), keys), [], `dose sends ${JSON.stringify(keys)}`);
   }
+});
+
+test('array limits: lab results, at the limit and one above (#2810)', async () => {
+  const lab = (/** @type {number} */ n) => ({
+    report_date: '2026-09-04', visibility: 'private', results: Array.from({ length: n }, (_, i) => ({ analyte: `A${i}`, value_num: i })),
+  });
+  const at = await assertArrayLimit((json) => call('POST', '/labs', { json }), lab, MAX_LAB_RESULTS, 'body/results');
+  assert.equal(at.status, 201, JSON.stringify(at.body));
 });

@@ -2,7 +2,7 @@
  * Modul: Aufgaben-Auswahl (geteilte Abfrage-Logik)
  * Zweck: Welche Aufgaben überhaupt in eine Liste gehören - zentral, damit
  *        Aufgaben-Route und Dashboard exakt dieselbe Auswahl treffen.
- * Abhängigkeiten: keine
+ * Abhängigkeiten: server/utils/sql-in-list.ts
  *
  * WARUM ALS SERVICE: `GET /api/v1/tasks` und `GET /api/v1/dashboard` beantworten
  * dieselbe Frage („welche Aufgaben stehen an?") und hatten dafür zwei Kopien der
@@ -27,6 +27,8 @@
  *
  * Guards: test/test-task-scope.js
  */
+
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 /**
  * WHERE-Fragment für die Grundauswahl einer Aufgabenliste.
@@ -94,9 +96,11 @@ export function taskScopeNeedsToday({ includeFuture = false } = {}) {
  *
  * BENANNTE ODER POSITIONALE PLATZHALTER, nicht beides gemischt: die Aufrufer
  * sind sich darin uneinig, und node:sqlite lässt eine Mischung in einer
- * Anweisung nicht zu. Die Aufgabenroute zählt ihre Parameter selbst durch, die
- * Übersicht bindet @today und @me namentlich - mit `named` bekommt sie
- * `@cat0, @cat1, …` und dazu das passende Objekt aus `categoryBindings()`.
+ * Anweisung nicht zu. Die Aufgabenroute zählt ihre Parameter selbst durch und
+ * bindet `categoryParam()` an der Stelle des Fragments, die Übersicht bindet
+ * @today und @me namentlich - mit `named` bekommt sie `@cat` und dazu das
+ * passende Objekt aus `categoryBindings()`. Die Liste ist EIN Parameter, ein
+ * JSON-Array für json_each (server/utils/sql-in-list.ts, Refs #2810).
  *
  * @param {string} alias        Tabellen-Alias der Aufgaben
  * @param {string[]} categories Kategorie-Schlüssel (normalisiert)
@@ -106,19 +110,29 @@ export function taskScopeNeedsToday({ includeFuture = false } = {}) {
  */
 export function taskCategoryWhere(alias, categories, { named = null } = {}) {
   if (!Array.isArray(categories) || categories.length === 0) return null;
-  const holes = categories.map((_, i) => (named ? `@${named}${i}` : '?'));
-  return `${alias}.category IN (${holes.join(', ')})`;
+  return `${alias}.category IN (${sqlInList(categories, named ?? undefined).sql})`;
 }
 
 /**
- * Die benannten Werte zum Fragment oben - dieselbe Reihenfolge, dieselben Namen.
+ * Der positionale Wert zum Fragment oben: EIN Parameter für die ganze Liste.
+ *
+ * @param {string[]} categories
+ * @returns {string}
+ */
+export function categoryParam(categories) {
+  return sqlInList(categories).param;
+}
+
+/**
+ * Der benannte Wert zum Fragment oben - derselbe Name. Leer ohne Kategorien,
+ * dann steht im Fragment auch kein Platzhalter.
  *
  * @param {string[]} categories
  * @param {string} [named]
  * @returns {Record<string, string>}
  */
 export function categoryBindings(categories, named = 'cat') {
-  return Object.fromEntries(categories.map((value, i) => [`${named}${i}`, value]));
+  return categories.length ? { [named]: sqlInList(categories).param } : {};
 }
 
 /**
@@ -127,9 +141,8 @@ export function categoryBindings(categories, named = 'cat') {
  * Express liefert `?category=a` als String und `?category=a&category=b` als
  * Array - wer den Rohwert bindet, schiebt im zweiten Fall ein Array in einen
  * Platzhalter, und die Anweisung kommt gar nicht erst durch. Doppelte fliegen
- * raus, damit die Platzhalterzahl der Wertezahl entspricht, und die Obergrenze
- * verhindert, dass eine Anfrage mit tausend Werten eine Anweisung baut, die
- * SQLite nicht mehr vorbereitet.
+ * raus, und die Obergrenze haelt eine Anfrage mit tausend Werten klein (die
+ * Liste selbst geht seit #2810 als EIN Parameter an SQLite).
  *
  * @param {unknown} raw   req.query.<name>
  * @param {number} [max]  Obergrenze (default 50)

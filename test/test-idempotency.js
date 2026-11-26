@@ -17,14 +17,13 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'idempotency-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: idempotencyMiddleware, canonicalize, fingerprint } = await import('../server/middleware/idempotency.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 
 const moduleDatabase = get();
@@ -65,20 +64,19 @@ const ALICE = seedUser('alice', 'admin');
 const BOB   = seedUser('bob', 'admin');
 
 let actor = { id: ALICE, role: 'admin' };
-const app = express();
-app.use(express.json());
-// Wie server/index.js: ohne Rumpf `{}` statt undefined (#2209).
-app.use(defaultEmptyBody);
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
+  before: [
+    // Genau die Reihenfolge aus server/index.js: die Middleware sieht den Pfad
+    // relativ zu ihrem eigenen Mount, der Router hängt eine Ebene tiefer.
+    ['/api/v1', idempotencyMiddleware],
+  ],
 });
-// Genau die Reihenfolge aus server/index.js: die Middleware sieht den Pfad
-// relativ zu ihrem eigenen Mount, der Router hängt eine Ebene tiefer.
-app.use('/api/v1', idempotencyMiddleware);
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1`;

@@ -18,7 +18,8 @@
 import express from 'express';
 import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
-import { collectErrors, date, id, str } from '../middleware/validate.js';
+import { withTx } from '../db/tx.ts';
+import { collectErrors, date, id, str } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
@@ -84,11 +85,11 @@ router.post('/', refuseForeignOwner('body'), validateRequest(), (req, res) => {
   // Zeile schon committed, bevor ihre Werte geschrieben waren, und ein Wurf
   // dazwischen liess einen 500er auf eine bereits vorhandene Zeile antworten -
   // ein idempotenter Retry (siehe idempotency-keys) haette sie dann verdoppelt.
-  const insertedId = db.get().transaction(() => {
+  const insertedId = withTx(db.get(), () => {
     const result = db.get().prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note, reminder_offset_minutes, created_by) VALUES (?, ?, ?, ?, ?, ?)').run(user.value, key.value, typeId.value, note.value, offset.value, actorId(req));
     replaceFieldValues('extra_shift', result.lastInsertRowid, fields.values);
     return result.lastInsertRowid;
-  })();
+  });
   resyncQuietly(user.value);
   const row = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(insertedId);
   res.status(201).json({ data: { ...row, field_values: fieldValuesFor('extra_shift', [row.id]).get(row.id) ?? {} } });
@@ -120,12 +121,12 @@ router.post('/fill', refuseForeignOwner('body'), validateRequest(), (req, res) =
   }
   const keys = dateKeysInRange(from.value, to.value);
   const insert = db.get().prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note, reminder_offset_minutes, created_by) VALUES (?, ?, ?, ?, ?, ?) RETURNING id');
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     for (const key of keys) {
       const row = insert.get(user.value, key, typeId.value, note.value, offset.value, actorId(req));
       replaceFieldValues('extra_shift', row.id, fields.values);
     }
-  })();
+  });
   resyncQuietly(user.value);
   res.json({ data: { created: keys.length } });
 });
@@ -157,10 +158,10 @@ router.delete('/:id', validateRequest(), (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(key.value);
   if (!old) return fail(res, 404, 'Extra shift not found.', { reason: 'schedule_extra_shift_not_found' }); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id=?`).run(old.id);
     db.get().prepare('DELETE FROM schedule_extra_shifts WHERE id=?').run(old.id);
-  })();
+  });
   resyncQuietly(old.user_id);
   return res.status(204).end();
 });

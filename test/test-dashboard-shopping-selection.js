@@ -32,7 +32,6 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { register } from 'node:module';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 register('./test-browser-loader.mjs', import.meta.url);
 
@@ -41,7 +40,8 @@ process.env.SESSION_SECRET = 'dashboard-shopping-selection-test-secret';
 
 const { resolvePermissions, buildSessionModuleAccess } = await import('../server/authorize/index.ts');
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: dashboardRouter, normalizeShoppingListFilter } = await import('../server/routes/dashboard.js');
+const { normalizeShoppingListFilter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 const { dashboardPaths } = await import('../server/openapi/paths/dashboard.js');
 const widgets = await import('../public/utils/dashboard-widgets.js');
@@ -81,19 +81,21 @@ const LEO = Number(addUser.run(`shop-leo-${randomUUID()}`, 'Leo', 'member', 'chi
 let currentUser = ADMIN;
 /** Ein gekoppeltes Display: Methode und Scopes wie `requireAuth` sie setzt, sonst null. */
 let displayScopes = null;
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(currentUser);
-  req.authUserId = user.id;
-  req.authRole = user.role;
-  req.session = { userId: user.id, role: user.role };
-  req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
-  if (displayScopes) { req.authMethod = 'display'; req.authScopes = displayScopes; }
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['dashboard'],
+  auth: (req, _res, next) => {
+    const user = db.prepare('SELECT id, role, family_role FROM users WHERE id = ?').get(currentUser);
+    req.authUserId = user.id;
+    req.authRole = user.role;
+    req.session = { userId: user.id, role: user.role };
+    req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db, user));
+    if (displayScopes) { req.authMethod = 'display'; req.authScopes = displayScopes; }
+    next();
+  },
+  before: [['/api/v1/preferences', preferencesRouter]],
 });
-app.use('/preferences', preferencesRouter);
-app.use('/', dashboardRouter);
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -103,8 +105,11 @@ test.after(async () => {
   db.close();
 });
 
+// Die Uebersicht steht unter ihrem echten Praefix (#2810); `path` bleibt der
+// Teil dahinter, wie ihn `query()` und `dashboardQuery()` bauen.
 async function getJson(path) {
-  const res = await fetch(`${base}${path}`);
+  const prefix = path.startsWith('/preferences') ? '/api/v1' : '/api/v1/dashboard';
+  const res = await fetch(`${base}${prefix}${path}`);
   assert.equal(res.status, 200, `${path}: ${res.status}`);
   return res.json();
 }
@@ -304,10 +309,14 @@ test('OpenAPI beschreibt den Parameter', () => {
   const parameter = dashboardPaths()['/api/v1/dashboard'].get.parameters.find((item) => item.name === 'shopping_list');
   assert.ok(parameter);
   assert.equal(parameter.in, 'query');
+  // Seit #2810 (Gruppe 10, Entscheidung 9): Text ohne Muster und ohne Hoechstzahl,
+  // denn `abc`, `0` oder eine 51. Liste fallen laut Beschreibung weg, statt
+  // abgewiesen zu werden. Form und Grenze stehen in der Beschreibung.
   assert.equal(parameter.schema.type, 'array');
-  assert.equal(parameter.schema.items.type, 'integer');
-  assert.equal(parameter.schema.items.minimum, 1);
-  assert.equal(parameter.schema.maxItems, 50);
+  assert.deepEqual(parameter.schema.items, { type: 'string' });
+  assert.equal(parameter.schema.maxItems, undefined);
+  assert.match(parameter.description, /positive list IDs, deduplicated and capped at 50/);
+  assert.match(parameter.description, /the value is not an ID, the request answers like one without the parameter/);
 });
 
 // --------------------------------------------------------------------------
@@ -316,7 +325,7 @@ test('OpenAPI beschreibt den Parameter', () => {
 
 const readPrefs = async () => (await getJson('/preferences')).data;
 async function writePrefs(body) {
-  const res = await fetch(`${base}/preferences`, {
+  const res = await fetch(`${base}/api/v1/preferences`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   return res.status;

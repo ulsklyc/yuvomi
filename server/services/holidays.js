@@ -9,7 +9,9 @@
 import { runExternalJob } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { resolveHouseholdLocale } from '../utils/i18n.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log = createLogger('Holidays');
 
@@ -702,7 +704,7 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const insertAll = db.get().transaction((rows) => {
+  const insertAll = (rows) => withTx(db.get(), () => {
     for (const h of rows) {
       const name = typeof h.name === 'string'
         ? h.name
@@ -983,7 +985,7 @@ function getForRange(from, to) {
   if (showPublic) types.push('public');
   if (showSchool) types.push('school');
 
-  const placeholders = types.map(() => '?').join(', ');
+  const typeList = sqlInList(types);
 
   // Ist eine Schulferien-Gruppe konfiguriert (mehrsprachiger Kanton), werden nur
   // die Zeilen dieser Gruppe sowie gruppenlose Zeilen (group_code NULL, z. B.
@@ -1008,12 +1010,12 @@ function getForRange(from, to) {
     WHERE country = ?
       AND (subdivision IS NULL OR subdivision = ? OR subdivision = '')
       ${groupClause}
-      AND type IN (${placeholders})
+      AND type IN (${typeList.sql})
       AND start_date <= ?
       AND end_date   >= ?
     GROUP BY type, start_date, end_date, name
     ORDER BY start_date ASC
-  `).all(country, subdivision ?? '', ...groupArgs, ...types, to, from);
+  `).all(country, subdivision ?? '', ...groupArgs, typeList.param, to, from);
 
   // OpenHolidays modelliert innerhalb EINER Subdivision teils mehrere
   // gleichnamige Schulferien-Varianten mit abweichenden Datumsbereichen –

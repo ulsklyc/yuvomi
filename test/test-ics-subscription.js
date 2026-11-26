@@ -1,5 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import http from 'node:http';
 import { normalizeUrl, checkSSRF, isPrivateNetworkAllowed, fetchAndParse } from '../server/services/ics-subscription.js';
 
@@ -20,19 +19,7 @@ async function assertThrows(fn, msg) {
 }
 const ENV_FLAG = 'ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK';
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-
-db.exec(`CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL,
-  password_hash TEXT NOT NULL, avatar_color TEXT NOT NULL DEFAULT '#007AFF',
-  role TEXT NOT NULL DEFAULT 'member',
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[10]);
-db.exec(MIGRATIONS_SQL[11]);
+const db = openSchemaDb(); // volles Schema aus der Baseline (test/helpers/schema-db.js)
 
 const uid1 = db.prepare(`INSERT INTO users (username,display_name,password_hash,role) VALUES ('admin','Admin','x','admin')`).run().lastInsertRowid;
 const uid2 = db.prepare(`INSERT INTO users (username,display_name,password_hash) VALUES ('maria','Maria','x')`).run().lastInsertRowid;
@@ -434,18 +421,17 @@ await (async () => {
       // Die Antworten der Route: der Fall reist als reason/params, das Abo
       // steht trotzdem (201), der Knopf bekommt 400 statt 200.
       process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
-      const { default: express } = await import('express');
-      const { default: calendarRouter } = await import('../server/routes/calendar.js');
-      const app = express();
-      app.use(express.json());
-      app.use((req, _res, next) => {
-        req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1, role: 'admin' };
-        next();
+      const { createCalendarApp } = await import('./calendar-app.js');
+      const app = await createCalendarApp({
+        mount: ['calendar'],
+        auth: (req, _res, next) => {
+          req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1, role: 'admin' };
+          next();
+        },
       });
-      app.use('/calendar', calendarRouter);
       const api = app.listen(0, '127.0.0.1');
       await new Promise((r) => api.on('listening', r));
-      const base = `http://127.0.0.1:${api.address().port}/calendar`;
+      const base = `http://127.0.0.1:${api.address().port}/api/v1/calendar`;
       try {
         await atest('POST /subscriptions: 201 mit syncReason und syncParams', async () => {
           const res = await fetch(`${base}/subscriptions`, {

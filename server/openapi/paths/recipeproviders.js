@@ -1,5 +1,5 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
-import { MAX_TITLE, MAX_URL } from '../../middleware/validate.js';
+import { MAX_TITLE, MAX_URL } from '../../api/formats.ts';
 import { SUPPORTED_PROVIDERS } from '../../services/recipe-providers/index.js';
 
 /**

@@ -12,7 +12,7 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, MAX_TITLE, MAX_URL } from '../middleware/validate.js';
+import { str, MAX_TITLE, MAX_URL } from '../api/formats.ts';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { getAdapter } from '../services/recipe-providers/index.js';
@@ -21,7 +21,7 @@ import {
 } from '../services/recipe-providers/private-network.js';
 import { classifyProbe } from '../services/recipe-providers/failure.js';
 import {
-  sync, syncOne, getStatus, recordAccountFailure,
+  sync, syncOne, getStatus, recordAccountFailure, RecipeProviderAccountGoneError,
 } from '../services/recipe-provider-sync.js';
 
 const log = createLogger('RecipeProviders');
@@ -190,7 +190,15 @@ router.post('/accounts/:id/test', requireAdmin, validateRequest(), async (req, r
 router.post('/accounts/:id/sync', requireAdmin, validateRequest(), async (req, res) => {
   const account = getAccount(Number(req.params.id));
   if (!account) return accountGone(res);
-  const result = await syncOne(account.id);
+  let result;
+  try {
+    result = await syncOne(account.id);
+  } catch (err) {
+    // Geloescht, waehrend der Lauf am Riegel wartete oder abrief (#2945): dieselbe
+    // Antwort wie fuer ein Konto, das schon vorher fehlte.
+    if (err instanceof RecipeProviderAccountGoneError) return accountGone(res);
+    throw err;
+  }
   res.json({ data: result });
 });
 

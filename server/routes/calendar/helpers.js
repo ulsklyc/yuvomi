@@ -4,7 +4,11 @@
  *        genutzt werden. Aufgeteilt aus server/routes/calendar.js (God-File-Split).
  */
 
-import { StorageError } from '../../services/document-storage.js';
+import {
+  STORAGE_CONFIG_CHANGED_MESSAGE,
+  StorageError,
+  assertStagedTargetCurrent,
+} from '../../services/document-storage.js';
 import { ensureModuleFolder } from '../../services/document-folders.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
@@ -12,7 +16,7 @@ import {
   filterVisible,
 } from '../../authorize/index.ts';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../../utils/upload-limit.js';
-import { contentMatchesMime } from '../../utils/file-signature.js';
+import { readDataUrlFile } from '../../utils/data-url-file.js';
 import {
   buildRecurrenceCapabilityMap, isLinkedOccurrence,
   parseOverrideFields, recurrenceIdFor, seriesIdFor,
@@ -24,7 +28,8 @@ import { seriesReadingZone } from '../../services/calendar-events.js';
 // it without importing a route; re-exported here for the calendar routes.
 export { setEventAssignments } from '../../services/event-assignments.ts';
 
-export const VALID_SOURCES  = ['local', 'google', 'apple', 'ics'];
+// The source filter of `GET /calendar` (server/services/calendar-fields.js, #2810).
+export { VALID_SOURCES } from '../../services/calendar-fields.js';
 // Ein Termin-Anhang ist ein Upload wie jeder andere und teilt deshalb die
 // gemeinsame Grenze (#806).
 export const MAX_ATTACHMENT_BYTES = MAX_UPLOAD_BYTES;
@@ -79,24 +84,44 @@ export function eventIcon(value) {
   return VALID_EVENT_ICONS.has(icon) ? icon : null;
 }
 
+/** Der Satz je Befund von readDataUrlFile; Teil der Antwort, deshalb fest. */
+const ATTACHMENT_REFUSALS = Object.freeze({
+  shape: 'attachment_data must be a base64 data URL.',
+  type: 'attachment_data: this file type is not allowed.',
+  empty: 'attachment_data: the file is empty.',
+  size: `attachment_data: the file may be at most ${MAX_UPLOAD_MB} MB.`,
+  content: 'attachment_data: the content does not match the declared file type.',
+});
+
+/**
+ * Ein gelesener Anhang, oder keiner (leer oder nicht gesendet).
+ * @typedef {{ mime: null, size: null, buffer: null } | { mime: string, size: number, buffer: Buffer }} Attachment
+ */
+
+/** @type {Attachment} */
+const NO_ATTACHMENT = Object.freeze({ mime: null, size: null, buffer: null });
+
+/**
+ * Den Anhang eines Termins lesen, im Stil der formats.ts-Helfer (#2810): ein
+ * Anhang, den die Route nicht nehmen kann (keine base64-Data-URL, Typ nicht
+ * auf der Liste, leer, über der Upload-Grenze, Inhalt passt nicht zum Typ),
+ * ist ein Befund für die `checks` der Route und damit eine 400, bevor etwas
+ * geschrieben oder hochgeladen wird. Bis #2810 warf diese Funktion, und die
+ * Routen antworteten 500. Leer oder kein Text ist kein Anhang und kein Fehler.
+ * @param {unknown} dataUrl
+ * @returns {{ value: Attachment, error: null } | { value: null, error: string }}
+ */
 export function parseAttachment(dataUrl) {
   const raw = typeof dataUrl === 'string' ? dataUrl.trim() : '';
-  if (!raw) return { mime: null, size: null, buffer: null };
-  const match = raw.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=\s]+)$/);
-  if (!match) throw new Error('attachment_data: ungültiges Dateiformat.');
-  const mime = match[1].toLowerCase();
-  if (!ATTACHMENT_MIME.has(mime)) throw new Error('attachment_data: Dateityp nicht erlaubt.');
-  const base64 = match[2].replace(/\s/g, '');
-  const buffer = Buffer.from(base64, 'base64');
-  if (!buffer.length) throw new Error('attachment_data: Datei ist leer.');
-  if (buffer.length > MAX_ATTACHMENT_BYTES) throw new Error(`attachment_data: Datei darf höchstens ${MAX_UPLOAD_MB} MB groß sein.`);
-  // Bis hier war nur geprueft, was der Absender BEHAUPTET (#937).
-  if (!contentMatchesMime(buffer, mime)) throw new Error('attachment_data: Inhalt passt nicht zum angegebenen Dateityp.');
-  return { mime, size: buffer.length, buffer };
+  if (!raw) return { value: NO_ATTACHMENT, error: null };
+  const read = readDataUrlFile(raw, { allowed: ATTACHMENT_MIME, maxBytes: MAX_ATTACHMENT_BYTES });
+  if (read.fault !== null) return { value: null, error: ATTACHMENT_REFUSALS[read.fault] };
+  const { mime, size, buffer } = read.file;
+  return { value: { mime, size, buffer }, error: null };
 }
 
 // CalDAV-Ziel eines Events validieren (Issue #241). Liefert {value, error}
-// im Stil der validate.js-Helfer, damit collectErrors 400 statt 500 erzeugt.
+// im Stil der formats.ts-Helfer, damit collectErrors 400 statt 500 erzeugt.
 // Leere/fehlende account_id bedeutet "Lokal" (kein Outbound-Sync).
 export function caldavTarget(body) {
   const rawId  = body.target_caldav_account_id;
@@ -221,6 +246,9 @@ export function ensureDocumentFolder(database, name, actorId) {
 
 export function createAttachmentDocument(database, attachment, staged, body, actorId) {
   if (!attachment?.buffer || !staged) return null;
+  // Called in the transaction of the write: the storage settings may have
+  // changed while the attachment was uploaded (#2946).
+  assertStagedTargetCurrent(staged);
   const originalName = String(body.attachment_name || 'Attachment').trim() || 'Attachment';
   const folderId = ensureDocumentFolder(database, body.document_folder_name || DEFAULT_ATTACHMENT_FOLDER, actorId);
   const result = database.prepare(`
@@ -265,6 +293,8 @@ export function cloneAttachmentDocument(database, source, staged) {
 }
 
 function insertAttachmentClone(database, source, staged) {
+  // As for a new attachment: the copy was uploaded before this write (#2946).
+  assertStagedTargetCurrent(staged);
   return database.prepare(`
     INSERT INTO family_documents
       (name, description, category, status, visibility, folder_id, original_name,
@@ -299,7 +329,7 @@ function insertAttachmentClone(database, source, staged) {
  * zwar als Erstes, vor jeder Suche, die mit 404 antworten koennte. Der Dialog
  * blendet die Ablage aus demselben Grund aus (`eventAttachmentFieldHtml()`).
  */
-export const ATTACHMENT_UPLOAD_REFUSAL = 'Attaching a file needs write access to documents.';
+const ATTACHMENT_UPLOAD_REFUSAL = 'Attaching a file needs write access to documents.';
 
 /** Bringt der Body einen neuen Anhang mit? Jeder nicht leere Wert zaehlt. */
 function bodyUploadsAttachment(body) {
@@ -309,8 +339,32 @@ function bodyUploadsAttachment(body) {
 }
 
 /** `true`, wenn der Body hochlaedt und der Aufrufer Dokumente nicht schreiben darf. */
-export function attachmentUploadRefused(req) {
+function attachmentUploadRefused(req) {
   return bodyUploadsAttachment(req.body) && !mayWriteModule(req, 'documents');
+}
+
+/**
+ * Dieselbe Absage als Middleware VOR der Pruefung der Anfrage (#2810, Gruppe 10
+ * Entscheidung 4): sie liest nur, ob `attachment_data` einen Wert traegt, und
+ * steht deshalb vor Schema, Suche und Zeilenrecht - die Absage verraet weder,
+ * ob es den Termin gibt, noch, ob der Rest des Rumpfs stimmt (DECISIONS.md
+ * Eintrag 10). Seit Schritt (b) die einzige Stelle: die Zeile im Handler ist weg.
+ * @param {any} req
+ * @param {any} res
+ * @param {() => void} next
+ */
+export function refuseUploadWithoutDocumentsWrite(req, res, next) {
+  if (attachmentUploadRefused(req)) return sendAttachmentUploadRefused(res);
+  return next();
+}
+
+/**
+ * Die Absage von `refuseUploadWithoutDocumentsWrite`, auch fuer den Fall, dass
+ * das Schreibrecht erst waehrend des Uploads verloren ging (#2947).
+ * @param {any} res
+ */
+export function sendAttachmentUploadRefused(res) {
+  return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
 }
 
 /* WER DEN GESPEICHERTEN ANHANG NICHT SIEHT, LOEST IHN NICHT AB (#1358).
@@ -516,6 +570,12 @@ export function serializeEvents(events, context) {
 
 export function sendStorageError(res, error, fallbackMessage) {
   if (!(error instanceof StorageError)) return false;
+  // The storage settings changed during the upload (#2946): 409 with its own
+  // sentence, the client may send the request again.
+  if (error.storageCode === 'DOCUMENT_STORAGE_CONFIG_CHANGED') {
+    res.status(409).json({ error: STORAGE_CONFIG_CHANGED_MESSAGE, code: 409, storage_code: error.storageCode });
+    return true;
+  }
   res.status(502).json({
     error: fallbackMessage,
     code: 502,

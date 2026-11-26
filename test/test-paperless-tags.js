@@ -3,17 +3,15 @@ import test, { beforeEach, after } from 'node:test';
 import express from '../server/utils/http-router.ts';
 import { resolveRequestModuleAccess } from '../server/authorize/index.ts';
 import { createErrorHandler } from '../server/middleware/error-handler.js';
-import { createRequire } from 'node:module';
-const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
-import { buildMigratedDatabase } from './helpers/migrated-database.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { PaperlessAdapter } from '../server/services/dms/paperless.js';
 
 process.env.DB_PATH = ':memory:';
-const { MIGRATIONS, _setTestDatabase, _resetTestDatabase } = await import('../server/db.js');
+const { _setTestDatabase, _resetTestDatabase } = await import('../server/db.js');
 const { default: router, _setAdapterFactory } = await import('../server/routes/paperless-tags.js');
-const database = buildMigratedDatabase(Database, MIGRATIONS);
+const database = openSchemaDb();
 _setTestDatabase(database);
-const user = (/** @type {string} */ name, /** @type {string} */ role) => database.prepare("INSERT INTO users (username,display_name,password_hash,role) VALUES (?,?,'x',?)").run(name,name,role).lastInsertRowid;
+const user = (/** @type {string} */ name, /** @type {string} */ role) => Number(database.prepare("INSERT INTO users (username,display_name,password_hash,role) VALUES (?,?,'x',?)").run(name,name,role).lastInsertRowid);
 const owner = user('tag-owner', 'admin');
 const member = user('tag-reader', 'member');
 const other = user('tag-admin', 'admin');
@@ -63,11 +61,11 @@ beforeEach(() => {
   database.prepare('DELETE FROM family_documents').run();
   database.prepare('DELETE FROM paperless_view_folders').run();
   database.prepare('DELETE FROM dms_accounts').run();
-  accountId = database.prepare("INSERT INTO dms_accounts (provider,name,base_url,api_token) VALUES ('paperless','Test','https://paperless.example','SECRET')").run().lastInsertRowid;
-  folderId = database.prepare("INSERT INTO paperless_view_folders (name,account_id,view_id,visibility,created_by) VALUES ('House',?,5,'family',?)").run(accountId,owner).lastInsertRowid;
-  linkId = database.prepare(`INSERT INTO family_documents (name,category,visibility,original_name,mime_type,file_size,content_data,
+  accountId = Number(database.prepare("INSERT INTO dms_accounts (provider,name,base_url,api_token) VALUES ('paperless','Test','https://paperless.example','SECRET')").run().lastInsertRowid);
+  folderId = Number(database.prepare("INSERT INTO paperless_view_folders (name,account_id,view_id,visibility,created_by) VALUES ('House',?,5,'family',?)").run(accountId,owner).lastInsertRowid);
+  linkId = Number(database.prepare(`INSERT INTO family_documents (name,category,visibility,original_name,mime_type,file_size,content_data,
     storage_provider,storage_backend,storage_key,dms_account_id,created_by)
-    VALUES ('Receipt','other','family','receipt.pdf','application/pdf',0,'','external','dms','99',?,?)`).run(accountId,owner).lastInsertRowid;
+    VALUES ('Receipt','other','family','receipt.pdf','application/pdf',0,'','external','dms','99',?,?)`).run(accountId,owner).lastInsertRowid);
   assigned = [7, 150]; writes = []; inView = true;
   adapter = {
     async getDocument() { return { tags: [...assigned] }; },

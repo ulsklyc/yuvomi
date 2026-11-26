@@ -127,7 +127,8 @@
         "transferUndone": "खरीदारी सूची से हटा दिया गया।",
         "transferSkipped": "{{count}} पहले से मौजूद थीं।",
         "transferSkipped_one": "{{count}} पहले से मौजूद थी।",
-        "transferAllPresent": "सभी सामग्रियाँ पहले से सूची में हैं।"
+        "transferAllPresent": "सभी सामग्रियाँ पहले से सूची में हैं।",
+        "errorTransferTooLarge": "एक साथ बहुत ज़्यादा सामग्री हैं। अधिकतम {{limit}} एक साथ स्थानांतरित और पूर्ववत की जा सकती हैं।"
     },
     "nav": {
         "dashboard": "डैशबोर्ड",
@@ -1272,7 +1273,8 @@
         "localCalendarEdit": "कैलेंडर संपादित करें",
         "localCalendarNew": "नया कैलेंडर",
         "manageSubscriptionsLink": "सदस्यताएँ और सिंक",
-        "cancelled": "रद्द"
+        "cancelled": "रद्द",
+        "errorSeriesChanged": "यह शृंखला अभी किसी और जगह बदली गई है। कृपया फिर से सहेजें।"
     },
     "noteCategories": {
         "categories": "श्रेणियाँ",
@@ -3638,7 +3640,8 @@
         "remoteErrorAuthFailed": "सर्वर ने साइन-इन अस्वीकार कर दिया। उपयोगकर्ता नाम और पासवर्ड जाँचें।",
         "remoteErrorStatus": "सर्वर ने स्थिति {{status}} के साथ उत्तर दिया।",
         "remoteErrorUnreachable": "सर्वर तक नहीं पहुँचा जा सकता। पता जाँचें और देखें कि सर्वर चल रहा है।",
-        "remoteErrorFailed": "सर्वर को भेजा गया अनुरोध विफल रहा।"
+        "remoteErrorFailed": "सर्वर को भेजा गया अनुरोध विफल रहा।",
+        "caldavErrorAccountChanged": "यह खाता अभी किसी और जगह बदला गया है। कृपया फिर से सहेजें।"
     },
     "login": {
         "tagline": "फिर से स्वागत है। आपका घर, एक ही जगह।",

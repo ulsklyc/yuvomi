@@ -4,11 +4,13 @@
  * Abhängigkeiten: tsdav, server/db.js
  */
 
-import { runExternalJob } from '../utils/restore-state.js';
+import { runExternalJob, SKIPPED_FOR_RESTORE } from '../utils/restore-state.js';
+import { runSerialized } from '../utils/sync-lock.js';
 import { createLogger } from '../logger.js';
 const log = createLogger('CardDAV');
 
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { toE164, defaultCountryFromConfig } from '../utils/phone.js';
 import { mayChangeContactEmails } from './contact-identity.js';
@@ -478,7 +480,7 @@ async function testConnection(cardavUrl, username, password) {
  * @param {string} password - Password
  * @returns {Promise<Object>} { accountId, addressbooks }
  */
-async function addAccount(name, cardavUrl, username, password) {
+async function addAccount(name, cardavUrl, username, password, { assertStillAllowed = () => {} } = {}) {
   try {
     // Validate inputs
     if (!name || !cardavUrl || !username || !password) {
@@ -487,6 +489,9 @@ async function addAccount(name, cardavUrl, username, password) {
 
     // Test connection first
     const { addressbooks } = await testConnection(cardavUrl, username, password);
+    // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947); ab hier
+    // kein await mehr bis zum Anlegen.
+    assertStillAllowed();
 
     // Check for duplicate
     const existing = db.get().prepare(
@@ -667,60 +672,98 @@ function deleteAccount(accountId) {
 // Addressbook Discovery & Selection
 // --------------------------------------------------------
 
+/** Das Konto verschwand, waehrend seine Adressbuecher abgefragt wurden (#2947). */
+class CardDAVAccountGoneError extends Error {
+  /** @param {number} accountId */
+  constructor(accountId) { super(`Account ${accountId} not found.`); this.name = 'CardDAVAccountGoneError'; }
+}
+
+/**
+ * Die gespeicherten Adressbuecher eines Kontos, in der Form von discoverAddressbooks().
+ * @param {ReturnType<typeof db.get>} database
+ * @param {number} accountId
+ */
+function storedAddressbooks(database, accountId) {
+  return database.prepare(`
+    SELECT id, addressbook_url AS url, addressbook_name AS name, enabled
+    FROM carddav_addressbook_selection WHERE account_id = ?
+  `).all(accountId).map((/** @type {any} */ row) => ({ id: row.id, url: row.url, name: row.name, enabled: row.enabled === 1 }));
+}
+
 /**
  * Discover addressbooks for an account (refresh from server)
  * @param {number} accountId - Account ID
  * @returns {Promise<Array<Object>>} Array of addressbook objects
  */
-async function discoverAddressbooks(accountId) {
+async function discoverAddressbooks(accountId, { assertStillAllowed = () => {} } = {}) {
   try {
-    const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
+    const database = db.get();
+    const account = database.prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
     if (!account) {
       throw new Error(`Account ${accountId} not found.`);
     }
 
     const { addressbooks } = await testConnection(account.carddav_url, account.username, account.password);
 
-    // UPSERT into carddav_addressbook_selection
-    const result = [];
-    for (const abook of addressbooks) {
-      const abookName = calendarDisplayName(abook.displayName, 'Unnamed Addressbook');
-
-      // Check if exists
-      const existing = db.get().prepare(`
-        SELECT id, enabled FROM carddav_addressbook_selection
-        WHERE account_id = ? AND addressbook_url = ?
-      `).get(accountId, abook.url);
-
-      if (existing) {
-        // Update name only (preserve enabled state)
-        db.get().prepare(`
-          UPDATE carddav_addressbook_selection
-          SET addressbook_name = ?
-          WHERE id = ?
-        `).run(abookName, existing.id);
-
-        result.push({
-          id: existing.id,
-          url: abook.url,
-          name: abookName,
-          enabled: existing.enabled === 1
-        });
-      } else {
-        // Insert new (enabled by default)
-        const insertResult = db.get().prepare(`
-          INSERT INTO carddav_addressbook_selection (account_id, addressbook_url, addressbook_name, enabled)
-          VALUES (?, ?, ?, 1)
-        `).run(accountId, abook.url, abookName);
-
-        result.push({
-          id: insertResult.lastInsertRowid,
-          url: abook.url,
-          name: abookName,
-          enabled: true
-        });
+    // NACH DEM AWAIT NOCH EINMAL (#2947): waehrend der Abfrage kann das Konto
+    // geloescht oder auf einen anderen Server umgestellt worden sein. Geloescht:
+    // dieselbe Antwort wie vorher ("nicht gefunden") statt eines Fremdschluessel-
+    // fehlers. Umgestellt: die Liste stammt vom alten Server und wird nicht
+    // gespeichert; es bleibt, was fuer das Konto schon gespeichert ist.
+    const result = withTx(database, () => {
+      // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947).
+      assertStillAllowed();
+      const current = database.prepare('SELECT carddav_url, username, password FROM carddav_accounts WHERE id = ?').get(accountId);
+      if (!current) throw new CardDAVAccountGoneError(accountId);
+      if (current.carddav_url !== account.carddav_url || current.username !== account.username
+          || current.password !== account.password) {
+        log.info(`Account ${accountId} changed during discovery - the result of the old server is not stored.`);
+        return null;
       }
-    }
+
+      // UPSERT into carddav_addressbook_selection
+      const stored = [];
+      for (const abook of addressbooks) {
+        const abookName = calendarDisplayName(abook.displayName, 'Unnamed Addressbook');
+
+        // Check if exists
+        const existing = database.prepare(`
+          SELECT id, enabled FROM carddav_addressbook_selection
+          WHERE account_id = ? AND addressbook_url = ?
+        `).get(accountId, abook.url);
+
+        if (existing) {
+          // Update name only (preserve enabled state)
+          database.prepare(`
+            UPDATE carddav_addressbook_selection
+            SET addressbook_name = ?
+            WHERE id = ?
+          `).run(abookName, existing.id);
+
+          stored.push({
+            id: existing.id,
+            url: abook.url,
+            name: abookName,
+            enabled: existing.enabled === 1
+          });
+        } else {
+          // Insert new (enabled by default)
+          const insertResult = database.prepare(`
+            INSERT INTO carddav_addressbook_selection (account_id, addressbook_url, addressbook_name, enabled)
+            VALUES (?, ?, ?, 1)
+          `).run(accountId, abook.url, abookName);
+
+          stored.push({
+            id: insertResult.lastInsertRowid,
+            url: abook.url,
+            name: abookName,
+            enabled: true
+          });
+        }
+      }
+      return stored;
+    });
+    if (!result) return storedAddressbooks(database, accountId);
 
     log.info(`Discovered ${addressbooks.length} addressbooks for account ${accountId}.`);
 
@@ -776,11 +819,11 @@ function toggleAddressbook(addressbookId, enabled) {
  * Der Sync als Job, der nach aussen schreibt: waehrend eines Restores beginnt
  * er nicht, und ein laufender wird abgewartet (Codex-Befund in #1431).
  */
-function sync() {
-  return runExternalJob(() => runCarddavSync());
+function sync(options = {}) {
+  return runExternalJob(() => runCarddavSync(options));
 }
 
-async function runCarddavSync() {
+async function runCarddavSync(options = {}) {
   const accounts = getAllAccounts();
 
   if (accounts.length === 0) {
@@ -793,8 +836,10 @@ async function runCarddavSync() {
 
   for (const account of accounts) {
     try {
-      const { synced } = await syncAccount(account.id);
-      syncedContacts += synced;
+      const result = await syncAccount(account.id, options);
+      // Ein Restore begann, waehrend der Lauf am Riegel des Kontos wartete.
+      if (result === SKIPPED_FOR_RESTORE) continue;
+      syncedContacts += result.synced;
       successfulAccounts++;
     } catch (err) {
       // syncAccount loggt bereits; hier nur weitermachen statt abbrechen.
@@ -876,14 +921,30 @@ export function pruneRemovedContacts(database, accountId, addressbookUrl, seenUi
 /**
  * Sync all enabled addressbooks for an account
  * @param {number} accountId - Account ID
+ * @param {{ createClient?: Function }} [options] - createClient setzen nur Tests
  * @returns {Promise<Object>} { synced, errors }
  */
-async function syncAccount(accountId) {
+function syncAccount(accountId, { createClient = createCardDAVClient } = {}) {
   // Use mock if set (for testing)
   if (_syncAccountMock) {
     return _syncAccountMock(accountId);
   }
 
+  // Ein Lauf je Konto, nie zwei gleichzeitig (#2943). Der Prune loescht, was
+  // in der Liste DIESES Laufs fehlt: lief ein zweiter Lauf (Stundenlauf und
+  // "Jetzt synchronisieren") dazwischen und importierte einen Kontakt, den der
+  // Server inzwischen hat, raeumte der erste ihn mit seiner aelteren Liste
+  // wieder ab, samt allem, was an der Zeile hing. Ein Aufruf waehrend eines
+  // Laufs wartet auf genau einen Nachlauf; waehrend eines Restores beginnt
+  // keiner (SKIPPED_FOR_RESTORE, server/utils/sync-lock.js).
+  return runSerialized(`carddav:${accountId}`, 'sync', () => runSyncAccount(accountId, createClient));
+}
+
+/**
+ * @param {number} accountId
+ * @param {Function} createClient
+ */
+async function runSyncAccount(accountId, createClient) {
   try {
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
     if (!account) {
@@ -892,8 +953,9 @@ async function syncAccount(accountId) {
 
     log.info(`Syncing CardDAV account ${accountId} ("${account.name}")...`);
 
-    // Create tsdav client
-    const client = await createCardDAVClient(account);
+    // Create tsdav client (`createClient` setzen nur Tests: ohne ihn spricht
+    // tsdav HTTP mit dem Server)
+    const client = await createClient(account);
 
     // Get enabled addressbooks for this account
     const enabledAddressbooks = db.get().prepare(`
@@ -1072,7 +1134,8 @@ async function fetchVCardsResilient(client, addressBook) {
  */
 async function syncAddressbook(accountId, addressbookUrl, client = null, serverAddressbook = null) {
   try {
-    const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
+    const conn = db.get();
+    const account = conn.prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
     if (!account) {
       throw new Error(`Account ${accountId} not found.`);
     }
@@ -1102,6 +1165,19 @@ async function syncAddressbook(accountId, addressbookUrl, client = null, serverA
       // festhalten kann - im Log allein sieht sie niemand (#534).
       const label = calendarDisplayName(serverAddressbook?.displayName, addressbookUrl);
       return { synced: 0, errors: 1, errorMessage: `${label}: ${err.message}` };
+    }
+
+    // Die Auswahl wurde vor dem Abruf gelesen; waehrend er lief, kann jemand
+    // das Adressbuch abgeschaltet oder das Konto geloescht haben (#2943). Ab
+    // hier laeuft der Abgleich ohne weiteres Warten bis zum Prune, also gilt
+    // die Auswahl, wie sie jetzt steht.
+    const stillSelected = conn.prepare(`
+      SELECT 1 FROM carddav_addressbook_selection
+      WHERE account_id = ? AND addressbook_url = ? AND enabled = 1
+    `).get(accountId, addressbookUrl);
+    if (!stillSelected) {
+      log.debug(`Addressbook ${addressbookUrl} was switched off during the fetch, skipping.`);
+      return { synced: 0, errors: 0, deleted: 0, decoupled: 0 };
     }
 
     let synced = 0;
@@ -1474,7 +1550,7 @@ function updateContactMultiValues(contactId, vcard) {
     return;
   }
 
-  const transaction = conn.transaction(() => {
+  withTx(conn, () => {
     // Delete non-primary entries
     conn.prepare('DELETE FROM contact_phones WHERE contact_id = ? AND is_primary = 0').run(contactId);
     if (!emailsLocked) conn.prepare('DELETE FROM contact_emails WHERE contact_id = ? AND is_primary = 0').run(contactId);
@@ -1483,8 +1559,6 @@ function updateContactMultiValues(contactId, vcard) {
     // Insert new entries from vCard
     insertContactMultiValues(contactId, emailsLocked ? { ...incoming, emails: [] } : incoming);
   });
-
-  transaction();
 }
 
 /**
@@ -1506,45 +1580,45 @@ function insertContactMultiValues(contactId, vcard) {
     'SELECT 1 FROM contact_addresses WHERE contact_id = ? AND is_primary = 1'
   ).get(contactId);
 
-  // Batch insert phones. value_e164 additiv (Phase 2): der rohe value bleibt die
-  // Wahrheit; value_e164 nur wo parsebar, damit der Sync format-unabhängig matcht.
+  // One prepared statement per table, run once per value: a multi-row VALUES list with
+  // one placeholder per value broke at SQLite's host parameter limit on a large vCard
+  // (Refs #2810).
+  // value_e164 additiv (Phase 2): der rohe value bleibt die Wahrheit; value_e164 nur wo
+  // parsebar, damit der Sync format-unabhaengig matcht.
   if (vcard.phones && vcard.phones.length > 0) {
     const defaultCountry = defaultCountryFromConfig(db.get());
-    const placeholders = vcard.phones.map(() => '(?, ?, ?, ?, ?)').join(', ');
-    const values = vcard.phones.flatMap((phone, i) => [
+    const insertPhone = db.get().prepare(`
+      INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    vcard.phones.forEach((phone, i) => insertPhone.run(
       contactId,
       phone.label || null,
       phone.value,
       (!hasPrimaryPhone && i === 0) ? 1 : 0,
       toE164(phone.value, defaultCountry)
-    ]);
-
-    db.get().prepare(`
-      INSERT INTO contact_phones (contact_id, label, value, is_primary, value_e164)
-      VALUES ${placeholders}
-    `).run(...values);
+    ));
   }
 
-  // Batch insert emails
   if (vcard.emails && vcard.emails.length > 0) {
-    const placeholders = vcard.emails.map(() => '(?, ?, ?, ?)').join(', ');
-    const values = vcard.emails.flatMap((email, i) => [
+    const insertEmail = db.get().prepare(`
+      INSERT INTO contact_emails (contact_id, label, value, is_primary)
+      VALUES (?, ?, ?, ?)
+    `);
+    vcard.emails.forEach((email, i) => insertEmail.run(
       contactId,
       email.label || null,
       email.value,
       (!hasPrimaryEmail && i === 0) ? 1 : 0
-    ]);
-
-    db.get().prepare(`
-      INSERT INTO contact_emails (contact_id, label, value, is_primary)
-      VALUES ${placeholders}
-    `).run(...values);
+    ));
   }
 
-  // Batch insert addresses
   if (vcard.addresses && vcard.addresses.length > 0) {
-    const placeholders = vcard.addresses.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
-    const values = vcard.addresses.flatMap((addr, i) => [
+    const insertAddress = db.get().prepare(`
+      INSERT INTO contact_addresses (contact_id, label, street, city, state, postal_code, country, is_primary)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    vcard.addresses.forEach((addr, i) => insertAddress.run(
       contactId,
       addr.label || null,
       addr.street,
@@ -1553,12 +1627,7 @@ function insertContactMultiValues(contactId, vcard) {
       addr.postalCode,
       addr.country,
       (!hasPrimaryAddress && i === 0) ? 1 : 0
-    ]);
-
-    db.get().prepare(`
-      INSERT INTO contact_addresses (contact_id, label, street, city, state, postal_code, country, is_primary)
-      VALUES ${placeholders}
-    `).run(...values);
+    ));
   }
 }
 
@@ -1576,6 +1645,7 @@ export {
 
   // Addressbook Discovery
   discoverAddressbooks,
+  CardDAVAccountGoneError,
   toggleAddressbook,
 
   // Contact Sync

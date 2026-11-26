@@ -42,6 +42,7 @@
  * aktiv und meldet sich trotzdem nie an.
  */
 import * as dbModule from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { activeAccountSql, deactivatedAtColumnSql } from './account-state.js';
 
 // Weitergereicht: wer eine Verbindung hat, fragt dieses Modul (siehe account-state.js).
@@ -248,10 +249,10 @@ export function writeMemberOrder(order, { db } = {}) {
   const database = db || dbModule.get();
   const clear = database.prepare('UPDATE users SET sort_order = NULL WHERE sort_order IS NOT NULL');
   const place = database.prepare('UPDATE users SET sort_order = ? WHERE id = ?');
-  database.transaction(() => {
+  withTx(database, () => {
     clear.run();
     order.forEach((id, index) => place.run(index + 1, id));
-  })();
+  });
 }
 
 /**

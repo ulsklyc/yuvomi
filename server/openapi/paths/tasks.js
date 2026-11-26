@@ -1,4 +1,5 @@
-import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINK_REFUSAL, withCaseReasons } from '../helpers.js';
+import { op, jsonBody, idParam, stringPathParam, DOCUMENT_LINK_REFUSAL, withCaseReasons, withValidationRefusal } from '../helpers.js';
+import { MAX_BULK_TASKS, TASK_MAX_POINTS } from '../../services/task-fields.js';
 
 // Die verknuepften Dokumente einer Aufgabe gehoeren dem Dokumente-Modul (#1358).
 const TASK_DOCUMENTS_NOTE = '`document_count` counts the linked documents the caller may see; `GET /api/v1/tasks/{id}` also carries them as `documents`. '
@@ -18,6 +19,41 @@ const typedResponses = (status, description, schema, refusals = {}) => ({
 });
 
 const BAD_REQUEST = { $ref: '#/components/responses/BadRequest' };
+const UNAUTHORIZED = { $ref: '#/components/responses/Unauthorized' };
+const SERVER_ERROR = { $ref: '#/components/responses/InternalServerError' };
+
+/**
+ * The answers of an operation without a typed client model (#2810, group 11a):
+ * its success and the refusals of the route itself. The 400 of
+ * validateRequest() is added to every operation with input at the end of
+ * tasksPaths() (withValidationRefusal).
+ */
+/**
+ * @param {number} status @param {string} description
+ * @param {Record<string, unknown>} [refusals]
+ * @returns {Record<string, unknown>}
+ */
+const answers = (status, description, refusals = {}) => ({
+  [status]: { description },
+  401: UNAUTHORIZED,
+  ...refusals,
+  500: SERVER_ERROR,
+});
+const NO_CONTENT = { description: 'No content' };
+const ADMIN_ONLY = { $ref: '#/components/responses/Forbidden' };
+const REORDER_REFUSED = apiError('The caller lacks the capability `tasks_reorder_family` (reason `reorder_not_allowed`). Answered before the body is checked, so a malformed body meets this 403 too.');
+const NO_TAG = apiError('No task the caller can see carries the tag (reason `tasks_tag_not_found`).');
+const NO_CATEGORY = apiError('The category does not exist (reason `tasks_category_not_found`).');
+const NO_COMMENT = apiError('The task or the comment does not exist or is not visible to the caller.');
+const NOT_THE_AUTHOR = apiError('The caller did not write the comment (deleting it is also open to an administrator).');
+
+// The filters of GET /tasks that take several values (#671): repeat the
+// parameter once per value, the values of one filter are OR-ed. Declared as
+// arrays, so a repeated parameter is no 400.
+/** @param {string} name @param {Record<string, unknown>} items @param {string} description */
+const repeatable = (name, items, description) => ({
+  name, in: 'query', required: false, explode: true, style: 'form', schema: { type: 'array', items }, description,
+});
 const FOREIGN_SERIES_CONFLICT = apiError('The task repeats in another app with a rule Yuvomi cannot follow (reason `task_foreign_series`, rule in `external_rrule`, no `is_recurring` here): ticking it off here would end the series there, so it is ticked off in that app (#2506). Other changes stay allowed.');
 const LOCKED = apiError('The task is locked and the caller is neither its creator nor an administrator (reason `task_locked`), or there is no write access to tasks.');
 const NO_TASK = apiError('The task does not exist or is not visible to the caller.');
@@ -27,7 +63,7 @@ const NO_TASK = apiError('The task does not exist or is not visible to the calle
 const TOP_LEVEL_ONLY = ' Only a top-level task is found here: a subtask answers 404 and is read through `subtasks` of its parent.';
 
 export function tasksPaths() {
-  return withCaseReasons('tasks', CASE_REASONS, {
+  return withInputRefusal(withCaseReasons('tasks', CASE_REASONS, {
     '/api/v1/tasks': {
       // Die Filter stehen als echte Parameter da, nicht nur im Fließtext: ein
       // generierter Client und die MCP-Brücke (get_api_operation) lesen die
@@ -41,11 +77,11 @@ export function tasksPaths() {
         description: 'Several tags narrow the result: a task must carry all of them. Tag matching ignores case, including non-ASCII letters. Archived tasks are omitted unless asked for. ' + TASK_DOCUMENTS_NOTE
           + ' A rotating task (`rotation_mode: "round_robin"`, fixed order only, #1763) additionally carries `rotation_pool` (member ids in delivery order, `null` when the task does not rotate), `rotation_last_user` (informational - which member the pointer names), `rotation_last_position` (the pointer: the pool position of the last recipient; the order reads the position, never the head, so a member leaving the pool does not restart the series) and `rotation_next_user` - the member the next occurrence would go to, resolved by the same rule that hands out the next instance (pointer plus one in pool order, over the gaps of departed members and the slots of deactivated ones), `null` when rotation is off or fewer than two members are active.',
         params: [
-          { name: 'status',      in: 'query', required: false, schema: { type: 'string', enum: ['open', 'in_progress', 'done', 'archived'] }, description: 'Repeatable; several values are OR-ed. "archived" is not a status but the separate archive axis and behaves like the `archived` parameter.' },
-          { name: 'archived',    in: 'query', required: false, schema: { type: 'string', enum: ['1', 'only'] }, description: 'Archived tasks are hidden by default. `1` includes them, `only` returns just the archive. A task keeps its own status while archived.' },
-          { name: 'priority',    in: 'query', required: false, schema: { type: 'string', enum: ['none', 'low', 'medium', 'high', 'urgent'] } },
-          { name: 'assigned_to', in: 'query', required: false, schema: { type: 'integer' }, description: 'Family member ID.' },
-          { name: 'category',    in: 'query', required: false, schema: { type: 'string' }, description: 'Task category key.' },
+          repeatable('status', { type: 'string' }, 'Repeatable; several values are OR-ed. `open`, `in_progress`, `done`; "archived" is not a status but the separate archive axis and behaves like the `archived` parameter. An unknown value matches no task.'),
+          { name: 'archived',    in: 'query', required: false, schema: { type: 'string' }, description: 'Archived tasks are hidden by default. `1` (or `true`) includes them, `only` returns just the archive; any other value is the default. A task keeps its own status while archived.' },
+          repeatable('priority', { type: 'string' }, 'Repeatable; several values are OR-ed. `none`, `low`, `medium`, `high`, `urgent`; an unknown value matches no task.'),
+          repeatable('assigned_to', { type: 'integer', minimum: 1 }, 'Family member ID. Repeatable; several values are OR-ed.'),
+          repeatable('category', { type: 'string' }, 'Task category key. Repeatable; several values are OR-ed.'),
           {
             name: 'tag',
             in: 'query',
@@ -72,36 +108,49 @@ export function tasksPaths() {
       get: op({
         summary: 'List completed tasks, newest first',
         tag: 'Tasks',
+        responses: answers(200, 'Successful response'),
         description: 'The household history of who completed which task, and when (#791). Each entry carries both people: `user_id` is who ticked it off and `done_by_user_id` is who was named as having done it (#1205, null when nobody was), with `person_user_id` resolving the two into the one the entry displays. `source` is `null` for a completion in Yuvomi and `"caldav"` for one taken over by the inbound CalDAV sync when the task was ticked off in a reminders app (#1836); such an entry carries no person, since the sync cannot tell who ticked it off, and its time is the COMPLETED stamp of the reminder where it has one. Recording started with the release that introduced it, so nothing before that appears. Timestamps are UTC instants; which calendar day one belongs to is a question for the display timezone, which is why there is no date range here. Only tasks the caller may see are returned, evaluated live against the task - a task later set to private disappears from the history too; a paired display gets only tasks with visibility `all` (the wall rule), even one that names it as an assignee. Subtasks are never recorded: a checklist item is part of its parent instruction, and the completion of the parent is the event.',
         params: [
           { name: 'limit',     in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 } },
-          { name: 'user_id',   in: 'query', required: false, schema: { type: 'integer' }, description: 'Only completions attributed to this member. That is whoever was named as having done the task (#1205), and the person who ticked it off where nobody was named - the same person the entry displays, so filtering and display cannot disagree.' },
+          { name: 'user_id',   in: 'query', required: false, schema: { type: 'integer', minimum: 1 }, description: 'Only completions attributed to this member. That is whoever was named as having done the task (#1205), and the person who ticked it off where nobody was named - the same person the entry displays, so filtering and display cannot disagree.' },
           { name: 'before_at', in: 'query', required: false, schema: { type: 'string' }, description: 'Cursor, taken from `next_cursor` of the previous page. Paired with before_id because several completions can share a second.' },
           { name: 'before_id', in: 'query', required: false, schema: { type: 'integer' }, description: 'Cursor, taken from `next_cursor` of the previous page.' },
         ],
       }),
     },
     '/api/v1/tasks/points/affected': {
-      get: op({ summary: 'Count unfinished tasks on a given point value', tag: 'Tasks', description: 'Admin only. Preview for the default-points rebase: top-level tasks that are not done and whose points equal the query value.' }),
+      get: op({
+        summary: 'Count unfinished tasks on a given point value',
+        tag: 'Tasks',
+        description: 'Admin only, refused before the query is checked. Preview for the default-points rebase: top-level tasks that are not done and whose points equal the query value.',
+        params: [{ name: 'points', in: 'query', required: true, schema: { type: 'integer', minimum: 0, maximum: TASK_MAX_POINTS }, description: 'The point value to count.' }],
+        responses: answers(200, 'Successful response', { 403: ADMIN_ONLY }),
+      }),
     },
     '/api/v1/tasks/points/rebase': {
-      post: op({ summary: 'Move unfinished tasks from one point value to another', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Admin only. Applies a changed default point value to top-level tasks that still carry the previous default. Tasks in status done keep their value because the reward ledger already holds an earn entry for it.' }),
+      post: op({ summary: 'Move unfinished tasks from one point value to another', tag: 'Tasks', stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskPointsRebaseInput'), responses: answers(200, 'Successful response', { 403: ADMIN_ONLY }), description: 'Admin only, refused before the body is checked. Applies a changed default point value to top-level tasks that still carry the previous default. Tasks in status done keep their value because the reward ledger already holds an earn entry for it.' }),
     },
     '/api/v1/tasks/categories': {
       get: op({ summary: 'List task categories', tag: 'Tasks' }),
-      post: op({ summary: 'Create task category', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({ summary: 'Create task category', tag: 'Tasks', stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskCategoryNameInput'), responses: answers(201, 'Category created', { 409: apiError('A category with this name already exists (reason `category_exists`).') }) }),
     },
     '/api/v1/tasks/categories/reorder': {
-      patch: op({ summary: 'Reorder task categories', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({ summary: 'Reorder task categories', tag: 'Tasks', stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskCategoryReorderInput'), responses: answers(200, 'The categories in their new order') }),
     },
     '/api/v1/tasks/categories/{key}': {
-      put: op({ summary: 'Rename task category', tag: 'Tasks', params: [stringPathParam('key', 'Category key')], stateChanging: true, requestBody: jsonBody(null) }),
-      delete: op({ summary: 'Delete task category', tag: 'Tasks', params: [stringPathParam('key', 'Category key')], stateChanging: true }),
+      put: op({ summary: 'Rename task category', tag: 'Tasks', params: [stringPathParam('key', 'Category key')], stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskCategoryNameInput'), responses: answers(200, 'Category renamed', { 404: NO_CATEGORY, 409: apiError('A category with this name already exists (reason `category_exists`).') }) }),
+      delete: op({ summary: 'Delete task category', tag: 'Tasks', params: [stringPathParam('key', 'Category key')], stateChanging: true, responses: answers(204, NO_CONTENT.description, { 404: NO_CATEGORY, 409: apiError('Tasks still use the category (reason `category_in_use`, with `count`), or it is the last one (reason `category_last`).') }) }),
     },
     '/api/v1/tasks/sync-targets': {
       get: op({
         summary: 'List selectable CalDAV reminder lists for the task editor',
         tag: 'Tasks',
+        responses: {
+          200: { description: 'Successful response' },
+          401: UNAUTHORIZED,
+          403: apiError('No write access to tasks (reason `cross_module_access`).'),
+          500: SERVER_ERROR,
+        },
         description: 'Available to every authenticated user (#695). Returns `{ data: { caldav: [{ accountId, accountName, listUrl, listName }] } }`, restricted to reminder lists the household has enabled **for tasks** - a list pointing at shopping is omitted, because a task sent there would come back as a shopping item - and that take new entries (#1840: a list shared read-only is omitted; one whose server does not report privileges stays). POST/PUT /tasks refuse a read-only list as a new `sync_target` with 400; a task whose stored target became read-only later keeps it and waits locally. Carries no credentials or server URLs; account management stays admin-only. The identifier for `sync_target` on POST/PUT /tasks is `caldav:<accountId>|<listUrl>`.',
       }),
     },
@@ -109,20 +158,20 @@ export function tasksPaths() {
       get: op({ summary: 'List task tags', tag: 'Tasks', description: 'Every visible tag in use with its task count. Tags are free-form and have no registry: the list follows from the tasks themselves. Mirrored from VTODO CATEGORIES on CalDAV task lists, and distinct from the single category a task carries. Tags on tasks the caller cannot see are omitted, counts included; a paired display sees only tasks with visibility `all` (the wall rule), even one that names it as an assignee.' }),
     },
     '/api/v1/tasks/tags/apply': {
-      post: op({ summary: 'Add or remove tags on several tasks', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { ids, add?, remove? }. Applies to the tasks in `ids` the caller can see; the others are skipped silently. Locked tasks the caller may not edit are skipped as well and counted in `skipped`, so a partial run is visible rather than silent. Returns the number of tasks actually changed and the refreshed tag list.' }),
+      post: op({ summary: 'Add or remove tags on several tasks', tag: 'Tasks', stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskTagsApplyInput'), responses: answers(200, 'Successful response'), description: `Body: { ids, add?, remove? } with at most ${MAX_BULK_TASKS} task IDs. Applies to the tasks in \`ids\` the caller can see; the others are skipped silently. Locked tasks the caller may not edit are skipped as well and counted in \`skipped\`, so a partial run is visible rather than silent. Returns the number of tasks actually changed and the refreshed tag list.` }),
     },
     '/api/v1/tasks/archive': {
-      post: op({ summary: 'Archive several tasks', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { ids } with at most 500 task IDs. Archives the listed tasks in one transaction under the same rules as PATCH /tasks/{id}/archive, checked per ID: tasks the caller cannot see are skipped silently and not counted, locked tasks the caller may not change (a subtask inherits the lock of its parent) are skipped and counted in `skipped`. A task that is already archived keeps its original `archived_at`. The status of each task is left untouched. Returns `{ data: { archived, skipped } }`, where `archived` counts the tasks this call actually archived. Send the IDs you show rather than every done task, so that nothing completed elsewhere since is archived unseen.' }),
+      post: op({ summary: 'Archive several tasks', tag: 'Tasks', stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskArchiveManyInput'), responses: answers(200, 'Successful response'), description: `Body: { ids } with at most ${MAX_BULK_TASKS} task IDs. Archives the listed tasks in one transaction under the same rules as PATCH /tasks/{id}/archive, checked per ID: tasks the caller cannot see are skipped silently and not counted, locked tasks the caller may not change (a subtask inherits the lock of its parent) are skipped and counted in \`skipped\`. A task that is already archived keeps its original \`archived_at\`. The status of each task is left untouched. Returns \`{ data: { archived, skipped } }\`, where \`archived\` counts the tasks this call actually archived. Send the IDs you show rather than every done task, so that nothing completed elsewhere since is archived unseen.` }),
     },
     '/api/v1/tasks/reorder': {
-      patch: op({ summary: 'Set the manual order of tasks within a category', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { order } with at most 500 task IDs (integers) in the wanted order. The list may be a subset of a category (an active filter, tasks the caller cannot see): the ranks the listed tasks already hold are sorted and dealt out again in the new order, tasks without a rank get new ranks behind the highest one in use, and every task not listed keeps its rank, so nothing collides. Tasks without a rank (`sort_order: null`) sort after ranked ones. `GET /tasks` does not apply the order: it returns the default order (status, priority, due date) and carries `sort_order` on each task, so a client that wants the hand order within a category sorts by `sort_order` itself, ranked tasks first, ties by the default order. A task keeps its rank when it recurs (the follow-up inherits it) and loses it when its category changes. Only top-level tasks the caller can see; an unknown, invisible or subtask ID answers 404 and nothing is changed, an empty, non-integer (strings and booleans included) or duplicated list answers 400. Reordering changes no content, so a locked task can be reordered. Returns `{ data: [{ id, sort_order }] }`.' }),
+      patch: op({ summary: 'Set the manual order of tasks within a category', tag: 'Tasks', stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskReorderInput'), responses: answers(200, 'Successful response', { 403: REORDER_REFUSED, 404: NO_TASK }), description: `Body: { order } with at most ${MAX_BULK_TASKS} task IDs (integers) in the wanted order. The list may be a subset of a category (an active filter, tasks the caller cannot see): the ranks the listed tasks already hold are sorted and dealt out again in the new order, tasks without a rank get new ranks behind the highest one in use, and every task not listed keeps its rank, so nothing collides. Tasks without a rank (\`sort_order: null\`) sort after ranked ones. \`GET /tasks\` does not apply the order: it returns the default order (status, priority, due date) and carries \`sort_order\` on each task, so a client that wants the hand order within a category sorts by \`sort_order\` itself, ranked tasks first, ties by the default order. A task keeps its rank when it recurs (the follow-up inherits it) and loses it when its category changes. Only top-level tasks the caller can see; an unknown, invisible or subtask ID answers 404 and nothing is changed, an empty, non-integer (strings and booleans included) or duplicated list answers 400. Reordering changes no content, so a locked task can be reordered. Returns \`{ data: [{ id, sort_order }] }\`.` }),
     },
     '/api/v1/tasks/reorder/reset': {
-      post: op({ summary: 'Return tasks to the automatic order', tag: 'Tasks', stateChanging: true, requestBody: jsonBody(null), description: 'Body: { ids } with at most 500 task IDs. Clears the rank (`sort_order` becomes null) of the listed tasks, so a client sorting by `sort_order` falls back to the default order for them. Same rules as PATCH /tasks/reorder: only top-level tasks the caller can see (404 otherwise, nothing changed), locked tasks included. Returns `{ data: [{ id, sort_order: null }] }`.' }),
+      post: op({ summary: 'Return tasks to the automatic order', tag: 'Tasks', stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskReorderResetInput'), responses: answers(200, 'Successful response', { 403: REORDER_REFUSED, 404: NO_TASK }), description: `Body: { ids } with at most ${MAX_BULK_TASKS} task IDs. Clears the rank (\`sort_order\` becomes null) of the listed tasks, so a client sorting by \`sort_order\` falls back to the default order for them. Same rules as PATCH /tasks/reorder: only top-level tasks the caller can see (404 otherwise, nothing changed), locked tasks included. Returns \`{ data: [{ id, sort_order: null }] }\`.` }),
     },
     '/api/v1/tasks/tags/{tag}': {
-      put: op({ summary: 'Rename a task tag', tag: 'Tasks', params: [stringPathParam('tag', 'Tag name')], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name }. Renames the tag on every task the caller can see. Renaming onto an existing tag merges the two. Tasks the caller cannot see keep the old tag, and so do locked tasks the caller may not edit - those are counted in `skipped`.' }),
-      delete: op({ summary: 'Remove a task tag everywhere', tag: 'Tasks', params: [stringPathParam('tag', 'Tag name')], stateChanging: true, description: 'Detaches the tag from every task the caller can see. The tasks themselves stay. Locked tasks the caller may not edit keep the tag and are counted in `skipped`. Unlike categories there is no in-use guard: a tag is nothing but its uses.' }),
+      put: op({ summary: 'Rename a task tag', tag: 'Tasks', params: [stringPathParam('tag', 'Tag name')], stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskTagRenameInput'), responses: answers(200, 'Successful response', { 404: NO_TAG }), description: 'Body: { name }. Renames the tag on every task the caller can see. Renaming onto an existing tag merges the two. Tasks the caller cannot see keep the old tag, and so do locked tasks the caller may not edit - those are counted in `skipped`.' }),
+      delete: op({ summary: 'Remove a task tag everywhere', tag: 'Tasks', params: [stringPathParam('tag', 'Tag name')], stateChanging: true, responses: answers(200, 'Successful response', { 404: NO_TAG }), description: 'Detaches the tag from every task the caller can see. The tasks themselves stay. Locked tasks the caller may not edit keep the tag and are counted in `skipped`. Unlike categories there is no in-use guard: a tag is nothing but its uses.' }),
     },
     '/api/v1/tasks/{id}': {
       get: op({ summary: 'Get task', operationId: 'getTask', tag: 'Tasks', params: [idParam()], responses: typedResponses(200, 'Task with full subtasks and documents', 'TaskDetailResponse', { 404: NO_TASK }), description: TASK_DOCUMENTS_NOTE + TOP_LEVEL_ONLY }),
@@ -133,7 +182,7 @@ export function tasksPaths() {
       patch: op({ summary: 'Update task status', operationId: 'updateTaskStatus', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskStatusInput'), responses: typedResponses(200, 'Status changed', 'TaskStatusResponse', { 400: BAD_REQUEST, 403: { $ref: '#/components/responses/Forbidden' }, 404: NO_TASK, 409: FOREIGN_SERIES_CONFLICT }), description: 'Body: { status, done_by_user_id? }. Sending `archived` files the task away without touching its status - use PATCH /archive instead. Deliberately open on a locked task: ticking one off is the interaction the lock exists to preserve. `done_by_user_id` names who actually did the task (#1205), which is not necessarily the caller - on a shared tablet it rarely is. It has to be a household member (400 otherwise), it only applies to the transition into `done` and is ignored on any other status change, and it decides where the points go: a named member who takes part in rewards receives them instead of the assignees, a named member who does not take part means no points at all rather than crediting someone who did not do it. Omit it and nothing changes: the history shows the caller and the assignees rule applies. The naming is as idempotent as the completion itself - correcting it means reopening the task and ticking it off again. A paired wall display reaches this route too, and only this one of the writing routes (#1209): for it the field is required rather than optional, only the transition into `done` is allowed, and the task has to be visible to the whole household, which answers 404 rather than 403 so an invisible task is not confirmed to exist. Returns `{ data: { id, status, archived_at, next_due_date } }`. `next_due_date` (YYYY-MM-DD) is the due date of the next occurrence still pending - not done and not archived, so one that is `in_progress` counts - when this call completed a recurring task, and `null` in every other case: a task without recurrence, a series that has ended, a status change that is not a transition into `done`, and the `archived` shortcut, which omits the field.' }),
     },
     '/api/v1/tasks/{id}/archive': {
-      patch: op({ summary: 'Archive or restore a task', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Archives the task by default. Send `{ "archived": false }` to bring it back. The status is left untouched: a task that was done stays done, and no reward booking changes. Filing a task removes it from everyone\'s view, so on a locked task this is the creator and administrators only.' }),
+      patch: op({ summary: 'Archive or restore a task', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: { ...jsonBody('#/components/schemas/TaskArchiveInput'), required: false }, responses: answers(200, 'Successful response', { 403: LOCKED, 404: NO_TASK }), description: 'Archives the task by default. Send `{ "archived": false }` to bring it back. The status is left untouched: a task that was done stays done, and no reward booking changes. Filing a task removes it from everyone\'s view, so on a locked task this is the creator and administrators only.' }),
     },
     '/api/v1/tasks/{id}/check': {
       patch: op({
@@ -158,25 +207,43 @@ export function tasksPaths() {
     },
     '/api/v1/tasks/{id}/documents': {
       get: op({ summary: 'List documents linked to a task', tag: 'Tasks', params: [idParam()], description: 'Returns family documents linked to the task that are visible to the current user. Needs access to the Documents module (for API tokens a `documents:read` scope): without it the answer is 403, after the task itself was found (an invisible task stays 404). A paired display sees only tasks with visibility `all` (the wall rule), even one that names it as an assignee: any other task answers 404 like an unknown id.', responses: { 200: { description: 'Successful response' }, 401: { $ref: '#/components/responses/Unauthorized' }, 403: { description: 'No access to the Documents module.' }, 404: { description: 'Task not found.' }, 500: { $ref: '#/components/responses/InternalServerError' } } }),
-      put: op({ summary: 'Set documents linked to a task', tag: 'Tasks', params: [idParam()], stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody(null), description: `Replace-set of document_ids; only documents visible to the user are linked. Attachments are part of the task definition, so a locked task answers 403 for anyone but its creator and administrators. ${DOCUMENT_LINK_REFUSAL} Without that access the response \`data\` is \`null\`.` }),
+      put: op({ summary: 'Set documents linked to a task', tag: 'Tasks', params: [idParam()], stateChanging: true, documentDeleteConflict: true, documentLinkRefusal: true, requestBody: jsonBody('#/components/schemas/TaskDocumentsInput'), responses: answers(200, 'Successful response', { 404: NO_TASK }), description: `Replace-set of document_ids; only documents visible to the user are linked. \`document_ids\` is required; \`[]\` removes every visible link. Attachments are part of the task definition, so a locked task answers 403 for anyone but its creator and administrators. ${DOCUMENT_LINK_REFUSAL} Without that access the response \`data\` is \`null\`.` }),
     },
     '/api/v1/tasks/{id}/completions': {
       get: op({
         summary: 'List completions of this task and its repetition chain',
         tag: 'Tasks',
         params: [idParam(), { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } }],
+        responses: answers(200, 'Successful response', { 404: NO_TASK }),
         description: 'Answers "when was this last done" for a recurring task (#791). A completed repeating task spawns a follow-up instance, so its history is spread across a chain of rows; this walks the chain to its root and returns the whole series, newest first. A task the caller cannot see answers 404; a paired display sees only tasks with visibility `all` (the wall rule), even one that names it as an assignee.',
       }),
     },
     '/api/v1/tasks/{id}/comments': {
-      get: op({ summary: 'List comments on a task', tag: 'Tasks', params: [idParam()], description: 'Oldest first. Anyone who may see the task may read its comments; a task the caller cannot see answers 404. A paired display sees only tasks with visibility `all` (the wall rule), even one that names it as an assignee.' }),
-      post: op({ summary: 'Comment on a task', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { comment }. `@Name` mentions are read from the text and push-notify the mentioned members that may see the task.' }),
+      get: op({ summary: 'List comments on a task', tag: 'Tasks', params: [idParam()], responses: answers(200, 'Successful response', { 404: NO_TASK }), description: 'Oldest first. Anyone who may see the task may read its comments; a task the caller cannot see answers 404. A paired display sees only tasks with visibility `all` (the wall rule), even one that names it as an assignee.' }),
+      post: op({ summary: 'Comment on a task', tag: 'Tasks', params: [idParam()], stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskCommentInput'), responses: answers(201, 'Comment created', { 404: NO_TASK }), description: 'Body: { comment }. `@Name` mentions are read from the text and push-notify the mentioned members that may see the task.' }),
     },
     '/api/v1/tasks/{id}/comments/{commentId}': {
-      patch: op({ summary: 'Edit a comment', tag: 'Tasks', params: [idParam(), idParam('commentId', 'Comment ID')], stateChanging: true, requestBody: jsonBody(null), description: 'Body: { comment }. The author only; sets updated_at.' }),
-      delete: op({ summary: 'Delete a comment', tag: 'Tasks', params: [idParam(), idParam('commentId', 'Comment ID')], stateChanging: true, description: 'The author, or an admin moderating.' }),
+      patch: op({ summary: 'Edit a comment', tag: 'Tasks', params: [idParam(), idParam('commentId', 'Comment ID')], stateChanging: true, requestBody: jsonBody('#/components/schemas/TaskCommentInput'), responses: answers(200, 'Successful response', { 403: NOT_THE_AUTHOR, 404: NO_COMMENT }), description: 'Body: { comment }. The author only; sets updated_at.' }),
+      delete: op({ summary: 'Delete a comment', tag: 'Tasks', params: [idParam(), idParam('commentId', 'Comment ID')], stateChanging: true, responses: answers(200, 'Successful response', { 403: NOT_THE_AUTHOR, 404: NO_COMMENT }), description: 'The author, or an admin moderating.' }),
     },
-  });
+  }));
+}
+
+/**
+ * Every task operation with a path parameter, a query or a body answers the
+ * 400 of validateRequest() (#2810, group 11a): a value outside its schema,
+ * `reason: 'validation'` with `fields`. The headers do not count, they are not
+ * checked.
+ * @param {Record<string, Record<string, any>>} paths
+ */
+function withInputRefusal(paths) {
+  for (const item of Object.values(paths)) {
+    for (const operation of Object.values(item)) {
+      const input = (operation.parameters ?? []).some((/** @type {any} */ p) => p.in !== 'header') || operation.requestBody;
+      if (input) withValidationRefusal(operation);
+    }
+  }
+  return paths;
 }
 
 // #1909: die Faelle, die ein Nutzer erreicht, tragen einen `reason` neben dem

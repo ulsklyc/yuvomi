@@ -127,7 +127,8 @@
         "transferUndone": "Van de boodschappenlijst verwijderd.",
         "transferSkipped": "{{count}} stonden er al op.",
         "transferSkipped_one": "{{count}} stond er al op.",
-        "transferAllPresent": "Alle ingrediënten staan al op de lijst."
+        "transferAllPresent": "Alle ingrediënten staan al op de lijst.",
+        "errorTransferTooLarge": "Dat zijn te veel ingrediënten tegelijk. Er kunnen er hoogstens {{limit}} samen worden overgezet en ongedaan gemaakt."
     },
     "nav": {
         "dashboard": "Overzicht",
@@ -1272,7 +1273,8 @@
         "localCalendarEdit": "Agenda bewerken",
         "localCalendarNew": "Nieuwe agenda",
         "manageSubscriptionsLink": "Abonnementen en synchronisatie",
-        "cancelled": "Geannuleerd"
+        "cancelled": "Geannuleerd",
+        "errorSeriesChanged": "De reeks is zojuist elders gewijzigd. Sla opnieuw op."
     },
     "noteCategories": {
         "categories": "Categorieën",
@@ -3638,7 +3640,8 @@
         "remoteErrorAuthFailed": "De server heeft de aanmelding geweigerd. Controleer gebruikersnaam en wachtwoord.",
         "remoteErrorStatus": "De server antwoordde met status {{status}}.",
         "remoteErrorUnreachable": "De server is niet bereikbaar. Controleer het adres en of de server draait.",
-        "remoteErrorFailed": "Het verzoek aan de server is mislukt."
+        "remoteErrorFailed": "Het verzoek aan de server is mislukt.",
+        "caldavErrorAccountChanged": "Het account is zojuist elders gewijzigd. Sla opnieuw op."
     },
     "login": {
         "tagline": "Welkom terug. Je huishouden op één plek.",

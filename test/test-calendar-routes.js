@@ -43,11 +43,10 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 import { readFileSync } from 'node:fs';
 
 const dbmod = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const {
   calendarOccurrenceDeleteTarget,
   calendarOccurrenceMutationTarget,
@@ -88,22 +87,25 @@ db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALU
 
 // ── App mit injizierter Auth (actor zur Request-Zeit gelesen) ────────────────────
 let actor = ADMIN;
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
-  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
-  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
-  // Modulrechte und Token-Scope fuer die Dokumentenrecht-Faelle (#1358).
-  req.sessionModuleAccess = actor.moduleAccess ?? null;
-  req.authScopes = actor.authScopes ?? null;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  jsonLimit: '10mb',
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+    // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+    req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
+    // Modulrechte und Token-Scope fuer die Dokumentenrecht-Faelle (#1358).
+    req.sessionModuleAccess = actor.moduleAccess ?? null;
+    req.authScopes = actor.authScopes ?? null;
+    next();
+  },
 });
-app.use(express.json({ limit: '10mb' }));
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
 
 test.after(() => server.close());
 
@@ -161,7 +163,9 @@ const titles = (rows) => rows.map((e) => e.title);
 test('GET / — 400 bei ungültigem from/to', async () => {
   const res = await call('GET', '/?from=2035-3-1&to=xxxx');
   assert.equal(res.status, 400);
-  assert.match(res.body.error, /YYYY-MM-DD/);
+  // Seit #2810 die 400 des Schemas (`format: date`), mit dem Feld statt Satz.
+  assert.equal(res.body.reason, 'validation');
+  assert.equal(res.body.fields[0].path, 'query/from');
 });
 
 test('GET / — liefert Termine im Fenster (all-sichtbar)', async () => {
@@ -533,8 +537,8 @@ test('Sync-Routen: Nicht-Admin erhält 403 (requireAdmin-Gate)', async () => {
 // ════════════════════════════════════════════════════════════════════════════════
 
 test('PATCH /external-calendars — Validierung + 404 (nicht synchronisiert)', async () => {
-  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'x', external_id: 'a' } })).status, 400);
-  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: '' } })).status, 400);
+  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'x', external_id: 'a', default_assignee_user_ids: [] } })).status, 400);
+  assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: '', default_assignee_user_ids: [] } })).status, 400);
   assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'c1', default_assignee_user_id: 'abc' } })).status, 400);
   assert.equal((await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'c1', default_assignee_user_id: 999 } })).status, 400);
   const notSynced = await call('PATCH', '/external-calendars', { body: { source: 'google', external_id: 'never-synced', default_assignee_user_id: 2 } });
@@ -1420,7 +1424,7 @@ test('PATCH /subscriptions/:id — 400/404/403/Happy', async () => {
   assert.equal((await call('PATCH', `/subscriptions/${subId}`, { body: { name: '' } })).status, 400);
   assert.equal((await call('PATCH', `/subscriptions/${subId}`, { body: { color: 'nope' } })).status, 400);
   // Maria (Owner, non-admin) darf eigenen Sub ändern
-  const ok = await call('PATCH', `/subscriptions/${subId}`, { actor: MARIA, body: { name: 'Renamed', shared: 1 } });
+  const ok = await call('PATCH', `/subscriptions/${subId}`, { actor: MARIA, body: { name: 'Renamed', shared: true } });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.data.name, 'Renamed');
   // Tom (non-admin, fremd) -> 403
@@ -1968,6 +1972,1150 @@ test('PUT /:id — partielles Update lässt andere Felder unberührt', async () 
   assert.equal(res.body.data.color, '#111111', 'Farbe unverändert');
 });
 
+// LESEN, AWAIT, SCHREIBEN (#2940). Ein PUT mit neuem Anhang wartet auf den
+// Upload; was die Anfrage nicht mitschickt, gilt danach so, wie die Zeile beim
+// Schreiben steht - nicht so, wie sie vor dem Upload geladen wurde. Die Naht
+// ist der Drive-Client: sein `files.create` haelt, bis der Test ihn loslaesst,
+// dazwischen laeuft die zweite Anfrage. Keine Wartezeit als Taktgeber.
+/**
+ * Jeder weitere Upload bekommt eine eigene Datei-ID (`<fileId>-2`, ...). Mit
+ * `holdDeletes` haelt auch `files.delete`, bis der Test `releaseDeletes` ruft
+ * (#2956: die Antwort nach dem Aufraeumen). Mit `eachUpload` laeuft statt des
+ * Tors dieser Haken in jedem Upload, mit der laufenden Nummer; `onGet` laeuft
+ * bei jedem `files.get` mit der Datei-ID und darf werfen.
+ * @param {string} fileId
+ * @param {(held: { started: Promise<unknown>, release: () => void, deleted: string[], deleteStarted: Promise<unknown>, releaseDeletes: () => void }) => Promise<void>} probe
+ * @param {{ holdDeletes?: boolean, eachUpload?: (n: number) => unknown, onGet?: (fileId: string) => unknown }} [options]
+ */
+async function withHeldDriveUpload(fileId, probe, { holdDeletes = false, eachUpload, onGet } = {}) {
+  const driveStorage = await import('../server/services/google-drive-storage.js');
+  const configKeys = [
+    'document_storage_selected_backend',
+    'document_storage_google_drive_refresh_token',
+    'document_storage_google_drive_folder_id',
+  ];
+  const previousConfig = new Map(configKeys.map((key) => [
+    key,
+    db.prepare('SELECT value FROM sync_config WHERE key = ?').get(key)?.value,
+  ]));
+  /** @type {Array<[string, string | undefined]>} */
+  const previousEnv = [
+    ['DOCUMENT_STORAGE_LOCAL_ENABLED', process.env.DOCUMENT_STORAGE_LOCAL_ENABLED],
+    ['GOOGLE_DRIVE_CLIENT_ID', process.env.GOOGLE_DRIVE_CLIENT_ID],
+    ['GOOGLE_DRIVE_CLIENT_SECRET', process.env.GOOGLE_DRIVE_CLIENT_SECRET],
+    ['GOOGLE_DRIVE_REDIRECT_URI', process.env.GOOGLE_DRIVE_REDIRECT_URI],
+  ];
+  let uploadStarted = () => {};
+  const started = new Promise((resolve) => { uploadStarted = () => resolve(undefined); });
+  let release = () => {};
+  const gate = new Promise((resolve) => { release = () => resolve(undefined); });
+  let deleteBegan = () => {};
+  const deleteStarted = new Promise((resolve) => { deleteBegan = () => resolve(undefined); });
+  let releaseDeletes = () => {};
+  const deleteGate = holdDeletes
+    ? new Promise((resolve) => { releaseDeletes = () => resolve(undefined); })
+    : Promise.resolve();
+  let uploads = 0;
+  /** @type {string[]} */
+  const deleted = [];
+  try {
+    process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'false';
+    process.env.GOOGLE_DRIVE_CLIENT_ID = 'held-drive-client';
+    process.env.GOOGLE_DRIVE_CLIENT_SECRET = 'held-drive-secret';
+    process.env.GOOGLE_DRIVE_REDIRECT_URI = 'https://example.test/drive-callback';
+    db.exec(`
+      INSERT OR REPLACE INTO sync_config (key, value)
+      VALUES
+        ('document_storage_selected_backend', 'google_drive'),
+        ('document_storage_google_drive_refresh_token', 'held-refresh'),
+        ('document_storage_google_drive_folder_id', 'held-folder');
+    `);
+    driveStorage.__setGoogleApiFactoryForTests({
+      createOAuth2: () => ({ setCredentials() {}, on() {} }),
+      createDrive: () => ({
+        files: {
+          get: async (/** @type {{ fileId: string }} */ { fileId: id }) => {
+            // Lesen einer Datei (#2956): der Haken darf werfen, wie Drive es tut.
+            if (onGet) await onGet(id);
+            return { data: { id, name: 'Documents', mimeType: 'application/vnd.google-apps.folder', trashed: false } };
+          },
+          create: async () => {
+            uploads += 1;
+            const id = uploads === 1 ? fileId : `${fileId}-${uploads}`;
+            uploadStarted();
+            // Waehrend JEDES Uploads (#2956): der Test aendert den Stand, dann
+            // laeuft dieser Upload weiter. Ohne den Haken haelt das Tor.
+            if (eachUpload) await eachUpload(uploads);
+            else await gate;
+            return { data: { id } };
+          },
+          delete: async (/** @type {{ fileId: string }} */ { fileId: id }) => {
+            deleteBegan();
+            await deleteGate;
+            deleted.push(id);
+            return { data: {} };
+          },
+        },
+      }),
+    });
+    await probe({ started, release, deleted, deleteStarted, releaseDeletes });
+  } finally {
+    release();
+    releaseDeletes();
+    driveStorage.__setGoogleApiFactoryForTests();
+    db.prepare(`DELETE FROM sync_config WHERE key IN (${configKeys.map(() => '?').join(', ')})`).run(...configKeys);
+    for (const [key, value] of previousConfig) {
+      if (value !== undefined) db.prepare('INSERT INTO sync_config (key, value) VALUES (?, ?)').run(key, value);
+    }
+    for (const [name, value] of previousEnv) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
+test('PUT /:id - a change made during the attachment upload stays (#2940)', async () => {
+  const id = insertEvent({
+    title: 'PUT-UPLOAD-RACE', start_datetime: '2041-02-03T09:00',
+    description: 'alt', location: 'Ort alt', end_datetime: '2041-02-03T10:00',
+  });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('neuer Anhang').toString('base64')}`;
+  await withHeldDriveUpload('drive-2940-stays', async ({ started, release }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: { attachment_data: dataUrl, attachment_name: 'neu.txt' } }));
+    await started;
+    const second = await call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      description: 'neu', location: 'Ort neu', end_datetime: '2041-02-03T11:00', countdown: true,
+    } }));
+    assert.equal(second.status, 200);
+    release();
+    const replaced = await first;
+    assert.equal(replaced.status, 200);
+  });
+  const row = db.prepare('SELECT description, location, end_datetime, countdown, attachment_name FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.attachment_name, 'neu.txt', 'der Anhang der ersten Anfrage ist da');
+  assert.equal(row.description, 'neu', 'die Beschreibung der zweiten Anfrage bleibt');
+  assert.equal(row.location, 'Ort neu', 'der Ort der zweiten Anfrage bleibt');
+  assert.equal(row.end_datetime, '2041-02-03T11:00', 'das Ende der zweiten Anfrage bleibt');
+  assert.equal(row.countdown, 1, 'der Countdown der zweiten Anfrage bleibt');
+});
+
+test('PUT /:id - an event deleted during the attachment upload answers 404 (#2940)', async () => {
+  const id = insertEvent({ title: 'PUT-UPLOAD-GONE', start_datetime: '2041-02-04T09:00' });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('verwaist').toString('base64')}`;
+  /** @type {any} */
+  let gone;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-gone', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      attachment_data: dataUrl, attachment_name: 'weg.txt', assigned_to: [MARIA.id],
+    } }));
+    await started;
+    assert.equal((await call('DELETE', `/${id}`)).status, 204);
+    release();
+    gone = await first;
+    uploadsDeleted = deleted;
+  });
+  assert.equal(gone.status, 404);
+  assert.deepEqual(gone.body, { error: 'Event not found.', code: 404, reason: 'calendar_event_not_found' });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE id = ?').get(id).n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM event_assignments WHERE event_id = ?').get(id).n, 0,
+    'keine Zuweisung fuer einen Termin, den es nicht mehr gibt');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = 'drive-2940-gone'").get().n, 0,
+    'kein Dokument fuer den verworfenen Anhang');
+  assert.deepEqual(uploadsDeleted, ['drive-2940-gone'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+test('PUT /:id - the series limits are checked against the row the upload save finds (#2940)', async () => {
+  const id = insertEvent({
+    title: 'PUT-UPLOAD-SERIES', start_datetime: '2041-03-01T09:00', recurrence_rule: 'FREQ=DAILY',
+  });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('serie').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-series', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      start_datetime: '2041-03-10T09:00', attachment_data: dataUrl, attachment_name: 'serie.txt',
+    } }));
+    await started;
+    const rule = await call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=DAILY;UNTIL=20410305',
+    } }));
+    assert.equal(rule.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  // Dieselbe Absage wie ohne Upload gegen denselben Stand.
+  const direct = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { start_datetime: '2041-03-10T09:00' } }));
+  assert.equal(direct.status, 400);
+  assert.equal(refused.status, 400, 'der Start nach dem Serienende wird abgewiesen');
+  assert.deepEqual(refused.body, direct.body);
+  const row = db.prepare('SELECT start_datetime, recurrence_rule, attachment_name FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.start_datetime, '2041-03-01T09:00');
+  assert.equal(row.recurrence_rule, 'FREQ=DAILY;UNTIL=20410305');
+  assert.equal(row.attachment_name, null);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = 'drive-2940-series'").get().n, 0);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-series'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+test('PUT /:id - the linked occurrences follow the calendar the upload save finds (#2940)', async () => {
+  const kalenderA = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 A')").run().lastInsertRowid);
+  const kalenderB = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 B')").run().lastInsertRowid);
+  const created = await call('POST', '/', /** @type {any} */ ({ body: {
+    title: 'PUT-UPLOAD-CHILDREN', start_datetime: '2041-04-01T09:00', recurrence_rule: 'FREQ=DAILY',
+    local_calendar_id: kalenderA,
+  } }));
+  assert.equal(created.status, 201);
+  const seriesId = Number(created.body.data.id);
+  const child = await call('PUT', `/${seriesId}/occurrences/2041-04-03`, /** @type {any} */ ({ body: { title: 'Ausnahme 2940' } }));
+  assert.equal(child.status, 200);
+  const childId = Number(child.body.data.id);
+  assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderA);
+  const dataUrl = `data:text/plain;base64,${Buffer.from('kinder').toString('base64')}`;
+  await withHeldDriveUpload('drive-2940-children', async ({ started, release }) => {
+    const first = call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      target_google_calendar_id: null, attachment_data: dataUrl, attachment_name: 'kinder.txt',
+    } }));
+    await started;
+    const moved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: { local_calendar_id: kalenderB } }));
+    assert.equal(moved.status, 200);
+    assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderB);
+    release();
+    assert.equal((await first).status, 200);
+  });
+  const master = db.prepare('SELECT local_calendar_id AS c, attachment_name AS a FROM calendar_events WHERE id = ?').get(seriesId);
+  assert.equal(master.a, 'kinder.txt');
+  assert.equal(master.c, kalenderB, 'die Serie bleibt in B');
+  assert.equal(db.prepare('SELECT local_calendar_id AS c FROM calendar_events WHERE id = ?').get(childId).c, kalenderB,
+    'die Ausnahme bleibt bei der Serie in B');
+});
+
+test('PUT /:id - a local calendar next to a sync target set during the upload is refused (#2940)', async () => {
+  const kalenderB = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2940 exklusiv')").run().lastInsertRowid);
+  const id = insertEvent({ title: 'PUT-UPLOAD-EXCLUSIVE', start_datetime: '2041-05-01T09:00' });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('exklusiv').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-exclusive', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      local_calendar_id: kalenderB, attachment_data: dataUrl, attachment_name: 'exklusiv.txt',
+    } }));
+    await started;
+    const google = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { target_google_calendar_id: 'family@group.calendar.google.com' } }));
+    assert.equal(google.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  const direct = await call('PUT', `/${id}`, /** @type {any} */ ({ body: { local_calendar_id: kalenderB } }));
+  assert.equal(direct.status, 400);
+  assert.equal(refused.status, 400, 'lokaler Kalender neben dem inzwischen gesetzten Google-Ziel');
+  assert.deepEqual(refused.body, direct.body);
+  const row = db.prepare('SELECT target_google_calendar_id AS g, local_calendar_id AS c, attachment_name AS a FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.g, 'family@group.calendar.google.com');
+  assert.notEqual(row.c, kalenderB);
+  assert.equal(row.a, null);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-exclusive'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+test('PUT /:id - an event made private during the upload answers 404 to the other member (#2940)', async () => {
+  const id = insertEvent({ title: 'PUT-UPLOAD-PRIVATE', start_datetime: '2041-05-02T09:00', created_by: TOM.id, visibility: 'all' });
+  // Gegenprobe: Maria darf diesen Termin ohne Wettlauf bearbeiten.
+  assert.equal((await call('PUT', `/${id}`, /** @type {any} */ ({ actor: MARIA, body: { description: 'vorher' } }))).status, 200);
+  const dataUrl = `data:text/plain;base64,${Buffer.from('privat').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2940-private', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ actor: MARIA, body: {
+      description: 'Maria', attachment_data: dataUrl, attachment_name: 'privat.txt',
+    } }));
+    await started;
+    const hidden = await call('PUT', `/${id}`, /** @type {any} */ ({ actor: TOM, body: { visibility: 'private' } }));
+    assert.equal(hidden.status, 200);
+    release();
+    refused = await first;
+    uploadsDeleted = deleted;
+  });
+  assert.equal(refused.status, 404);
+  assert.deepEqual(refused.body, { error: 'Event not found.', code: 404, reason: 'calendar_event_not_found' });
+  const row = db.prepare('SELECT description, visibility, attachment_name FROM calendar_events WHERE id = ?').get(id);
+  assert.equal(row.description, 'vorher');
+  assert.equal(row.visibility, 'private');
+  assert.equal(row.attachment_name, null);
+  assert.deepEqual(uploadsDeleted, ['drive-2940-private'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
+// DER WEG NACH DER KOPIE (#2956). Braucht eine verknuepfte Ausnahme beim
+// Speichern eine eigene Kopie des Anhangs, liest und laedt PUT /:id sie hoch
+// (await) und speichert dann ein zweites Mal. Weg und Kopien gelten fuer die
+// Zeile, die dieses zweite Speichern vorfindet. Die Naht ist wieder der
+// Drive-Client: das Hochladen der Kopie haelt, dazwischen aendert eine zweite
+// Anfrage die Serie.
+/**
+ * Eine Serie mit Anhang ab einem Mittwoch und eine Ausnahme am Freitag, die
+ * den Anhang erbt; die Quelle liegt im lokalen Speicher. `extraDocuments`
+ * legt dort weitere Anhang-Dokumente an (an eigenen Terminen) und gibt ihre IDs.
+ * @param {string} title
+ * @param {number} [extraDocuments]
+ */
+async function seriesWithInheritingOverride(title, extraDocuments = 0) {
+  const previousEnabled = process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  const previousBackend = db.prepare("SELECT value FROM sync_config WHERE key = 'document_storage_selected_backend'").get()?.value;
+  try {
+    process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'false';
+    db.prepare("INSERT OR REPLACE INTO sync_config (key, value) VALUES ('document_storage_selected_backend', 'local')").run();
+    const created = await call('POST', '/', /** @type {any} */ ({ body: {
+      title, start_datetime: '2059-01-01T09:00:00', recurrence_rule: 'FREQ=DAILY',
+      attachment_name: `${title}.txt`,
+      attachment_data: `data:text/plain;base64,${Buffer.from(title).toString('base64')}`,
+    } }));
+    assert.equal(created.status, 201);
+    const seriesId = Number(created.body.data.id);
+    const child = await call('PUT', `/${seriesId}/occurrences/2059-01-03`, /** @type {any} */ ({ body: { title: `${title} Freitag` } }));
+    assert.equal(child.status, 200);
+    /** @type {number[]} */
+    const documentIds = [];
+    for (let n = 1; n <= extraDocuments; n += 1) {
+      const other = await call('POST', '/', /** @type {any} */ ({ body: {
+        title: `${title} Dokument ${n}`, start_datetime: '2059-06-01T09:00:00',
+        attachment_name: `${title}-${n}.txt`,
+        attachment_data: `data:text/plain;base64,${Buffer.from(`${title} ${n}`).toString('base64')}`,
+      } }));
+      assert.equal(other.status, 201);
+      documentIds.push(Number(db.prepare('SELECT attachment_document_id AS d FROM calendar_events WHERE id = ?').get(other.body.data.id).d));
+    }
+    return { seriesId, childId: Number(child.body.data.id), documentIds };
+  } finally {
+    if (previousEnabled === undefined) delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    else process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = previousEnabled;
+    db.prepare("DELETE FROM sync_config WHERE key = 'document_storage_selected_backend'").run();
+    if (previousBackend !== undefined) {
+      db.prepare("INSERT INTO sync_config (key, value) VALUES ('document_storage_selected_backend', ?)").run(previousBackend);
+    }
+  }
+}
+
+test('PUT /:id - the save path follows the row found after the attachment copy (#2956)', async () => {
+  const { seriesId } = await seriesWithInheritingOverride('PUT-CLONE-PATH');
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2956-path', async ({ started, release, deleted }) => {
+    // Montags statt taeglich: die Freitags-Ausnahme verwaist und braucht ihre Kopie.
+    const first = call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+    await started;
+    // Waehrenddessen: die Ausnahme geht, die Serie wird ein einfacher Termin.
+    assert.equal((await call('DELETE', `/${seriesId}/occurrences/2059-01-03`)).status, 204);
+    assert.equal((await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: { recurrence_rule: null } }))).status, 200);
+    release();
+    saved = await first;
+    uploadsDeleted = deleted;
+  });
+  // Ohne Pause speichert dieselbe Anfrage einen einfachen Termin als Serie.
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=WEEKLY;BYDAY=MO');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key = 'drive-2956-path'").get().n, 0,
+    'keine Kopie fuer eine Ausnahme, die es nicht mehr gibt');
+  assert.deepEqual(uploadsDeleted, ['drive-2956-path'], 'die unbenutzte Kopie wird wieder entfernt');
+});
+
+test('PUT /:id - the copies follow the overrides found after the attachment copy (#2956)', async () => {
+  const { seriesId, childId } = await seriesWithInheritingOverride('PUT-CLONE-PLAN');
+  /** @type {any} */
+  let saved;
+  /** @type {any} */
+  let replacementId;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2956-plan', async ({ started, release, deleted }) => {
+    const first = call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+    await started;
+    // Waehrenddessen: statt der Freitags-Ausnahme steht eine am Samstag.
+    assert.equal((await call('DELETE', `/${seriesId}/occurrences/2059-01-03`)).status, 204);
+    const replacement = await call('PUT', `/${seriesId}/occurrences/2059-01-04`, /** @type {any} */ ({ body: { title: 'Samstag' } }));
+    assert.equal(replacement.status, 200);
+    replacementId = Number(replacement.body.data.id);
+    release();
+    saved = await first;
+    uploadsDeleted = deleted;
+  });
+  assert.notEqual(replacementId, childId);
+  // Ohne Pause bekaeme die Samstags-Ausnahme ihre Kopie, und die Serie ist woechentlich.
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const series = db.prepare('SELECT recurrence_rule AS r, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(seriesId);
+  assert.equal(series.r, 'FREQ=WEEKLY;BYDAY=MO');
+  const detached = db.prepare('SELECT recurrence_parent_id AS p, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(replacementId);
+  assert.equal(detached.p, null, 'die Samstags-Ausnahme ist abgeloest');
+  assert.ok(detached.d && detached.d !== series.d, 'mit eigener Kopie des Anhangs');
+  const copy = db.prepare('SELECT storage_key AS k FROM family_documents WHERE id = ?').get(detached.d);
+  assert.ok(String(copy.k).startsWith('drive-2956-plan'));
+  assert.equal(uploadsDeleted.length, 0, 'die bereitgestellte Kopie wird benutzt, nicht weggeraeumt');
+});
+
+// NACH DREI RUNDEN 409 (#2956). Aendert sich die Serie waehrend JEDES
+// Kopier-Uploads so, dass die bereitgestellten Kopien nicht mehr passen, plant
+// das Speichern dreimal neu und gibt dann auf: 409 `calendar_series_changed`,
+// nichts gespeichert, alle Kopien weggeraeumt. Den Anhang der Serie stellt der
+// Test direkt um (eine Route dafuer liefe selbst durch den gehaltenen Upload).
+const SERIES_CHANGED = {
+  error: 'The series changed while attachment copies were uploaded. Nothing was saved; send the request again.',
+  code: 409,
+  reason: 'calendar_series_changed',
+};
+
+/**
+ * @param {string} title
+ * @param {number} uploads - Uploads ueber drei Runden (je Runde einer je Kopie)
+ * @param {(seriesId: number) => Promise<any>} send
+ */
+async function seriesChangedDuringEveryCopy(title, uploads, send) {
+  const { seriesId, childId, documentIds } = await seriesWithInheritingOverride(title, uploads);
+  const childBefore = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(childId);
+  /** @type {any} */
+  let afterLastSwap = null;
+  const seriesCount = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  /** @type {any} */
+  let answer;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  /** @type {number[]} */
+  const seen = [];
+  await withHeldDriveUpload(`drive-2956-${title}`, async ({ deleted }) => {
+    answer = await send(seriesId);
+    uploadsDeleted = deleted;
+  }, {
+    eachUpload: (n) => {
+      seen.push(n);
+      db.prepare('UPDATE calendar_events SET attachment_document_id = ? WHERE id = ?').run(documentIds[n - 1], seriesId);
+      // Der Stand unmittelbar nach dem letzten Eingriff (auch `updated_at`,
+      // das der Trigger setzt): danach darf die Anfrage nichts mehr schreiben.
+      if (n === uploads) afterLastSwap = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(seriesId);
+    },
+  });
+  assert.equal(seen.length, uploads, 'jede Runde laedt ihre Kopien neu hoch');
+  assert.equal(answer.status, 409, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, SERIES_CHANGED);
+  const after = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(seriesId);
+  assert.deepEqual({ ...after }, { ...afterLastSwap }, 'die Serie steht, wie der letzte Eingriff sie liess');
+  assert.equal(after.attachment_document_id, documentIds[uploads - 1]);
+  assert.deepEqual({ ...db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(childId) }, { ...childBefore },
+    'die Ausnahme bleibt unveraendert verknuepft');
+  assert.equal(childBefore.recurrence_parent_id, seriesId);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, seriesCount, 'keine neue Serie');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE ?').get(`drive-2956-${title}%`).n, 0,
+    'kein Dokument fuer eine Kopie');
+  assert.equal(uploadsDeleted.length, uploads, 'jede bereitgestellte Kopie wird wieder entfernt');
+  assert.equal(new Set(uploadsDeleted).size, uploads);
+}
+
+test('PUT /:id - a series that needs no copy after the last round is saved (#2956)', async () => {
+  const title = 'rounds-none';
+  const { seriesId, childId, documentIds } = await seriesWithInheritingOverride(title, 2);
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload(`drive-2956-${title}`, async ({ deleted }) => {
+    saved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+    uploadsDeleted = deleted;
+  }, {
+    eachUpload: (n) => {
+      // Runde 1 und 2: ein anderes Dokument; Runde 3: gar keins mehr.
+      db.prepare('UPDATE calendar_events SET attachment_document_id = ? WHERE id = ?').run(n < 3 ? documentIds[n - 1] : null, seriesId);
+    },
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(db.prepare('SELECT recurrence_parent_id AS p FROM calendar_events WHERE id = ?').get(childId).p, null);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE ?').get(`drive-2956-${title}%`).n, 0);
+  assert.equal(uploadsDeleted.length, 3, 'jede bereitgestellte Kopie wird wieder entfernt');
+});
+
+test('PUT /:id - a series that changes during every copy upload answers 409 after three rounds (#2956)', async () => {
+  await seriesChangedDuringEveryCopy('rounds-put', 3, (seriesId) => call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+    recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+  } })));
+});
+
+test('PUT /:seriesId/occurrences/:recurrenceId/following - the same 409 after three rounds (#2956)', async () => {
+  // Zwei Kopien je Runde: die Folgeserie und die verwaiste Freitags-Ausnahme.
+  await seriesChangedDuringEveryCopy('rounds-following', 6, (seriesId) => call('PUT', `/${seriesId}/occurrences/2059-01-02/following`, /** @type {any} */ ({ body: {
+    recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+  } })));
+});
+
+// DIE QUELLE VERSCHWINDET WAEHREND DER KOPIEN (#2956). Zwei verwaiste
+// Ausnahmen brauchen je eine Kopie derselben Quelle (alle Kopie-Anfragen eines
+// Speicherns nennen das Dokument der Serie). Waehrend die erste hochlaedt, wird
+// das Dokument geloescht; die zweite Anfrage liest seine Zeile erst danach.
+// Wie eine verweigerte Kopie: keine Kopie, das Speichern laeuft durch.
+test('PUT /:id - a source document deleted during the copy upload leaves the overrides without a copy (#2956)', async () => {
+  const { seriesId, childId } = await seriesWithInheritingOverride('PUT-CLONE-GONE');
+  const second = await call('PUT', `/${seriesId}/occurrences/2059-01-04`, /** @type {any} */ ({ body: { title: 'Samstag' } }));
+  assert.equal(second.status, 200);
+  const secondId = Number(second.body.data.id);
+  const sourceId = db.prepare('SELECT attachment_document_id AS d FROM calendar_events WHERE id = ?').get(seriesId).d;
+  assert.ok(sourceId);
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  /** @type {number[]} */
+  const seen = [];
+  await withHeldDriveUpload('drive-2956-gone-source', async ({ deleted }) => {
+    saved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 2,
+    } }));
+    uploadsDeleted = deleted;
+  }, {
+    eachUpload: (n) => {
+      seen.push(n);
+      if (n === 1) db.prepare('DELETE FROM family_documents WHERE id = ?').run(sourceId);
+    },
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.deepEqual(seen, [1], 'die zweite Kopie wird gar nicht erst hochgeladen');
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=WEEKLY;BYDAY=MO');
+  for (const id of [childId, secondId]) {
+    const row = db.prepare('SELECT recurrence_parent_id AS p, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(id);
+    assert.equal(row.p, null, 'die Ausnahme ist abgeloest');
+    assert.equal(row.d, null, 'ohne Kopie der geloeschten Quelle');
+  }
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE 'drive-2956-gone-source%'").get().n, 0,
+    'kein Dokument fuer eine Kopie');
+  assert.deepEqual(uploadsDeleted, ['drive-2956-gone-source'], 'die bereitgestellte Kopie wird wieder entfernt');
+});
+
+// DIE QUELLE WIRD WAEHREND DES LESENS GELOESCHT (#2956). Die Dokument-Route
+// sperrt das Dokument, loescht erst die Datei (await) und dann die Zeile
+// (routes/documents.js, DELETE /:id). Liest die Kopie die Quelle in diesem
+// Fenster, schlaegt das Lesen fehl, waehrend die Zeile noch steht. Dasselbe
+// Ergebnis wie eine vor dem Lesen geloeschte Quelle: keine Kopie, das
+// Speichern laeuft durch. Ein Lesefehler ohne Loeschung bleibt 502.
+/** @param {string} title */
+async function seriesWithDriveSource(title) {
+  const { seriesId, childId } = await seriesWithInheritingOverride(title);
+  const sourceId = Number(db.prepare('SELECT attachment_document_id AS d FROM calendar_events WHERE id = ?').get(seriesId).d);
+  const sourceKey = `drive-src-${title}`;
+  db.prepare("UPDATE family_documents SET storage_provider = 'external', storage_backend = 'google_drive', storage_key = ? WHERE id = ?").run(sourceKey, sourceId);
+  return { seriesId, childId, sourceId, sourceKey };
+}
+
+test('PUT /:id - a source document deleted while it is read leaves the override without a copy (#2956)', async () => {
+  const { seriesId, childId, sourceId, sourceKey } = await seriesWithDriveSource('PUT-CLONE-READ-GONE');
+  const { lockDocumentDeletes, unlockDocumentDeletes } = await import('../server/services/document-deletion-lock.js');
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  try {
+    await withHeldDriveUpload('drive-2956-read-gone', async ({ deleted }) => {
+      saved = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+        recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+      } }));
+      uploadsDeleted = deleted;
+    }, {
+      eachUpload: () => undefined,
+      onGet: (id) => {
+        if (id !== sourceKey) return;
+        // Wie DELETE /documents/:id: sperren, dann ist die Datei weg.
+        lockDocumentDeletes([sourceId]);
+        throw new Error('File not found.');
+      },
+    });
+  } finally {
+    // Der Rest der Loeschung: die Zeile, dann die Sperre.
+    db.prepare('DELETE FROM family_documents WHERE id = ?').run(sourceId);
+    unlockDocumentDeletes([sourceId]);
+  }
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=WEEKLY;BYDAY=MO');
+  const child = db.prepare('SELECT recurrence_parent_id AS p, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(childId);
+  assert.equal(child.p, null, 'die Ausnahme ist abgeloest');
+  assert.equal(child.d, null, 'ohne Kopie der geloeschten Quelle');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE 'drive-2956-read-gone%'").get().n, 0);
+  assert.deepEqual(uploadsDeleted, [], 'nichts hochgeladen, nichts verwaist');
+});
+
+test('PUT /:id - a read error of an existing source stays a storage error (#2956)', async () => {
+  const { seriesId, childId, sourceKey } = await seriesWithDriveSource('PUT-CLONE-READ-FAIL');
+  /** @type {any} */
+  let answer;
+  await withHeldDriveUpload('drive-2956-read-fail', async () => {
+    answer = await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+  }, {
+    eachUpload: () => undefined,
+    onGet: (id) => { if (id === sourceKey) throw new Error('Drive is down.'); },
+  });
+  assert.equal(answer.status, 502, JSON.stringify(answer.body));
+  assert.equal(answer.body.storage_code, 'DOCUMENT_STORAGE_READ_FAILED');
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=DAILY');
+  assert.equal(db.prepare('SELECT recurrence_parent_id AS p FROM calendar_events WHERE id = ?').get(childId).p, seriesId);
+});
+
+test('PUT .../following - a series that changes once during the copies is saved in the second round (#2956)', async () => {
+  const title = 'follow-second-round';
+  const { seriesId, childId, documentIds } = await seriesWithInheritingOverride(title, 1);
+  const current = db.prepare('SELECT original_name AS n FROM family_documents WHERE id = ?').get(documentIds[0]).n;
+  /** @type {any} */
+  let saved;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  /** @type {number[]} */
+  const seen = [];
+  await withHeldDriveUpload(`drive-2956-${title}`, async ({ deleted }) => {
+    saved = await call('PUT', `/${seriesId}/occurrences/2059-01-02/following`, /** @type {any} */ ({ body: {
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO', confirmed_orphan_count: 1,
+    } }));
+    uploadsDeleted = deleted;
+  }, {
+    eachUpload: (n) => {
+      seen.push(n);
+      // Nur waehrend des ersten Uploads: die Serie bekommt ein anderes Dokument.
+      if (n === 1) db.prepare('UPDATE calendar_events SET attachment_document_id = ? WHERE id = ?').run(documentIds[0], seriesId);
+    },
+  });
+  assert.equal(saved.status, 201, JSON.stringify(saved.body));
+  assert.deepEqual(seen, [1, 2, 3, 4], 'zwei Kopien je Runde, zwei Runden');
+  const successorId = Number(saved.body.data.id);
+  for (const [label, id] of [['Folgeserie', successorId], ['Freitags-Ausnahme', childId]]) {
+    const row = db.prepare('SELECT recurrence_parent_id AS p, attachment_document_id AS d FROM calendar_events WHERE id = ?').get(id);
+    assert.equal(row.p, null, `${label} ist eigenstaendig`);
+    const copy = db.prepare('SELECT original_name AS n, storage_key AS k FROM family_documents WHERE id = ?').get(row.d);
+    assert.equal(copy.n, current, `${label} traegt die Kopie des aktuellen Dokuments`);
+    assert.ok(String(copy.k).startsWith(`drive-2956-${title}`), `${label}: eine der Kopien`);
+  }
+  assert.equal(uploadsDeleted.length, 2, 'die zwei Kopien der ersten Runde werden wieder entfernt');
+  const kept = db.prepare('SELECT storage_key AS k FROM family_documents WHERE storage_key LIKE ?').all(`drive-2956-${title}%`).map((/** @type {any} */ r) => r.k);
+  assert.equal(kept.length, 2);
+  assert.deepEqual([...kept, ...uploadsDeleted].sort(), [1, 2, 3, 4].map((n) => (n === 1 ? `drive-2956-${title}` : `drive-2956-${title}-${n}`)).sort(),
+    'jede hochgeladene Datei ist entweder Kopie oder entfernt');
+});
+
+// DIE SERIE NACH DEM UPLOAD (#2956). Die Vorkommen-Routen luden die Serie
+// vor dem Upload und prueften danach Bestandsliste, Anhang und Ziel gegen
+// diese alte Zeile (`?? master`). Jetzt laden sie sie nach dem letzten await
+// neu: geloescht oder unsichtbar ist dieselbe 404 wie vor dem Upload, und ein
+// inzwischen gesetztes Sync-Ziel weist den lokalen Kalender ab wie ohne Upload.
+const SERIES_GONE = { error: 'Calendar series not found.', code: 404, reason: 'calendar_series_not_found' };
+
+/**
+ * @param {string} key
+ * @param {() => Promise<any>} send - startet die Anfrage mit Upload
+ * @param {() => Promise<void>} meanwhile - laeuft, waehrend der Upload haelt
+ */
+async function duringUpload(key, send, meanwhile) {
+  /** @type {any} */
+  let answer;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload(key, async ({ started, release, deleted }) => {
+    const first = send();
+    await started;
+    await meanwhile();
+    release();
+    answer = await first;
+    uploadsDeleted = deleted;
+  });
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE ?').get(`${key}%`).n, 0,
+    'kein Dokument fuer den verworfenen Anhang');
+  assert.deepEqual(uploadsDeleted, [key], 'der hochgeladene Anhang wird wieder entfernt');
+  return answer;
+}
+
+const uploadBody = (/** @type {string} */ name) => ({
+  attachment_data: `data:text/plain;base64,${Buffer.from(name).toString('base64')}`,
+  attachment_name: `${name}.txt`,
+});
+
+test('PUT /:seriesId/occurrences/:recurrenceId - a series deleted during the upload answers 404 (#2956)', async () => {
+  const seriesId = insertEvent({ title: 'OCC-UPLOAD-GONE', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const answer = await duringUpload('drive-2956-occ-gone',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-03`, /** @type {any} */ ({ body: { title: 'Ausnahme', ...uploadBody('occ-gone') } })),
+    async () => { assert.equal((await call('DELETE', `/${seriesId}`)).status, 204); });
+  assert.equal(answer.status, 404, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, SERIES_GONE);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId).n, 0,
+    'keine Ausnahme-Zeile');
+});
+
+test('PUT /:seriesId/occurrences/:recurrenceId - a series made private during the upload answers 404 (#2956)', async () => {
+  const seriesId = insertEvent({
+    title: 'OCC-UPLOAD-PRIVATE', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY',
+    created_by: TOM.id, visibility: 'all',
+  });
+  // Gegenprobe: Maria darf hier ohne Wettlauf ein Vorkommen aendern.
+  assert.equal((await call('PUT', `/${seriesId}/occurrences/2059-03-02`, /** @type {any} */ ({ actor: MARIA, body: { title: 'vorher' } }))).status, 200);
+  const answer = await duringUpload('drive-2956-occ-private',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-03`, /** @type {any} */ ({ actor: MARIA, body: { title: 'Maria', ...uploadBody('occ-private') } })),
+    async () => {
+      assert.equal((await call('PUT', `/${seriesId}`, /** @type {any} */ ({ actor: TOM, body: { visibility: 'private' } }))).status, 200);
+    });
+  assert.equal(answer.status, 404, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, SERIES_GONE);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id LIKE '2059-03-03%'").get(seriesId).n, 0,
+    'keine Ausnahme-Zeile fuer den 3.');
+});
+
+test('PUT .../following - a series deleted during the upload answers 404 (#2956)', async () => {
+  const seriesId = insertEvent({ title: 'FOLLOW-UPLOAD-GONE', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const answer = await duringUpload('drive-2956-follow-gone',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-05/following`, /** @type {any} */ ({ body: { title: 'Folge', ...uploadBody('follow-gone') } })),
+    async () => { assert.equal((await call('DELETE', `/${seriesId}`)).status, 204); });
+  assert.equal(answer.status, 404, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, SERIES_GONE);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before - 1, 'keine Folgeserie');
+});
+
+test('PUT .../following - a series made private during the upload answers 404 (#2956)', async () => {
+  const seriesId = insertEvent({
+    title: 'FOLLOW-UPLOAD-PRIVATE', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY',
+    created_by: TOM.id, visibility: 'all',
+  });
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const answer = await duringUpload('drive-2956-follow-private',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-05/following`, /** @type {any} */ ({ actor: MARIA, body: { title: 'Maria', ...uploadBody('follow-private') } })),
+    async () => {
+      assert.equal((await call('PUT', `/${seriesId}`, /** @type {any} */ ({ actor: TOM, body: { visibility: 'private' } }))).status, 200);
+    });
+  assert.equal(answer.status, 404, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, SERIES_GONE);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'keine Folgeserie');
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=DAILY');
+});
+
+test('PUT .../following - a sync target set during the upload refuses the local calendar (#2956)', async () => {
+  const kalender = Number(db.prepare("INSERT INTO local_calendars (name) VALUES ('2956 Folge')").run().lastInsertRowid);
+  const seriesId = insertEvent({ title: 'FOLLOW-UPLOAD-TARGET', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const answer = await duringUpload('drive-2956-follow-target',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-05/following`, /** @type {any} */ ({ body: { local_calendar_id: kalender, ...uploadBody('follow-target') } })),
+    async () => {
+      assert.equal((await call('PUT', `/${seriesId}`, /** @type {any} */ ({ body: { target_google_calendar_id: 'family@group.calendar.google.com' } }))).status, 200);
+    });
+  const direct = await call('PUT', `/${seriesId}/occurrences/2059-03-05/following`, /** @type {any} */ ({ body: { local_calendar_id: kalender } }));
+  assert.equal(direct.status, 400);
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, direct.body, 'dieselbe Absage wie ohne Upload');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'keine Folgeserie');
+});
+
+test('POST / - a person removed during the upload is refused like without it (#2956)', async () => {
+  const userId = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('weg2956', 'Weg', 'x', 'member')").run().lastInsertRowid);
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const answer = await duringUpload('drive-2956-post-person',
+    () => call('POST', '/', /** @type {any} */ ({ body: {
+      title: 'POST-UPLOAD-PERSON', start_datetime: '2059-04-01T09:00', assigned_to: [userId], ...uploadBody('post-person'),
+    } })),
+    async () => { db.prepare('DELETE FROM users WHERE id = ?').run(userId); });
+  const direct = await call('POST', '/', /** @type {any} */ ({ body: {
+    title: 'POST-UPLOAD-PERSON', start_datetime: '2059-04-01T09:00', assigned_to: [userId],
+  } }));
+  assert.equal(direct.status, 400);
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, direct.body, 'dieselbe Absage wie ohne Upload');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'kein Termin');
+});
+
+// KEIN MITGLIED MEHR WAEHREND DES UPLOADS (#2956, #1207). Die Person bleibt als
+// Zeile stehen, faellt aber aus dem Haushalt: entfernt ueber removeUser(), den
+// Weg der Personenverwaltung - mit einer Spur (eigener Termin) wird sie
+// deaktiviert statt geloescht. Die Bestandspruefung `validateOccurrenceAssignments`
+// sieht das nicht (die Zeile gibt es noch), nur die Mitgliederpruefung.
+async function memberToRetire(/** @type {string} */ name) {
+  const userId = Number(db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'x', 'member')").run(name, name).lastInsertRowid);
+  insertEvent({ title: `${name}-Spur`, created_by: userId });
+  return userId;
+}
+async function retire(/** @type {number} */ userId) {
+  const { removeUser } = await import('../server/services/user-removal.js');
+  assert.equal(removeUser(db, userId).outcome, 'deactivated');
+}
+const notMember = (/** @type {number} */ userId) => ({
+  error: `Only household members can be chosen here - user ${userId} is not a household member.`,
+  code: 400,
+});
+
+test('POST / - a person who stops being a member during the upload is refused like without it (#2956)', async () => {
+  const userId = await memberToRetire('ehemals2956post');
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const body = { title: 'POST-UPLOAD-MEMBER', start_datetime: '2059-04-03T09:00', assigned_to: [userId] };
+  const answer = await duringUpload('drive-2956-post-member',
+    () => call('POST', '/', /** @type {any} */ ({ body: { ...body, ...uploadBody('post-member') } })),
+    () => retire(userId));
+  const direct = await call('POST', '/', /** @type {any} */ ({ body }));
+  assert.deepEqual(direct.body, notMember(userId));
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, direct.body, 'dieselbe Absage wie ohne Upload');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'kein Termin');
+});
+
+test('PUT /:seriesId/occurrences/:recurrenceId - a person who stops being a member during the upload is refused (#2956)', async () => {
+  const userId = await memberToRetire('ehemals2956occ');
+  const seriesId = insertEvent({ title: 'OCC-UPLOAD-MEMBER', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const answer = await duringUpload('drive-2956-occ-member',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-03`, /** @type {any} */ ({ body: { assigned_to: [userId], ...uploadBody('occ-member') } })),
+    () => retire(userId));
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, notMember(userId));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId).n, 0,
+    'keine Ausnahme-Zeile');
+});
+
+test('PUT .../following - a person who stops being a member during the upload is refused (#2956)', async () => {
+  const userId = await memberToRetire('ehemals2956follow');
+  const seriesId = insertEvent({ title: 'FOLLOW-UPLOAD-MEMBER', start_datetime: '2059-03-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  const answer = await duringUpload('drive-2956-follow-member',
+    () => call('PUT', `/${seriesId}/occurrences/2059-03-05/following`, /** @type {any} */ ({ body: { assigned_to: [userId], ...uploadBody('follow-member') } })),
+    () => retire(userId));
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, notMember(userId));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'keine Folgeserie');
+  assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=DAILY');
+});
+
+// DAS DOKUMENTE-RECHT GILT AM SCHREIBEN (#2947). Am Eingang fragt
+// `refuseUploadWithoutDocumentsWrite`; waehrend des Uploads (await) nimmt der
+// Test Maria das Schreibrecht an Dokumenten in der Datenbank (`access_permissions`).
+// Danach entsteht kein Anhang und kein Termin bzw. keine Aenderung, der Upload
+// wird entfernt, und die Antwort ist die Absage des Eingangs.
+/** `call` mit den Optionen dieser Faelle (Rumpf, Akteur mit Modulrechten). */
+const callAs = /** @type {(method: string, route: string, options: any) => Promise<any>} */ (call);
+const UPLOAD_REFUSED = { error: 'Attaching a file needs write access to documents.', code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' };
+const revokeDocumentsWrite = () => db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+  VALUES ('user', ?, 'module', 'documents', 'read')`).run(String(MARIA.id));
+const restoreDocumentsWrite = () => db.prepare(`DELETE FROM access_permissions
+  WHERE subject_type = 'user' AND subject_id = ? AND resource_type = 'module' AND resource_key = 'documents'`).run(String(MARIA.id));
+
+for (const [label, request] of /** @type {const} */ ([
+  ['POST /', () => ({ method: 'POST', route: '/', body: { title: 'RIGHT-2947-POST', start_datetime: '2059-05-01T09:00' } })],
+  ['PUT /:id', () => {
+    const id = insertEvent({ title: 'RIGHT-2947-PUT', start_datetime: '2059-05-02T09:00', created_by: MARIA.id });
+    return { method: 'PUT', route: `/${id}`, body: { description: 'mit Anhang' } };
+  }],
+  ['PUT occurrence', () => {
+    const id = insertEvent({ title: 'RIGHT-2947-OCC', start_datetime: '2059-05-03T09:00', created_by: MARIA.id, recurrence_rule: 'FREQ=DAILY' });
+    return { method: 'PUT', route: `/${id}/occurrences/2059-05-04`, body: { title: 'Ausnahme' } };
+  }],
+  ['PUT following', () => {
+    const id = insertEvent({ title: 'RIGHT-2947-FOL', start_datetime: '2059-05-05T09:00', created_by: MARIA.id, recurrence_rule: 'FREQ=DAILY' });
+    return { method: 'PUT', route: `/${id}/occurrences/2059-05-07/following`, body: { title: 'Nachfolger' } };
+  }],
+])) {
+  test(`${label} - documents write taken during the upload: the entry refusal, no attachment, upload removed (#2947)`, async () => {
+    const { method, route, body } = request();
+    const key = `drive-2947-${label.replace(/\W+/g, '-')}`;
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    const titleRow = route === '/' ? null : db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(Number(route.split('/')[1]));
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs(method, route, /** @type {any} */ ({ actor: MARIA, body: { ...body, ...uploadBody(key) } })),
+        async () => { revokeDocumentsWrite(); });
+    } finally {
+      restoreDocumentsWrite();
+    }
+    const direct = await callAs(method, route, /** @type {any} */ ({
+      actor: { ...MARIA, moduleAccess: { documents: 'read' } }, body: { ...body, ...uploadBody(key) },
+    }));
+    assert.deepEqual([direct.status, direct.body], [403, UPLOAD_REFUSED], 'die Absage am Eingang');
+    assert.deepEqual([answer.status, answer.body], [403, UPLOAD_REFUSED], 'dieselbe Absage nach dem Upload');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'kein neuer Termin');
+    if (titleRow) {
+      assert.deepEqual(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(titleRow.id), titleRow, 'der Termin bleibt, wie er war');
+    }
+  });
+}
+
+test('PUT following - documents write taken while the attachment copy uploads: no copy, the copy is removed (#2947)', async () => {
+  // Der Split kopiert den Anhang der Serie fuer den Nachfolger (Upload der
+  // Kopie, await). Waehrenddessen verliert Maria das Dokumente-Schreibrecht:
+  // die Kopie gilt dann als verweigert, wie mit `documents: none` am Eingang.
+  const dataUrl = `data:text/plain;base64,${Buffer.from('kopie').toString('base64')}`;
+  const series = await callAs('POST', '/', { actor: MARIA, body: {
+    title: 'RIGHT-2947-CLONE', start_datetime: '2059-06-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    attachment_data: dataUrl, attachment_name: 'k.txt',
+  } });
+  assert.equal(series.status, 201, JSON.stringify(series.body));
+  const documentsBefore = db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n;
+  /** @type {any} */
+  let split;
+  try {
+    split = await duringUpload('drive-2947-clone',
+      () => callAs('PUT', `/${series.body.data.id}/occurrences/2059-06-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } }),
+      async () => { revokeDocumentsWrite(); });
+  } finally {
+    restoreDocumentsWrite();
+  }
+  assert.equal(split.status, 201, JSON.stringify(split.body));
+  assert.equal(split.body.data.attachment_document_id, null, 'der Nachfolger hat keinen Anhang');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n, documentsBefore, 'keine Dokumentkopie');
+});
+
+test('PUT /:id - an admin demoted while a detach copy uploads no longer aligns a foreign document (#2947)', async () => {
+  // Abgleichen darf nur, wer das Dokument verwaltet - die Besitzerin oder ein
+  // Admin. Das Abloesen einer Ausnahme kopiert den Anhang (await); waehrend
+  // dessen verliert der Admin die Rolle. Danach bleibt das Dokument, wie die
+  // Besitzerin es gesetzt hat (Tom behaelt seine Freigabe).
+  const dataUrl = `data:text/plain;base64,${Buffer.from('abgleich').toString('base64')}`;
+  const access = (/** @type {number} */ id) => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+    .all(id).map((/** @type {any} */ r) => r.user_id);
+  const series = await callAs('POST', '/', { actor: MARIA, body: {
+    title: 'RIGHT-2947-WIDEN', start_datetime: '2059-07-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    visibility: 'assignees', assigned_to: [MARIA.id, ADMIN.id], attachment_data: dataUrl, attachment_name: 'w.txt',
+  } });
+  assert.equal(series.status, 201, JSON.stringify(series.body));
+  const seriesId = series.body.data.id;
+  const docId = series.body.data.attachment_document_id;
+  db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, TOM.id);
+  const owned = access(docId);
+  assert.ok(owned.includes(TOM.id));
+  const override = await callAs('PUT', `/${seriesId}/occurrences/2059-07-03`, { actor: MARIA, body: { title: 'Ausnahme' } });
+  assert.equal(override.status, 200, JSON.stringify(override.body));
+  // Der Admin nimmt sich aus den Zugewiesenen: ein Verwalter gliche die
+  // Freigaben des Dokuments darauf ab.
+  const rule = { recurrence_rule: 'FREQ=WEEKLY;COUNT=3', visibility: 'assignees', assigned_to: [MARIA.id] };
+  const conflict = await callAs('PUT', `/${seriesId}`, { actor: ADMIN, body: rule });
+  assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
+  /** @type {any} */
+  let detached;
+  try {
+    await withHeldDriveUpload('drive-2947-widen', async ({ started, release }) => {
+      const pending = callAs('PUT', `/${seriesId}`, {
+        actor: ADMIN, body: { ...rule, confirmed_orphan_count: conflict.body.orphaned_override_count },
+      });
+      await started;
+      db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(ADMIN.id);
+      release();
+      detached = await pending;
+    });
+  } finally {
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(ADMIN.id);
+  }
+  assert.equal(detached.status, 200, JSON.stringify(detached.body));
+  assert.deepEqual(access(docId), owned, 'kein Abgleich ohne Verwaltungsrecht: Tom behaelt die Freigabe');
+});
+
+// DAS BEARBEITUNGSRECHT UND DAS MODUL-GATE GELTEN AM SCHREIBEN (#2947). Am
+// Eingang fragt die Route `calendar_edit_others` (bzw. die Admin-Rolle) und das
+// Modul-Gate; waehrend des Uploads nimmt der Test das Recht in der Datenbank.
+// Danach dieselbe 403 wie am Eingang, nichts geschrieben, Upload entfernt.
+const NOT_OWNER = { error: 'You can only change entries you created.', code: 403, reason: 'not_owner' };
+const MODULE_READ_ONLY = { error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' };
+/** @param {number} userId @param {string} type @param {string} key @param {string} access */
+const grant = (userId, type, key, access) => db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+  VALUES ('user', ?, ?, ?, ?)`).run(String(userId), type, key, access);
+/** @param {number} userId */
+const ungrant = (userId) => db.prepare("DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?").run(String(userId));
+
+test('PUT /:id - an admin demoted during the upload, without calendar_edit_others, gets not_owner (#2947)', async () => {
+  const id = insertEvent({ title: 'EDIT-2947-PUT', start_datetime: '2059-08-01T09:00', created_by: MARIA.id });
+  const before = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  /** @type {any} */
+  let answer;
+  try {
+    answer = await duringUpload('drive-2947-edit-put',
+      () => callAs('PUT', `/${id}`, { actor: ADMIN, body: { description: 'vom Admin', ...uploadBody('drive-2947-edit-put') } }),
+      async () => {
+        db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(ADMIN.id);
+        grant(ADMIN.id, 'capability', 'calendar_edit_others', 'none');
+      });
+  } finally {
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(ADMIN.id);
+    ungrant(ADMIN.id);
+  }
+  assert.deepEqual([answer.status, answer.body], [403, NOT_OWNER]);
+  assert.deepEqual(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id), before, 'der Termin bleibt, wie er war');
+});
+
+for (const [label, request] of /** @type {const} */ ([
+  ['PUT occurrence', (/** @type {number} */ id) => ({ route: `/${id}/occurrences/2059-08-04`, body: { title: 'Ausnahme' } })],
+  ['PUT following', (/** @type {number} */ id) => ({ route: `/${id}/occurrences/2059-08-05/following`, body: { title: 'Nachfolger' } })],
+])) {
+  test(`${label} - calendar_edit_others taken during the upload: not_owner, nothing written, upload removed (#2947)`, async () => {
+    const id = insertEvent({ title: `EDIT-2947-${label}`, start_datetime: '2059-08-03T09:00', created_by: ADMIN.id, recurrence_rule: 'FREQ=DAILY' });
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    const { route, body } = request(id);
+    const key = `drive-2947-edit-${label.replace(/\W+/g, '-')}`;
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs('PUT', route, { actor: MARIA, body: { ...body, ...uploadBody(key) } }),
+        async () => { grant(MARIA.id, 'capability', 'calendar_edit_others', 'none'); });
+    } finally {
+      ungrant(MARIA.id);
+    }
+    assert.deepEqual([answer.status, answer.body], [403, NOT_OWNER]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'keine Ausnahme, keine Folgeserie');
+  });
+}
+
+for (const [label, request] of /** @type {const} */ ([
+  ['POST /', () => ({ method: 'POST', route: '/', body: { title: 'GATE-2947-POST', start_datetime: '2059-08-10T09:00' } })],
+  ['PUT /:id', () => {
+    const id = insertEvent({ title: 'GATE-2947-PUT', start_datetime: '2059-08-11T09:00', created_by: MARIA.id });
+    return { method: 'PUT', route: `/${id}`, body: { description: 'mit Anhang' } };
+  }],
+])) {
+  test(`${label} - calendar write taken during the upload: the module gate refusal, nothing written (#2947)`, async () => {
+    const { method, route, body } = request();
+    const key = `drive-2947-gate-${label.replace(/\W+/g, '-')}`;
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs(method, route, { actor: MARIA, body: { ...body, ...uploadBody(key) } }),
+        async () => { grant(MARIA.id, 'module', 'calendar', 'read'); });
+    } finally {
+      ungrant(MARIA.id);
+    }
+    assert.deepEqual([answer.status, answer.body], [403, MODULE_READ_ONLY]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'kein neuer Termin');
+    if (method === 'PUT') {
+      assert.equal(db.prepare('SELECT description FROM calendar_events WHERE id = ?').get(Number(route.slice(1))).description, null);
+    }
+  });
+}
+
+test('PUT /:id - documents read taken during the upload of a replacement: the attachment refusal, nothing written (#2947)', async () => {
+  // Ersetzen verlangt, dass man den gespeicherten Anhang sieht (Dokumente
+  // lesen, #1358). Waehrend des Uploads verliert Maria das Modul ganz.
+  const created = await callAs('POST', '/', { actor: MARIA, body: {
+    title: 'LOCK-2947', start_datetime: '2059-08-20T09:00', ...uploadBody('lock-2947-old'),
+  } });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const id = created.body.data.id;
+  const before = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  /** @type {any} */
+  let answer;
+  try {
+    answer = await duringUpload('drive-2947-lock',
+      () => callAs('PUT', `/${id}`, { actor: MARIA, body: { ...uploadBody('drive-2947-lock') } }),
+      async () => { grant(MARIA.id, 'module', 'documents', 'none'); });
+  } finally {
+    ungrant(MARIA.id);
+  }
+  assert.deepEqual([answer.status, answer.body?.reason], [403, 'ATTACHMENT_CHANGE_REFUSED'], JSON.stringify(answer.body));
+  assert.deepEqual(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id), before, 'der Termin bleibt, wie er war');
+});
+
+// DAS KONTO WIRD WAEHREND DES UPLOADS DEAKTIVIERT (#2947): die 401, die
+// requireAuth am Eingang jetzt gaebe - die App meldet ab -, nichts geschrieben,
+// Upload entfernt.
+for (const [label, request] of /** @type {const} */ ([
+  ['POST /', () => ({ method: 'POST', route: '/', body: { title: 'GONE-2947-POST', start_datetime: '2059-09-01T09:00' } })],
+  ['PUT /:id', () => {
+    const id = insertEvent({ title: 'GONE-2947-PUT', start_datetime: '2059-09-02T09:00', created_by: MARIA.id });
+    return { method: 'PUT', route: `/${id}`, body: { description: 'mit Anhang' } };
+  }],
+])) {
+  test(`${label} - the account deactivated during the upload gets the 401 of requireAuth, nothing written (#2947)`, async () => {
+    const { method, route, body } = request();
+    const key = `drive-2947-gone-${label.replace(/\W+/g, '-')}`;
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs(method, route, { actor: MARIA, body: { ...body, ...uploadBody(key) } }),
+        async () => { db.prepare("UPDATE users SET deactivated_at = '2059-01-01T00:00:00Z' WHERE id = ?").run(MARIA.id); });
+    } finally {
+      db.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(MARIA.id);
+    }
+    assert.deepEqual([answer.status, answer.body], [401, { error: 'Not authenticated.', code: 401 }]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'kein neuer Termin');
+    if (method === 'PUT') {
+      assert.equal(db.prepare('SELECT description FROM calendar_events WHERE id = ?').get(Number(route.slice(1))).description, null);
+    }
+  });
+}
+
+test('POST / - a CalDAV target switched off during the upload is refused like without it (#2956)', async () => {
+  caldavTargetAccount7();
+  const target = { target_caldav_account_id: 7, target_caldav_calendar_url: 'https://dav.test/cal/' };
+  const before = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+  /** @type {any} */
+  let answer;
+  /** @type {any} */
+  let direct;
+  try {
+    answer = await duringUpload('drive-2956-post-target',
+      () => call('POST', '/', /** @type {any} */ ({ body: {
+        title: 'POST-UPLOAD-TARGET', start_datetime: '2059-04-02T09:00', ...target, ...uploadBody('post-target'),
+      } })),
+      async () => {
+        db.prepare("UPDATE caldav_calendar_selection SET enabled = 0 WHERE account_id = 7 AND calendar_url = 'https://dav.test/cal/'").run();
+      });
+    direct = await call('POST', '/', /** @type {any} */ ({ body: {
+      title: 'POST-UPLOAD-TARGET', start_datetime: '2059-04-02T09:00', ...target,
+    } }));
+  } finally {
+    db.prepare("UPDATE caldav_calendar_selection SET enabled = 1 WHERE account_id = 7 AND calendar_url = 'https://dav.test/cal/'").run();
+  }
+  assert.equal(direct.status, 400);
+  assert.equal(answer.status, 400, JSON.stringify(answer.body));
+  assert.deepEqual(answer.body, direct.body, 'dieselbe Absage wie ohne Upload');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, before, 'kein Termin');
+});
+
+test('PUT /:id - a refusal after the upload answers from what the check read (#2956)', async () => {
+  const seriesId = insertEvent({ title: 'PUT-REFUSAL-SERIES', start_datetime: '2059-02-01T09:00', recurrence_rule: 'FREQ=DAILY' });
+  const id = insertEvent({ title: 'PUT-REFUSAL-EVENT', start_datetime: '2059-02-03T09:00' });
+  const dataUrl = `data:text/plain;base64,${Buffer.from('absage').toString('base64')}`;
+  /** @type {any} */
+  let refused;
+  /** @type {string[]} */
+  let uploadsDeleted = [];
+  await withHeldDriveUpload('drive-2956-refusal', async ({ started, release, deleted, deleteStarted, releaseDeletes }) => {
+    const first = call('PUT', `/${id}`, /** @type {any} */ ({ body: {
+      description: 'mit Anhang', attachment_data: dataUrl, attachment_name: 'absage.txt',
+    } }));
+    await started;
+    // Waehrend des Uploads wird der Termin ein verknuepftes Vorkommen der Serie
+    // (keine Route macht das; es ist der Stand, den die Pruefung beim Schreiben sieht).
+    db.prepare("UPDATE calendar_events SET recurrence_parent_id = ?, recurrence_id = '2059-02-03', overridden_fields = '[\"title\"]' WHERE id = ?")
+      .run(seriesId, id);
+    release();
+    await deleteStarted;
+    // Waehrend des Aufraeumens verschwindet die Serie.
+    db.prepare('UPDATE calendar_events SET recurrence_parent_id = NULL WHERE id = ?').run(id);
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(seriesId);
+    releaseDeletes();
+    refused = await first;
+    uploadsDeleted = deleted;
+  }, { holdDeletes: true });
+  assert.equal(refused.status, 400, JSON.stringify(refused.body));
+  assert.deepEqual(refused.body, {
+    error: 'Use the occurrence endpoint to change a linked recurring occurrence.',
+    code: 400,
+    reason: 'calendar_occurrence_route_required',
+  });
+  assert.equal(db.prepare('SELECT description AS d FROM calendar_events WHERE id = ?').get(id).d, null);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE storage_key LIKE 'drive-2956-refusal%'").get().n, 0,
+    'kein Dokument fuer den verworfenen Anhang');
+  assert.deepEqual(uploadsDeleted, ['drive-2956-refusal'], 'der hochgeladene Anhang wird wieder entfernt');
+});
+
 test('PUT /:id — Sichtbarkeit, Serie und Zuweisungen aktualisieren', async () => {
   const id = insertEvent({ title: 'PUT-FULL', start_datetime: '2041-03-01T09:00' });
   const res = await call('PUT', `/${id}`, { body: {
@@ -2240,12 +3388,18 @@ test('POST /:id/exceptions — 404 + 400 keine Serie + 400 extern', async () => 
 
 test('single event PUT ignores irrelevant orphan confirmation metadata', async () => {
   const id = insertEvent({ title: 'Single confirmation', start_datetime: '2042-02-03T09:00' });
-  for (const count of [0, null, 'obsolete metadata', -1]) {
+  // Seit #2810 prueft das Schema die Form (`integer >= 0`): was keine solche
+  // Zahl ist (`null`, Text, `-1`), ist eine 400, bevor der Handler sie
+  // ignorieren koennte; eine Zahl ohne Bedeutung fuer einen Einzeltermin bleibt
+  // ohne Wirkung.
+  for (const count of [0, 3, null, 'obsolete metadata', -1]) {
+    const valid = Number.isInteger(count) && Number(count) >= 0;
     const result = await call('PUT', `/${id}`, {
       body: { title: 'Still editable', confirmed_orphan_count: count },
     });
-    assert.equal(result.status, 200);
-    assert.equal(result.body.data.title, 'Still editable');
+    assert.equal(result.status, valid ? 200 : 400, JSON.stringify(count));
+    if (valid) assert.equal(result.body.data.title, 'Still editable');
+    else assert.equal(result.body.reason, 'validation');
   }
 });
 
@@ -3595,10 +4749,11 @@ test('occurrence mutation routes reject schema-invalid values before persistence
         body,
       });
       assert.equal(response.status, 400, `${suffix || '/only'} ${JSON.stringify(body)}`);
-      // Englisch fuer API-Clients, ohne Grund: das Formular laesst keinen dieser
-      // Werte durch, die App sagt ihren allgemeinen Satz (#1909).
+      // Englisch fuer API-Clients, ohne eigenen Fall: das Formular laesst keinen
+      // dieser Werte durch, die App sagt ihren allgemeinen Satz (#1909). Seit
+      // #2810 antwortet das Schema die Formfehler mit `reason: validation`.
       assert.doesNotMatch(response.body.error, /[äöüß]|Gib |Wähle/);
-      assert.equal(response.body.reason, undefined, JSON.stringify(body));
+      assert.ok([undefined, 'validation'].includes(response.body.reason), JSON.stringify(body));
       assert.equal(db.prepare(`
         SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
       `).get(seriesId).count, 0);
@@ -4387,12 +5542,15 @@ test('PUT / — eine Serie mit eigener Zone wird an ihrem Ortstag geprueft', asy
 // ID, Vorschau- und Download-URL, Name, Typ und Groesse sind `null`, auf jedem
 // Leseweg des Kalenders.
 test('Anhang: ohne Dokumentenrecht oder Sicht aufs Dokument nennt der Termin ihn nicht (#1358)', async () => {
-  // Zehn Tage voraus in der Haushaltszone: im 90-Tage-Fenster von /upcoming.
+  // Morgen um Mitternacht in der Haushaltszone: vor jedem spaeteren Vorkommen der offenen
+  // Serien, die andere Tests dieser Datei anlegen. Zehn Tage voraus fiel der
+  // Termin aus den 20 Plaetzen von /upcoming, sobald das Datum der Serien
+  // (2026-01-15 taeglich und weitere) das Fenster fuellt.
   const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
-  const day = shiftDateKey(todayKey(db), 10);
+  const day = shiftDateKey(todayKey(db), 1);
   const dataUrl = `data:text/plain;base64,${Buffer.from('Geheimer Anhang').toString('base64')}`;
   const created = await call('POST', '/', { actor: ADMIN, body: {
-    title: 'Qzxanhangsrecht', start_datetime: `${day}T09:00`,
+    title: 'Qzxanhangsrecht', start_datetime: `${day}T00:00`,
     attachment_data: dataUrl, attachment_name: 'vertrag.txt',
   } });
   assert.equal(created.status, 201);
@@ -5572,9 +6730,10 @@ test('die Termin-Faelle tragen einen reason und einen englischen Text (#1909)', 
       english(res, `${method} ${route}`);
     }
     // Eine Kennung, die keine Zahl ist, schickt nur ein Aufrufer: kein Fall.
+    // Seit #2810 die 400 des Schemas, `reason: validation`.
     const malformed = await call('POST', '/', { body: { title: 'Neu', start_datetime: '2035-03-10T09:00', local_calendar_id: 'x' } });
     assert.equal(malformed.status, 400);
-    assert.equal(malformed.body.reason, undefined);
+    assert.equal(malformed.body.reason, 'validation');
     english(malformed, 'local_calendar_id x');
     // Ein leerer Titel ebenso (das Formular prueft ihn selbst).
     const untitled = await call('POST', '/', { body: { title: '', start_datetime: '2035-03-10T09:00' } });

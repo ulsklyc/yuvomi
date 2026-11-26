@@ -6,6 +6,7 @@
 import { isRestoreRunning } from '../utils/restore-state.js';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { buildSplits, insertExpenseLedger, membershipRefusal, SplitInputError } from './split-expenses.js';
 import { todayKey } from '../utils/timezone.js';
 import { addInterval, nextRunNotBefore } from '../utils/interval-date.js';
@@ -146,13 +147,13 @@ function unbookableReason(database, recurring) {
 // zeigt Serien nirgends sonst, ohne den Eintrag stuende er nur im Serverlog.
 // `actor_id` NULL: das war niemand, die App zeigt dafuer "System".
 function pauseUnbookable(database, recurring, reason) {
-  database.transaction(() => {
+  withTx(database, () => {
     // Der Grund ersetzt einen unerwarteten Fehlschlag von vorher (#1746): die
     // Zeile nennt dann ihn.
     const paused = database.prepare("UPDATE recurring_expenses SET paused_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), failed_at = NULL WHERE id = ? AND paused_at IS NULL").run(recurring.id);
     if (!paused.changes) return;
     insertActivity(database, recurring.group_id, null, 'recurring_auto_paused', 'recurring_expense', recurring.id, { title: recurring.title, reason });
-  })();
+  });
 }
 
 // Merkt sich den ersten unerwarteten Fehlschlag einer Serie (#1746). Die Serie
@@ -197,12 +198,12 @@ function processDueRecurringExpenses(today = todayKey(db.get()), book = generate
   const result = { generated: 0, paused: 0, failed: 0 };
   for (const recurring of due) {
     try {
-      database.transaction(() => {
+      withTx(database, () => {
         book(database, recurring);
         // Gebucht: ein Fehlschlag von vorher ist vorbei (#1746). In derselben
         // Transaktion, damit Buchung und Zustand der Zeile zusammen gelten.
         if (recurring.failed_at) database.prepare('UPDATE recurring_expenses SET failed_at = NULL WHERE id = ?').run(recurring.id);
-      })();
+      });
       result.generated += 1;
     } catch (err) {
       const reason = pauseReason(err);

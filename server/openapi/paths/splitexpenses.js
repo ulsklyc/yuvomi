@@ -1,10 +1,11 @@
 import { op, idParam, DOCUMENT_LINKS_READ_NOTE, withCaseReasons, withValidationRefusal } from '../helpers.js';
-import { MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { CURRENCY_CODES } from '../../../public/utils/currency-codes.js';
 import {
   CATEGORIES, FAMILY_ROLES, FREQUENCIES, GROUP_ROLES, GROUP_STATUSES, GROUP_TYPES, MAX_CURSOR_TEXT, MAX_GUEST_EMAIL, MAX_GUEST_NAME,
   MAX_GUEST_PHONE, MISSED_MODES, SPLIT_METHODS,
 } from '../../services/split-expense-fields.js';
+import { MAX_ATTACHMENTS, MAX_MEMBER_IDS } from '../array-limits.js';
 
 // Betraege im Request (#1607): eine Regel fuer Ausgabe, Genau-Anteil und Zahlung,
 // durchgesetzt in parseMoneyToMinor().
@@ -328,11 +329,13 @@ function expenseProperties({ update = false } = {}) {
     split_method: oneOf(SPLIT_METHODS, update ? `How the amount is split. ${wasReset('split it `equal`')}` : 'How the amount is split; left out: `equal`.'),
     participants: {
       type: 'array',
+      maxItems: MAX_MEMBER_IDS,
       items: bodyId('A member of the group.'),
       description: update ? 'Who shares the amount; left out: the stored participants.' : 'Who shares the amount; left out: the payer.',
     },
     splits: {
       type: 'array',
+      maxItems: MAX_MEMBER_IDS,
       items: SPLIT_ENTRY,
       description: 'The value per participant for `exact`, `percentage` and `shares`; ignored with `equal`. Left out with a method that reads values: 400.',
     },
@@ -348,6 +351,7 @@ function expenseProperties({ update = false } = {}) {
     },
     attachment_document_ids: {
       type: 'array',
+      maxItems: MAX_ATTACHMENTS,
       items: bodyId('A document of the Documents module.'),
       description: update
         ? 'Replaces the receipt links; `[]` removes them all. Left out: untouched. Not `null` and not a single id: until #2810 any value that was not a list removed every receipt.'
@@ -373,8 +377,8 @@ const RECURRING_CREATE = {
     currency: currency('Without it: the currency of the group.'),
     payer_id: bodyId('Who pays; left out: the caller.'),
     split_method: oneOf(SPLIT_METHODS, 'How the amount is split; left out: `equal`.'),
-    participants: { type: 'array', items: bodyId('A member of the group.'), description: 'Who shares the amount; left out: the payer.' },
-    splits: { type: 'array', items: SPLIT_ENTRY, description: 'The value per participant for `exact`, `percentage` and `shares`.' },
+    participants: { type: 'array', maxItems: MAX_MEMBER_IDS, items: bodyId('A member of the group.'), description: 'Who shares the amount; left out: the payer.' },
+    splits: { type: 'array', maxItems: MAX_MEMBER_IDS, items: SPLIT_ENTRY, description: 'The value per participant for `exact`, `percentage` and `shares`.' },
     category: oneOf(CATEGORIES, 'The older split-expense category; left out: `general`.'),
     budget_category: BUDGET_CATEGORY,
     frequency: oneOf(FREQUENCIES, 'The rhythm of the series.'),
@@ -391,8 +395,8 @@ const RECURRING_UPDATE = {
     currency: currency('Without it the amount is read in the currency of the recurring expense.'),
     payer_id: bodyId('Who pays.'),
     split_method: oneOf(SPLIT_METHODS, 'How the amount is split.'),
-    participants: { type: 'array', items: bodyId('A member of the group.') },
-    splits: { type: 'array', items: SPLIT_ENTRY },
+    participants: { type: 'array', maxItems: MAX_MEMBER_IDS, items: bodyId('A member of the group.') },
+    splits: { type: 'array', maxItems: MAX_MEMBER_IDS, items: SPLIT_ENTRY },
     category: oneOf(CATEGORIES, 'The older split-expense category.'),
     budget_category: BUDGET_CATEGORY,
     frequency: oneOf(FREQUENCIES, 'The rhythm of the recurring expense.'),
@@ -412,6 +416,7 @@ const GROUP_FIELDS = {
 /** The preset values per member (#517), read for `percentage` and `shares`. */
 const DEFAULT_SPLIT_CONFIG = {
   type: ['array', 'null'],
+  maxItems: MAX_MEMBER_IDS,
   description: 'Preset values per member for `percentage` and `shares`. Entries for non-members, doubles and values outside the rule of the method are dropped, not refused; an empty result, `[]` or `null` clears the preset.',
   items: {
     type: 'object',

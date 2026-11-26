@@ -1,4 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { CALENDAR_NAME_MAX } from './calendar-fields.js';
 
 const DEFAULT_CALENDAR_NAME = 'Yuvomi';
 const DEFAULT_CALENDAR_COLOR = '#007AFF';
@@ -62,8 +63,6 @@ function validateCalendarId(conn, raw, { required = false } = {}) {
   }
   return { value: row.id, error: null };
 }
-
-const CALENDAR_NAME_MAX = 80;
 
 // Ein leerer oder zu langer Name ist ein Fall, den ein Nutzer im Dialog
 // erreicht: er traegt `reason` und die Grenze (#1909). Ein Name, der kein Text

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { google } from 'googleapis';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { createLogger } from '../logger.js';
 import { MAX_UPLOAD_BYTES } from '../utils/upload-limit.js';
 
@@ -89,8 +90,16 @@ function createClient() {
   );
 }
 
-function attachTokenPersistence(client) {
-  client.on?.('tokens', (tokens) => {
+/**
+ * @param {any} client
+ * @param {string} refreshToken the grant this client was loaded with
+ */
+function attachTokenPersistence(client, refreshToken) {
+  client.on?.('tokens', (/** @type {any} */ tokens) => {
+    // A client kept from before another account was connected (the cleanup
+    // of a staged upload, #2946) must not write its access token over the
+    // new account's.
+    if (cfgGet('refresh_token') !== refreshToken) return;
     if (tokens.access_token) cfgSet('access_token', tokens.access_token);
     if (tokens.expiry_date) cfgSet('token_expiry', tokens.expiry_date);
   });
@@ -112,7 +121,7 @@ function loadAuthorizedClient() {
       ? Number.parseInt(cfgGet('token_expiry'), 10)
       : undefined,
   });
-  attachTokenPersistence(client);
+  attachTokenPersistence(client, refreshToken);
   return client;
 }
 
@@ -153,7 +162,13 @@ async function createFolder(drive, name, parentId = null) {
   return response.data;
 }
 
-async function ensureAppFolder(drive, { persist = true } = {}) {
+/**
+ * @param {any} drive
+ * @param {{ persist?: boolean, accountId?: string | null }} [options]
+ *   `accountId`: the account `drive` belongs to; without it the stored one,
+ *   read here before the first await
+ */
+async function ensureAppFolder(drive, { persist = true, accountId = cfgGet('account_id') } = {}) {
   const storedId = cfgGet('folder_id');
   if (storedId) {
     try {
@@ -173,7 +188,10 @@ async function ensureAppFolder(drive, { persist = true } = {}) {
     || await createFolder(drive, APP_FOLDER_NAME);
   const documentsFolder = await findFolder(drive, DOCUMENTS_FOLDER_NAME, appFolder.id)
     || await createFolder(drive, DOCUMENTS_FOLDER_NAME, appFolder.id);
-  if (persist) {
+  // The folder belongs to the account of `drive`. Another account connected
+  // during the awaits above has its own folder; this one is not written over
+  // it (#2946).
+  if (persist && cfgGet('account_id') === accountId) {
     cfgSet('folder_id', documentsFolder.id);
     cfgSet('folder_name', DISPLAY_FOLDER_NAME);
   }
@@ -246,6 +264,45 @@ export function getAuthUrl(session) {
   });
 }
 
+function firstDriveDocument() {
+  return db.get().prepare(`
+    SELECT storage_key
+    FROM family_documents
+    WHERE storage_backend = 'google_drive'
+    ORDER BY id
+    LIMIT 1
+  `).get();
+}
+
+// Documents already in Drive belong to the stored account; another account
+// would cut them off.
+/** @param {{ permissionId?: string | null }} account */
+function assertStoringAccount(account) {
+  const storedAccountId = cfgGet('account_id');
+  if (!storedAccountId || storedAccountId !== account.permissionId) {
+    throw new GoogleDriveStorageError(
+      'DOCUMENT_STORAGE_CONFIG_PROTECTED',
+      'The connected Google account does not match the account that stores existing documents.'
+    );
+  }
+}
+
+/** The account new uploads go to; no secret (#2946, upload target stamp). */
+export function connectedAccountId() {
+  return cfgGet('account_id');
+}
+
+/**
+ * The connection an upload goes through, opened in one synchronous step: the
+ * authorized client of the stored grant and the account it belongs to
+ * (#2946). The caller keeps it in memory for the request only, to stamp the
+ * upload and to remove the file again through the same account if the write
+ * is refused; it is never stored or logged.
+ */
+export function openUploadConnection() {
+  return { accountId: cfgGet('account_id'), drive: createDrive() };
+}
+
 export async function handleCallback(code) {
   const candidate = createClient();
   const { tokens } = await candidate.getToken(code);
@@ -268,21 +325,9 @@ export async function handleCallback(code) {
     );
   }
 
-  const existingDocument = db.get().prepare(`
-    SELECT storage_key
-    FROM family_documents
-    WHERE storage_backend = 'google_drive'
-    ORDER BY id
-    LIMIT 1
-  `).get();
+  const existingDocument = firstDriveDocument();
   if (existingDocument) {
-    const storedAccountId = cfgGet('account_id');
-    if (!storedAccountId || storedAccountId !== account.permissionId) {
-      throw new GoogleDriveStorageError(
-        'DOCUMENT_STORAGE_CONFIG_PROTECTED',
-        'The connected Google account does not match the account that stores existing documents.'
-      );
-    }
+    assertStoringAccount(account);
     try {
       await drive.files.get({ fileId: existingDocument.storage_key, fields: 'id' });
     } catch (error) {
@@ -295,7 +340,11 @@ export async function handleCallback(code) {
   }
 
   const folder = await ensureAppFolder(drive, { persist: false });
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
+    // The Drive calls above let other requests run (#2946): a first document
+    // may have been stored meanwhile. The account check is decided again on
+    // the documents as they are at the write.
+    if (firstDriveDocument()) assertStoringAccount(account);
     if (tokens.access_token) cfgSet('access_token', tokens.access_token);
     else cfgDel('access_token');
     cfgSet('refresh_token', tokens.refresh_token);
@@ -309,7 +358,7 @@ export async function handleCallback(code) {
     if (account.displayName) cfgSet('account_name', account.displayName);
     else cfgDel('account_name');
     cfgDel('last_error');
-  })();
+  });
   log.info('Google Drive OAuth connection saved.');
   return getStatus();
 }
@@ -355,10 +404,15 @@ export function getStatus() {
   };
 }
 
-export async function uploadFile({ buffer, mime = 'application/octet-stream', originalName } = {}) {
+/**
+ * @param {{ buffer?: any, mime?: string, originalName?: string,
+ *   connection?: { drive: any, accountId: string | null } }} [options]
+ *   `connection` from openUploadConnection(); without it the stored grant
+ */
+export async function uploadFile({ buffer, mime = 'application/octet-stream', originalName, connection } = {}) {
   const content = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || '');
-  const drive = createDrive();
-  const folder = await ensureAppFolder(drive);
+  const { drive, accountId } = connection ?? openUploadConnection();
+  const folder = await ensureAppFolder(drive, { accountId });
   try {
     const response = await drive.files.create({
       requestBody: {
@@ -383,8 +437,13 @@ export async function uploadFile({ buffer, mime = 'application/octet-stream', or
   }
 }
 
-export async function readFile(fileId) {
-  const drive = createDrive();
+/**
+ * @param {string} fileId
+ * @param {{ connection?: { drive: any } }} [options] the connection to read
+ *   through; without it the stored grant
+ */
+export async function readFile(fileId, { connection } = {}) {
+  const drive = connection?.drive ?? createDrive();
   try {
     const metadata = await drive.files.get({
       fileId,
@@ -415,8 +474,13 @@ export async function readFile(fileId) {
   }
 }
 
-export async function deleteFile(fileId) {
-  const drive = createDrive();
+/**
+ * @param {string} fileId
+ * @param {{ connection?: { drive: any } }} [options] the connection the file
+ *   was uploaded through; without it the stored grant
+ */
+export async function deleteFile(fileId, { connection } = {}) {
+  const drive = connection?.drive ?? createDrive();
   try {
     await drive.files.delete({ fileId });
   } catch (error) {
@@ -432,25 +496,35 @@ export async function deleteFile(fileId) {
 export async function testConnection() {
   const expected = Buffer.from(`yuvomi-google-drive-test:${randomUUID()}`);
   let fileId = null;
+  // The whole roundtrip goes through one account, and its result is written
+  // only while that account is still the connected one: another account
+  // connected during the test has not been tested (#2946).
+  /** @type {{ drive: any, accountId: string | null } | null} */
+  let connection = null;
+  const stillConnected = () => connection !== null && cfgGet('account_id') === connection.accountId;
   try {
+    connection = openUploadConnection();
     fileId = await uploadFile({
       buffer: expected,
       mime: 'application/octet-stream',
       originalName: '.connection-test.bin',
+      connection,
     });
-    const actual = await readFile(fileId);
+    const actual = await readFile(fileId, { connection });
     if (!actual.buffer.equals(expected)) {
       throw new Error('Google Drive roundtrip verification failed.');
     }
-    await deleteFile(fileId);
+    await deleteFile(fileId, { connection });
     fileId = null;
-    cfgSet('last_test', new Date().toISOString());
-    cfgDel('last_error');
+    if (stillConnected()) {
+      cfgSet('last_test', new Date().toISOString());
+      cfgDel('last_error');
+    }
     return { ok: true };
   } catch (error) {
     if (fileId) {
       try {
-        await deleteFile(fileId);
+        await deleteFile(fileId, { connection: connection ?? undefined });
       } catch {
         // Preserve the primary test failure.
       }
@@ -464,7 +538,7 @@ export async function testConnection() {
     ) {
       throw error;
     }
-    cfgSet('last_error', 'Google Drive connection test failed.');
+    if (stillConnected()) cfgSet('last_error', 'Google Drive connection test failed.');
     throw new GoogleDriveStorageError(
       'DOCUMENT_STORAGE_CONNECTION_TEST_FAILED',
       'The Google Drive connection test failed.',

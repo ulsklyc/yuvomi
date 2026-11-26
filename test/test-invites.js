@@ -15,8 +15,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import express from 'express';
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { createAuthApp } from './auth-app.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 
 const { createInviteService } = await import('../server/services/invites.js');
 
@@ -26,11 +26,7 @@ const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const AFTER_TTL = T0 + TTL_MS + 1;
 
 function makeDb() {
-  const db = new DatabaseSync(':memory:');
-  db.exec('PRAGMA foreign_keys = ON;');
-  db.exec(MIGRATIONS_SQL[1]);   // users
-  db.exec(MIGRATIONS_SQL[121]); // invites
-  db.exec(MIGRATIONS_SQL[171]); // invites.permissions (#869)
+  const db = openSchemaDb();
   db.prepare(`INSERT INTO users (id, username, display_name, password_hash)
     VALUES (1, 'alice', 'Alice', 'x'), (2, 'bob', 'Bob', 'x')`).run();
   return db;
@@ -113,7 +109,7 @@ test('markAccepted greift nach Ablauf nicht mehr, auch mit gültig geprüftem To
   const db = makeDb();
   const { token } = svcAt(db, T0).createInvite({ createdBy: 1 });
   // Der Ablauf faellt zwischen verifyToken und markAccepted: beim Einloesen liegt
-  // dazwischen ein bcrypt-Hash von rund 300 ms.
+  // dazwischen ein Passwort-Hash (Argon2id, rund 20 ms).
   assert.notEqual(svcAt(db, T0).verifyToken(token), null);
   assert.equal(svcAt(db, AFTER_TTL).markAccepted(token, 2), 0);
   assert.equal(db.prepare('SELECT accepted_at FROM invites').get().accepted_at, null);
@@ -227,12 +223,6 @@ const sentMails = [];
 let actor = ADM;
 let mailConfigured = true;
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.session = { csrfToken: CSRF, ...(actor ? { userId: actor.id, role: actor.role } : {}) };
-  next();
-});
 const inviteRouter = express.Router();
 buildInviteRoutes(inviteRouter, {
   database: routeDb,
@@ -244,10 +234,18 @@ buildInviteRoutes(inviteRouter, {
   baseUrl: 'https://yuvomi.test',
   limiter: (_req, _res, next) => next(), // Rate-Limit im Test überbrücken
 });
-app.use('/auth', inviteRouter);
+// At the real prefix (test/auth-app.js); the paths below say `/auth/...`, the
+// base carries `/api/v1`.
+const app = await createAuthApp({
+  auth: (req, _res, next) => {
+    req.session = { csrfToken: CSRF, ...(actor ? { userId: actor.id, role: actor.role } : {}) };
+    next();
+  },
+  routers: [inviteRouter],
+});
 const server = app.listen(0, '127.0.0.1');
 const routeBase = await new Promise((r) =>
-  server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+  server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1`)));
 
 async function call(method, path, { actor: a, body, csrf = CSRF } = {}) {
   if (a !== undefined) actor = a;
@@ -369,8 +367,14 @@ test('GET /invites liefert nie token oder token_hash', async () => {
 });
 
 test('GET /invites/preview: Unsinn-Token liefert valid false statt 500', async () => {
+  // Ohne `token` weist seit #2810 (Gruppe 12a) das Dokument ab (der Parameter ist Pflicht).
   for (const query of ['?token=quatsch', '?token=', '']) {
     const res = await call('GET', `/auth/invites/preview${query}`, { actor: null });
+    if (query === '') {
+      assert.equal(res.status, 400);
+      assert.deepEqual(res.body.fields, [{ path: 'query/token', rule: 'required' }]);
+      continue;
+    }
     assert.equal(res.status, 200);
     assert.equal(res.body.data.valid, false);
   }

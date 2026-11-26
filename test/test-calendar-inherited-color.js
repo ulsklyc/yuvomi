@@ -237,37 +237,6 @@ test('Migration 166 uebersteht eine DB, der die tzid-Spalte fehlt (#549)', () =>
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, 3, 'ohne Zeilen zu verlieren');
 });
 
-test('der Test-Schema-Auszug haelt die Spalte ebenfalls nullable', async () => {
-  // `server/db-schema-test.js` ist ein handgeschriebener AUSZUG, aus dem viele
-  // Suiten ihre Datenbank bauen statt die ganze Migrationskette zu fahren. Er
-  // driftet still: haelt er `color` weiter NOT NULL, laufen genau die Suiten
-  // gruen darueber, die den neuen Zustand pruefen wollten - ihre Fixtures
-  // koennen ihn gar nicht herstellen. Dieselbe Datei lag schon einmal sieben
-  // Eintraege daneben, und `test:schema-mirror` faellt das nicht auf: der Guard
-  // prueft die Zuordnung der Migrationsnummern, nicht die Spaltendefinitionen.
-  const { MIGRATIONS_SQL } = await import('../server/db-schema-test.js');
-
-  for (const key of [1, 11]) {
-    const sql = MIGRATIONS_SQL[key];
-    if (!sql || !/CREATE TABLE[^;]*calendar_events/.test(sql)) continue;
-    const db = new Database(join(tempDir('yuvomi-auszug-'), 'db.sqlite'));
-    // Jeder Eintrag ist fuer sich lesbar, seine Nachbartabellen fehlen aber - die
-    // Suiten fahren jeweils die, die sie brauchen. Geprueft wird hier die
-    // Spalte, nicht die Verweisintegritaet, deshalb ohne Fremdschluessel.
-    db.pragma('foreign_keys = OFF');
-    db.exec(sql);
-    const col = db.prepare('PRAGMA table_info(calendar_events)').all().find((c) => c.name === 'color');
-    assert.equal(col.notnull, 0, `MIGRATIONS_SQL[${key}]: color muss NULL annehmen wie in Produktion`);
-
-    // Und es wirklich koennen - eine Spaltendefinition ist eine Behauptung,
-    // ein INSERT ist der Beleg.
-    db.prepare(`INSERT INTO calendar_events (title, start_datetime, color, created_by)
-                VALUES ('Farblos', '2040-01-01T09:00', NULL, 1)`).run();
-    assert.equal(db.prepare('SELECT color FROM calendar_events').get().color, null);
-    db.close();
-  }
-});
-
 // --------------------------------------------------------
 // Die Farbe bekommt einen eigenen Zustand (Migration 167, #899)
 // --------------------------------------------------------
@@ -310,22 +279,6 @@ test('Migration 167 laesst einen neuen Termin bei 0 anfangen', () => {
               VALUES ('Frisch importiert', '2040-01-01T09:00', 1)`).run();
   const neu = db.prepare("SELECT color_modified FROM calendar_events WHERE title = 'Frisch importiert'").get();
   assert.equal(neu.color_modified, 0);
-});
-
-test('der Test-Schema-Auszug kennt den Zustand ebenfalls', async () => {
-  // Dieselbe Falle wie bei der nullable Farbe darueber: fehlt die Spalte im
-  // Auszug, stirbt jede Suite, die einen Sync-Upsert faehrt, an `no such
-  // column` - und zwar an einer Stelle, die mit ihrem Pruefzweck nichts zu tun
-  // hat. Der Beleg ist deshalb ein INSERT, keine Spaltendefinition.
-  const { MIGRATIONS_SQL } = await import('../server/db-schema-test.js');
-  const sql = MIGRATIONS_SQL[11];
-  const db = new Database(join(tempDir('yuvomi-auszug-'), 'db.sqlite'));
-  db.pragma('foreign_keys = OFF');
-  db.exec(sql);
-  db.prepare(`INSERT INTO calendar_events (title, start_datetime, created_by)
-              VALUES ('Farblos', '2040-01-01T09:00', 1)`).run();
-  assert.equal(db.prepare('SELECT color_modified FROM calendar_events').get().color_modified, 0);
-  db.close();
 });
 
 // --------------------------------------------------------

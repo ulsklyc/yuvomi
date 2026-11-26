@@ -22,7 +22,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
-import express from 'express';
 import { eachRule } from './css-rules.js';
 
 process.env.DB_PATH = ':memory:';
@@ -31,7 +30,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'dashboard-rewards-te
 register('./test-browser-loader.mjs', import.meta.url);
 
 const { get } = await import('../server/db.js');
-const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { __test } = await import('../public/pages/dashboard.js');
 const { selectMetricTiles } = __test;
 // Die Stub-Uebersetzung liefert `key{"a":1}`; im Markup steht das durch esc()
@@ -69,18 +68,19 @@ d.prepare("INSERT INTO reward_redemptions (user_id, reward_name, cost, status) V
 d.prepare("INSERT INTO reward_redemptions (user_id, reward_name, cost, status) VALUES (?, 'Eis', 10, 'pending')").run(EMMA);
 
 async function dashboardAs(userId, authRole) {
-  const app = express();
-  app.use((req, _res, next) => {
-    req.authUserId = userId;
-    req.authRole = authRole;
-    req.session = { userId };
-    next();
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => {
+      req.authUserId = userId;
+      req.authRole = authRole;
+      req.session = { userId };
+      next();
+    },
   });
-  app.use('/', dashboardRouter);
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    return await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    return await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

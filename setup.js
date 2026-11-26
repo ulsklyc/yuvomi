@@ -2,11 +2,11 @@
  * Modul: Setup-Script
  * Zweck: Erstmalige Einrichtung - ersten Admin-User anlegen.
  *        Wird einmalig nach dem ersten Start ausgeführt: `node setup.js`
- * Abhängigkeiten: server/db.js, bcrypt, dotenv
+ * Abhängigkeiten: server/db.js, server/utils/password.js, dotenv
  */
 
 import readline from 'node:readline';
-import bcrypt from 'bcrypt';
+import { hashPassword } from './server/utils/password.js';
 import './server/utils/load-file-secrets.js';
 import * as db from './server/db.js';
 import os from 'node:os';
@@ -110,7 +110,7 @@ async function main() {
 
   console.log('\nCreating account …');
 
-  const hash = await bcrypt.hash(password, 12);
+  const hash = await hashPassword(password);
 
   try {
     const result = db.get()

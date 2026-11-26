@@ -27,15 +27,10 @@ import { runExternalJob, waitUntilIdle } from './utils/restore-state.js';
 import { readinessHandler } from './services/readiness.js';
 import { createErrorHandler } from './middleware/error-handler.js';
 import { buildOpenApiSpec } from './openapi.js';
+import { validateRequest } from './api/validate-request.ts';
 import * as googleCalendar from './services/google-calendar.js';
 import * as appleCalendar from './services/apple-calendar.js';
 import * as icsSubscription from './services/ics-subscription.js';
-import * as icsExport from './services/ics-export.js';
-import { findCalendarByFeedToken } from './services/local-calendars.js';
-import * as inventoryDeadlinesIcs from './services/inventory-deadlines-ics.js';
-import * as cycleIcs from './services/cycle-ics.js';
-import * as scheduleIcs from './services/schedule-ics.js';
-import * as wasteIcs from './services/waste-ics.js';
 import * as caldavReminders from './services/caldav-reminders-sync.js';
 import * as caldavSync from './services/caldav-sync.js';
 import * as outlookCalendar from './services/outlook-calendar.js';
@@ -64,7 +59,6 @@ import quickLinksRouter from './routes/quick-links.js';
 import contactsRouter from './routes/contacts.js';
 import cardavRouter from './routes/cardav.js';
 import birthdaysRouter from './routes/birthdays.js';
-import * as birthdayIcs from './services/birthday-ics.js';
 import budgetRouter from './routes/budget.js';
 import subscriptionsRouter from './routes/subscriptions.js';
 import documentsRouter from './routes/documents.js';
@@ -93,7 +87,7 @@ import { pairingRouter } from './routes/displays.js';
 import { peopleRouter } from './routes/displays.js';
 import { displayMayAct } from './display-scopes.js';
 import { splitGuestMayReach } from './split-guest-scope.js';
-import { actorForUser, actorFromRequest, mayReceiveFeed } from './authorize/index.ts';
+import { actorFromRequest } from './authorize/index.ts';
 import { DISPLAY_PASSWORD_SENTINEL } from './services/display-accounts.js';
 import backupRouter from './routes/backup.js';
 import housekeepingRouter from './routes/housekeeping.js';
@@ -110,13 +104,14 @@ import permissionsRouter from './routes/permissions.js';
 import changelogRouter from './routes/changelog.js';
 import systemRouter from './routes/system.js';
 import mcpRouter from './mcp/server.js';
+import icsFeedsRouter from './routes/ics-feeds.js';
 import scheduleRouter from './routes/schedule.js';
 import scheduleFeedRouter from './routes/schedule-feed.js';
 import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
 import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
-import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './authorize/index.ts';
-import { FEED_MODULE } from './services/reminder-origins.js';
+import { moduleAccessVerdict } from './authorize/index.ts';
+import { sendModuleGateRefusal } from './middleware/gate-now.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
 import { createStaticAssets } from './utils/static-assets.js';
@@ -423,7 +418,7 @@ app.use('/api/', imageLimiter);
 // API-Routen
 // --------------------------------------------------------
 // Anmeldung, Passwort-Reset und Einladungen schreiben ebenfalls - /auth/login
-// liest den Nutzer, wartet auf bcrypt und schreibt dann die Sitzung. Ein
+// liest den Nutzer, wartet auf den Passwort-Hash und schreibt dann die Sitzung. Ein
 // Restore in dieser Luecke wartet sie ab, statt dass die Sitzung nach dem Tausch
 // in der eingespielten Datenbank landet (#1441). Der Koerper ist hier schon
 // gelesen (express.json oben), eine langsame Anfrage haelt also nichts auf.
@@ -552,161 +547,19 @@ function sendOpenApi(req, res) {
   res.json(buildOpenApiSpec(req, APP_VERSION));
 }
 
-app.get('/api/v1/openapi.json', requireAuth, requireAdmin, sendOpenApi);
+// validateRequest() after the admin check: anonymous 401 and a member's 403
+// come before a 400 about `download` (#2810, group 13).
+app.get('/api/v1/openapi.json', requireAuth, requireAdmin, validateRequest(), sendOpenApi);
 // /openapi.json liegt außerhalb von /api/, daher Rate-Limiter explizit als Route-Middleware.
-app.get('/openapi.json', apiLimiter, requireAuth, requireAdmin, sendOpenApi);
+app.get('/openapi.json', apiLimiter, requireAuth, requireAdmin, validateRequest(), sendOpenApi);
 
 // --------------------------------------------------------
 // Öffentlicher read-only ICS-Feed (Discussion #387)
-// Außerhalb /api/v1: keine Session/CSRF — Token in URL ist das Geheimnis.
+// Außerhalb /api/v1: keine Session/CSRF - Token in URL ist das Geheimnis. Die
+// sechs Feeds, ihr gemeinsamer Limiter und validateRequest() stehen in
+// server/routes/ics-feeds.js (#2810, Gruppe 13).
 // --------------------------------------------------------
-const feedLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// A member's feed follows the member's module permission (#2615). The feeds sit
-// outside `/api/v1`, so the module gate there never reached them, and revoking
-// a permission leaves the feed tokens in place. On `none` - and for an owner
-// that no longer resolves - the feed answers 200 with an EMPTY calendar under
-// the same headers instead of 404: the subscription stays in the calendar app
-// and fills again once the permission is given back (skip, do not delete, as
-// the delivery of reminders since #1289). `read` keeps delivering, an admin is
-// never affected. The household module switch stays deliberately open for
-// feeds (docs/DECISIONS.md). A feed is a delivery, not a request: `receive`,
-// without token scopes, and no feed for a display or a split guest
-// (mayReceiveFeed in server/authorize/).
-function feedModuleDenied(userId, feed) {
-  return !mayReceiveFeed(actorForUser(db.get(), userId), FEED_MODULE[feed]);
-}
-
-app.get('/feed/calendar/:token.ics', feedLimiter, (req, res) => {
-  try {
-    const userId = icsExport.findUserIdByFeedToken(db.get(), 'calendar_feed_token', req.params.token);
-    const localCalendar = userId ? null : findCalendarByFeedToken(db.get(), req.params.token);
-    if (!userId && !localCalendar) return res.status(404).type('text/plain').send('Not found');
-    // A local calendar's token belongs to the calendar, not to a member: no gate.
-    const ics = !userId
-      ? icsExport.buildCalendarFeed(db.get(), localCalendar.id)
-      : feedModuleDenied(userId, 'calendar')
-        ? icsExport.buildEmptyFeed(db.get())
-        : icsExport.buildFeed(db.get(), userId);
-    res.set('Cache-Control', 'private, no-store');
-    res.set('Content-Disposition', `inline; filename="${localCalendar ? `yuvomi-${localCalendar.id}.ics` : 'yuvomi.ics'}"`);
-    res.type('text/calendar; charset=utf-8').send(ics);
-  } catch (err) {
-    log.error('', err);
-    res.status(500).type('text/plain').send('Internal error');
-  }
-});
-
-app.get('/feed/birthdays/:token.ics', feedLimiter, (req, res) => {
-  try {
-    const userId = birthdayIcs.findUserIdByFeedToken(db.get(), req.params.token);
-    if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = feedModuleDenied(userId, 'birthdays')
-      ? birthdayIcs.buildEmptyBirthdayFeed(db.get())
-      : birthdayIcs.buildBirthdayFeed(db.get());
-    res.set('Cache-Control', 'private, no-store');
-    res.set('Content-Disposition', 'inline; filename="yuvomi-birthdays.ics"');
-    res.type('text/calendar; charset=utf-8').send(ics);
-  } catch (err) {
-    log.error('Birthday feed', err);
-    res.status(500).type('text/plain').send('Internal error');
-  }
-});
-
-// Eigenständiger Feed für Inventar-Garantiefristen (Stufe 4) - getrennt vom
-// Haushaltskalender-Feed oben, siehe server/services/inventory-deadlines-ics.js.
-app.get('/feed/inventory-deadlines/:token.ics', feedLimiter, (req, res) => {
-  try {
-    // Auflösen statt nur prüfen, wie beim Kalender-Feed oben: das Token gehört
-    // einem Nutzer, damit es einzeln zurückziehbar ist. In den Feed-Inhalt geht
-    // die Id nicht ein - Inventar ist Haushaltseigentum ohne Sichtbarkeitsachse.
-    // The id decides only whether the owner still has the module (#2615).
-    const userId = inventoryDeadlinesIcs.findUserIdByFeedToken(db.get(), req.params.token);
-    if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = feedModuleDenied(userId, 'inventory-deadlines')
-      ? inventoryDeadlinesIcs.buildEmptyInventoryDeadlinesFeed(db.get())
-      : inventoryDeadlinesIcs.buildInventoryDeadlinesFeed(db.get());
-    res.set('Cache-Control', 'private, no-store');
-    res.set('Content-Disposition', 'inline; filename="yuvomi-inventory-deadlines.ics"');
-    res.type('text/calendar; charset=utf-8').send(ics);
-  } catch (err) {
-    log.error('', err);
-    res.status(500).type('text/plain').send('Internal error');
-  }
-});
-
-// Vorhergesagter Zyklus-Feed (Phase 5, Health) - anders als der Inventar-Feed
-// oben ist der INHALT hier schon personengebunden (cycle_periods.user_id),
-// nicht nur das Token; siehe server/services/cycle-ics.js.
-//
-// THE VIEW LOCK DOES NOT GATE THIS FEED, THE REVOKED MODULE DOES (#2615).
-// server/services/cycle-reminders.js stops the reminder sync once the cycle
-// tab is locked (household or personal, healthCycleViews()); this feed keeps
-// delivering then - the content is the token owner's own, and an existing
-// subscription on another device should not run empty just because the view
-// is locked in the app; switching it off stays "disable feed" in the settings.
-// `health: none` is a different thing: an administrative decision about the
-// member, and it empties the feed like every other one (feedModuleDenied()).
-app.get('/feed/cycle/:token.ics', feedLimiter, (req, res) => {
-  try {
-    const userId = cycleIcs.findUserIdByFeedToken(db.get(), req.params.token);
-    if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = feedModuleDenied(userId, 'cycle')
-      ? cycleIcs.buildEmptyCycleFeed(db.get())
-      : cycleIcs.buildCycleFeed(db.get(), userId);
-    res.set('Cache-Control', 'private, no-store');
-    res.set('Content-Disposition', 'inline; filename="yuvomi-cycle.ics"');
-    res.type('text/calendar; charset=utf-8').send(ics);
-  } catch (err) {
-    log.error('', err);
-    res.status(500).type('text/plain').send('Internal error');
-  }
-});
-
-// Eigenständiger Feed für den persönlichen Schichtplan (Schedule v3) - anders
-// als beim Inventar-Feed steckt hier die Nutzer-Id auch im Inhalt: gefeedet
-// werden NUR die eigenen aufgelösten Einträge dieses Tokens, siehe
-// server/services/schedule-ics.js.
-app.get('/feed/schedule/:token.ics', feedLimiter, (req, res) => {
-  try {
-    const userId = scheduleIcs.findUserIdByFeedToken(db.get(), req.params.token);
-    if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = feedModuleDenied(userId, 'schedule')
-      ? scheduleIcs.buildEmptyScheduleFeed(db.get())
-      : scheduleIcs.buildScheduleFeed(db.get(), userId);
-    res.set('Cache-Control', 'private, no-store');
-    res.set('Content-Disposition', 'inline; filename="yuvomi-schedule.ics"');
-    res.type('text/calendar; charset=utf-8').send(ics);
-  } catch (err) {
-    log.error('', err);
-    res.status(500).type('text/plain').send('Internal error');
-  }
-});
-
-// Eigenständiger Feed für Abfuhrtermine (Waste, Stufe 10) - anders als beim
-// Schichtplan-Feed oben steckt hier keine Nutzer-Id im INHALT (Abfuhrtermine
-// sind Haushaltseigentum ohne Sichtbarkeitsachse, wie beim Inventar-Feed);
-// nur das optionale Typ-Filter je Nutzer, siehe server/services/waste-ics.js.
-app.get('/feed/waste/:token.ics', feedLimiter, (req, res) => {
-  try {
-    const userId = wasteIcs.findUserIdByFeedToken(db.get(), req.params.token);
-    if (!userId) return res.status(404).type('text/plain').send('Not found');
-    const ics = feedModuleDenied(userId, 'waste')
-      ? wasteIcs.buildEmptyWasteFeed(db.get())
-      : wasteIcs.buildWasteFeed(db.get(), userId);
-    res.set('Cache-Control', 'private, no-store');
-    res.set('Content-Disposition', 'inline; filename="yuvomi-waste.ics"');
-    res.type('text/calendar; charset=utf-8').send(ics);
-  } catch (err) {
-    log.error('', err);
-    res.status(500).type('text/plain').send('Internal error');
-  }
-});
+app.use('/feed', icsFeedsRouter);
 
 // MCP-Endpoint (Streamable HTTP, stateless): Auth über bestehende Bearer-API-Tokens.
 // Eigener Namespace außerhalb von /api/v1 → kein CSRF, kein Guest-Guard.
@@ -841,12 +694,9 @@ app.use('/api/v1', (req, res, next) => {
   // `reason` ist der maschinenlesbare Grund (#1607): der Satz in `error` ist
   // englisch und stand so in jeder Oberflaechensprache im Toast. Die App
   // uebersetzt ueber den Grund (public/api.js), API-Nutzer behalten den Satz.
-  if (verdict === MODULE_ACCESS_DENIED) {
-    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-  }
-  if (verdict === MODULE_ACCESS_READ_ONLY) {
-    return res.status(403).json({ error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' });
-  }
+  // Die Absage selbst steht in server/middleware/gate-now.js: dieselbe gibt
+  // eine Route, die nach einem await vor dem Schreiben noch einmal fragt (#2947).
+  if (sendModuleGateRefusal(res, verdict)) return;
   return next();
 });
 app.use('/api/v1', csrfMiddleware);

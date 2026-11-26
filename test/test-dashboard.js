@@ -11,8 +11,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
 import * as nodeAssert from 'node:assert/strict';
-import express from 'express';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { addLocalDays, toLocalDateKey } from '../public/utils/date.js';
 import { withoutBlockComments } from './source-text.js';
 import { eachRule } from './css-rules.js';
@@ -51,26 +50,8 @@ function assert(condition, msg) {
 // --------------------------------------------------------
 // DB aufbauen
 // --------------------------------------------------------
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`
-  CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-    applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-  );
-`);
-db.exec(MIGRATIONS_SQL[1]);
-db.exec(MIGRATIONS_SQL[2]);  // sync_config - traegt die Haushaltszone (siehe unten)
-db.exec(MIGRATIONS_SQL[85]); // calendar_event_exceptions (EXDATE, #489)
-db.exec(MIGRATIONS_SQL[174]); // birthday/name-day membership exclusions
-db.exec(`
-  ALTER TABLE calendar_events ADD COLUMN target_google_calendar_id TEXT;
-  ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
-  CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
-`);
-db.exec(MIGRATIONS_SQL[245]);
-// Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
-db.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
+// Volles Schema aus der Baseline (test/helpers/schema-db.js); sync_config traegt die Haushaltszone (siehe unten).
+const db = openSchemaDb();
 
 // Testdaten einfügen
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -1514,16 +1495,7 @@ test('Geburtstage: haushaltsweit, sortiert nach nächstem Geburtstag', () => {
  * innerhalb eines Laufs konstant.
  */
 test('Geburtstage: der Stichtag folgt der Haushaltszone, nicht der des Servers', () => {
-  const zdb = new DatabaseSync(':memory:');
-  zdb.exec('PRAGMA foreign_keys = ON;');
-  zdb.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-      applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-    );
-  `);
-  zdb.exec(MIGRATIONS_SQL[1]);
-  zdb.exec(MIGRATIONS_SQL[2]); // sync_config - traegt die Haushaltszone, hier bewusst eine fremde
+  const zdb = openSchemaDb(); // sync_config traegt die Haushaltszone, hier bewusst eine fremde
 
   const zoneUser = zdb.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color)
     VALUES ('zonen-test', 'Zonen Test', 'x', '#FF9500')`).run().lastInsertRowid;
@@ -1558,7 +1530,7 @@ test('Geburtstage: der Stichtag folgt der Haushaltszone, nicht der des Servers',
 
 test('Dashboard-Geburtstagswidget lädt Geburtstage haushaltsweit (Issue #406)', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM reminders WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-birthday-%')").run();
@@ -1580,18 +1552,19 @@ test('Dashboard-Geburtstagswidget lädt Geburtstage haushaltsweit (Issue #406)',
   routeDb.prepare('INSERT INTO birthdays (name, birth_date, created_by) VALUES (?, ?, ?)')
     .run('Widget Other Today', `2011-${today.slice(5)}`, routeUser2);
 
-  const app = express();
-  app.use((req, _res, next) => {
-    req.authUserId = routeUser1;
-    req.session = { userId: routeUser1 };
-    next();
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => {
+      req.authUserId = routeUser1;
+      req.session = { userId: routeUser1 };
+      next();
+    },
   });
-  app.use('/', dashboardRouter);
 
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`);
     const body = await response.json();
     const names = body.birthdays.map((birthday) => birthday.name);
 
@@ -1619,7 +1592,7 @@ test('Dashboard-Geburtstagswidget lädt Geburtstage haushaltsweit (Issue #406)',
 
 test('Dashboard-Endpoint filtert heutige Mahlzeiten nach sichtbaren Typen', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
   const previousMealTypes = routeDb.prepare('SELECT value FROM sync_config WHERE key = ?').get('visible_meal_types')?.value ?? null;
 
@@ -1645,18 +1618,19 @@ test('Dashboard-Endpoint filtert heutige Mahlzeiten nach sichtbaren Typen', asyn
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run();
 
-  const app = express();
-  app.use((req, _res, next) => {
-    req.authUserId = routeUser;
-    req.session = { userId: routeUser };
-    next();
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => {
+      req.authUserId = routeUser;
+      req.session = { userId: routeUser };
+      next();
+    },
   });
-  app.use('/', dashboardRouter);
 
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`);
     const body = await response.json();
 
     nodeAssert.equal(response.status, 200);
@@ -1683,7 +1657,7 @@ test('Dashboard-Endpoint filtert heutige Mahlzeiten nach sichtbaren Typen', asyn
 // (authRole). Die Sichten einzeln prueft test/test-dashboard-rewards.js.
 test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und offene Freigaben', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM users WHERE username LIKE 'dashboard-rewards-%'").run();
@@ -1709,13 +1683,14 @@ test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und of
   routeDb.prepare(`INSERT INTO reward_redemptions (user_id, reward_name, cost, status)
     VALUES (?, 'Kino', 50, 'pending')`).run(kidB);
 
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = parent; req.authRole = 'admin'; req.session = { userId: parent }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = parent; req.authRole = 'admin'; req.session = { userId: parent }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
     const names = body.rewards.standings.map((s) => s.display_name);
     nodeAssert.equal(body.rewards.view, 'approver');
     nodeAssert.equal(names[0], 'Kid A', 'nach Namen, nicht nach Saldo - Kid B hat mehr und steht nicht vorn');
@@ -1732,7 +1707,7 @@ test('Dashboard-Endpoint: Belohnungen liefert Punktestand, Teilnehmerzahl und of
 
 test('Dashboard-Endpoint: Gesundheit zählt heute fällige eigene Dosen und Nachbestellungen', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM users WHERE username LIKE 'dashboard-health-%'").run();
@@ -1821,13 +1796,14 @@ test('Dashboard-Endpoint: Gesundheit zählt heute fällige eigene Dosen und Nach
     INSERT INTO medication_logs (medication_id, scheduled_at, status) VALUES (?, ?, 'skipped')
   `).run(skippedMed, `${localKey}T11:00:00`);
 
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
     nodeAssert.equal(body.health.hasMeds, true);
     // Fällig heute: Tagesmed (07:00), Vitamin D (08:00), Privat-Med (09:00),
     // Genommenmed (10:00), Ausgelassenmed (11:00). Zukunfts-/Abgelaufen-Plan zählen
@@ -1845,7 +1821,7 @@ test('Dashboard-Endpoint: Gesundheit zählt heute fällige eigene Dosen und Nach
 
 test('Dashboard-Endpoint: Haushaltshilfe meldet Anwesenheit, Monatsbesuche und offenen Betrag', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM users WHERE username LIKE 'dashboard-hk-%'").run();
@@ -1872,13 +1848,14 @@ test('Dashboard-Endpoint: Haushaltshilfe meldet Anwesenheit, Monatsbesuche und o
     VALUES (?, ?, 40, 10, NULL, ?, ?)
   `).run(`${currentMonth}-01T09:00:00`, `${currentMonth}-01T13:00:00`, workerId, owner);
 
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
     nodeAssert.equal(body.housekeeping.configured, true);
     nodeAssert.equal(body.housekeeping.present, true);
     nodeAssert.equal(body.housekeeping.workerName, 'Maria');
@@ -1892,7 +1869,7 @@ test('Dashboard-Endpoint: Haushaltshilfe meldet Anwesenheit, Monatsbesuche und o
 
 test('Dashboard-Endpoint: dringende Aufgaben, anstehende Termine, Einkaufslisten und Sparziel', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
 
   routeDb.prepare("DELETE FROM budget_plans WHERE category = '__savings__'").run();
@@ -1943,13 +1920,14 @@ test('Dashboard-Endpoint: dringende Aufgaben, anstehende Termine, Einkaufslisten
   // Monats-Sparziel (Budgetplan) → deckt den savingsGoal-Zweig.
   routeDb.prepare("INSERT INTO budget_plans (category, amount) VALUES ('__savings__', 500)").run();
 
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
 
     const urgent = body.urgentTasks.find((t) => t.title === 'Widget Urgent');
     nodeAssert.ok(urgent, 'dringende Aufgabe erscheint im Widget');
@@ -1992,21 +1970,23 @@ test('Dashboard-Endpoint: dringende Aufgaben, anstehende Termine, Einkaufslisten
 });
 
 test('Dashboard-Endpoint: fehlender Auth-Kontext führt zu 500 (kritischer Fehlerpfad)', async () => {
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
 
-  const app = express();
   // Middleware setzt weder authUserId noch session → der Handler wirft beim Lesen von
-  // req.session.userId und der äußere try/catch liefert die 500-Antwort.
-  app.use((req, _res, next) => { next(); });
-  app.use('/', dashboardRouter);
+  // req.session.userId, und der zentrale Fehlerhandler liefert die 500-Antwort
+  // (seit #2810 Gruppe 10a Schritt b; vorher ein eigener Satz der Route).
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/`);
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`);
     nodeAssert.equal(response.status, 500);
     const body = await response.json();
     nodeAssert.equal(body.code, 500);
-    nodeAssert.equal(body.error, 'Dashboard could not be loaded.');
+    nodeAssert.equal(body.error, 'Internal server error.');
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -2050,83 +2030,10 @@ test('Budget: Monatswerte für Einnahmen, Ausgaben, Saldo und Top-Ausgabe', () =
 // der Vergangenheit liegt, müssen auf der Übersicht erscheinen.
 // --------------------------------------------------------
 
-// Eigene DB mit vollständigem Kalender-Schema (subscription_id, calendar_ref_id).
-const cdb = new DatabaseSync(':memory:');
-cdb.exec('PRAGMA foreign_keys = ON;');
-cdb.exec(`
-  CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL, display_name TEXT NOT NULL,
-    password_hash TEXT NOT NULL, avatar_color TEXT NOT NULL DEFAULT '#007AFF',
-    avatar_data TEXT, avatar_key TEXT
-  );
-  CREATE TABLE external_calendars (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source TEXT NOT NULL DEFAULT 'google', external_id TEXT,
-    name TEXT NOT NULL, color TEXT
-  );
-  CREATE TABLE external_calendar_assignees (calendar_id INTEGER NOT NULL, user_id INTEGER NOT NULL, position INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (calendar_id, user_id));
-  -- color gehoert dazu: sie ist die GEERBTE Farbe eines Abos und wird seit #891
-  -- als cal_color mitgelesen, weil ein Abo-Termin keinen external_calendars-
-  -- Eintrag hat. Fehlt sie hier, misst dieses verkuerzte Schema an der echten
-  -- Abfrage vorbei. Dasselbe gilt fuer source/external_id und die beiden
-  -- target_*-Spalten unten: SOURCE_CALENDAR_JOIN loest darueber die Quelle
-  -- eines noch nicht hochgeladenen Termins auf (#1064).
-  CREATE TABLE ics_subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL, color TEXT, shared INTEGER NOT NULL DEFAULT 0,
-    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE
-  );
-  CREATE TABLE calendar_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL, description TEXT,
-    start_datetime TEXT NOT NULL, end_datetime TEXT,
-    all_day INTEGER NOT NULL DEFAULT 0, location TEXT,
-    color TEXT NOT NULL DEFAULT '#007AFF', icon TEXT NOT NULL DEFAULT 'calendar',
-    assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    external_source TEXT NOT NULL DEFAULT 'local',
-    recurrence_rule TEXT,
-    subscription_id INTEGER REFERENCES ics_subscriptions(id) ON DELETE CASCADE,
-    calendar_ref_id INTEGER REFERENCES external_calendars(id) ON DELETE SET NULL,
-    target_google_calendar_id TEXT, target_caldav_calendar_url TEXT, outbound_move_to TEXT,
-    visibility TEXT NOT NULL DEFAULT 'all',
-    recurrence_parent_id INTEGER REFERENCES calendar_events(id) ON DELETE CASCADE,
-    recurrence_id TEXT,
-    overridden_fields TEXT,
-    attachment_data TEXT
-  );
-  CREATE TABLE event_assignments (
-    event_id INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
-    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    PRIMARY KEY (event_id, user_id)
-  );
-  CREATE TABLE calendar_event_exceptions (
-    event_id       INTEGER NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
-    exception_date TEXT    NOT NULL,
-    created_at     TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    PRIMARY KEY (event_id, exception_date)
-  );
-  -- Für den LEFT JOIN in getUpcomingEvents (Geburtstags-Lokalisierung, Issue #524).
-  CREATE TABLE birthdays (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL, birth_date TEXT NOT NULL,
-    calendar_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
-    name_day TEXT,
-    name_day_calendar_event_id INTEGER REFERENCES calendar_events(id) ON DELETE SET NULL,
-    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    -- Migration 254 (#2095): ohne Jahr liefert der Join kein birthday_date.
-    year_unknown INTEGER NOT NULL DEFAULT 0
-  );
-`);
-
-cdb.exec(`
-  ALTER TABLE calendar_events ADD COLUMN target_caldav_account_id INTEGER;
-  CREATE TABLE housekeeping_work_sessions (id INTEGER PRIMARY KEY, calendar_event_id INTEGER);
-`);
-cdb.exec(MIGRATIONS_SQL[245]);
-// Migration 246 (#1935) hat ein Funktions-up und steht nicht im Spiegel.
-cdb.exec('ALTER TABLE calendar_events ADD COLUMN series_authored INTEGER NOT NULL DEFAULT 0 CHECK(series_authored IN (0, 1));');
+// Eigene DB mit vollem Schema aus der Baseline (test/helpers/schema-db.js): die
+// echten Abfragen (SOURCE_CALENDAR_JOIN, cal_color, Geburtstags-Join) laufen
+// gegen die Spalten, die eine Installation wirklich hat.
+const cdb = openSchemaDb();
 
 const cu1 = cdb.prepare(`INSERT INTO users (username, display_name, password_hash, avatar_color)
   VALUES ('theodore', 'Theodore', 'x', '#34C759')`).run();
@@ -2240,8 +2147,8 @@ test('getUpcomingEvents limits by effective instant after merging moved occurren
       recurrence_rule: 'FREQ=YEARLY', created_by: cuTheo,
     });
     cdb.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(birthday, cuTheo);
-    cdb.prepare('INSERT INTO birthdays (name, birth_date, calendar_event_id) VALUES (?, ?, ?)')
-      .run('Birthday fixture', '2000-01-01', birthday);
+    cdb.prepare('INSERT INTO birthdays (name, birth_date, calendar_event_id, created_by) VALUES (?, ?, ?, ?)')
+      .run('Birthday fixture', '2000-01-01', birthday, cuTheo);
     insertEvent({
       title: 'Unassigned before everything', start_datetime: '2090-01-01T07:00:00Z',
       recurrence_rule: 'FREQ=DAILY', created_by: cuTheo,
@@ -2486,7 +2393,7 @@ test('getUpcomingEvents liest keine großen attachment_data-Bodies', () => {
 });
 
 test('getUpcomingEvents: private ICS-Termine fremder User werden ausgeblendet', () => {
-  const sub = cdb.prepare(`INSERT INTO ics_subscriptions (name, shared, created_by) VALUES ('Privat', 0, ?)`)
+  const sub = cdb.prepare(`INSERT INTO ics_subscriptions (name, url, shared, created_by) VALUES ('Privat', 'https://feed.test/privat.ics', 0, ?)`)
     .run(cuSofia).lastInsertRowid;
   insertEvent({
     title: 'Sofias privater ICS-Termin',
@@ -4731,7 +4638,7 @@ test('Wetter: ohne Tageswerte bleibt die Hoch/Tief-Zeile weg statt leer zu stehe
 
 test('Dashboard serialisiert linked occurrences ohne rohe Persistenzfelder', async () => {
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
   const owner = routeDb.prepare(`
     INSERT INTO users (username, display_name, password_hash, avatar_color, role)
@@ -4756,17 +4663,18 @@ test('Dashboard serialisiert linked occurrences ohne rohe Persistenzfelder', asy
   routeDb.prepare('INSERT INTO calendar_event_exceptions (event_id, exception_date) VALUES (?, ?)')
     .run(masterId, slot);
 
-  const app = express();
-  app.use((req, _res, next) => {
-    req.authUserId = owner;
-    req.session = { userId: owner, role: 'member' };
-    next();
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => {
+      req.authUserId = owner;
+      req.session = { userId: owner, role: 'member' };
+      next();
+    },
   });
-  app.use('/', dashboardRouter);
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/?events_scope=mine`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/?events_scope=mine`)).json();
     const child = body.upcomingEvents.find((event) => Number(event.id) === Number(childId));
     nodeAssert.ok(child, 'linked occurrence musí být v dashboard odpovědi');
     nodeAssert.equal(child.series_id, Number(masterId));
@@ -5768,7 +5676,7 @@ const othersFirst = pendingTests.slice();
 test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe Kachel hinaus', async () => {
   await Promise.allSettled(othersFirst);
   const { get } = await import('../server/db.js');
-  const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const routeDb = get();
   const cleanup = () => {
     routeDb.prepare("DELETE FROM reminders WHERE created_by IN (SELECT id FROM users WHERE username LIKE 'dashboard-u14-%')").run();
@@ -5791,13 +5699,14 @@ test('U14: der Server liefert Geburtstage und Ausgabenkategorien ueber die hohe 
     routeDb.prepare(`INSERT INTO budget_entries (title, amount, category, subcategory, date, created_by)
       VALUES (?, ?, ?, '', ?, ?)`).run(`U14 ${category}`, -(600 - i * 50), category, `${month}-0${1 + i}`, owner);
   });
-  const app = express();
-  app.use((req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); });
-  app.use('/', dashboardRouter);
+  const app = await createCalendarApp({
+    mount: ['dashboard'],
+    auth: (req, _res, next) => { req.authUserId = owner; req.session = { userId: owner }; next(); },
+  });
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   try {
-    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/`)).json();
+    const body = await (await fetch(`http://127.0.0.1:${server.address().port}/api/v1/dashboard/`)).json();
     nodeAssert.equal(body.birthdays.length, 8, 'acht Geburtstage: fuenf fuer die hohe Kachel, drei fuer den gestreckten Platz');
     nodeAssert.ok(body.birthdayTotal >= 10, 'die Gesamtzahl bleibt die ganze');
     nodeAssert.equal(body.budget.topExpenses.length, 5, 'fuenf Kategorien: drei fuer die hohe Kachel, zwei fuer den gestreckten Platz');

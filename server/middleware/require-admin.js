@@ -60,6 +60,17 @@ export function refuseAdmin(req, res) {
 }
 
 /**
+ * THE 401 of requireAuth (server/auth.js): no valid sign-in, or an account
+ * that is no longer active. Also the answer when the account was deactivated
+ * while a request waited for an await and is asked again at the write (#2947,
+ * server/middleware/gate-now.js) - the app signs out on it.
+ * @param {{ status(code: number): { json(body: unknown): unknown } }} res
+ */
+export function sendNotAuthenticated(res) {
+  return res.status(401).json({ error: 'Not authenticated.', code: 401 });
+}
+
+/**
  * Lets only admins through; everyone else gets the one refusal (refuseAdmin).
  */
 export function requireAdmin(req, res, next) {

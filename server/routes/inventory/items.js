@@ -12,10 +12,11 @@
 
 import express from 'express';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import { mayChangeRecord, requestHasCapability, sendNotOwner } from '../../authorize/index.ts';
 import {
   str, oneOf, num, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT,
-} from '../../middleware/validate.js';
+} from '../../api/formats.ts';
 import {
   assertDocumentLinkTargetsAvailable, documentLinksFor, documentLinksOf, documentViewer, loadDocumentLinks, replaceDocumentLinks,
   sendDocumentLinkRefusal,
@@ -438,7 +439,7 @@ router.post('/', validateRequest(), (req, res) => {
     // Datumsrechnung nicht parsen kann -, darf der Gegenstand nicht trotzdem
     // geschrieben bleiben, waehrend die Anfrage mit 500 endet.
     assertDocumentLinkTargetsAvailable(db.get(), req.body.attachment_document_ids, documentViewer(req));
-    const result = db.get().transaction(() => {
+    const result = withTx(db.get(), () => {
       const inserted = db.get().prepare(`
         INSERT INTO inventory_items
           (name, brand, model, serial_number, category, location_id, purchase_date,
@@ -463,7 +464,7 @@ router.post('/', validateRequest(), (req, res) => {
       writeTrackedDates(inserted.lastInsertRowid, trackedDateValues, userId);
 
       return inserted;
-    })();
+    });
 
     // Belege sind optional, deshalb erst nach dem Insert - der Gegenstand
     // steht auch ohne sie, ein unbekanntes Dokument darf ihn nicht scheitern lassen.
@@ -517,7 +518,7 @@ router.put('/:id', validateRequest(), (req, res) => {
 
     // Update und Erinnerungs-Sync in einer Transaktion, gleiche Begruendung wie
     // im POST-Handler: kein halb geschriebener Zustand, wenn syncReminder wirft.
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare(`
         UPDATE inventory_items
         SET name = ?, brand = ?, model = ?, serial_number = ?, category = ?, location_id = ?,
@@ -543,7 +544,7 @@ router.put('/:id', validateRequest(), (req, res) => {
       if (trackedDateValues !== null) {
         writeTrackedDates(item.id, trackedDateValues, item.created_by);
       }
-    })();
+    });
 
     // Belege nur anfassen, wenn das Feld mitkommt - ein PUT, das nur einen
     // Wert korrigiert, darf angehaengte Belege nicht stillschweigend abraeumen
@@ -721,11 +722,11 @@ router.delete('/:id', validateRequest(), (req, res) => {
   if (!item) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
   if (refuseForeignItem(req, res, item)) return;
 
-  const deleted = db.get().transaction(() => {
+  const deleted = withTx(db.get(), () => {
     db.get().prepare("DELETE FROM reminders WHERE entity_type = 'inventory_item' AND entity_id = ?").run(vId.value);
     removeTrackedDateReminders(vId.value);
     return db.get().prepare('DELETE FROM inventory_items WHERE id = ?').run(vId.value);
-  })();
+  });
 
   if (deleted.changes === 0) return res.status(404).json({ error: 'Item not found.', code: 404, reason: 'inventory_item_not_found' });
   res.status(204).end();

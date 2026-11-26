@@ -6,7 +6,8 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
+import { withTx } from '../db/tx.ts';
+import { str, oneOf, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../api/formats.ts';
 import { uniqueKey } from '../utils/category-slug.js';
 import { composeDisplayName, normalizeNameParts } from '../../public/utils/contact-name.js';
 import { CONTACT_PHONE_MAX_LENGTH } from '../../public/utils/contact-limits.js';
@@ -359,7 +360,7 @@ router.post('/categories', validateRequest(), (req, res) => {
 router.patch('/categories/reorder', validateRequest(), (req, res) => {
   const order = Array.isArray(req.body.order) ? req.body.order : [];
   const update = db.get().prepare('UPDATE contact_categories SET sort_order = ? WHERE key = ?');
-  db.get().transaction(() => order.forEach((key, i) => update.run(i, key)))();
+  withTx(db.get(), () => order.forEach((key, i) => update.run(i, key)));
   res.json({ data: loadContactCategories() });
 });
 
@@ -585,7 +586,7 @@ router.post('/', validateRequest(), (req, res) => {
   }
 
   // Insert contact and multi-value fields in a transaction
-  const transaction = db.get().transaction(() => {
+  const contactId = withTx(db.get(), () => {
     const result = db.get().prepare(`
       INSERT INTO contacts (name, category, phone, email, address, notes, birthday, birthday_year_unknown,
                             first_name, last_name, middle_name, name_prefix, name_suffix)
@@ -644,8 +645,6 @@ router.post('/', validateRequest(), (req, res) => {
 
     return contactId;
   });
-
-  const contactId = transaction();
 
   // Query the created contact with multi-value fields
   const contact = db.get().prepare('SELECT * FROM contacts WHERE id = ?').get(contactId);
@@ -772,7 +771,7 @@ router.put('/:id', validateRequest(), (req, res) => {
   }
 
   // Update contact and multi-value fields in a transaction
-  const transaction = db.get().transaction(() => {
+  withTx(db.get(), () => {
     // Update scalar fields
     db.get().prepare(`
       UPDATE contacts
@@ -858,8 +857,6 @@ router.put('/:id', validateRequest(), (req, res) => {
       }
     }
   });
-
-  transaction();
 
   // Query the updated contact with multi-value fields
   const updated = db.get().prepare(`${CONTACT_SELECT} WHERE contacts.id = ?`).get(id);

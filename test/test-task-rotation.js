@@ -27,7 +27,6 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import test from 'node:test';
-import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -35,7 +34,7 @@ process.env.TZ = 'UTC';
 
 const { MIGRATIONS, _setTestDatabase } = await import('../server/db.js');
 const { pickRotationUser, setRotation, nextRotationEntry } = await import('../server/services/task-rotation.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 
 const DAY = 86400000;
 const dayKey = (offsetDays) => new Date(Date.now() + offsetDays * DAY).toISOString().slice(0, 10);
@@ -65,14 +64,13 @@ function mkUser(name) {
 const u2 = mkUser('zwei');
 const u3 = mkUser('drei');
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = uid;
-  req.session = { userId: uid, role: 'admin' };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = uid;
+    req.session = { userId: uid, role: 'admin' };
+    next();
+  },
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;

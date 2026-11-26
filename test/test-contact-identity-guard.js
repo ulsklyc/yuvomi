@@ -17,6 +17,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import { createServer } from 'node:http';
 import { startTestServer, cookieHeader } from './server-ready.js';
 
@@ -111,8 +112,6 @@ async function tokenFor(subjectUserId, scopes) {
 async function withResetRoutes(fn) {
   const sent = [];
   const pending = [];
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   buildResetRoutes(router, {
     database: db,
@@ -124,10 +123,10 @@ async function withResetRoutes(fn) {
     // danach verlaesslich zaehlt statt vom Zufall der Ereignisschleife.
     defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const base = `http://127.0.0.1:${server.address().port}/auth`;
+  const base = `http://127.0.0.1:${server.address().port}/api/v1/auth`;
   const post = (path, body) => fetch(`${base}${path}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }).then(async (r) => {
@@ -424,12 +423,31 @@ test('a group deleted while the account is being prepared leaves no account behi
   assert.equal(c.status, 201);
   const g = await call(kid, 'POST', '/split-expenses/groups', { name: 'Race trip' });
   assert.equal(g.status, 201);
-  const add = call(kid, 'POST', `/split-expenses/groups/${g.body.data.id}/members`, { contact_id: c.body.data.id });
-  // Die Loeschung soll WAEHREND des Hashs ankommen, nicht davor.
-  await new Promise((r) => setTimeout(r, 30));
-  const del = await call(kid, 'DELETE', `/split-expenses/groups/${g.body.data.id}`);
+  // Die Loeschung soll WAEHREND des Hashs ankommen, nicht davor. Das Fenster
+  // stellt der Test selbst her, statt auf die Dauer des Hashes zu wetten (ein
+  // Timer von 30 ms hielt nur, solange bcrypt rund 280 ms rechnete; Argon2id
+  // ist nach rund 20 ms fertig): der erste `crypto.argon2`-Aufruf - den
+  // server/utils/password.js erst beim Aufruf vom geteilten Modulobjekt liest -
+  // startet die Loeschung und rechnet erst, wenn sie beantwortet ist.
+  const crypto = (await import('node:crypto')).default;
+  const original = crypto.argon2;
+  /** @type {{ deletion: Promise<{ status: number, body: any }> | null }} */
+  const held = { deletion: null };
+  crypto.argon2 = /** @type {any} */ (/** @this {any} */ function heldForDeletion(/** @type {any[]} */ ...args) {
+    crypto.argon2 = original;
+    held.deletion = call(kid, 'DELETE', `/split-expenses/groups/${g.body.data.id}`);
+    const resume = () => /** @type {any} */ (original).apply(this, args);
+    held.deletion.then(resume, resume);
+  });
+  let added;
+  try {
+    added = await call(kid, 'POST', `/split-expenses/groups/${g.body.data.id}/members`, { contact_id: c.body.data.id });
+  } finally {
+    crypto.argon2 = original;
+  }
+  assert.ok(held.deletion, 'the deletion ran while the account was being prepared');
+  const del = await held.deletion;
   assert.equal(del.status, 200);
-  const added = await add;
   assert.equal(added.status, 404, `adding answered ${added.status}`);
   assert.equal(db.prepare('SELECT family_user_id FROM contacts WHERE id = ?').get(c.body.data.id).family_user_id, null);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM users WHERE display_name = 'Racer'").get().n, 0);

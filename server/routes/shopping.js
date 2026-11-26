@@ -10,8 +10,9 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, url, date, textShape, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../middleware/validate.js';
-import { handOverToShoppingList, mealPlanSource, previewHandover } from '../services/kitchen-handover.js';
+import { withTx } from '../db/tx.ts';
+import { str, oneOf, url, date, textShape, collectErrors, MAX_TITLE, MAX_SHORT, MAX_TEXT } from '../api/formats.ts';
+import { handOverToShoppingList, handoverTooLarge, handoverTooLargeAnswer, mealPlanSource, previewHandover } from '../services/kitchen-handover.js';
 import { loadItemTagsFor } from '../utils/task-tags.js';
 import {
   flushOutbound, markTodoOutbound, queueTodoDeletions, moveShoppingMirror,
@@ -24,6 +25,7 @@ import { buildShoppingListMail } from '../services/shopping-mail.js';
 import { householdTimeZone, utcToWall } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log = createLogger('Shopping');
 
@@ -266,7 +268,7 @@ router.put('/categories/:catId', validateRequest(), (req, res) => {
   if (conflict) return res.status(409).json({ error: 'Category already exists.', code: 409, reason: 'category_exists' });
 
   // Artikel und Küche, die die alte Kategorie nutzen, mitumbenennen
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get()
       .prepare('UPDATE shopping_items SET category = ? WHERE category = ?')
       .run(vName.value, cat.name);
@@ -274,7 +276,7 @@ router.put('/categories/:catId', validateRequest(), (req, res) => {
     db.get()
       .prepare('UPDATE shopping_categories SET name = ? WHERE id = ?')
       .run(vName.value, cat.id);
-  })();
+  });
 
   const updated = db.get()
     .prepare('SELECT * FROM shopping_categories WHERE id = ?')
@@ -305,7 +307,7 @@ router.delete('/categories/:catId', validateRequest(), (req, res) => {
     .prepare('SELECT name FROM shopping_categories WHERE id != ? ORDER BY sort_order ASC LIMIT 1')
     .get(cat.id);
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     // Umziehende Artikel hinten anstellen, je Liste (#678). Ohne den Versatz
     // behielten sie ihre Ränge aus der gelöschten Kategorie und mischten sich
     // zwischen die handsortierten der Zielkategorie - eine Reihenfolge, die
@@ -332,7 +334,7 @@ router.delete('/categories/:catId', validateRequest(), (req, res) => {
     db.get()
       .prepare('DELETE FROM shopping_categories WHERE id = ?')
       .run(cat.id);
-  })();
+  });
 
   res.json({ ok: true });
 });
@@ -349,9 +351,9 @@ router.patch('/categories/reorder', validateRequest(), (req, res) => {
     return res.status(400).json({ error: 'order must be a non-empty array of ids.', code: 400 });
 
   const update = db.get().prepare('UPDATE shopping_categories SET sort_order = ? WHERE id = ?');
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     order.forEach((id, idx) => update.run(idx, id));
-  })();
+  });
 
   res.json({ data: loadCategories() });
 });
@@ -704,7 +706,7 @@ router.patch('/items/:itemId', validateRequest(), (req, res) => {
     // Eine Transaktion: ein Umzug, der zwischen der Vormerkung für den
     // Server und "auf der neuen Liste" abbricht, hinterliesse einen Artikel,
     // dessen Objekt in eine Liste gezogen würde, in der er nicht steht.
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       // VOR dem Umzug, mit der Zeile der alten Liste.
       if (moved) moveShoppingMirror(item, targetListId, req.authUserId || req.session.userId);
 
@@ -743,7 +745,7 @@ router.patch('/items/:itemId', validateRequest(), (req, res) => {
       } else if (!is_checked || priceCents === null) {
         removeShoppingPurchase(db.get(), itemId);
       }
-    })();
+    });
   });
 
   const updated = db.get()
@@ -820,7 +822,7 @@ router.post('/items/undo-transfer', validateRequest(), (req, res) => {
     return res.status(403).json({ error: 'Write access to the meal plan is required.', code: 403, reason: 'cross_module_access' });
   }
 
-  const removed = db.get().transaction(() => {
+  const removed = withTx(db.get(), () => {
     const findItem = db.get()
       .prepare('SELECT id, name, added_from_meal FROM shopping_items WHERE id = ?');
     const deleteItem = db.get().prepare('DELETE FROM shopping_items WHERE id = ?');
@@ -843,7 +845,7 @@ router.post('/items/undo-transfer', validateRequest(), (req, res) => {
     }
     for (const id of ingredientIds ?? []) unmarkById.run(id);
     return count;
-  })();
+  });
 
   res.json({ data: { removed } });
 });
@@ -1003,7 +1005,7 @@ router.post('/:listId/duplicate', validateRequest(), (req, res) => {
     .prepare('SELECT * FROM shopping_items WHERE list_id = ?')
     .all(listId);
 
-  const newList = db.get().transaction(() => {
+  const newList = withTx(db.get(), () => {
     const info = db.get()
       .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
       .run(vName.value, req.authUserId || req.session.userId);
@@ -1030,7 +1032,7 @@ router.post('/:listId/duplicate', validateRequest(), (req, res) => {
       );
     }
     return db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(newListId);
-  })();
+  });
 
   res.status(201).json({ data: newList });
 });
@@ -1131,10 +1133,10 @@ router.patch('/:listId/items/reorder', validateRequest(), (req, res) => {
 
   const update = db.get().prepare('UPDATE shopping_items SET sort_order = ? WHERE id = ?');
   const { list_change } = withListChange(listId, () => {
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       // Ab 1: die 0 bleibt dem Trigger als Marke "noch nicht eingeordnet".
       ids.forEach((id, idx) => update.run(idx + 1, id));
-    })();
+    });
   });
 
   const categories = loadCategories();
@@ -1389,14 +1391,22 @@ router.post('/:listId/import-meal-plan', requireMealsWrite, validateRequest(), (
   // Schreib-Transaktion - Rezept-Mahlzeiten werden dafuer aus dem Rezept
   // gelesen statt kopiert. Der Client zeigt "X Zutaten aus Y Mahlzeiten",
   // und seit R23 auch, wie viele davon schon auf der Liste stehen.
+  //
+  // Die Vorschau zaehlt ohne zu schreiben; dieselbe Zahl entscheidet vor dem
+  // Import, ob sein Rueckgaengig in EINE Anfrage passt (#2810, Folge 5b,
+  // services/kitchen-handover.js): sonst 400, bevor etwas geschrieben ist -
+  // auch die Vorschau, damit der Dialog es vor dem Import sagt. Synchron, also
+  // aendert sich zwischen Zaehlen und Schreiben nichts.
+  const counted = mealPlanSource(db.get(), range, { materialize: false });
+  if (handoverTooLarge(counted.ingredients.length)) return res.status(400).json(handoverTooLargeAnswer());
   if (req.body.preview === true) {
-    const { ingredients, rows, meals } = mealPlanSource(db.get(), range, { materialize: false });
+    const { ingredients, rows, meals } = counted;
     if (!ingredients.length) return res.json({ data: { ...empty, preview: true } });
     const { added, skipped } = previewHandover(db.get(), listId, rows);
     return res.json({ data: { transferred: ingredients.length, added, skipped, meals, preview: true } });
   }
 
-  const result = db.transaction(() => {
+  const result = withTx(db.get(), () => {
     const { ingredients, rows, meals } = mealPlanSource(db.get(), range);
     if (!ingredients.length) return null;
     return { transferred: ingredients.length, meals, ...handOverToShoppingList(db.get(), listId, rows) };
@@ -1456,7 +1466,7 @@ router.post('/:listId/import-pantry', requirePantryRead, validateRequest(), (req
   // Die Dublettenregel ist die der ganzen Kueche (services/kitchen-handover.js,
   // R23 D2) - bis dahin stand hier eine eigene mit SQLites NOCASE, die nur
   // ASCII kennt: "Öl" und "öl" waren zwei Artikel.
-  const result = db.transaction(() => {
+  const result = withTx(db.get(), () => {
     const findPantryItem = db.get().prepare('SELECT name, category FROM pantry_items WHERE id = ?');
     const findPantryProduct = db.get().prepare('SELECT name, category FROM pantry_products WHERE id = ?');
     let missing = 0;
@@ -1505,8 +1515,11 @@ router.delete('/:listId/items/checked', validateRequest(), (req, res) => {
     if (ids.some((id) => !Number.isInteger(id) || id <= 0))
       return res.status(400).json({ error: 'ids may only contain item ids.', code: 400 });
   }
-  const scope = ids
-    ? { where: `list_id = ? AND is_checked = 1 AND id IN (${ids.map(() => '?').join(',')})`, params: [listId, ...ids] }
+  // The ids go in as one JSON parameter (Refs #2810): one placeholder per id broke at
+  // SQLite's 32766 host parameters with a 500.
+  const idList = ids ? sqlInList(ids) : null;
+  const scope = idList
+    ? { where: `list_id = ? AND is_checked = 1 AND id IN (${idList.sql})`, params: [listId, idList.param] }
     : { where: 'list_id = ? AND is_checked = 1', params: [listId] };
 
   const queued = queueTodoDeletions('shopping', mirroredItems(scope.where, ...scope.params));

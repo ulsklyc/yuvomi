@@ -1,5 +1,5 @@
 import { op, idParam, withValidationRefusal } from '../helpers.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { DATE_PATTERN, DATETIME_PATTERN, OPTIONAL_DATE_PATTERN, OPTIONAL_DATETIME_PATTERN, TIME_PATTERN } from '../../utils/datetime-pattern.js';
 import {
   CYCLE_SETTING_RANGES, LAB_FLAGS, LOG_STATUS, MAX_ICON, MAX_INTERVAL_HOURS, MAX_INTERVAL_MONTHS, MAX_NUTRIENT, MAX_OFFSET_DAYS,
@@ -10,6 +10,7 @@ import {
   BASAL_TEMP_UNITS, CERVIX_MUCUS_VALUES, CONTRACEPTION_VALUES, FLOW_VALUES, INTENSITY_LEVELS, INTIMACY_VALUES, MOOD_VALUES,
   TEST_RESULT_VALUES,
 } from '../../../public/utils/health-cycle.js';
+import { MAX_KEYS, MAX_LAB_RESULTS, MAX_MEMBER_IDS, MAX_RAW_ENTRIES } from '../array-limits.js';
 
 // ---------------------------------------------------------------------------
 // Bausteine der Anfrage-Schemata (#2810, Gruppe 6). Die Wertelisten und
@@ -290,7 +291,7 @@ const DAY_LOG_FIELDS = {
   note: resetRequired(NOTE, 'cleared the stored one'),
   visibility: oneOf(VISIBILITIES, `\`private\` or \`family\`; \`null\`: \`private\` - also on a day that was \`family\` before. ${wasReset('made the day `private`')}`, { nullable: true }),
   symptoms: {
-    anyOf: [{ type: 'array', items: SYMPTOM_ENTRY }, { type: 'string' }, { type: 'null' }],
+    anyOf: [{ type: 'array', maxItems: MAX_RAW_ENTRIES, items: SYMPTOM_ENTRY }, { type: 'string' }, { type: 'null' }],
     description: 'The symptoms of the day: a list of `{ key, intensity }` (or keys), or the older comma-separated text. Unknown keys and doubles fall away; '
       + `more than 40 after that is 400. \`[]\`, \`null\` or \`""\`: none - the stored symptoms are cleared. Until #2810 a number or an object cleared them as well. ${wasReset('cleared the stored symptoms')}`,
   },
@@ -302,6 +303,7 @@ const DAY_LOG_FIELDS = {
   intimacy: resetRequired(dayChoice(INTIMACY_VALUES, 'Intimacy.'), 'cleared the stored one'),
   feelings: {
     type: ['array', 'null'],
+    maxItems: MAX_KEYS,
     items: { type: 'string', enum: [...MOOD_VALUES] },
     description: 'The feelings of the day from the fixed set; named (also as `[]` or `null`) it replaces the stored ones and the older `mood`. Optional: left out (together with `mood`) it keeps the stored feelings and the stored `mood` unchanged.',
   },
@@ -539,7 +541,7 @@ export function healthPaths() {
     },
     '/api/v1/health/labs': {
       get: checked({ summary: 'List lab reports (with results)', tag: 'Health', params: [PERSON_QUERY, ...boundQueries('report_date')], description: 'Scoped to the viewer.' }),
-      post: checked({ summary: 'Create a lab report with analyte results', tag: 'Health', stateChanging: true, requestBody: body({ required: ['report_date'], properties: { report_date: DAY, lab_name: text(MAX_TITLE, 'The laboratory; `null` or `""` means none.'), note: NOTE, visibility: VISIBILITY, results: { type: ['array', 'null'], items: { type: 'object', required: ['analyte'], properties: resultFields() }, description: 'Analyte results written with the report, all or nothing. Until #2810 a value that was not a list was dropped silently.' }, user_id: OWNER } }) }),
+      post: checked({ summary: 'Create a lab report with analyte results', tag: 'Health', stateChanging: true, requestBody: body({ required: ['report_date'], properties: { report_date: DAY, lab_name: text(MAX_TITLE, 'The laboratory; `null` or `""` means none.'), note: NOTE, visibility: VISIBILITY, results: { type: ['array', 'null'], maxItems: MAX_LAB_RESULTS, items: { type: 'object', required: ['analyte'], properties: resultFields() }, description: 'Analyte results written with the report, all or nothing. Until #2810 a value that was not a list was dropped silently.' }, user_id: OWNER } }) }),
     },
     '/api/v1/health/labs/{id}': {
       get: checked({ summary: 'Get a lab report (with results)', tag: 'Health', params: [LAB_ID] }),
@@ -682,6 +684,7 @@ export function healthPaths() {
           properties: {
             caregiver_ids: {
               type: 'array',
+              maxItems: MAX_MEMBER_IDS,
               items: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'string', pattern: '^0*[1-9][0-9]*$' }], description: `A user id. ${LEGACY_NOTE}` },
               description: 'The caregivers, exactly this list. Doubles and the person themselves fall away. Until #2810 an entry that was not a whole number fell away silently - `["abc"]` withdrew all care; now it is 400.',
             },

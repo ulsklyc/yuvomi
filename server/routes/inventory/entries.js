@@ -9,7 +9,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import { id as idParam } from '../../middleware/validate.js';
+import { id as idParam } from '../../api/formats.ts';
 import { budgetViewer, visibleEntry } from './entry-links.js';
 import { validateRequest } from '../../api/validate-request.ts';
 

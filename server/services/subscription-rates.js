@@ -1,4 +1,5 @@
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('SubscriptionRates');
@@ -54,12 +55,11 @@ async function fetchFixerRates(baseCurrency, currencies) {
     ON CONFLICT(base_currency, quote_currency)
     DO UPDATE SET rate = excluded.rate, fetched_at = excluded.fetched_at
   `);
-  const save = db.get().transaction(() => {
+  withTx(db.get(), () => {
     for (const [currency, rate] of Object.entries(converted)) {
       write.run(baseCurrency, currency, rate, fetchedAt);
     }
   });
-  save();
   return { rates: converted, fetchedAt, source: 'fixer' };
 }
 

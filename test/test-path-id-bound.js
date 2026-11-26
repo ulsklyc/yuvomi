@@ -43,6 +43,7 @@ const { resolveOperation } = await import('../server/api/validate-request.ts');
 const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
 const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const db = dbmod.get();
+const CSRF = 'c'.repeat(64);
 
 const MAX = '9007199254740991';
 const ABOVE = '9007199254740992';
@@ -125,7 +126,34 @@ const MOUNTS = [
   { file: 'subscriptions.js', mount: '/api/v1/budget/subscriptions' },
   ...['categories', 'loans', 'accounts', 'plans', 'stats', 'transfers', 'entries']
     .map((name) => ({ file: `budget/${name}.js`, mount: '/api/v1/budget' })),
+  // In der Reihenfolge von server/index.js: die Uebersicht, dann die zehn
+  // Kalender-Router (Gruppen 10a und 10b) in der Reihenfolge von
+  // server/routes/calendar.js (die Termine mit `/:id` nach allen
+  // Einsegment-Pfaden, CalDAV und Outlook mit ihren Mehrsegment-Pfaden
+  // danach). Ein unbekanntes Konto antwortet dort 404 (#2810, Entscheidung 11).
+  { file: 'dashboard.js', mount: '/api/v1/dashboard' },
+  // Die Aufgaben (Gruppe 11a) stehen in server/index.js gleich hinter der
+  // Uebersicht; die festen Pfade vor `/:id`.
+  { file: 'tasks.js', mount: '/api/v1/tasks' },
+  ...['read', 'google', 'apple', 'subscriptions', 'feed', 'local-calendars', 'sync-targets', 'crud', 'caldav', 'outlook']
+    .map((name) => ({ file: `calendar/${name}.js`, mount: '/api/v1/calendar' })),
+  // Gruppe 11b: Einstellungen und Push, eigene Praefixe ohne Ueberschneidung.
+  { file: 'preferences.js', mount: '/api/v1/preferences' },
+  { file: 'push.js', mount: '/api/v1/push' },
+  // Gruppe 12a: der Auth-Router liegt ausserhalb von server/routes und haengt in
+  // server/index.js vor requireAuth; seine Routen pruefen Anmeldung und CSRF
+  // selbst (das Schein-Konto unten traegt deshalb ein CSRF-Token).
+  { file: '../auth.js', mount: '/api/v1/auth', exports: ['router'] },
 ];
+
+/**
+ * Routes of a migrated-in-part file that do not carry validateRequest() yet
+ * (test/test-validate-request-coverage.js, PARTIAL): they are not asked.
+ * Empty since group 12b (a) gave the administration routes of server/auth.js
+ * with an id their check (#2810).
+ * @type {string[]}
+ */
+const NOT_YET_VALIDATED = [];
 
 /** Migrated files whose routes have no integer path parameter (a text key, or none at all). */
 const WITHOUT_INTEGER_PATH_ID = [
@@ -136,6 +164,9 @@ const WITHOUT_INTEGER_PATH_ID = [
   'backup.js', 'system.js', 'changelog.js',
   'health/export.js', 'health/cycle-feed.js', 'health/visibility-defaults.js',
   'document-storage-google-drive.js',
+  'dashboard.js', 'calendar/read.js', 'calendar/feed.js', 'calendar/sync-targets.js',
+  'calendar/google.js', 'calendar/apple.js',
+  'preferences.js', 'push.js',
 ];
 
 const spec = /** @type {any} */ (buildOpenApiSpec(null, '0.0.0-test'));
@@ -147,7 +178,9 @@ app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void}
   req.authUserId = ADMIN;
   req.authRole = 'admin';
   req.authMethod = 'session';
-  req.session = { userId: ADMIN, role: 'admin', destroy: (/** @type {(err?: unknown) => void} */ done) => done() };
+  // POST /auth/users/:id/devices/sign-out asks for a browser session in front of its check.
+  req.sessionID = 'path-id-bound';
+  req.session = { userId: ADMIN, role: 'admin', csrfToken: CSRF, destroy: (/** @type {(err?: unknown) => void} */ done) => done() };
   next();
 });
 
@@ -156,6 +189,8 @@ app.use((/** @type {any} */ req, /** @type {any} */ _res, /** @type {() => void}
  * @type {Array<{ file: string, method: string, pattern: string, mount: string }>}
  */
 const routes = [];
+/** @type {string[]} */
+const skipped = [];
 for (const { file, mount, exports = ['default'] } of MOUNTS) {
   const mod = await import(`../server/routes/${file}`);
   for (const name of exports) {
@@ -165,6 +200,12 @@ for (const { file, mount, exports = ['default'] } of MOUNTS) {
     for (const layer of router.stack) {
       if (!layer.route || typeof layer.route.path !== 'string') continue;
       for (const method of Object.keys(layer.route.methods).filter((m) => layer.route.methods[m])) {
+        const name = `${file} ${method.toUpperCase()} ${layer.route.path}`;
+        if (NOT_YET_VALIDATED.includes(name)) {
+          assert.ok(!layer.route.stack.some((/** @type {any} */ l) => l.name === 'validateRequestMiddleware'), `${name} carries validateRequest() now: take it off NOT_YET_VALIDATED`);
+          skipped.push(name);
+          continue;
+        }
         routes.push({ file, method, pattern: layer.route.path, mount });
       }
     }
@@ -222,7 +263,7 @@ function urlOf({ pattern, mount }, name, value) {
  * @param {string} url
  */
 async function call(method, url) {
-  const res = await fetch(url, { method: method.toUpperCase(), headers: { 'Content-Type': 'application/json' }, body: method === 'get' || method === 'head' ? undefined : '{}' });
+  const res = await fetch(url, { method: method.toUpperCase(), headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF }, body: method === 'get' || method === 'head' ? undefined : '{}' });
   const text = await res.text();
   let body = null;
   try { body = JSON.parse(text); } catch { /* not JSON */ }
@@ -245,6 +286,10 @@ test('the document: every integer path parameter ends at Number.MAX_SAFE_INTEGER
   }
   assert.ok(seen > 250, `${seen} integer path parameters read`);
   assert.deepEqual(wrong, [], 'an integer path id goes through idParam() in server/openapi/helpers.js');
+});
+
+test('NOT_YET_VALIDATED only shrinks: every entry is a route that still lacks validateRequest()', () => {
+  assert.deepEqual([...skipped].sort(), [...NOT_YET_VALIDATED].sort());
 });
 
 test('the routes: every migrated file with an integer path id is asked, the others are named', () => {

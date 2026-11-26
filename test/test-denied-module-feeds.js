@@ -14,9 +14,11 @@
  *          same line as the delivery of reminders (#1289,
  *          test-denied-module-reminders.js).
  *
- *          Measured over the REAL server (test/server-ready.js): the handlers
- *          are inline routes in server/index.js, there is no router to mount
- *          in-process. Per feed: events before; empty on `none` from the
+ *          Measured over the REAL server (test/server-ready.js), so the feeds
+ *          run behind everything server/index.js puts in front of them; since
+ *          #2810 (group 13) they are a router (server/routes/ics-feeds.js,
+ *          in-process through test/feeds-app.js in test:validate-feeds), the
+ *          answers here are unchanged. Per feed: events before; empty on `none` from the
  *          member override and from the role profile; `read` keeps
  *          delivering; an admin with a deny row keeps delivering; giving the
  *          permission back fills it again. Plus the guard that every feed

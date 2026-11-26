@@ -3,6 +3,7 @@ import { daysBetweenDateKeys, shiftDateKey } from '../utils/timezone.js';
 import * as db from '../db.js';
 import { activeAccountSql } from './account-state.js';
 import { memberOrderSql } from './household-members.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 export function cyclePosition(anchorDate, cycleLength, dateKey) {
   const days = daysBetweenDateKeys(anchorDate, dateKey);
@@ -68,13 +69,14 @@ export const typeColumns = 'id, name, short_code, start_time, end_time, color, i
 export function fieldsForShiftTypes(typeIds) {
   const map = new Map();
   if (!typeIds.length) return map;
+  const typeIdList = sqlInList(typeIds);
   const rows = db.get().prepare(`
     SELECT stf.shift_type_id, cf.id, cf.name, stf.position, stf.show_in_overlay
     FROM schedule_shift_type_fields stf
     JOIN schedule_custom_fields cf ON cf.id = stf.custom_field_id
-    WHERE stf.shift_type_id IN (${typeIds.map(() => '?').join(',')})
+    WHERE stf.shift_type_id IN (${typeIdList.sql})
     ORDER BY stf.shift_type_id, stf.position
-  `).all(...typeIds);
+  `).all(typeIdList.param);
   for (const row of rows) {
     if (!map.has(row.shift_type_id)) map.set(row.shift_type_id, []);
     map.get(row.shift_type_id).push({ id: row.id, name: row.name, position: row.position, show_in_overlay: Boolean(row.show_in_overlay) });
@@ -82,24 +84,16 @@ export function fieldsForShiftTypes(typeIds) {
   return map;
 }
 
-// SQLite begrenzt die Zahl gebundener Platzhalter je Statement (historisch
-// 999, neuere Builds bis rund 32766) - ein Haushalt mit genug Overrides/Extras
-// wuerde diesen Deckel irgendwann treffen, und ein `prepare()` darueber wirft,
-// nicht nur diese eine Anfrage, sondern GET /overrides und GET /extras fuer
-// den ganzen Haushalt dauerhaft. 500 pro Los liegt deutlich darunter, auch auf
-// dem kleinsten bekannten Limit.
-const FIELD_VALUES_CHUNK_SIZE = 500;
 /** Batch-Nachschlag ueber mehrere Vorkommen derselben Art, ohne N+1. */
 export function fieldValuesFor(entryType, entryIds) {
   const map = new Map();
   if (!entryIds.length) return map;
-  for (let i = 0; i < entryIds.length; i += FIELD_VALUES_CHUNK_SIZE) {
-    const chunk = entryIds.slice(i, i + FIELD_VALUES_CHUNK_SIZE);
-    const rows = db.get().prepare(`SELECT entry_id, custom_field_id, value FROM schedule_custom_field_values WHERE entry_type = ? AND entry_id IN (${chunk.map(() => '?').join(',')})`).all(entryType, ...chunk);
-    for (const row of rows) {
-      if (!map.has(row.entry_id)) map.set(row.entry_id, {});
-      map.get(row.entry_id)[row.custom_field_id] = row.value;
-    }
+  // Die Liste geht als ein JSON-Parameter ein, ein Variablenlimit gibt es nicht.
+  const entryIdList = sqlInList(entryIds);
+  const rows = db.get().prepare(`SELECT entry_id, custom_field_id, value FROM schedule_custom_field_values WHERE entry_type = ? AND entry_id IN (${entryIdList.sql})`).all(entryType, entryIdList.param);
+  for (const row of rows) {
+    if (!map.has(row.entry_id)) map.set(row.entry_id, {});
+    map.get(row.entry_id)[row.custom_field_id] = row.value;
   }
   return map;
 }
@@ -122,7 +116,8 @@ export function scheduleData(from, to, userId) {
   const patternDays = new Map();
   if (patterns.length) {
     const ids = patterns.map((p) => p.id);
-    for (const row of database.prepare(`SELECT * FROM schedule_pattern_days WHERE pattern_id IN (${ids.map(() => '?').join(',')})`).all(...ids)) {
+    const idList = sqlInList(ids);
+    for (const row of database.prepare(`SELECT * FROM schedule_pattern_days WHERE pattern_id IN (${idList.sql})`).all(idList.param)) {
       const key = `${row.pattern_id}:${row.position}`;
       if (patternDays.has(key)) patternDays.get(key).push(row);
       else patternDays.set(key, [row]);
@@ -149,7 +144,10 @@ export function scheduleData(from, to, userId) {
   }
   const typeIds = [...new Set(entries.map((entry) => entry.shift_type_id).filter(Boolean))];
   const types = new Map();
-  if (typeIds.length) for (const row of database.prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id IN (${typeIds.map(() => '?').join(',')})`).all(...typeIds)) types.set(row.id, row);
+  if (typeIds.length) {
+    const typeIdList = sqlInList(typeIds);
+    for (const row of database.prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id IN (${typeIdList.sql})`).all(typeIdList.param)) types.set(row.id, row);
+  }
   // Ein zweiter, unabhaengiger Aufruf gegenueber GET /shift-types - diese
   // Funktion baut ihre eigene types-Map fuer nur die Typen, die im Zeitraum
   // TATSAECHLICH aufgeloest wurden, nicht fuer alle Typen des Haushalts.

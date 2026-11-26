@@ -9,6 +9,7 @@
  */
 
 import type { Database } from '../catalog.ts';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 
 /** The audience of an event as eventAudienceChanged() compares it. */
 type EventAudience = { visibility?: string | null; userIds?: readonly unknown[] | null };
@@ -107,11 +108,11 @@ export function filterVisibleIds(
     .filter((id) => Number.isInteger(id) && id > 0))];
   if (!wanted.length) return [];
 
-  const placeholders = wanted.map(() => '?').join(', ');
+  const idList = sqlInList(wanted, 'ids');
   const rows = new Set((database.prepare(`
     SELECT d.id FROM ${table} d
-    WHERE d.id IN (${placeholders}) AND ${visible}
-  `).all(...wanted, { userId }) as { id: number }[]).map((row) => row.id));
+    WHERE d.id IN (${idList.sql}) AND ${visible}
+  `).all({ ids: idList.param, userId }) as { id: number }[]).map((row) => row.id));
 
   return wanted.filter((id) => rows.has(id));
 }
@@ -307,9 +308,11 @@ function documentSeenBy(database: Database, documentId: number, userId: number):
 /** A folder audience, already validated by the route. */
 type FolderAudience = { visibility: string; allowed_member_ids: number[]; created_by?: number | null };
 
-/** Only restricted audiences carry individual grants. */
-export function paperlessFolderMembers(visibility: string, memberIds: unknown): unknown {
-  return visibility === 'restricted' ? memberIds : [];
+/** Null means a restricted audience is missing its required selection. */
+export function paperlessFolderMembers(visibility: string, memberIds: readonly number[]): number[] | null {
+  if (visibility !== 'restricted') return [];
+  if (!memberIds.length) return null;
+  return [...new Set(memberIds)].sort((a, b) => a - b);
 }
 
 /** Consent is required only when an update makes the delegation wider. */
@@ -318,9 +321,4 @@ export function paperlessFolderAudienceWidens(after: FolderAudience, before: Fol
     after.visibility === 'family' || (after.visibility === 'restricted'
       && after.allowed_member_ids.some((id) => id !== before.created_by && !before.allowed_member_ids.includes(id)))
   );
-}
-
-/** Validate the persisted folder audience vocabulary. */
-export function paperlessFolderVisibilityValid(value: unknown): boolean {
-  return ['private', 'restricted', 'family'].includes(String(value));
 }

@@ -4,7 +4,7 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb, withTransaction } from './helpers/schema-db.js';
 
 let passed = 0;
 let failed = 0;
@@ -28,21 +28,8 @@ function assert(condition, message) {
 // ─── Hilfsfunktion: Schema-DB aufbauen ───────────────────────────────────────
 
 function buildSchemaDb() {
-  const db = new DatabaseSync(':memory:');
-  db.exec('PRAGMA foreign_keys = ON;');
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version     INTEGER PRIMARY KEY,
-      description TEXT NOT NULL,
-      applied_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-    );
-  `);
-  // MIGRATIONS_SQL[1] ist ein zusammengeführter Basis-Snapshot aller Tabellen
-  // bis v10 (kein sequentielles Replay — db-schema-test.js ist kein inkrementeller
-  // Migrations-Log). Migration 42 wird danach als echter Schritt angewendet.
-  db.exec(MIGRATIONS_SQL[1]);
-  if (MIGRATIONS_SQL[42]) db.exec(MIGRATIONS_SQL[42]);
-  return db;
+  // volles Schema aus der Baseline (test/helpers/schema-db.js)
+  return openSchemaDb();
 }
 
 console.log('\n[OIDC-Test] Migration v42 — Schema\n');
@@ -135,7 +122,7 @@ process.env.SESSION_SECRET = 'test-oidc-secret-minimum-32-chars-xx';
 process.env.SESSION_SECURE = 'false';
 
 const { _setTestDatabase } = await import('../server/db.js');
-const sessionDb = buildSchemaDb(); // schema_migrations + alle Migrationen; die sessions-Tabelle legt der BetterSQLiteStore-Konstruktor selbst per CREATE TABLE IF NOT EXISTS an
+const sessionDb = buildSchemaDb(); // volles Schema aus der Baseline (test/helpers/schema-db.js); die sessions-Tabelle legt der BetterSQLiteStore-Konstruktor selbst per CREATE TABLE IF NOT EXISTS an
 _setTestDatabase(sessionDb);
 
 const { findOrCreateOidcUser, assertSsoOnlyAllowed } = await import('../server/auth.js');
@@ -200,20 +187,9 @@ function buildOidcTestDb() {
     );
   `);
   // node:sqlite kennt kein `transaction()` wie better-sqlite3; findOrCreateOidcUser
-  // legt Konto und Kontakt in einer Transaktion an (#1357). Dieselbe Semantik:
-  // BEGIN, bei Wurf ROLLBACK und weiterwerfen.
-  db.transaction = (fn) => (...args) => {
-    db.exec('BEGIN');
-    try {
-      const out = fn(...args);
-      db.exec('COMMIT');
-      return out;
-    } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
-    }
-  };
-  return db;
+  // legt Konto und Kontakt in einer Transaktion an (#1357). withTransaction()
+  // bildet es ueber withTx() nach (Commit, bei Wurf Rollback und weiterwerfen).
+  return withTransaction(db);
 }
 
 // Legt einen lokalen, noch nicht verknuepften Family-User samt Kontakt-E-Mail

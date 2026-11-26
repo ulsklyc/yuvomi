@@ -2,7 +2,8 @@
 import express from 'express';
 import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
-import { collectErrors, date, id, str } from '../middleware/validate.js';
+import { withTx } from '../db/tx.ts';
+import { collectErrors, date, id, str } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { createLogger } from '../logger.js';
 import { dateKeysInRange, scheduleData, fieldsForShiftTypes, fieldValuesFor, typeColumns } from '../services/schedule.js';
@@ -18,6 +19,7 @@ import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js'
 import {
   MAX_CUSTOM_FIELD_NAME, MAX_CYCLE_LENGTH, MAX_FIELD_VALUE_LENGTH, MAX_SCHEDULE_NOTE, MAX_SHORT_CODE, MIN_CYCLE_LENGTH,
 } from '../services/schedule-fields.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 // Seit #2810 prueft validateRequest() jede Anfrage gegen das Schema ihrer
 // Operation (server/openapi/paths/schedule.js), bevor ein Handler laeuft. Was
@@ -380,11 +382,11 @@ router.put('/overrides/:dateKey', refuseForeignOwner('body'), validateRequest(),
   // Feld-Id) liess die erste Zeile committed und den Aufruf trotzdem mit einem
   // 500er scheitern. `field_values` ersetzt die gespeicherten Werte immer,
   // `{}` und `null` leeren sie (das Schema verlangt das Feld, #2810).
-  const row = db.get().transaction(() => {
+  const row = withTx(db.get(), () => {
     const upserted = db.get().prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note RETURNING *').get(user.value, key.value, typeId?.value ?? null, note.value);
     replaceFieldValues('override', upserted.id, fields.values);
     return upserted;
-  })();
+  });
   try { syncScheduleRemindersForUser(db.get(), user.value); }
   catch (err) { log.error('Error resyncing schedule reminders after override write:', err.message); }
   res.json({ data: { ...row, field_values: fieldValuesFor('override', [row.id]).get(row.id) ?? {} } });
@@ -431,11 +433,11 @@ router.put('/shift-types/:id/fields', validateRequest(), (req, res) => {
     seen.add(fieldId.value);
     rows.push([fieldId.value, row.position, Number(row.show_in_overlay ?? false)]);
   }
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare('DELETE FROM schedule_shift_type_fields WHERE shift_type_id=?').run(old.id);
     const add = db.get().prepare('INSERT INTO schedule_shift_type_fields (shift_type_id,custom_field_id,position,show_in_overlay) VALUES (?,?,?,?)');
     rows.forEach((row) => add.run(old.id, ...row));
-  })();
+  });
   return res.json({ data: withFields(db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(old.id)) });
 });
 router.put('/patterns/:id', validateRequest(), (req, res) => {
@@ -469,11 +471,14 @@ router.delete('/patterns/:id', validateRequest(), (req, res) => {
   // Fremdschluessel, siehe Migration 189) - deshalb hier dieselbe Reihenfolge
   // wie PUT /patterns/:id/days: Werte ueber die NOCH bekannten Tag-Ids zuerst
   // weg, dann das Muster (das die Tage mitreisst), alles in einer Transaktion.
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     const dayIds = db.get().prepare('SELECT id FROM schedule_pattern_days WHERE pattern_id=?').all(old.id).map((row) => row.id);
-    if (dayIds.length) db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${dayIds.map(() => '?').join(',')})`).run(...dayIds);
+    if (dayIds.length) {
+      const dayList = sqlInList(dayIds);
+      db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${dayList.sql})`).run(dayList.param);
+    }
     db.get().prepare('DELETE FROM schedule_patterns WHERE id=?').run(old.id);
-  })();
+  });
   return res.status(204).end();
 });
 router.get('/patterns/:id/days', validateRequest(), (req, res) => {
@@ -516,16 +521,19 @@ router.put('/patterns/:id/days', validateRequest(), (req, res) => {
   // derselben Transaktion, in dieser Reihenfolge: alte Werte weg (ueber die
   // NOCH bekannten alten Ids), alte Tage weg, neue Tage rein, neue Werte fuer
   // die frischen Ids rein.
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     const oldIds = db.get().prepare('SELECT id FROM schedule_pattern_days WHERE pattern_id=?').all(old.id).map((row) => row.id);
-    if (oldIds.length) db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${oldIds.map(() => '?').join(',')})`).run(...oldIds);
+    if (oldIds.length) {
+      const oldList = sqlInList(oldIds);
+      db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${oldList.sql})`).run(oldList.param);
+    }
     db.get().prepare('DELETE FROM schedule_pattern_days WHERE pattern_id=?').run(old.id);
     const add = db.get().prepare('INSERT INTO schedule_pattern_days (pattern_id,position,shift_type_id) VALUES (?,?,?)');
     for (const day of days) {
       const newId = add.run(old.id, day.position, day.shiftTypeId).lastInsertRowid;
       if (day.fieldValues.length) replaceFieldValues('pattern_day', newId, day.fieldValues);
     }
-  })();
+  });
   const rows = db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position').all(old.id);
   const values = fieldValuesFor('pattern_day', rows.map((row) => row.id));
   return res.json({ data: rows.map((row) => ({ ...row, field_values: values.get(row.id) ?? {} })) });
@@ -577,12 +585,12 @@ router.post('/overrides/fill', refuseForeignOwner('body'), validateRequest(), (r
   // ganzen Zeitraum, nicht je Tag verschieden.
   const upsert = db.get().prepare(`INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note)
     VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note RETURNING id`);
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     for (const key of keys) {
       const row = upsert.get(user.value, key, typeId?.value ?? null, note.value);
       replaceFieldValues('override', row.id, fields.values);
     }
-  })();
+  });
   try { syncScheduleRemindersForUser(db.get(), user.value); }
   catch (err) { log.error('Error resyncing schedule reminders after override fill:', err.message); }
   res.json({ data: { updated: keys.length } });
@@ -612,10 +620,10 @@ router.delete('/overrides', refuseForeignOwner('query'), validateRequest(), (req
   // entry_id ist polymorph (kein echter Fremdschluessel, siehe Migration 189) -
   // die Werte muessen VOR den Overrides selbst weg, solange die Unterabfrage
   // sie noch findet.
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=? AND date_key BETWEEN ? AND ?)`).run(user.value, from.value, to.value);
     return db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key BETWEEN ? AND ?').run(user.value, from.value, to.value);
-  })();
+  });
   if (result.changes) {
     try { syncScheduleRemindersForUser(db.get(), user.value); }
     catch (err) { log.error('Error resyncing schedule reminders after override range delete:', err.message); }
@@ -627,10 +635,10 @@ router.delete('/overrides/:dateKey', refuseForeignOwner('query'), validateReques
   // Das Recht haelt refuseForeignOwner() davor (#2810).
   const key = date(req.params.dateKey, 'date_key', true); const user = id(req.query.user_id ?? actorId(req), 'user_id'); const errors = collectErrors([key, user]);
   if (errors.length) return fail(res, 400, errors.join(' '));
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=? AND date_key=?)`).run(user.value, key.value);
     return db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key=?').run(user.value, key.value);
-  })();
+  });
   if (!result.changes) return fail(res, 404, 'Override not found.', { reason: 'schedule_override_not_found' });
   try { syncScheduleRemindersForUser(db.get(), user.value); }
   catch (err) { log.error('Error resyncing schedule reminders after override delete:', err.message); }

@@ -2,13 +2,15 @@
  * Unicode-Normalisierung von Passwörtern (Issue #608).
  *
  * Firefox/macOS liefert Passwort-Eingaben in NFD (zerlegt), Safari/iOS in NFC
- * (komponiert). bcrypt arbeitet auf Bytes - dadurch schlug der Login mit
- * Umlauten je nach Browser fehl. Gehasht wird nun immer NFC; `verifyPassword`
- * akzeptiert zusätzlich Alt-Hashes aus nicht-normalisierten Eingaben und meldet
+ * (komponiert). Ein Hash arbeitet auf Bytes - dadurch schlug der Login mit
+ * Umlauten je nach Browser fehl. Gehasht wird nun immer NFC (seit #2810
+ * Gruppe 12p mit Argon2id, test:password-hash); `verifyPassword` akzeptiert
+ * zusätzlich bcrypt-Alt-Hashes aus nicht-normalisierten Eingaben und meldet
  * sie über `needsRehash` zur stillen Migration.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
 
 import { hashPassword, normalizePassword, verifyPassword } from '../server/utils/password.js';
@@ -18,6 +20,25 @@ import { startTestServer, cookieHeader } from './server-ready.js';
 const NFC = 'Bärenstark1'.normalize('NFC');
 const NFD = 'Bärenstark1'.normalize('NFD');
 assert.notEqual(NFC, NFD, 'Testdaten müssen sich in der Byte-Form unterscheiden');
+
+/**
+ * Ist `hash` ein Argon2id-Hash genau dieser Byte-Form? Nachgerechnet mit Salz
+ * und Parametern aus dem PHC-String, ohne die Normalisierung von verifyPassword.
+ * @param {string} password @param {string} hash @returns {Promise<boolean>}
+ */
+async function argon2idOf(password, hash) {
+  const [, algorithm, , params, salt, tag] = hash.split('$');
+  assert.equal(algorithm, 'argon2id');
+  const [memory, passes, parallelism] = params.split(',').map((/** @type {string} */ p) => Number(p.split('=')[1]));
+  const expected = Buffer.from(tag, 'base64');
+  /** @type {Buffer} */
+  const key = await new Promise((resolve, reject) => {
+    crypto.argon2('argon2id', {
+      message: password, nonce: Buffer.from(salt, 'base64'), memory, passes, parallelism, tagLength: expected.length,
+    }, (err, k) => (err ? reject(err) : resolve(k)));
+  });
+  return key.equals(expected);
+}
 
 // --------------------------------------------------------
 // Unit: server/utils/password.js
@@ -31,8 +52,8 @@ test('normalizePassword liefert NFC für beide Eingabeformen', () => {
 
 test('hashPassword hasht immer die NFC-Form', async () => {
   const hash = await hashPassword(NFD);
-  assert.equal(await bcrypt.compare(NFC, hash), true);
-  assert.equal(await bcrypt.compare(NFD, hash), false);
+  assert.equal(await argon2idOf(NFC, hash), true);
+  assert.equal(await argon2idOf(NFD, hash), false);
 });
 
 test('verifyPassword akzeptiert beide Normalformen gegen einen NFC-Hash', async () => {
@@ -41,7 +62,7 @@ test('verifyPassword akzeptiert beide Normalformen gegen einen NFC-Hash', async 
   assert.deepEqual(await verifyPassword(NFD, hash), { valid: true, needsRehash: false });
 });
 
-test('verifyPassword akzeptiert Legacy-Hashes aus NFD-Eingaben und meldet needsRehash', async () => {
+test('verifyPassword akzeptiert Legacy-bcrypt-Hashes aus NFD-Eingaben und meldet needsRehash', async () => {
   // So sah ein vor dem Fix in Firefox gesetztes Passwort in der DB aus.
   const legacyHash = await bcrypt.hash(NFD, 12);
   assert.deepEqual(await verifyPassword(NFD, legacyHash), { valid: true, needsRehash: true });
@@ -54,7 +75,7 @@ test('verifyPassword lehnt falsche Passwörter ab', async () => {
   assert.deepEqual(await verifyPassword('', hash), { valid: false, needsRehash: false });
 });
 
-test('verifyPassword scheitert an einem Nicht-bcrypt-Hash statt zu werfen', async () => {
+test('verifyPassword scheitert an einem Nicht-Hash statt zu werfen', async () => {
   // OIDC-Konten tragen den Platzhalter '$oidc$' als password_hash.
   assert.deepEqual(await verifyPassword(NFC, '$oidc$'), { valid: false, needsRehash: false });
 });
@@ -113,7 +134,7 @@ test('POST /auth/login: falsches Passwort bleibt 401', async () => {
   assert.equal(res.status, 401);
 });
 
-test('POST /auth/login: Legacy-Hash aus NFD-Eingabe wird still auf NFC migriert', async () => {
+test('POST /auth/login: Legacy-bcrypt-Hash aus NFD-Eingabe wird still auf Argon2id über NFC migriert', async () => {
   // Zustand vor dem Fix simulieren: Passwort in Firefox gesetzt -> NFD-Hash.
   const legacyHash = await bcrypt.hash(NFD, 12);
   db.get().prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(legacyHash, 'admin');
@@ -124,8 +145,8 @@ test('POST /auth/login: Legacy-Hash aus NFD-Eingabe wird still auf NFC migriert'
 
   const migrated = passwordHashOf('admin');
   assert.notEqual(migrated, legacyHash, 'Hash muss neu geschrieben worden sein');
-  assert.equal(await bcrypt.compare(NFC, migrated), true);
-  assert.equal(await bcrypt.compare(NFD, migrated), false);
+  assert.equal(await argon2idOf(NFC, migrated), true);
+  assert.equal(await argon2idOf(NFD, migrated), false);
 
   // Nach der Migration funktionieren weiterhin beide Eingabeformen.
   assert.equal((await login('admin', NFD)).status, 200);
@@ -174,8 +195,8 @@ test('PATCH /auth/me/password: current_password wird normalisiert, neues Passwor
   assert.equal(res.status, 200);
 
   const stored = passwordHashOf('admin');
-  assert.equal(await bcrypt.compare(NEW_NFC, stored), true);
-  assert.equal(await bcrypt.compare(NEW_NFD, stored), false);
+  assert.equal(await argon2idOf(NEW_NFC, stored), true);
+  assert.equal(await argon2idOf(NEW_NFD, stored), false);
 
   assert.equal((await login('admin', NEW_NFC)).status, 200);
   assert.equal((await login('admin', NEW_NFD)).status, 200);

@@ -6,7 +6,7 @@
  *          exit 1 naming file and rule, a fixed one exit 0 with "Baseline can sink", --update
  *          lowers and never raises, a hard rule fails even with --init, a broken tool run is
  *          exit 2, a disable comment is a finding of its own (hard without a rule list or for
- *          no-restricted-syntax). The fixture test/fixtures/lint/ must give exactly its ten
+ *          no-restricted-syntax). The fixture test/fixtures/lint/ must give exactly its sixteen
  *          findings, the TypeScript layer fixture test/fixtures/lint/layers/ exactly its three
  *          dependency-cruiser violations, the knip fixture test/fixtures/lint/knip/ (run with the
  *          real knip.json) exactly its six findings; a knip entry that names no file is exit 2;
@@ -26,7 +26,20 @@
  *          replaced, phase 1b section E, and the spellings a probe against that reader
  *          found) and nothing for the lines it must leave alone. A
  *          baseline key of that rule needs a reason in lint-baseline-reasons.json, and a
- *          reason needs its key.
+ *          reason needs its key. The fixture test/fixtures/lint/sql-in-list/ (Refs #2810) must
+ *          give exactly its thirteen SQL-IN-LIST lines (one SQL placeholder per value, one line
+ *          per spelling) and nothing in server/db.js; a SQL-IN-LIST key needs a reason.
+ *          A TX-MANUAL key needs a reason as well (phase 2, F6b: exec or prepare, string or
+ *          template literal), and in the server only server/db/tx.ts and the instance lock
+ *          carry one. Phase 2, F6c: effectiveSelectors() resolves the overrides as oxlint does
+ *          (measured on a fixture), and over it SYNC-ONLY (hard) holds in exactly the files of
+ *          the synchronous areas, DB-SINGLETON (a baseline that only sinks) in exactly
+ *          server/services/ and server/authorize/, and every server/ file gets the server list
+ *          plus its areas minus its named exemptions; the generator's nesting check refuses
+ *          two entries of one rank; the fixtures sync-only/ and db-singleton/ give exactly
+ *          their marked lines. Phase 2, F6d: TX-DRIVER (hard) holds in server/ only; the fixture
+ *          tx-driver/ gives exactly its marked driver calls and the withTx lines with options
+ *          under TX-ASYNC-FN and TX-AWAIT-INSIDE, and nothing under test/.
  * Run:     npm run test:lint-baseline
  */
 
@@ -37,7 +50,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync,
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tempDir } from './tmp-dir.js';
-import { buildOverrides, pushSenders } from '../scripts/generate-oxlint-overrides.mjs';
+import { buildOverrides, checkNesting, patternCovers, pushSenders } from '../scripts/generate-oxlint-overrides.mjs';
 
 const REPO = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(REPO, 'scripts', 'check-lint-baseline.ts');
@@ -50,7 +63,7 @@ const CONFIG = JSON.parse(readFileSync(join(REPO, '.oxlintrc.json'), 'utf8'));
 const HARD_RULES = ['HTML-STRING-WRITE', 'TX-ASYNC-FN', 'TX-AWAIT-INSIDE', 'CHANNEL-SEND', 'PUSH-SEND',
   'push-service-importers', 'web-push-only-in-push-service', 'channel-delivery-importers', 'providers-only-in-channel-delivery',
   'RIGHTS-MODULE', 'rights-only-through-authorize', 'authorize-not-to-db', 'settings-is-a-leaf',
-  'blanket-disable', 'disable-no-restricted-syntax'];
+  'blanket-disable', 'disable-no-restricted-syntax', 'SYNC-ONLY', 'TX-DRIVER', 'DOC-CONTENT'];
 
 /** The real rule set for a directory outside the repo: no fixture ignore, plugin by absolute URL. */
 function portableConfig() {
@@ -61,11 +74,13 @@ function portableConfig() {
   return config;
 }
 
-const ONE_MANUAL = "export function f(db) { db.exec('BEGIN'); }\n";
-const TWO_MANUAL = "export function f(db) { db.exec('BEGIN'); db.exec('COMMIT'); }\n";
+// A plain debt rule (no reason, not hard) for the ratchet itself: UTC-DAY-KEY. TX-MANUAL served
+// here until it became a list of exceptions with reasons (phase 2, F6b).
+const ONE_DEBT = 'export const f = (d) => d.toISOString().slice(0, 10);\n';
+const TWO_DEBT = 'export const f = (d) => [d.toISOString().slice(0, 10), d.toISOString().slice(0, 10)];\n';
 const NONE = 'export function f(db) { return db; }\n';
 
-function project(source = TWO_MANUAL) {
+function project(source = TWO_DEBT) {
   const dir = tempDir('yuvomi-lint-baseline-');
   writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
   mkdirSync(join(dir, 'server'));
@@ -84,7 +99,7 @@ function run(dir, ...args) {
 
 /** @param {string} dir */
 const baselineOf = (dir) => JSON.parse(readFileSync(join(dir, 'lint-baseline.json'), 'utf8'));
-const MANUAL = 'server/x.js\toxlint/no-restricted-syntax/TX-MANUAL';
+const DEBT = 'server/x.js\toxlint/no-restricted-syntax/UTC-DAY-KEY';
 // Built from parts so that this file does not carry a directive itself.
 const DISABLE = `// ${'eslint'}-disable-next-line`;
 
@@ -99,7 +114,7 @@ test('--init fills the baseline, after that the run is green', () => {
   const dir = project();
   try {
     assert.equal(run(dir, '--init').code, 0);
-    assert.deepEqual(baselineOf(dir), { [MANUAL]: 2 });
+    assert.deepEqual(baselineOf(dir), { [DEBT]: 2 });
     assert.equal(run(dir).code, 0);
     assert.equal(run(dir, '--init').code, 2, '--init does not overwrite a filled baseline');
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -111,18 +126,18 @@ test('an empty baseline names the whole stock and fails', () => {
     writeFileSync(join(dir, 'lint-baseline.json'), '{}\n');
     const r = run(dir);
     assert.equal(r.code, 1);
-    assert.match(r.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+0 -> 2/);
+    assert.match(r.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/UTC-DAY-KEY\s+0 -> 2/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('an extra finding: exit 1, file and rule are named', () => {
-  const dir = project(ONE_MANUAL);
+  const dir = project(ONE_DEBT);
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, 'server', 'x.js'), TWO_MANUAL);
+    writeFileSync(join(dir, 'server', 'x.js'), TWO_DEBT);
     const r = run(dir);
     assert.equal(r.code, 1);
-    assert.match(r.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+1 -> 2/);
+    assert.match(r.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/UTC-DAY-KEY\s+1 -> 2/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -130,10 +145,10 @@ test('a new key (another file): exit 1', () => {
   const dir = project();
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, 'server', 'y.js'), ONE_MANUAL);
+    writeFileSync(join(dir, 'server', 'y.js'), ONE_DEBT);
     const r = run(dir);
     assert.equal(r.code, 1);
-    assert.match(r.out, /server\/y\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+0 -> 1/);
+    assert.match(r.out, /server\/y\.js\s+oxlint\/no-restricted-syntax\/UTC-DAY-KEY\s+0 -> 1/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -141,11 +156,11 @@ test('a fixed finding: exit 0 with a hint, the baseline stays', () => {
   const dir = project();
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, 'server', 'x.js'), ONE_MANUAL);
+    writeFileSync(join(dir, 'server', 'x.js'), ONE_DEBT);
     const r = run(dir);
     assert.equal(r.code, 0);
     assert.match(r.out, /Baseline can sink: 1 key/);
-    assert.deepEqual(baselineOf(dir), { [MANUAL]: 2 }, 'without --update the file stays');
+    assert.deepEqual(baselineOf(dir), { [DEBT]: 2 }, 'without --update the file stays');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -153,12 +168,12 @@ test('--update lowers and removes, but never raises', () => {
   const dir = project();
   try {
     run(dir, '--init');
-    writeFileSync(join(dir, 'server', 'x.js'), ONE_MANUAL);
+    writeFileSync(join(dir, 'server', 'x.js'), ONE_DEBT);
     assert.equal(run(dir, '--update').code, 0);
-    assert.deepEqual(baselineOf(dir), { [MANUAL]: 1 });
-    writeFileSync(join(dir, 'server', 'x.js'), TWO_MANUAL);
+    assert.deepEqual(baselineOf(dir), { [DEBT]: 1 });
+    writeFileSync(join(dir, 'server', 'x.js'), TWO_DEBT);
     assert.equal(run(dir, '--update').code, 1);
-    assert.deepEqual(baselineOf(dir), { [MANUAL]: 1 });
+    assert.deepEqual(baselineOf(dir), { [DEBT]: 1 });
     writeFileSync(join(dir, 'server', 'x.js'), NONE);
     assert.equal(run(dir, '--update').code, 0);
     assert.deepEqual(baselineOf(dir), {});
@@ -434,7 +449,7 @@ test('the TypeScript layer fixture gives exactly its three violations', () => {
   ]);
 });
 
-test('the fixture gives exactly its ten findings, and nothing for the allowed lines', () => {
+test('the fixture gives exactly its sixteen findings, and nothing for the allowed lines', () => {
   const dir = tempDir('yuvomi-lint-fixture-');
   try {
     writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
@@ -452,8 +467,14 @@ test('the fixture gives exactly its ten findings, and nothing for the allowed li
       'a.js:20 UTC-DAY-KEY', // toISOString().slice(0, 10)
       'a.js:21 UTC-DAY-KEY', // toISOString().substring(0, 10)
       'a.js:24 LOG-PLUS-500', // catch block answering 500
-      'tx.js:5 TX-ASYNC-FN', // async transaction function
-      'tx.js:7 TX-AWAIT-INSIDE', // await nested in a synchronous transaction body
+      'tx.js:12 TX-ASYNC-FN', // async function passed to withTx()
+      'tx.js:14 TX-AWAIT-INSIDE', // await nested in a synchronous withTx() body
+      'tx.js:17 TX-MANUAL', // exec with a string literal
+      'tx.js:18 TX-MANUAL', // exec with a template literal (phase 2, F6b)
+      'tx.js:19 TX-MANUAL', // prepare with a string literal (phase 2, F6b)
+      'tx.js:20 TX-MANUAL', // prepare with a template literal (phase 2, F6b)
+      'tx.js:7 TX-ASYNC-FN', // async transaction function
+      'tx.js:9 TX-AWAIT-INSIDE', // await nested in a synchronous transaction body
     ]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -493,98 +514,221 @@ function serverSelectors() {
 /** @param {string} tag @returns {(s: Selector) => boolean} */
 const tagged = (tag) => (s) => s.message.startsWith(`${tag}:`);
 
-const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW'];
+const SERVER_ONLY = ['CHANNEL-SEND', 'PUSH-SEND', 'RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW', 'SQL-IN-LIST', 'TX-DRIVER', 'DOC-CONTENT'];
 /** @param {Selector} s */
 const serverOnly = (s) => SERVER_ONLY.some((tag) => tagged(tag)(s));
 
-test('server/ gets the whole base rule plus the sender and rights selectors, nothing else', () => {
+test('server/ gets the whole base rule plus the sender, rights and SQL list selectors, nothing else', () => {
   const [severity, ...base] = CONFIG.rules[RESTRICTED];
   const [serverSeverity, ...server] = serverSelectors();
   assert.equal(serverSeverity, severity);
   assert.deepEqual(server.slice(0, base.length), base);
   const extra = server.slice(base.length);
-  assert.ok(extra.every(serverOnly), 'only sender and rights selectors are added');
+  assert.ok(extra.every(serverOnly), 'only sender, rights and SQL list selectors are added');
   for (const tag of SERVER_ONLY) assert.ok(extra.some(tagged(tag)), `server/** carries no ${tag} selector`);
   // Test files may stub a sender or seed a visibility value; the rules are for server/ only.
   assert.ok(!base.some(serverOnly), 'a server-only selector in the base rule');
 });
 
-// Where the rights rules are the rule itself (phase 2, B5, B8c): the permission module, the
-// schema and its test mirror (migrations write visibility values and compare a row's level
-// while they move data), the API documentation.
+// Where the rights rules are the rule itself (phase 2, B5, B8c): the permission module and
+// the API documentation; the schema and its migrations (server/migrations/, one file each;
+// migrations write visibility values, compare a row's level while they move data, and keep
+// their SQL as it was applied) have an exception of their own that drops the rights and the
+// SQL list selectors (Refs #2810).
 const RIGHTS_TAGS = ['RIGHTS-SQL', 'RIGHTS-MODULE', 'RIGHTS-ROW'];
-const RIGHTS_HOME = ['server/authorize/**', 'server/db.js', 'server/db-schema-test.js', 'server/openapi/**'];
+const RIGHTS_HOME = ['server/authorize/**', 'server/openapi/**'];
+const SCHEMA_HOME = ['server/db.js', 'server/migrations/**'];
 
-test('the rights exception covers exactly the permission module, the schema and the API docs, and drops only the rights selectors', () => {
-  const [severity, ...selectors] = serverSelectors();
-  const override = CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes('server/authorize/**'));
-  assert.ok(override, 'no override for server/authorize/**');
-  assert.deepEqual(override.files, RIGHTS_HOME);
-  assert.deepEqual(override.rules[RESTRICTED], [severity, ...selectors.filter((s) => !RIGHTS_TAGS.some((tag) => tagged(tag)(s)))]);
-  // Every other server override keeps every rights tag.
-  for (const other of /** @type {Override[]} */ (CONFIG.overrides)) {
-    if (other === override || !other.files.some((f) => f.startsWith('server/'))) continue;
-    for (const tag of RIGHTS_TAGS) {
-      const [, ...list] = other.rules[RESTRICTED];
-      assert.ok(list.some(tagged(tag)), `${other.files.join(', ')} loses ${tag}`);
-    }
+/**
+ * The no-restricted-syntax list oxlint applies to `file` (repository-relative, `/`): the LAST
+ * override whose `files` match wins whole, else the base rule. This is how oxlint 1.93
+ * resolves overrides, measured on a fixture below ("oxlint resolves overrides ...").
+ * Patterns: `dir/**` and `*` inside one path segment.
+ * @param {any} config @param {string} file @returns {Selector[]}
+ */
+function effectiveSelectors(config, file) {
+  /** @param {string} glob */
+  const re = (glob) => new RegExp(`^${glob.replace(/\/\*\*$/, '').replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}${glob.endsWith('/**') ? '/.*' : ''}$`);
+  let list = config.rules[RESTRICTED];
+  for (const o of config.overrides ?? []) {
+    if (o.rules?.[RESTRICTED] && o.files.some((/** @type {string} */ g) => re(g).test(file))) list = o.rules[RESTRICTED];
   }
+  return list.slice(1);
+}
+/** @param {string} file @param {string} tag */
+const hasTag = (file, tag) => effectiveSelectors(CONFIG, file).some(tagged(tag));
+/** Every selector with `tag` in any override (the areas add theirs in overrides only). @param {string} tag */
+const selectorsTagged = (tag) => [...new Map(CONFIG.overrides
+  .flatMap((/** @type {Override} */ o) => o.rules[RESTRICTED].slice(1))
+  .filter(tagged(tag)).map((/** @type {Selector} */ s) => [JSON.stringify(s), s])).values()];
+
+/** Every file under server/ that oxlint lints, as oxlint names it. */
+const SERVER_FILES = `${spawnSync(process.execPath, [OXLINT, '--debug=files', '.'], { cwd: REPO, encoding: 'utf8', maxBuffer: 1 << 29 }).stdout}`
+  .split('\n').map((f) => f.trim().split('\\').join('/')).filter((f) => f.startsWith('server/'));
+
+// The areas of phase 2, F6c, spelled here a second time on purpose: the generator's list
+// is what is tested, not what the test reads back.
+const SYNC_EXEMPT = ['server/db/backup.ts', 'server/db/restore.ts'];
+/** @param {string} f */
+const inSyncArea = (f) => !SYNC_EXEMPT.includes(f) && (['server/authorize/', 'server/migrations/', 'server/db/'].some((d) => f.startsWith(d))
+  || f === 'server/db.js' || /^server\/services\/[^/]+-slices\.ts$/.test(f));
+/** @param {string} f */
+const inDbArea = (f) => f.startsWith('server/services/') || f.startsWith('server/authorize/');
+
+test('oxlint resolves overrides as effectiveSelectors() does: the last match wins whole, * stays in one segment', () => {
+  const dir = tempDir('yuvomi-oxlint-resolve-');
+  try {
+    for (const d of ['server/x', 'server/s/sub']) mkdirSync(join(dir, d), { recursive: true });
+    const source = 'export async function f(db: any): Promise<number> { return db.get(); }\n';
+    const files = ['server/a.ts', 'server/x/b.ts', 'server/s/a-slices.ts', 'server/s/sub/b-slices.ts'];
+    for (const f of files) writeFileSync(join(dir, f), source);
+    const get = { selector: "CallExpression[arguments.length=0][callee.property.name='get']", message: 'GET: get' };
+    const fnA = { selector: ':function[async=true]', message: 'ASYNC-A: async' };
+    const fnB = { selector: ':function[async=true]', message: 'ASYNC-B: async' };
+    const config = {
+      ...portableConfig(), rules: { [RESTRICTED]: ['error'] },
+      overrides: [
+        { files: ['server/**'], rules: { [RESTRICTED]: ['error', get] } },
+        { files: ['server/x/**'], rules: { [RESTRICTED]: ['error', fnA] } },
+        { files: ['server/s/*-slices.ts'], rules: { [RESTRICTED]: ['error', fnB, get] } },
+      ],
+    };
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(config));
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .filter((/** @type {{ code: string }} */ d) => d.code.includes('no-restricted-syntax'))
+      .map((/** @type {{ filename: string, message: string }} */ d) => `${d.filename} ${d.message.split(':')[0]}`).sort();
+    const predicted = files.flatMap((f) => effectiveSelectors(config, f).map((s) => `${f} ${s.message.split(':')[0]}`)).sort();
+    assert.deepEqual(found, predicted);
+    // The measurement itself: server/x/b.ts lost GET to the later override; a slice one level
+    // deeper is not matched by `*`.
+    assert.deepEqual(predicted, [
+      'server/a.ts GET', 'server/s/a-slices.ts ASYNC-B', 'server/s/a-slices.ts GET', 'server/s/sub/b-slices.ts GET', 'server/x/b.ts ASYNC-A',
+    ]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('SYNC-ONLY holds in every real file of the synchronous areas, and nowhere else', () => {
+  const sync = SERVER_FILES.filter(inSyncArea);
+  for (const [area, min] of /** @type {[string | RegExp, number][]} */ ([
+    ['server/authorize/', 5], ['server/migrations/', 100], ['server/db/', 3], ['server/db.js', 1], [/^server\/services\/[^/]+-slices\.ts$/, 10],
+  ])) {
+    const n = sync.filter((f) => (typeof area === 'string' ? f.startsWith(area) : area.test(f))).length;
+    assert.ok(n >= min, `${area}: only ${n} files`);
+  }
+  const missing = sync.filter((f) => !hasTag(f, 'SYNC-ONLY'));
+  assert.deepEqual(missing, [], 'a file of a synchronous area without SYNC-ONLY');
+  const stray = SERVER_FILES.filter((f) => !inSyncArea(f) && hasTag(f, 'SYNC-ONLY'));
+  assert.deepEqual(stray, [], 'SYNC-ONLY outside its areas');
+  for (const f of [...SYNC_EXEMPT, 'server/routes/tasks.js', 'server/index.js', 'public/app.js', 'server/services/push.js']) {
+    assert.ok(!hasTag(f, 'SYNC-ONLY'), `${f} carries SYNC-ONLY`);
+  }
+  assert.equal(selectorsTagged('SYNC-ONLY').length, 3, 'async function, await, for await');
+});
+
+test('DB-SINGLETON holds in every real file under server/services/ and server/authorize/, and nowhere else', () => {
+  const area = SERVER_FILES.filter(inDbArea);
+  assert.ok(area.length > 100, 'too few files in the services and the permission module');
+  assert.deepEqual(area.filter((f) => !hasTag(f, 'DB-SINGLETON')), [], 'a service without DB-SINGLETON');
+  assert.deepEqual(SERVER_FILES.filter((f) => !inDbArea(f) && hasTag(f, 'DB-SINGLETON')), [], 'DB-SINGLETON outside its areas');
+  for (const f of ['server/db/backup.ts', 'server/routes/tasks.js', 'server/index.js', 'public/app.js']) {
+    assert.ok(!hasTag(f, 'DB-SINGLETON'), `${f} carries DB-SINGLETON`);
+  }
+  assert.equal(selectorsTagged('DB-SINGLETON').length, 1);
+});
+
+test('the rights exception covers exactly the permission module and the API docs, and drops only the rights selectors', () => {
+  for (const file of SERVER_FILES) {
+    const inRights = RIGHTS_HOME.some((h) => file.startsWith(h.slice(0, -2)));
+    const inSchema = file === 'server/db.js' || file.startsWith('server/migrations/');
+    for (const tag of RIGHTS_TAGS) assert.equal(hasTag(file, tag), !inRights && !inSchema, `${file} ${tag}`);
+    assert.equal(hasTag(file, 'SQL-IN-LIST'), !inSchema, `${file} SQL-IN-LIST`);
+  }
+  assert.deepEqual(SCHEMA_HOME, ['server/db.js', 'server/migrations/**']);
 });
 
 test('the generator refuses a file under two exceptions (the later list would win whole)', () => {
   assert.throws(() => buildOverrides(CONFIG, ['server/authorize/x.js']), /overlap: server\/authorize\/x\.js and server\/authorize\/\*\*/);
   assert.throws(() => buildOverrides(CONFIG, ['server/utils/timezone.js']), /overlap/);
+  assert.throws(() => buildOverrides(CONFIG, ['server/db/backup.ts']), /overlap/);
+});
+
+test('the nesting check lets through only an inner entry after its outer one that keeps what it adds', () => {
+  const a = { selector: 'A', message: 'A: a' };
+  const b = { selector: 'B', message: 'B: b' };
+  /** @param {string[]} files @param {object[]} list */
+  const entry = (files, list) => ({ files, rules: { [RESTRICTED]: ['error', ...list] } });
+  const none = () => [];
+  // Same pattern twice, crossing file globs, the outer entry after the inner one: refused.
+  assert.throws(() => checkNesting([entry(['server/**'], [a]), entry(['server/**'], [a])], none), /overlap: server\/\*\* and server\/\*\*/);
+  assert.throws(() => checkNesting([entry(['server/s/*-a.ts'], [a]), entry(['server/s/b-*.ts'], [a])], none), /overlap/);
+  assert.throws(() => checkNesting([entry(['server/x/**'], [a]), entry(['server/**'], [a])], none), /overlap/);
+  // Nested, but the inner one loses what the outer one has and may not drop it.
+  assert.throws(() => checkNesting([entry(['server/**'], [a, b]), entry(['server/x/**'], [a])], none), /server\/x\/\*\* loses what server\/\*\* adds: B/);
+  // Allowed: nested and keeping it, or dropping exactly what its exception names.
+  checkNesting([entry(['server/**'], [a]), entry(['server/x/**'], [a, b]), entry(['server/x/y.js'], [a, b])], none);
+  checkNesting([entry(['server/**'], [a, b]), entry(['server/x/**'], [a])], () => [b]);
+  checkNesting([entry(['server/s/**'], [a]), entry(['server/s/*-slices.ts'], [a, b])], none);
+  assert.ok(patternCovers('server/s/*-slices.ts', 'server/s/x-slices.ts'));
+  assert.ok(!patternCovers('server/s/*-slices.ts', 'server/s/sub/x-slices.ts'), '* stays in one segment');
 });
 
 test('the timezone exception drops only the UTC selector', () => {
-  const [severity, ...selectors] = serverSelectors();
-  const override = overrideFor('server/utils/timezone.js');
-  assert.ok(override, 'no override for server/utils/timezone.js');
-  assert.deepEqual(override.rules[RESTRICTED], [severity, ...selectors.filter((s) => !tagged('UTC-DAY-KEY')(s))]);
+  const [, ...selectors] = serverSelectors();
+  const kept = new Set(effectiveSelectors(CONFIG, 'server/utils/timezone.js').map((s) => JSON.stringify(s)));
+  const lost = selectors.filter((s) => !kept.has(JSON.stringify(s)));
+  assert.deepEqual(lost, selectors.filter(tagged('UTC-DAY-KEY')));
 });
 
 test('each sender exception drops only its own sender selectors', () => {
-  const [severity, ...selectors] = serverSelectors();
+  const [, ...selectors] = serverSelectors();
   const push = selectors.filter(tagged('PUSH-SEND'));
   const sendPushToUser = push.filter((s) => s.selector.includes('sendPushToUser'));
   assert.equal(sendPushToUser.length, 1);
-  /** @param {Selector[]} drop */
-  const without = (drop) => [severity, ...selectors.filter((s) => !drop.includes(s))];
-  assert.deepEqual(overrideFor('server/services/channel-delivery.js')?.rules[RESTRICTED], without(selectors.filter(tagged('CHANNEL-SEND'))));
-  assert.deepEqual(overrideFor('server/services/push.js')?.rules[RESTRICTED], without(push));
-  for (const file of PUSH_SENDERS) assert.deepEqual(overrideFor(file)?.rules[RESTRICTED], without(sendPushToUser), file);
+  /** @param {string} file */
+  const lostBy = (file) => selectors.filter((s) => !effectiveSelectors(CONFIG, file).some((t) => JSON.stringify(t) === JSON.stringify(s)));
+  assert.deepEqual(lostBy('server/services/channel-delivery.js'), selectors.filter(tagged('CHANNEL-SEND')));
+  assert.deepEqual(lostBy('server/services/push.js'), push);
+  for (const file of PUSH_SENDERS) assert.deepEqual(lostBy(file), sendPushToUser, file);
 });
 
-test('no override for a server/ file loses a sender selector it is not exempt from', () => {
+test('no server/ file loses a sender, area or other selector it is not exempt from', () => {
   // oxlint replaces the whole option list per override and the later one wins, so an
-  // override that copies only the base rule would switch the sender rules off for its files.
+  // override that copies only the base rule would switch the sender rules off for its files,
+  // and one written before an area's override would switch the area's rule off.
   const [, ...selectors] = serverSelectors();
   const channel = selectors.filter(tagged('CHANNEL-SEND'));
   const push = selectors.filter(tagged('PUSH-SEND'));
+  const sync = selectorsTagged('SYNC-ONLY');
+  const handle = selectorsTagged('DB-SINGLETON');
   assert.ok(channel.length > 0 && push.length > 0, 'the server/** override carries no sender selectors');
+  /** @param {string[]} tags */
+  const byTags = (tags) => selectors.filter((s) => tags.some((tag) => tagged(tag)(s)));
   /** The documented exemptions: what a file may drop. @param {string} file @returns {Selector[]} */
   const mayDrop = (file) => {
     if (file === 'server/services/channel-delivery.js') return channel;
     if (file === 'server/services/push.js') return push;
     if (PUSH_SENDERS.includes(file)) return push.filter((s) => s.selector.includes('sendPushToUser'));
+    if (file === 'server/utils/timezone.js') return byTags(['UTC-DAY-KEY']);
+    // The migrations may move document content (#2956: DOC-CONTENT).
+    if (file === 'server/db.js' || file.startsWith('server/migrations/')) return byTags([...RIGHTS_TAGS, 'SQL-IN-LIST', 'DOC-CONTENT']);
+    if (RIGHTS_HOME.some((h) => file.startsWith(h.slice(0, -2)))) return byTags(RIGHTS_TAGS);
     return [];
   };
-  const lost = [];
-  let seen = 0;
-  for (const override of /** @type {Override[]} */ (CONFIG.overrides)) {
-    const list = override.rules?.[RESTRICTED];
-    if (!list || !override.files.some((f) => f.startsWith('server/'))) continue;
-    seen += 1;
-    const has = new Set(list.slice(1).map((s) => JSON.stringify(s)));
-    for (const s of [...channel, ...push]) {
-      if (has.has(JSON.stringify(s))) continue;
-      // A selector may be missing only if every file of the override is exempt from it.
-      if (override.files.every((f) => mayDrop(f).includes(s))) continue;
-      lost.push(`${override.files.join(', ')}: ${s.message.split(':')[0]} ${s.selector}`);
+  const key = (/** @type {Selector} */ s) => JSON.stringify(s);
+  const wrong = [];
+  for (const file of new Set([...SERVER_FILES, ...PUSH_SENDERS])) {
+    const expected = [...selectors, ...(inSyncArea(file) ? sync : []), ...(inDbArea(file) ? handle : [])]
+      .filter((s) => !mayDrop(file).includes(s)).map(key).sort();
+    const actual = effectiveSelectors(CONFIG, file).map(key).sort();
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      const lost = expected.filter((s) => !actual.includes(s)).map((s) => JSON.parse(s).message.split(':')[0]);
+      const extra = actual.filter((s) => !expected.includes(s)).map((s) => JSON.parse(s).message.split(':')[0]);
+      wrong.push(`${file}: lost [${lost}] extra [${extra}]`);
     }
   }
-  assert.ok(seen >= 5, 'the server overrides were not read');
-  assert.deepEqual(lost, [], 'an override for a server/ file drops a sender selector');
+  assert.ok(SERVER_FILES.length > 500, 'the server files were not read');
+  assert.deepEqual(wrong, [], 'a server/ file gets another list than its areas and exemptions say');
 });
 
 /** Files a rule lets through, as the pathNot list of .dependency-cruiser.mjs spells them. */
@@ -623,16 +767,21 @@ test('the overrides in .oxlintrc.json are what the generator writes', () => {
     const write = spawnSync(process.execPath, [GENERATOR, '--root', dir], { encoding: 'utf8' });
     assert.equal(write.status, 0, write.stderr);
     const regenerated = JSON.parse(readFileSync(join(dir, '.oxlintrc.json'), 'utf8'));
-    const senders = regenerated.overrides.find((/** @type {Override} */ o) => o.files.includes('server/routes/push.js'));
-    assert.ok(senders.files.includes('server/services/sixth.js'));
+    // The new sender sits under server/services/, so its entry comes after the services area.
+    const at = (/** @type {string} */ f) => regenerated.overrides.findLastIndex((/** @type {Override} */ o) => o.files.includes(f));
+    assert.ok(at('server/services/sixth.js') > at('server/services/**'));
+    const list = regenerated.overrides[at('server/services/sixth.js')].rules[RESTRICTED].slice(1);
+    assert.ok(!list.some((/** @type {Selector} */ s) => s.selector?.includes('sendPushToUser')), 'the new sender may call sendPushToUser');
+    assert.ok(list.some(tagged('DB-SINGLETON')), 'the new sender keeps the services area');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
 test('the lint exceptions name exactly the senders the import rules let through', async () => {
-  const pushOverride = CONFIG.overrides.find((/** @type {Override} */ o) => o.files.includes('server/routes/push.js'));
-  assert.deepEqual([...pushOverride.files].sort(), [...PUSH_SENDERS].sort());
+  // The files that may call sendPushToUser, as the overrides resolve.
+  const callers = SERVER_FILES.filter((f) => !effectiveSelectors(CONFIG, f).some((s) => s.selector.includes('sendPushToUser')));
+  assert.deepEqual(callers.sort(), [...PUSH_SENDERS, 'server/services/push.js'].sort());
   const pushImporters = await exemptPaths('push-service-importers');
   for (const file of [...PUSH_SENDERS, 'server/services/push.js']) assert.ok(pushImporters.some((re) => re.test(file)), `${file} is not a named push importer`);
   assert.equal(pushImporters.length, PUSH_SENDERS.length + 1, 'a push importer without a lint exception');
@@ -789,6 +938,201 @@ test('the ratchet holds RIGHTS-MODULE and the import rule as hard, and asks a re
     const ok = run(sql);
     assert.equal(ok.code, 0, ok.out);
   } finally { rmSync(sql, { recursive: true, force: true }); }
+});
+
+const SQL_LIST_FIXTURE = join(FIXTURE, 'sql-in-list');
+
+test('the SQL-IN-LIST fixture gives exactly its thirteen marked lines, and nothing in the schema file', () => {
+  const dir = tempDir('yuvomi-sql-in-list-fixture-');
+  try {
+    cpSync(SQL_LIST_FIXTURE, dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    // The fixture marks every line that must be reported with `sql-N`.
+    const marked = ['server/routes/lists.js', 'server/authorize/rows.ts'].flatMap((file) => readFileSync(join(dir, file), 'utf8').split('\n')
+      .flatMap((line, i) => (/\/\/ sql-\d+$/.test(line) ? [`${file}:${i + 1} SQL-IN-LIST`] : [])));
+    assert.equal(marked.length, 13, 'the fixture marks thirteen spellings');
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    // Silent: the function `silent` (one json_each parameter, two columns, a single '?',
+    // maps that build something else) and server/db.js (migrations).
+    assert.deepEqual(found, [...marked].sort());
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a SQL-IN-LIST key stands only with a reason (a fixed column list), never as a hard rule', () => {
+  const dir = project("export const f = (db, cols) => db.prepare(`INSERT INTO t (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`);\n");
+  try {
+    const init = run(dir, '--init');
+    assert.equal(init.code, 1, init.out);
+    assert.match(init.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/SQL-IN-LIST\s+no reason/);
+    assert.doesNotMatch(init.out, /Hard rules have no baseline/);
+    assert.deepEqual(baselineOf(dir), { 'server/x.js\toxlint/no-restricted-syntax/SQL-IN-LIST': 1 });
+    writeReasons(dir, { 'server/x.js\toxlint/no-restricted-syntax/SQL-IN-LIST': 'a fixed column list of the table, not a list of values' });
+    const ok = run(dir);
+    assert.equal(ok.code, 0, ok.out);
+    // A second list in the same file raises the count: red, and --update never takes it in.
+    writeFileSync(join(dir, 'server', 'x.js'), "export const f = (db, cols) => db.prepare(`INSERT INTO t (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`);\nexport const g = (db, ids) => db.prepare(`SELECT * FROM t WHERE id IN (${ids.map(() => '?').join(',')})`);\n");
+    const more = run(dir);
+    assert.equal(more.code, 1, more.out);
+    assert.match(more.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/SQL-IN-LIST\s+1 -> 2/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+/**
+ * Lints a copy of a fixture project with the real rule set; returns the marked lines (`// <mark>-N`)
+ * and the no-restricted-syntax findings, both as `file:line TAG`.
+ * @param {string} name @param {string} mark @param {string} tag
+ */
+function markedFixture(name, mark, tag) {
+  const dir = tempDir(`yuvomi-${name}-fixture-`);
+  try {
+    cpSync(join(FIXTURE, name), dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    const files = readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(js|ts)$/.test(f)).map((f) => f.split('\\').join('/'));
+    const marked = files.flatMap((file) => readFileSync(join(dir, file), 'utf8').split('\n')
+      .flatMap((line, i) => (new RegExp(`// ${mark}-\\d+$`).test(line) ? [`${file}:${i + 1} ${tag}`] : []))).sort();
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .filter((/** @type {{ code: string }} */ d) => d.code.includes('no-restricted-syntax'))
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    return { marked, found };
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+test('the SYNC-ONLY fixture gives exactly its seven marked lines, and nothing outside the areas (phase 2, F6c)', () => {
+  const { marked, found } = markedFixture('sync-only', 'sync', 'SYNC-ONLY');
+  // async function, async arrow, async IIFE, await, for await, async method, an async read slice.
+  assert.equal(marked.length, 7, 'the fixture marks seven spellings');
+  // Silent: Promise.resolve(), a Promise type, the words in a comment or string, an async
+  // service, a route and server/db/backup.ts.
+  assert.deepEqual(found, marked);
+});
+
+test('the DB-SINGLETON fixture gives exactly its four marked lines, and nothing in a route (phase 2, F6c)', () => {
+  const { marked, found } = markedFixture('db-singleton', 'handle', 'DB-SINGLETON');
+  assert.equal(marked.length, 4, 'the fixture marks db.get(), dbModule.get(), a chained db.get() and one in server/authorize/');
+  // Silent: map.get(key), db.get(1), calendar.colors.get(), database.prepare(...).get(), a string, a route.
+  assert.deepEqual(found, marked);
+});
+
+test('the TX-DRIVER fixture gives exactly its marked lines, withTx with options stays under the async rules (phase 2, F6d)', () => {
+  const dir = tempDir('yuvomi-tx-driver-fixture-');
+  try {
+    cpSync(join(FIXTURE, 'tx-driver'), dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    const file = 'server/routes/tx.js';
+    const tags = { tx: 'TX-DRIVER', async: 'TX-ASYNC-FN', await: 'TX-AWAIT-INSIDE' };
+    const marked = readFileSync(join(dir, file), 'utf8').split('\n').flatMap((line, i) => {
+      const m = /\/\/ (tx|async|await)-\d+$/.exec(line);
+      return m ? [`${file}:${i + 1} ${tags[/** @type {'tx' | 'async' | 'await'} */ (m[1])]}`] : [];
+    }).sort();
+    assert.equal(marked.filter((m) => m.endsWith('TX-DRIVER')).length, 4, 'the fixture marks four driver spellings');
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .filter((/** @type {{ code: string }} */ d) => d.code.includes('no-restricted-syntax'))
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    // Silent: withTx(db, fn) with and without options, idb.transactions, transaction as a
+    // name, in a string and a comment, and the driver call under test/.
+    assert.deepEqual(found, marked);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('TX-DRIVER is hard: a driver transaction in the server is red even with --init (phase 2, F6d)', () => {
+  const dir = project('export function f(db) { return db.get().transaction(() => 1)(); }\n');
+  try {
+    const r = run(dir, '--init');
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /Hard rules[\s\S]*server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-DRIVER\s+1/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the DOC-CONTENT fixture gives exactly its marked lines, migrations and tests stay silent (#2956)', () => {
+  const dir = tempDir('yuvomi-doc-content-fixture-');
+  try {
+    cpSync(join(FIXTURE, 'doc-content'), dir, { recursive: true });
+    writeFileSync(join(dir, '.oxlintrc.json'), JSON.stringify(portableConfig()));
+    const files = readdirSync(dir, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(js|ts)$/.test(f)).map((f) => f.split('\\').join('/'));
+    // The mark sits in a comment on the line where the string starts (a multi-line
+    // template string is reported there, not at its end).
+    const marked = files.flatMap((file) => readFileSync(join(dir, file), 'utf8').split('\n')
+      .flatMap((line, i) => (/(\/\/|\/\*) doc-\d+/.test(line) ? [`${file}:${i + 1} DOC-CONTENT`] : []))).sort();
+    assert.equal(marked.length, 14, 'the fixture marks fourteen spellings');
+    const r = spawnSync(process.execPath, [OXLINT, '--format', 'json', '.'], { cwd: dir, encoding: 'utf8' });
+    const found = JSON.parse(r.stdout).diagnostics
+      .filter((/** @type {{ code: string }} */ d) => d.code.includes('no-restricted-syntax'))
+      .map((/** @type {{ filename: string, message: string, labels: { span: { line: number } }[] }} */ d) => `${d.filename}:${d.labels[0].span.line} ${d.message.split(':')[0]}`)
+      .sort();
+    // Silent: a metadata update, a content column in WHERE, another table, an
+    // interpolated table name, a comment, a migration and a file under test/.
+    assert.deepEqual(found, marked);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('DOC-CONTENT is hard: rewriting the content of a document row is red even with --init (#2956)', () => {
+  const dir = project("export function f(db) { return db.prepare('UPDATE family_documents SET storage_key = ? WHERE id = ?').run(1, 2); }\n");
+  try {
+    const r = run(dir, '--init');
+    assert.equal(r.code, 1, r.out);
+    assert.match(r.out, /Hard rules[\s\S]*server\/x\.js\s+oxlint\/no-restricted-syntax\/DOC-CONTENT\s+1/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('SYNC-ONLY is hard, DB-SINGLETON an ordinary baseline that only sinks (phase 2, F6c)', () => {
+  const dir = project(NONE);
+  try {
+    mkdirSync(join(dir, 'server', 'db'));
+    writeFileSync(join(dir, 'server', 'db', 'x.ts'), 'export async function f(): Promise<void> {}\n');
+    const hard = run(dir, '--init');
+    assert.equal(hard.code, 1, hard.out);
+    assert.match(hard.out, /Hard rules have no baseline/);
+    assert.match(hard.out, /server\/db\/x\.ts\s+oxlint\/no-restricted-syntax\/SYNC-ONLY\s+1/);
+    assert.equal(existsSync(join(dir, 'lint-baseline.json')), false, 'a hard finding never enters a baseline');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+  const HANDLE = 'server/services/s.js\toxlint/no-restricted-syntax/DB-SINGLETON';
+  const two = "import * as db from '../db.js';\nexport const f = () => [db.get(), db.get()];\n";
+  const svc = project(NONE);
+  try {
+    mkdirSync(join(svc, 'server', 'services'));
+    writeFileSync(join(svc, 'server', 'services', 's.js'), two);
+    const init = run(svc, '--init');
+    assert.equal(init.code, 0, init.out);
+    assert.deepEqual(baselineOf(svc), { [HANDLE]: 2 }, 'no reason needed');
+    writeFileSync(join(svc, 'server', 'services', 's.js'), two.replace('db.get()]', 'db.get(), db.get()]'));
+    const more = run(svc);
+    assert.equal(more.code, 1, more.out);
+    assert.match(more.out, /server\/services\/s\.js\s+oxlint\/no-restricted-syntax\/DB-SINGLETON\s+2 -> 3/);
+    writeFileSync(join(svc, 'server', 'services', 's.js'), two.replace(', db.get()]', ']'));
+    assert.equal(run(svc, '--update').code, 0);
+    assert.deepEqual(baselineOf(svc), { [HANDLE]: 1 });
+  } finally { rmSync(svc, { recursive: true, force: true }); }
+});
+
+test('a TX-MANUAL key stands only with a reason, also for a template literal (phase 2, F6b)', () => {
+  const MANUAL = 'server/x.js\toxlint/no-restricted-syntax/TX-MANUAL';
+  const dir = project("export function f(db, n) { db.exec('BEGIN EXCLUSIVE'); db.exec(`SAVEPOINT ${n}`); }\n");
+  try {
+    const init = run(dir, '--init');
+    assert.equal(init.code, 1, init.out);
+    assert.match(init.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+no reason/);
+    assert.doesNotMatch(init.out, /Hard rules have no baseline/);
+    assert.deepEqual(baselineOf(dir), { [MANUAL]: 2 });
+    writeReasons(dir, { [MANUAL]: 'too short' });
+    assert.equal(run(dir).code, 1, 'a reason under twenty characters');
+    writeReasons(dir, { [MANUAL]: 'an exclusive lock on a file of its own; withTx() only issues BEGIN' });
+    const ok = run(dir);
+    assert.equal(ok.code, 0, ok.out);
+    // A prepared BEGIN in the same file raises the count: red, and --update never takes it in.
+    writeFileSync(join(dir, 'server', 'x.js'), "export function f(db, n) { db.exec('BEGIN EXCLUSIVE'); db.exec(`SAVEPOINT ${n}`); db.prepare('BEGIN').run(); }\n");
+    const more = run(dir);
+    assert.equal(more.code, 1, more.out);
+    assert.match(more.out, /server\/x\.js\s+oxlint\/no-restricted-syntax\/TX-MANUAL\s+2 -> 3/);
+    assert.equal(run(dir, '--update').code, 1);
+    assert.deepEqual(baselineOf(dir), { [MANUAL]: 2 });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 const ROW = 'server/x.js\toxlint/no-restricted-syntax/RIGHTS-ROW';
@@ -970,7 +1314,7 @@ test('the real lint-baseline.json is sorted, has no hard rule and names only exi
   assert.deepEqual([...new Set(stale)], [], 'baseline names files that do not exist');
 });
 
-test('the real lint-baseline-reasons.json is sorted and explains every error-text, rights-sql and rights-row key', () => {
+test('the real lint-baseline-reasons.json is sorted and explains every error-text, rights-sql, rights-row, sql-in-list and TX-MANUAL key', () => {
   const baseline = JSON.parse(readFileSync(join(REPO, 'lint-baseline.json'), 'utf8'));
   const reasons = JSON.parse(readFileSync(join(REPO, 'lint-baseline-reasons.json'), 'utf8'));
   const keys = Object.keys(reasons);
@@ -987,4 +1331,12 @@ test('the real lint-baseline-reasons.json is sorted and explains every error-tex
   const rightsRow = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/RIGHTS-ROW'));
   assert.ok(rightsRow.length > 0, 'the baseline carries no rights-row key');
   assert.deepEqual(rightsRow.filter((key) => !(key in reasons)), [], 'rights-row keys without a reason');
+  const sqlList = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/SQL-IN-LIST'));
+  assert.deepEqual(sqlList.filter((key) => !(key in reasons)), [], 'sql-in-list keys without a reason');
+  const txManual = Object.keys(baseline).filter((key) => key.endsWith('\toxlint/no-restricted-syntax/TX-MANUAL'));
+  assert.ok(txManual.length > 0, 'the baseline carries no TX-MANUAL key');
+  assert.deepEqual(txManual.filter((key) => !(key in reasons)), [], 'TX-MANUAL keys without a reason');
+  // F14: in the server only the implementation and the instance lock write transaction statements.
+  assert.deepEqual(txManual.filter((key) => key.startsWith('server/')).map((key) => key.split('\t')[0]),
+    ['server/db/tx.ts', 'server/utils/instance-lock.js']);
 });

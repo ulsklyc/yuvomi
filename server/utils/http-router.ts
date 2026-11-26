@@ -47,6 +47,6 @@ type Router = {
   delete(path: string, ...handlers: Handler[]): Router;
 };
 type Application = Router & { listen(port: number, host: string): Server };
-type Express = { (): Application; Router(): Router; json(): Handler };
+type Express = { (): Application; Router: () => Router; json(): Handler };
 const express: Express = createRequire(import.meta.url)('express');
 export default express;

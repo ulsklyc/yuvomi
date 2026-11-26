@@ -127,7 +127,8 @@
         "transferUndone": "已从购物清单中移除。",
         "transferSkipped": "{{count}} 件已在清单中。",
         "transferSkipped_one": "{{count}} 件已在清单中。",
-        "transferAllPresent": "所有食材都已在清单中。"
+        "transferAllPresent": "所有食材都已在清单中。",
+        "errorTransferTooLarge": "一次的食材太多了。最多只能一起转移并撤销 {{limit}} 项。"
     },
     "nav": {
         "dashboard": "概览",
@@ -1272,7 +1273,8 @@
         "localCalendarEdit": "编辑日历",
         "localCalendarNew": "新建日历",
         "manageSubscriptionsLink": "订阅与同步",
-        "cancelled": "已取消"
+        "cancelled": "已取消",
+        "errorSeriesChanged": "此系列刚在其他地方被更改。请再保存一次。"
     },
     "noteCategories": {
         "categories": "分类",
@@ -3638,7 +3640,8 @@
         "remoteErrorAuthFailed": "服务器拒绝了登录。请检查用户名和密码。",
         "remoteErrorStatus": "服务器返回的状态为 {{status}}。",
         "remoteErrorUnreachable": "无法连接到服务器。请检查地址以及服务器是否正在运行。",
-        "remoteErrorFailed": "对服务器的请求失败。"
+        "remoteErrorFailed": "对服务器的请求失败。",
+        "caldavErrorAccountChanged": "此账户刚在其他地方被更改。请再保存一次。"
     },
     "login": {
         "tagline": "欢迎回来。您的家，尽在一处。",

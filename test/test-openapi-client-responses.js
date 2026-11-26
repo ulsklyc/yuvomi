@@ -303,9 +303,10 @@ async function call(method, template, { params = {}, query = '', body, headers =
       await seed('POST', '/tasks', { title: 'Schon fertig', due_date: today, assigned_to: [adminId], status: 'done' });
       await seed('POST', '/calendar', {
         title: 'Elternabend', start_datetime: `${await householdDay(1)}T17:00:00Z`, end_datetime: `${await householdDay(1)}T18:00:00Z`,
-        assigned_to: [adminId], countdown: 1,
+        assigned_to: [adminId], countdown: true,
       });
-      await seed('POST', '/calendar', { title: 'Klassenfahrt', start_datetime: today, all_day: 1, assigned_to: [child.id] });
+      // The switches of an event are booleans (#2810): 1 is a 400 since then.
+      await seed('POST', '/calendar', { title: 'Klassenfahrt', start_datetime: today, all_day: true, assigned_to: [child.id] });
 
       const { data: list } = await seed('POST', '/shopping', { name: 'Wocheneinkauf' });
       const { data: emptyList } = await seed('POST', '/shopping', { name: 'Noch leer' });

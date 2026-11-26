@@ -1,11 +1,12 @@
 import {
   op, idParam, stringPathParam, DOCUMENT_LINKS_READ_NOTE, BUDGET_LINKS_READ_NOTE, withCaseReasons, withValidationRefusal,
 } from '../helpers.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { DATE_PATTERN, OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
 import {
   CONDITIONS, STATUSES, ODOMETER_UNITS, ROLES, MAX_PHOTO_LENGTH, MAX_TRACKED_DATES_PER_ITEM, MAX_LABEL,
 } from '../../routes/inventory/fields.js';
+import { MAX_ATTACHMENTS, MAX_ORDER_ROWS } from '../array-limits.js';
 
 // R23 (D5): Kaufpreise folgen einem eigenen Recht.
 const PRICES_NOTE = 'Without the `inventory_view_prices` capability (new child accounts start without it) `purchase_price` and `currency` '
@@ -89,6 +90,7 @@ const LOCATION_BODY = body({
  */
 const locationOrder = (minItems) => ({
   type: 'array',
+  maxItems: MAX_ORDER_ROWS,
   ...(minItems ? { minItems } : {}),
   items: { anyOf: [{ type: 'integer' }, DIGIT_TEXT] },
   description: `Location ids in the wanted order, as whole numbers. ${LEGACY_NOTE} Ids that do not exist (or are not at this level) are skipped.`,
@@ -156,6 +158,7 @@ function itemProperties({ create }) {
     },
     attachment_document_ids: {
       type: 'array',
+      maxItems: MAX_ATTACHMENTS,
       items: { type: 'integer' },
       description: create
         ? 'Documents of the Documents module to link. Left out: none. Not `null`.'
@@ -299,7 +302,7 @@ function placePaths() {
         requestBody: body({
           type: 'object',
           required: ['order'],
-          properties: { order: { type: 'array', minItems: 1, items: { type: 'string' }, description: 'Category keys.' } },
+          properties: { order: { type: 'array', minItems: 1, maxItems: MAX_ORDER_ROWS, items: { type: 'string' }, description: 'Category keys.' } },
         }),
       })),
     },

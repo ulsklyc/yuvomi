@@ -127,7 +127,8 @@
         "transferUndone": "از فهرست خرید حذف شد.",
         "transferSkipped": "{{count}} از قبل در آن بود.",
         "transferSkipped_one": "{{count}} از قبل در آن بود.",
-        "transferAllPresent": "همه مواد از قبل در فهرست هستند."
+        "transferAllPresent": "همه مواد از قبل در فهرست هستند.",
+        "errorTransferTooLarge": "این تعداد مواد اولیه برای یک بار زیاد است. حداکثر {{limit}} مورد را می‌توان با هم منتقل و دوباره لغو کرد."
     },
     "nav": {
         "dashboard": "نمای کلی",
@@ -1290,7 +1291,8 @@
         "localCalendarEdit": "ویرایش تقویم",
         "localCalendarNew": "تقویم جدید",
         "manageSubscriptionsLink": "اشتراک‌ها و همگام‌سازی",
-        "cancelled": "لغو شد"
+        "cancelled": "لغو شد",
+        "errorSeriesChanged": "این سری همین حالا جای دیگری تغییر کرد. لطفاً دوباره ذخیره کنید."
     },
     "noteCategories": {
         "categories": "دسته‌بندی‌ها",
@@ -3656,7 +3658,8 @@
         "remoteErrorAuthFailed": "سرور ورود را رد کرد. نام کاربری و رمز عبور را بررسی کنید.",
         "remoteErrorStatus": "سرور با وضعیت {{status}} پاسخ داد.",
         "remoteErrorUnreachable": "سرور در دسترس نیست. نشانی را بررسی کنید و اینکه سرور در حال اجراست.",
-        "remoteErrorFailed": "درخواست به سرور ناموفق بود."
+        "remoteErrorFailed": "درخواست به سرور ناموفق بود.",
+        "caldavErrorAccountChanged": "این حساب همین حالا جای دیگری تغییر کرد. لطفاً دوباره ذخیره کنید."
     },
     "login": {
         "tagline": "دوباره خوش آمدید. خانهٔ شما در یک جا.",

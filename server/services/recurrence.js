@@ -803,7 +803,7 @@ function hasAnyOccurrence(dateKey, rrule, { utcDiffersFromLocal = false } = {}) 
  * Endet die Regel vor dem Tag, an dem die Serie beginnt? (#1607)
  *
  * `FREQ=DAILY;UNTIL=20260930` ab dem 2. Oktober hat die richtige FORM, und
- * mehr prueft `rrule()` in `middleware/validate.js` nicht - der Validator
+ * mehr prueft `rrule()` in `api/formats.ts` nicht - der Validator
  * kennt kein Startdatum. Die Frage steht deshalb hier, als eigene Funktion,
  * und NICHT in `hasAnyOccurrence`: das lesen auch Countdown-Kachel und
  * Serien-Teilung, und eine eingelesene Fremdserie mit so einer Regel zeigt der

@@ -182,8 +182,21 @@ through type stripping, which is why only erasable syntax is allowed.
 1,500 lines and functions up to 200, no `innerHTML`/`outerHTML` assignment, no
 `toISOString().slice(0, 10)` as a day key (the helpers in `server/utils/timezone.js` know the
 household's zone), no catch block that answers 500 itself, no `async` function or `await` in a
-`db.transaction()` body, no manual `BEGIN`/`COMMIT`, and oxlint's `correctness` category. The
-`innerHTML` and transaction rules are hard: they have no baseline and fail at the first finding.
+`withTx()` body, no call of a `transaction` method under `server/` (`TX-DRIVER`: the driver's
+`conn.transaction(fn)` and the old `db.transaction()` facade are gone from the server, every
+transaction is `withTx()`), no manual `BEGIN`/`COMMIT` (`withTx()` from `server/db/tx.ts` writes
+them once, for both drivers), and oxlint's `correctness` category. The `innerHTML` rule,
+`TX-DRIVER` and the two rules on a transaction body are hard: they have no baseline and fail
+at the first finding; a manual `BEGIN`/`COMMIT` (`TX-MANUAL`: `exec` or `prepare`, string or
+template literal) stands only as a listed exception with its reason in
+`lint-baseline-reasons.json` - the implementation, the instance lock and a few test instruments.
+`server/authorize/`, `server/migrations/`, `server/db/` (`backup.ts` and `restore.ts` apart),
+`server/db.js` and the read slices `server/services/*-slices.ts` stay synchronous, without
+`async`, `await` or `for await` (`SYNC-ONLY`, hard): the driver is synchronous, and every `await`
+is a yield point where another request runs between a read and its write. `db.get()` in
+`server/services/` and `server/authorize/` is a debt that only sinks (`DB-SINGLETON`): a new or
+rebuilt module takes the connection as its first parameter (`withTx(db, fn)`,
+`resolvePermissions(db, ...)`), and `db.get()` stays the facade of routes and entry points.
 The same script runs dependency-cruiser with the layer rules in `.dependency-cruiser.mjs`: no
 import cycles; `services/`, `utils/`, `middleware/` and `mcp/` never import `routes/`; only four
 named files import `server/services/push.js`, and only that file imports `web-push`; the server
@@ -192,7 +205,7 @@ The rights rules keep the visibility rules and the module verdict in `server/aut
 outside it no module imports anything but `server/authorize/index.ts`
 (`rights-only-through-authorize`, tests apart), the permission module never reaches
 `server/db.js` (`authorize-not-to-db`), and no file under `server/` outside `server/authorize/`,
-the schema (`server/db.js`, `server/db-schema-test.js`) and the API docs (`server/openapi/`)
+the schema (`server/db.js`, `server/migrations/`) and the API docs (`server/openapi/`)
 compares a module level in dot notation (`x.modules.y`) with `'none'` (`RIGHTS-MODULE`), all
 three hard; a visibility literal in SQL there (`RIGHTS-SQL`) and a visibility level compared
 with a string literal in JavaScript (`RIGHTS-ROW`: `row.visibility === 'all'`, also reversed,
@@ -269,7 +282,9 @@ Understanding where things live helps you find the right place for your changes:
 ```
 server/
   index.js             # Express entry point, middleware chain
-  db.js                # SQLite connection + migration runner (append-only)
+  db.js                # SQLite connection, encryption key, get
+  db/                  # Migration runner, backup and restore (used through db.js)
+  migrations/          # One file per migration (append-only)
   auth.js              # Session auth + user management
   routes/              # API route handlers - one file per module
   services/            # Business logic (calendar sync, recurrence engine)
@@ -295,7 +310,7 @@ docs/                  # Product spec, screenshots
 - Every API route lives in `server/routes/` and answers JSON; an error it does not expect is not caught there but reaches the central error handler (see [Backend](#backend))
 - Every frontend page is an ES module in `public/pages/` that exports `render()`
 - All design values come from `tokens.css` - never hardcode colors, radii, or shadows
-- Database migrations are appended to the `MIGRATIONS` array in `server/db.js` - never modify existing entries
+- Database migrations are appended as a new file `server/migrations/NNNN.ts` plus its line at the end of `server/migrations/index.ts` - never modify existing entries
 
 ---
 
@@ -389,7 +404,7 @@ own - a fix to an unrelated module, a refactor you needed along the way, a new
 dependency - open that separately and first. It lands in days instead of waiting
 on the review of everything around it.
 
-**On migrations.** Take the next free number in the `MIGRATIONS` array and expect
+**On migrations.** Take the next free number in `server/migrations/` and expect
 it to change. Two open PRs regularly claim the same one. The maintainer renumbers
 yours as it lands, which does not break the append-only rule: that rule protects
 migrations that have shipped, not one that is still in review.
@@ -548,7 +563,10 @@ stops being one.
 
 - One route file per module in `server/routes/`
 - API responses: `{ data: ... }` on success, `{ error: string, code: number }` on failure
-- Database migrations: append to the `MIGRATIONS` array in `server/db.js` - **never modify existing entries**
+- Input is checked by the schema, not by the handler. Every route carries `validateRequest()` from `server/api/validate-request.ts` as its first handler (`router.post('/', validateRequest(), handler)`); it checks path, query and JSON body against the route's operation in the OpenAPI document under `server/openapi/paths/` and answers a mismatch with a 400 before the handler runs: `{ error, code: 400, reason, fields: [{ path, rule, reason? }] }`. A new route therefore gets its operation first, a route without one throws. A rule the schema can express belongs in the schema, with `x-reason` on the node where the client already translates a reason of its own; the helpers in `server/api/formats.ts` are for what a schema cannot say (rules across fields, lookups). `npm run test:validate-request-coverage` reads every router at runtime and has no exception list left.
+- Database migrations: one file per migration, `server/migrations/NNNN.ts` (`export default { version, description, up }`), appended at the end of `server/migrations/index.ts`; helpers a migration calls live frozen in `server/migrations/helpers.ts` - **never modify existing entries** (`npm run test:migrations-append-only` compares them byte for byte with the base)
+- A transaction is `withTx(db, fn)` from `server/db/tx.ts`, the one way for both SQLite drivers: `fn` is synchronous and its return value is the result; a throw rolls back; a call inside an open transaction becomes a savepoint; `{ immediate: true }` takes the write lock at `BEGIN` for a write that must not wait for an upgrade. Nothing that awaits (network, password hash, file, provider) runs inside it: a read, check and write that spans an `await` checks again inside the transaction after the last `await`, or writes conditionally (`WHERE` carries the checked value, `changes` is read). `TX-DRIVER`, `TX-MANUAL`, `TX-ASYNC-FN` and `TX-AWAIT-INSIDE` hold this.
+- A new database does not run the migrations one by one: it starts from `server/migrations/baseline.sql` (schema and default rows of migrations 1 to N, N in `baseline.json`) and then runs the migrations above N. The two files are generated by `node scripts/build-schema-baseline.ts` and never edited; a new migration does not touch them. They are re-cut only with a foundation release. `npm run test:schema-baseline` holds that baseline plus the rest equals every migration from zero, on both SQLite drivers
 - New entity tables: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO 8601). Key/value and join tables (`sync_config`, `task_tags`, …) deviate deliberately
 - Any server-side fetch of a URL stored from user/admin input (WebDAV targets, ICS feed URLs, subscription logos, recipe provider `base_url`s, ...) goes through `server/utils/ssrf.js` (`isBlockedAddress`/`createGuardedLookup`), not a bare `fetch()`. This is one classifier so DNS-rebinding and private-network edge cases aren't reimplemented per subsystem; `npm run test:ssrf` pins both the classification logic and which known modules actually call it, and runs as part of `npm test`.
 - Errors: a route does not answer an unexpected error itself - it lets the error reach the central error handler (`server/middleware/error-handler.js`), or throws an `HttpError` (`server/utils/http-error.js`) for a 4xx the client may read. The client only ever gets a sentence of our own, in English, plus `reason`, never the `err.message` of a foreign error; the lint rules `ERROR-TEXT` and `LOG-PLUS-500` hold this.
@@ -562,8 +580,11 @@ stops being one.
   [The pre-release handrail](#the-pre-release-handrail)). `npm run test:suite-chain` fails on a file
   without a script and on a script that runs in the wrong chain or in none.
 - Real SQLite, never a mock: an in-memory database or a temp file from `freshTestDbPath()` in
-  `test/tmp-db.js`, with the real migrations (or their test mirror in `server/db-schema-test.js`)
-  applied. Don't stub out migrations.
+  `test/tmp-db.js`, with the real migrations applied. A suite on `node:sqlite` takes its schema
+  from `test/helpers/schema-db.js`: the shipped baseline plus the migrations above it
+  (`openSchemaDb()`), or a legacy state from the real migrations up to version K
+  (`openSchemaDb({ upTo: K })`, then `migrateTo(db, M)`). Don't stub out migrations or hand-copy
+  the schema.
 - Route tests may go over HTTP on loopback: mount the router on a small Express app, set
   `req.authUserId`, `req.authRole` and `req.session` in a stub middleware, `listen(0, '127.0.0.1')`
   and `fetch()` that port. `createHarness()` in `test/test-document-folders.js` shows the pattern.
@@ -645,7 +666,7 @@ Asked for in [#687](https://github.com/ulsklyc/yuvomi/discussions/687). Yuvomi h
 
 ### How this project is built
 
-**AI coding agents are used here, extensively and openly.** Much of the code in this repository was drafted with them. Two of them also review pull requests automatically, and you will see their comments on yours: a Claude Code workflow and an OpenAI Codex connector.
+**AI coding agents are used here, extensively and openly.** Much of the code in this repository was drafted with them. Two of them also review pull requests automatically, and you will see their comments on yours: a Claude Code workflow and an OpenAI Codex connector. A third, a Mistral workflow (`.github/workflows/mistral-code-review.yml`), reviews only the maintainer's own pull requests, on every push.
 
 That is worth stating plainly rather than leaving to inference. An automated review comment on your PR is not a maintainer's verdict; it is a second pair of eyes with no authority to merge anything.
 

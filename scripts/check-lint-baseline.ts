@@ -66,11 +66,20 @@ const DEPCRUISE_TARGETS = ['server', 'public', 'scripts', 'tools', 'vite.config.
 // (rights-only-through-authorize) and a permission module that never opens the database
 // (authorize-not-to-db). The settings registry stays a leaf under the services (phase 2,
 // C3: settings-is-a-leaf). A blanket or no-restricted-syntax suppression would switch them
-// off, so it is hard as well.
+// off, so it is hard as well. SYNC-ONLY (phase 2, F6c) keeps async/await out of the
+// permission module, the migrations, the database core and the read slices: the driver is
+// synchronous, and an await between a read and its write lets another request in.
+// TX-DRIVER (phase 2, F6d) keeps every server transaction on withTx(db, fn): no call of a
+// `transaction` method under server/, so the driver's forgotten second call cannot happen.
+// DOC-CONTENT (#2956) keeps the content columns of a family_documents row fixed once it is
+// created; the calendar's attachment copies reuse what they read across planning rounds.
 const HARD = new Set([
+  'oxlint/no-restricted-syntax/DOC-CONTENT',
+  'oxlint/no-restricted-syntax/SYNC-ONLY',
   'oxlint/no-restricted-syntax/HTML-STRING-WRITE',
   'oxlint/no-restricted-syntax/TX-ASYNC-FN',
   'oxlint/no-restricted-syntax/TX-AWAIT-INSIDE',
+  'oxlint/no-restricted-syntax/TX-DRIVER',
   'oxlint/no-restricted-syntax/CHANNEL-SEND',
   'oxlint/no-restricted-syntax/PUSH-SEND',
   'depcruise/push-service-importers',
@@ -91,12 +100,24 @@ const HARD = new Set([
 // RIGHTS-SQL (phase 2, B5): a visibility literal in SQL outside server/authorize/ stands
 // only as a write, never a read. RIGHTS-ROW (phase 2, B8c): a visibility level compared in
 // JavaScript there stands only as a write filter or data upkeep, never a read rule.
-// A new key of either is red like any new key, and --update never takes one in (it only
+// SQL-IN-LIST (Refs #2810): a fixed column list built with one placeholder per column
+// stands only with its reason; a list of values goes through sqlInList().
+// TX-MANUAL (phase 2, F6b): a transaction statement written by hand (exec or prepare, string
+// or template literal) stands only where withTx() cannot be the tool: its own implementation
+// (server/db/tx.ts), the instance lock (server/utils/instance-lock.js: BEGIN EXCLUSIVE on a
+// lock file of its own, which the plain BEGIN of withTx() does not take), and two kinds of
+// test instrument: a second
+// connection that holds a lock or transaction open across several steps on purpose, and
+// fixture rows that are rolled back in every case (SAVEPOINT ... ROLLBACK TO; withTx commits
+// on return). Everything else runs through withTx().
+// A new key of any of them is red like any new key, and --update never takes one in (it only
 // lowers), so the list grows only by hand, with its reason.
 const REASONED = new Set([
   'oxlint/no-restricted-syntax/ERROR-TEXT',
   'oxlint/no-restricted-syntax/RIGHTS-SQL',
   'oxlint/no-restricted-syntax/RIGHTS-ROW',
+  'oxlint/no-restricted-syntax/SQL-IN-LIST',
+  'oxlint/no-restricted-syntax/TX-MANUAL',
 ]);
 const MIN_REASON = 20;
 

@@ -215,6 +215,16 @@ test('reminders: PUT needs remind_ats as a list of times, and the 400 comes befo
   assertRefused(await call('PUT', '/reminders?entity_type=task&entity_id=999999', { json: { remind_ats: 'x' } }), [{ path: 'body/remind_ats', rule: 'type' }]);
 });
 
+test('array limits: reminder instants, at the limit and one above (#2810)', async () => {
+  const { assertArrayLimit } = await import('./array-limit-cases.js');
+  const { MAX_REMINDER_INSTANTS } = await import('../server/openapi/array-limits.js');
+  const route = `/reminders?entity_type=task&entity_id=${newTask()}`;
+  // The same instant in every entry: past the schema the route dedupes, and one distinct instant stays below its cap of 5.
+  const at = await assertArrayLimit((json) => call('PUT', route, { json }),
+    (n) => ({ remind_ats: Array.from({ length: n }, () => '2097-06-01T08:00:00Z') }), MAX_REMINDER_INSTANTS, 'body/remind_ats');
+  assert.equal(at.status, 200, JSON.stringify(at.body));
+});
+
 test('reminders: the window edges of /upcoming have the shape the handler reads, not RFC 3339 date-time', async () => {
   for (const from of ['2099-01-01t10:00:00z', '2099-01-01 10:00', '2099-01-01T10:00+02']) {
     assertRefused(await call('GET', `/reminders/upcoming?from=${encodeURIComponent(from)}&to=2099-01-02`), [{ path: 'query/from', rule: 'pattern' }]);

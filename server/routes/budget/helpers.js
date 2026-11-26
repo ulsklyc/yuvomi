@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { linkTransfer } from '../../services/budget-transfers.js';
 import path from 'path';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import {
   budgetDetailsVisibleWhere,
   budgetScopeWhere,
@@ -412,7 +413,7 @@ function occurrenceWriter(database) {
     if (orig.transfer_entry_id) {
       const partner = database.prepare(`${SERIES_SELECT} AND a.id = ?`).get(orig.transfer_entry_id);
       if (!partner) throw new Error('Transfer series partner missing');
-      return database.transaction(() => {
+      return withTx(database, () => {
         if ((orig.grid_from && date < orig.grid_from) || (partner.grid_from && date < partner.grid_from)) return false;
         if (skipStmt.get(orig.id, date) || skipStmt.get(partner.id, date)) return false;
         const first = existsStmt.get(orig.id, date);
@@ -425,7 +426,7 @@ function occurrenceWriter(database) {
         const secondId = existsStmt.get(partner.id, date).id;
         linkTransfer(database, firstId, secondId);
         return true;
-      })();
+      });
     }
     // VOR DER LETZTEN RASTERAENDERUNG ENTSTEHT NICHTS (#1545, Review-Befund in
     // #1585). Hat eine Serien-Aenderung den Starttag oder den Rhythmus

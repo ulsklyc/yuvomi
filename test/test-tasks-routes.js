@@ -15,13 +15,12 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'tasks-routes-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { pushService } = await import('../server/services/push.js');
 const { pendingCreations, processPendingCreations, todoUidFor } =
   await import('../server/services/caldav-todo-outbound.js');
@@ -68,15 +67,14 @@ db.prepare('INSERT INTO housekeeping_workers (user_id, daily_rate) VALUES (?, 0)
 
 // Aktueller Akteur (Middleware liest ihn zur Request-Zeit).
 let actor = { id: ALICE, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;
@@ -135,8 +133,10 @@ test('POST: ungültige Priorität → 400', async () => {
 
 // Vorher 500 (Zahl als Titel, null in Kategorie oder Prioritaet, null als
 // Titel im PUT), ein leerer Titel im PUT wurde gespeichert, eine Zahl als
-// Beschreibung landete als "5.0", und '' in Tagesfeldern stand als '' in der Zeile.
-test('POST/PUT: falsche Formen sind 400, leere Tagesfelder werden null', async () => {
+// Beschreibung landete als "5.0", und '' in Tagesfeldern stand als '' in der
+// Zeile, danach als null. Seit #2810 ist '' dort die 400 des Schemas: kein
+// Tag ist `null`, und das schickt die App.
+test('POST/PUT: falsche Formen sind 400, leere Tagesfelder auch', async () => {
   const as = { id: ALICE, role: 'admin' };
   for (const body of [
     { title: 5 },
@@ -158,10 +158,16 @@ test('POST/PUT: falsche Formen sind 400, leere Tagesfelder werden null', async (
   assert.equal((await call('PUT', `/${id}`, { as, body: { title: 'Neu' } })).status, 200);
   assert.equal((await call('PUT', `/${id}`, { as, body: { description: null } })).body.data.description, null);
 
-  const blank = await call('POST', '/', { as, body: { title: 'Leer', start_date: '', due_date: '', due_time: '' } });
-  assert.equal(blank.status, 201);
+  for (const field of ['start_date', 'due_date', 'due_time']) {
+    const blank = await call('POST', '/', { as, body: { title: 'Leer', [field]: '' } });
+    assert.equal(blank.status, 400, field);
+    assert.equal(blank.body.reason, 'validation', field);
+    assert.ok(blank.body.fields.some((/** @type {any} */ f) => f.path === `body/${field}`), field);
+  }
+  const none = await call('POST', '/', { as, body: { title: 'Leer', start_date: null, due_date: null, due_time: null } });
+  assert.equal(none.status, 201);
   assert.deepEqual(
-    [blank.body.data.start_date, blank.body.data.due_date, blank.body.data.due_time],
+    [none.body.data.start_date, none.body.data.due_date, none.body.data.due_time],
     [null, null, null],
   );
 });
@@ -361,6 +367,31 @@ test('PUT /:id: unbekannte ID → 404, ungültiger Status → 400', async () => 
   assert.equal(bad.status, 400);
 });
 
+test('Schema: trg_tasks_updated_at existiert in der Migration-Kette (nicht nur im Testspiegel)', () => {
+  // Migration 1 legt den Trigger an; die Tabelle-Rebuilds (v4/v25/v114)
+  // droppten ihn mit, weil `DROP TABLE` die daran hängenden Trigger mitnimmt,
+  // und Migration 283 stellt ihn wieder her. Die Prüfung läuft gegen die echte
+  // Migration-Kette - der fruehere handgepflegte Testspiegel hatte den
+  // Trigger weiter, was den Verlust deshalb unentdeckt ließ.
+  const trigger = db.prepare(
+    "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_tasks_updated_at'"
+  ).get();
+  assert.ok(trigger, 'Trigger in migrierter Datenbank vorhanden');
+});
+
+test('PUT /:id: updated_at rückt bei echter Änderung vor', async () => {
+  const created = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'Zeitstempel-Vor' } });
+  const id = created.body.data.id;
+  const before = db.prepare('SELECT updated_at FROM tasks WHERE id = ?').get(id).updated_at;
+  // Die Spalte hat Sekunden-Präzision - nur ein Zeitfenster macht den Vorrücken sichtbar.
+  await new Promise((r) => setTimeout(r, 1100));
+  const r = await call('PUT', `/${id}`, { as: { id: ALICE, role: 'admin' }, body: { title: 'Zeitstempel-Nach' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.title, 'Zeitstempel-Nach');
+  const after = db.prepare('SELECT updated_at FROM tasks WHERE id = ?').get(id).updated_at;
+  assert.notEqual(after, before, 'updated_at rückt beim Update vor');
+});
+
 // --------------------------------------------------------
 // PATCH /:id/status, DELETE /:id
 // --------------------------------------------------------
@@ -544,10 +575,15 @@ test('GET /: ein leerer oder unsinniger Wert engt nicht versehentlich ein', asyn
   const unfiltered = await call('GET', '/', { as: admin });
   assert.equal(empty.body.data.length, unfiltered.body.data.length);
 
-  // Eine nicht-numerische Person wird verworfen, statt die Query zu sprengen.
+  // Eine nicht-numerische Person ist seit #2810 die 400 des Schemas, statt
+  // still verworfen zu werden; ein unbekannter Status bleibt ein Filter ohne
+  // Treffer (die Beschreibung sagt es so).
   const bogus = await call('GET', '/?assigned_to=abc', { as: admin });
-  assert.equal(bogus.status, 200);
-  assert.equal(bogus.body.data.length, unfiltered.body.data.length);
+  assert.equal(bogus.status, 400);
+  assert.equal(bogus.body.reason, 'validation');
+  const unknown = await call('GET', '/?status=nope', { as: admin });
+  assert.equal(unknown.status, 200);
+  assert.deepEqual(unknown.body.data, []);
 });
 
 // --------------------------------------------------------
@@ -1419,15 +1455,18 @@ test('POST: ein leerer Status ist kein Status, sondern keiner (Review zu #807)',
   // Defaults sah nur `undefined`, also trug ein leeres Auswahlfeld den Wert bis
   // ins INSERT: gegen eine NOT-NULL-Spalte mit CHECK, also 500 auf eine Eingabe,
   // die der eigene Validator eben noch akzeptiert hat.
-  for (const leer of [null, '']) {
-    const r = await call('POST', '/', {
-      as: { id: ALICE, role: 'admin' },
-      body: { title: `leerer-status-${JSON.stringify(leer)}`, status: leer },
-    });
-    assert.equal(r.status, 201, `status: ${JSON.stringify(leer)} darf kein Fehler sein`);
-    assert.equal(r.body.data.status, 'open', 'und faellt auf den ersten Status');
-    assert.equal(r.body.data.archived_at, null);
-  }
+  // Seit #2810 gilt das nur noch fuer null (das Schema nennt es); '' ist die
+  // 400 des Schemas und erreicht das INSERT nie.
+  const r = await call('POST', '/', {
+    as: { id: ALICE, role: 'admin' },
+    body: { title: 'leerer-status-null', status: null },
+  });
+  assert.equal(r.status, 201, 'status: null darf kein Fehler sein');
+  assert.equal(r.body.data.status, 'open', 'und faellt auf den ersten Status');
+  assert.equal(r.body.data.archived_at, null);
+  const blank = await call('POST', '/', { as: { id: ALICE, role: 'admin' }, body: { title: 'leerer-status', status: '' } });
+  assert.equal(blank.status, 400);
+  assert.equal(blank.body.reason, 'validation');
 });
 
 test('POST: das eingegebene Faelligkeitsdatum bleibt stehen (#960)', async () => {

@@ -37,6 +37,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error express 5 ships no type declarations (TS7016)
 import express from 'express';
+import { assertArrayLimit } from './array-limit-cases.js';
+import { MAX_INGREDIENTS, MAX_SHOPPING_ITEMS } from '../server/openapi/array-limits.js';
 
 const dbmod = await import('../server/db.js');
 const { default: recipesRouter, MAX_RECIPE_IMAGE_LENGTH } = await import('../server/routes/recipes.js');
@@ -779,4 +781,15 @@ test('pantry: quantity and min_quantity are refused below 0 by the document', ()
     assert.equal(properties.quantity.minimum, 0, `${method} ${path} quantity`);
     assert.equal(properties.min_quantity.minimum, 0, `${method} ${path} min_quantity`);
   }
+});
+
+test('array limits: recipe ingredients and the pantry take-over, at the limit and one above (#2810)', async () => {
+  const ingredients = (/** @type {number} */ n) => ({
+    title: 'Grenze', ingredients: Array.from({ length: n }, (_, i) => ({ name: `Zutat ${i}`, quantity: null, category: CATEGORY })),
+  });
+  const created = await assertArrayLimit((body) => call('POST', '/recipes', { json: body }), ingredients, MAX_INGREDIENTS, 'body/ingredients');
+  assert.equal(created.status, 201);
+  const takeOver = (/** @type {number} */ n) => ({ list_id: LIST, items: Array.from({ length: n }, (_, i) => ({ shopping_item_id: 900000 + i })) });
+  const taken = await assertArrayLimit((body) => call('POST', '/pantry/import-shopping', { json: body }), takeOver, MAX_SHOPPING_ITEMS, 'body/items');
+  assert.equal(taken.status, 200, 'unknown rows are skipped');
 });

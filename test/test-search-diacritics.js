@@ -7,8 +7,7 @@
  * Ausführen: node test/test-search-diacritics.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { buildMatchQuery } from '../server/services/search.js';
 
 let passed = 0;
@@ -20,21 +19,9 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-// Prerequisite-Chain: 77 liest beim Rebuild index-weit aus allen Modul-Tabellen
-// (Health v65/66, Event-location v76). Das konsolidierte Test-Schema führt
-// shopping_items.notes bereits in der Basis, daher kein separates v68 nötig.
-for (const v of [1, 44, 65, 66, 76, 77, 130]) db.exec(MIGRATIONS_SQL[v]);
-// Der Events-Bucket von runSearch() filtert seit dem #1055-Review nach Abo und
-// Sichtbarkeit und braucht dafuer ics_subscriptions (Migration 10) und die
-// Spalte subscription_id - wie in test-search.js.
-db.exec(MIGRATIONS_SQL[10]);
-db.exec('ALTER TABLE calendar_events ADD COLUMN subscription_id INTEGER REFERENCES ics_subscriptions(id) ON DELETE CASCADE;');
+// Volles Schema aus der Baseline (test/helpers/schema-db.js): der FTS-Index
+// steht schon in der Form von Migration 77 (unicode61 remove_diacritics 2).
+const db = openSchemaDb();
 
 console.log('\n[Diacritics-Search-Test] unicode61 remove_diacritics 2 (#471)\n');
 

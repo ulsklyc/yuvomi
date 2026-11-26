@@ -306,16 +306,16 @@ docker compose up -d
 Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. Nothing to build or install on the host, not even Node.js; the image carries the built app.
 
 > **Pinning a version.** Every release is also published under immutable tags:
-> `2.94.0` (exact version), `2.93` (latest patch of that minor), plus a moving `main`
+> `2.96.0` (exact version), `2.96` (latest patch of that minor), plus a moving `main`
 > tag for the current development state. To pin production to a known-good release,
-> set `image: ghcr.io/ulsklyc/yuvomi:2.94.0` in your compose file and bump it
+> set `image: ghcr.io/ulsklyc/yuvomi:2.96.0` in your compose file and bump it
 > deliberately; `latest` always points at the newest release.
 >
 > **Going back to an earlier release** is the same move in reverse: pin the previous tag and
 > restart. Whether your database can follow depends on whether the newer release ran a
 > migration, see [Going back](#going-back). A foundation release (its CHANGELOG block starts
-> with "Foundation") changes the toolchain and not the database, so it rolls back this way with
-> your data untouched.
+> with "Foundation") rolls back this way with your data untouched when it brings no migration;
+> its "Foundation" section says which case it is.
 
 
 > **Verifying what you pull.** Every image the publish workflow builds is signed at build
@@ -324,7 +324,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. Nothing to build or 
 > image you are about to run is one GitHub built from a release tag of this repository:
 >
 > ```bash
-> cosign verify ghcr.io/ulsklyc/yuvomi:2.94.0 \
+> cosign verify ghcr.io/ulsklyc/yuvomi:2.96.0 \
 >   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 >   --certificate-identity-regexp '^https://github.com/ulsklyc/yuvomi/.github/workflows/docker-publish.yml@refs/tags/v'
 > ```
@@ -333,7 +333,7 @@ Docker pulls `ghcr.io/ulsklyc/yuvomi:latest` automatically. Nothing to build or 
 > anything else means the image is not one this repository released. The `main` tag is
 > signed too, under `refs/heads/main`, which the pattern above deliberately excludes. Tags
 > published before September 2026 carry no signature. Provenance and SBOM travel inside the
-> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.94.0 --format '{{ json .Provenance }}'`.
+> image: `docker buildx imagetools inspect ghcr.io/ulsklyc/yuvomi:2.96.0 --format '{{ json .Provenance }}'`.
 
 > **Verify a release tarball.** Releases from November 2026 on also carry the app as a tarball,
 > `yuvomi-<version>-dist.tar.gz` (one top-level folder `yuvomi-<version>/`), next to a
@@ -398,7 +398,7 @@ docker compose logs -f
 You should see output like:
 
 ```
-yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.94.0
+yuvomi  | [Yuvomi] Server running on port 3000 | Version 2.96.0
 yuvomi  | [Yuvomi] Environment: production
 yuvomi  | [Sync] Auto-sync active every 15 minutes.
 ```
@@ -638,7 +638,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | `SESSION_SECURE` | Set to `true` when running behind an HTTPS reverse proxy (Caddy, Nginx, Traefik). Leave unset for direct HTTP access (e.g. TrueNAS, bare Docker). | `false` | No |
 | `RATE_LIMIT_WINDOW_MS` | Time window for rate limiting (ms) | `60000` | No |
 | `RATE_LIMIT_MAX_ATTEMPTS` | Max attempts per window on the credential routes: sign-in, the second factor, and password reset | `5` | No |
-| `ENABLE_API_DOCS` | API documentation (`/docs`, `/openapi.json`) is admin-only and hidden entirely in production. Set to `true` to expose it to signed-in admins in production too. | `false` (hidden) | No |
+| `ENABLE_API_DOCS` | In production the `/docs` page returns `404` unless this is `true`; set to `true` to show it to signed-in admins. The OpenAPI document at `/api/v1/openapi.json` and `/openapi.json` stays available to signed-in admins either way. | `false` (`/docs` hidden) | No |
 | `MCP_INTERNAL_BASE_URL` | Base URL the built-in MCP endpoint (`/mcp`) uses when its `call_api_operation` bridge calls the REST API back over loopback. Only needed when neither default reaches the app. | `BASE_URL`, otherwise `http://<BIND_ADDRESS>:<PORT>` (`127.0.0.1` while `BIND_ADDRESS` is unset) | No |
 
 Generate a secure `SESSION_SECRET`:

@@ -4,23 +4,21 @@ import test, { beforeEach, after } from 'node:test';
 import express from '../server/utils/http-router.ts';
 import { resolveRequestModuleAccess } from '../server/authorize/index.ts';
 import { createErrorHandler } from '../server/middleware/error-handler.js';
-import { createRequire } from 'node:module';
-const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
-import { buildMigratedDatabase } from './helpers/migrated-database.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { sessionModuleAccessRequirement } from '../server/scopes.js';
 import { moduleAccessVerdict } from '../server/authorize/index.ts';
 
 process.env.DB_PATH = ':memory:';
-const { MIGRATIONS, _setTestDatabase, _resetTestDatabase } = await import('../server/db.js');
+const { _setTestDatabase, _resetTestDatabase } = await import('../server/db.js');
 const folders = await import('../server/routes/paperless-folders.js');
 const tags = await import('../server/routes/paperless-tags.js');
 const settings = await import('../server/routes/paperless-live-settings.js');
-const database = buildMigratedDatabase(Database, MIGRATIONS);
+const database = openSchemaDb();
 database.exec('CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired_at INTEGER NOT NULL)');
 const { removeUser } = await import('../server/services/user-removal.js');
 _setTestDatabase(database);
-const user = (/** @type {string} */ name, /** @type {string} */ role) => database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'test', ?)")
-  .run(name, name, role).lastInsertRowid;
+const user = (/** @type {string} */ name, /** @type {string} */ role) => Number(database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, 'test', ?)")
+  .run(name, name, role).lastInsertRowid);
 const owner = user('live-admin', 'admin'), reader = user('live-reader', 'member'), other = user('live-other', 'member');
 const root = '/api/v1/documents/dms/paperless';
 /** @type {{id: number, role: string, cookieSession?: {userId?: number, role?: string}, access?: Record<string, 'none' | 'read'> | null, method?: string}} */
@@ -70,8 +68,8 @@ beforeEach(() => {
   identity = { id: owner, role: 'admin' };
   database.prepare('DELETE FROM paperless_view_folders').run();
   database.prepare('DELETE FROM dms_accounts').run();
-  accountId = database.prepare("INSERT INTO dms_accounts (provider, name, base_url, api_token) VALUES ('paperless','Live','http://127.0.0.1','CENTRAL_SECRET')").run().lastInsertRowid;
-  folderId = database.prepare("INSERT INTO paperless_view_folders (name,account_id,view_id,visibility,created_by) VALUES ('Shared',?,5,'family',?)").run(accountId, owner).lastInsertRowid;
+  accountId = Number(database.prepare("INSERT INTO dms_accounts (provider, name, base_url, api_token) VALUES ('paperless','Live','http://127.0.0.1','CENTRAL_SECRET')").run().lastInsertRowid);
+  folderId = Number(database.prepare("INSERT INTO paperless_view_folders (name,account_id,view_id,visibility,created_by) VALUES ('Shared',?,5,'family',?)").run(accountId, owner).lastInsertRowid);
   assigned = [7, 150]; writes = []; credentials = [];
   adapter = {
     async listViewDocuments() { return { results: [{ id: '99', title: 'Receipt', filename: 'receipt.txt' }], count: 1, has_more: false }; },
@@ -185,7 +183,7 @@ test('users manage only their own token, and Documents readers can save personal
   await call('PUT', `/live-settings/${accountId}/token`, { api_token: 'OTHER_SECRET', user_id: reader });
   assert.equal((await call('GET', media())).status, 200);
   assert.equal(credentials.at(-1), 'OTHER_SECRET');
-  assert.equal(database.prepare('SELECT api_token FROM paperless_user_tokens WHERE user_id = ?').get(reader).api_token, 'READER_SECRET');
+  assert.equal(database.prepare('SELECT api_token FROM paperless_user_tokens WHERE user_id = ?').get(reader)?.api_token, 'READER_SECRET');
   await call('DELETE', `/live-settings/${accountId}/token`);
   assert.equal((await call('GET', media())).status, 403);
   identity = { id: reader, role: 'member', access: { documents: 'none' } };
@@ -193,7 +191,12 @@ test('users manage only their own token, and Documents readers can save personal
 });
 
 test('invalid personal tokens and display principals cannot write credentials', async () => {
-  for (const value of ['', ' ', 'bad\r\nheader', 'x'.repeat(501), null]) assert.equal((await token(value)).status, 400);
+  for (const value of ['', ' ', 'bad\r\nheader', 'bad\0header', 'x'.repeat(501), null]) {
+    const result = await token(value);
+    assert.equal(result.status, 400);
+    assert.equal(result.body.reason, 'paperless_personal_token_invalid');
+    assert.equal(result.body.fields[0].path, 'body/api_token');
+  }
   identity.method = 'display';
   assert.equal((await token('DISPLAY_SECRET')).status, 403);
 });
@@ -262,9 +265,9 @@ test('deleting a DMS account cascades its policy and personal tokens', async () 
   await policy('personal'); await token('ADMIN_SECRET');
   database.prepare('DELETE FROM dms_accounts WHERE id = ?').run(accountId);
   for (const table of ['paperless_live_settings', 'paperless_user_tokens']) {
-    assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n, 0);
+    assert.equal(database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()?.n, 0);
   }
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.deepEqual(database.prepare('PRAGMA foreign_key_check').all(), []);
 });
 
 test('personal tokens and received folder grants do not prevent deletion of an otherwise empty account', () => {
@@ -275,27 +278,27 @@ test('personal tokens and received folder grants do not prevent deletion of an o
   const result = removeUser(database, departing);
   assert.equal(result.outcome, 'deleted');
   assert.deepEqual(result.traces, []);
-  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_user_tokens WHERE user_id=?').get(departing).n, 0);
-  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access WHERE user_id=?').get(departing).n, 0);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_user_tokens WHERE user_id=?').get(departing)?.n, 0);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access WHERE user_id=?').get(departing)?.n, 0);
   assert.ok(database.prepare('SELECT 1 FROM paperless_view_folders WHERE id=?').get(folderId));
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.deepEqual(database.prepare('PRAGMA foreign_key_check').all(), []);
 });
 
 test('deactivation ends only the departing user credentials and grants while shared folders survive', () => {
   const departing = user('live-shared-departing', 'member');
-  const created = database.prepare("INSERT INTO paperless_view_folders(name,account_id,view_id,visibility,created_by) VALUES ('Retained',?,5,'family',?)")
-    .run(accountId, departing).lastInsertRowid;
+  const created = Number(database.prepare("INSERT INTO paperless_view_folders(name,account_id,view_id,visibility,created_by) VALUES ('Retained',?,5,'family',?)")
+    .run(accountId, departing).lastInsertRowid);
   const insert = database.prepare('INSERT INTO paperless_user_tokens(account_id,user_id,api_token) VALUES (?,?,?)');
   insert.run(accountId, departing, 'DEPARTING_SECRET');
   insert.run(accountId, reader, 'READER_SECRET');
   database.prepare('INSERT INTO paperless_view_folder_access(folder_id,user_id) VALUES (?,?)').run(folderId, departing);
   assert.equal(removeUser(database, departing).outcome, 'deactivated');
-  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_user_tokens WHERE user_id=?').get(departing).n, 0);
-  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access WHERE user_id=?').get(departing).n, 0);
-  assert.equal(database.prepare('SELECT api_token FROM paperless_user_tokens WHERE user_id=?').get(reader).api_token, 'READER_SECRET');
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_user_tokens WHERE user_id=?').get(departing)?.n, 0);
+  assert.equal(database.prepare('SELECT COUNT(*) AS n FROM paperless_view_folder_access WHERE user_id=?').get(departing)?.n, 0);
+  assert.equal(database.prepare('SELECT api_token FROM paperless_user_tokens WHERE user_id=?').get(reader)?.api_token, 'READER_SECRET');
   assert.ok(database.prepare('SELECT 1 FROM paperless_view_folders WHERE id=?').get(created));
-  assert.equal(database.prepare('SELECT api_token FROM dms_accounts WHERE id=?').get(accountId).api_token, 'CENTRAL_SECRET');
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.equal(database.prepare('SELECT api_token FROM dms_accounts WHERE id=?').get(accountId)?.api_token, 'CENTRAL_SECRET');
+  assert.deepEqual(database.prepare('PRAGMA foreign_key_check').all(), []);
 });
 
 test('DMS rejection of a personal token never retries with the central token', async () => {
@@ -346,7 +349,8 @@ test('OpenAPI refuses malformed policy and credential bodies without changing ei
   }
   const result = await token(['PRIVATE_TOKEN']);
   assert.equal(result.status, 400);
-  assert.equal(result.body.reason, 'validation');
+  assert.equal(result.body.reason, 'paperless_personal_token_invalid');
+  assert.equal(result.body.fields[0].path, 'body/api_token');
   assert.ok(!JSON.stringify(result.body).includes('PRIVATE_TOKEN'));
   const state = (await call('GET', '/live-settings')).body.data[0];
   assert.equal(state.revision, 0);

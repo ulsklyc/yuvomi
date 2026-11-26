@@ -22,6 +22,7 @@ const log = createLogger('Google');
 import { google } from 'googleapis';
 import crypto from 'node:crypto';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import * as outbound from './calendar-outbound.js';
 import { decodeHtmlEntities } from '../utils/html-entities.js';
 import { nearestColorId } from '../utils/ical-color.js';
@@ -274,11 +275,11 @@ async function withReauthGuard(run) {
   } catch (err) {
     if (!isInvalidGrant(err)) throw err;
     const usedToken = refreshTokenOf(source) ?? startToken;
-    const marked = db.get().transaction(() => {
+    const marked = withTx(db.get(), () => {
       if (!isCurrentRefreshToken(usedToken)) return false;
       cfgSet('google_needs_reauth', '1');
       return true;
-    })();
+    });
     if (!marked) {
       log.warn('Google refused a refresh token that has since been replaced; the current connection stays active.');
       throw err;
@@ -539,6 +540,11 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
           clearMove(event.id);
         }
       } else {
+        // `moveTo` stammt aus der Auswahl; seitdem lagen die Metadaten-Abrufe von
+        // Quelle und Ziel. Nennt der Termin jetzt ein anderes Ziel oder keins mehr,
+        // geht in diesem Lauf nichts hinaus, der nächste entscheidet (#2944).
+        const now = outbound.reloadEvent(event.id);
+        if (!now || now.outbound_move_to !== moveTo) continue;
         try {
           const moved = await calendar.events.move({
             calendarId,
@@ -569,7 +575,9 @@ async function processPendingUpdates(calendar, colorMap = {}, metaCache = new Ma
       }
     } else if (moveTo) {
       // Ziel == aktueller Kalender: nichts zu tun (z. B. Umzug bereits erfolgt).
-      clearMove(event.id);
+      // Nur diese Vormerkung fällt: ein während des Metadaten-Abrufs gewähltes
+      // Ziel ist ein neuer Umzug (#2944).
+      clearMove(event.id, moveTo);
     }
 
     // ── Geänderte Felder pushen (events.patch) ───────────────────────────────
@@ -808,7 +816,7 @@ function loadAuthorizedClient() {
   // `client.credentials` steht - ohne diese Zeile das alte, und der nächste
   // Refresh im selben Lauf schickte ein abgelöstes Token (#2019).
   client.on('tokens', (tokens) => {
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       if (!isCurrentRefreshToken(client.credentials?.refresh_token)) {
         log.debug('Refreshed Google token belongs to a replaced connection, not stored.');
         return;
@@ -822,7 +830,7 @@ function loadAuthorizedClient() {
       // Ein Refresh der aktuellen Generation ist gelungen: das Token gilt. Ein
       // Marker aus einer überholten Ablehnung fällt im selben Schritt.
       cfgDel('google_needs_reauth');
-    })();
+    });
   });
 
   shareRefreshes(client);
@@ -943,13 +951,13 @@ async function dropUnreachableSelection() {
   // Während der Abfrage erneut verbunden oder getrennt (#2035): die Liste gehört
   // zu einem abgelösten Konto und sagt über die aktuelle Auswahl nichts.
   // Prüfen und Löschen in einer Transaktion, ohne await dazwischen.
-  const gone = db.get().transaction(() => {
+  const gone = withTx(db.get(), () => {
     if (!isCurrentRefreshToken(refreshTokenOf(client))) return null;
     const del = db.get().prepare('DELETE FROM google_calendar_selection WHERE calendar_id = ?');
     const ids = listSelection().map((row) => row.calendar_id).filter((id) => !offered.has(id));
     for (const id of ids) del.run(id);
     return ids;
-  })();
+  });
   if (gone === null) {
     log.info('Connection replaced while checking the calendar selection, selection kept.');
     return;
@@ -1013,7 +1021,7 @@ function disconnect({ deleteEvents = false } = {}) {
   // Vor dem Trennen: danach ist die Kalenderauswahl fort, und ein Aufräumen nach
   // Kalender wäre nicht mehr möglich. Beides in einer Transaktion, damit nicht die
   // Termine fallen und die Verbindung stehen bleibt (oder umgekehrt).
-  return db.get().transaction(() => {
+  return withTx(db.get(), () => {
     const removed = deleteEvents ? clearMirroredEvents() : 0;
     ['google_access_token', 'google_refresh_token', 'google_token_expiry',
      'google_last_sync', 'google_readonly', 'google_needs_reauth',
@@ -1026,7 +1034,7 @@ function disconnect({ deleteEvents = false } = {}) {
     db.get().prepare(`DELETE FROM calendar_pending_deletions WHERE source = 'google'`).run();
     log.info('Disconnected.' + (removed ? ` ${removed} mirrored event(s) removed.` : ''));
     return { removed };
-  })();
+  });
 }
 
 /**
@@ -1370,7 +1378,7 @@ function upsertGoogleEvents(items, calRefId = null, calColor = GOOGLE_COLOR, col
   const createdBy = ownerRow ? ownerRow.id : null;
   if (createdBy === null) log.warn('No user in database - new events are not imported.');
 
-  const insertOrUpdate = db.get().transaction((item) => {
+  const insertOrUpdate = (item) => withTx(db.get(), () => {
     // Löschung aus diesem Kalender - eine Zeile, die inzwischen zu einem anderen
     // Kalender gehört, ist davon nicht gemeint.
     if (item.status === 'cancelled') {
@@ -1639,7 +1647,7 @@ function inboundFields(item, calTimeZone) {
 }
 
 // Yuvomi speichert getimte Events als "YYYY-MM-DDTHH:MM" (ohne Sekunden,
-// siehe validate.js). Die Google Calendar API verlangt RFC 3339 mit
+// siehe api/formats.ts). Die Google Calendar API verlangt RFC 3339 mit
 // Sekunden, sonst "Bad Request" bzw. bei Wiederholungen "Invalid
 // recurrence rule" (Issue #217). Sekunden ergänzen, falls sie fehlen.
 function toRfc3339(dt) {

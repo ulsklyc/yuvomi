@@ -77,9 +77,9 @@ export function isOidcSignupAllowed() {
 /**
  * Der `password_hash` eines Kontos, das ausschliesslich per SSO hineinkommt.
  *
- * Kein bcrypt-Hash, sondern ein Platzhalter: `verifyPassword` laeuft trotzdem
- * durch (Timing) und kann nie zutreffen, weil kein bcrypt-Vergleich gegen einen
- * Nicht-Hash gelingt. Damit ist "dieses Konto hat kein Passwort" ein Zustand in
+ * Kein Passwort-Hash, sondern ein Platzhalter: `verifyPassword` erkennt das
+ * Format nicht, rechnet trotzdem eine Argon2id-Berechnung (Timing) und meldet
+ * immer `valid: false`. Damit ist "dieses Konto hat kein Passwort" ein Zustand in
  * der Spalte selbst und nicht eine zusaetzliche Spalte, die irgendwo
  * mitgeprueft werden muesste.
  *

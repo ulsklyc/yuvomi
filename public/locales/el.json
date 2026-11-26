@@ -127,7 +127,8 @@
         "transferUndone": "Αφαιρέθηκε από τη λίστα αγορών.",
         "transferSkipped": "{{count}} υπήρχαν ήδη.",
         "transferSkipped_one": "{{count}} υπήρχε ήδη.",
-        "transferAllPresent": "Όλα τα υλικά είναι ήδη στη λίστα."
+        "transferAllPresent": "Όλα τα υλικά είναι ήδη στη λίστα.",
+        "errorTransferTooLarge": "Αυτά είναι πάρα πολλά υλικά μαζί. Το πολύ {{limit}} μπορούν να μεταφερθούν και να αναιρεθούν μαζί."
     },
     "nav": {
         "dashboard": "Επισκόπηση",
@@ -1272,7 +1273,8 @@
         "localCalendarEdit": "Επεξεργασία ημερολογίου",
         "localCalendarNew": "Νέο ημερολόγιο",
         "manageSubscriptionsLink": "Συνδρομές και συγχρονισμός",
-        "cancelled": "Ακυρώθηκε"
+        "cancelled": "Ακυρώθηκε",
+        "errorSeriesChanged": "Η σειρά μόλις άλλαξε από αλλού. Αποθηκεύστε ξανά."
     },
     "noteCategories": {
         "categories": "Κατηγορίες",
@@ -3638,7 +3640,8 @@
         "remoteErrorAuthFailed": "Ο διακομιστής απέρριψε τη σύνδεση. Ελέγξτε το όνομα χρήστη και τον κωδικό πρόσβασης.",
         "remoteErrorStatus": "Ο διακομιστής απάντησε με κατάσταση {{status}}.",
         "remoteErrorUnreachable": "Ο διακομιστής δεν είναι προσβάσιμος. Ελέγξτε τη διεύθυνση και αν ο διακομιστής λειτουργεί.",
-        "remoteErrorFailed": "Το αίτημα προς τον διακομιστή απέτυχε."
+        "remoteErrorFailed": "Το αίτημα προς τον διακομιστή απέτυχε.",
+        "caldavErrorAccountChanged": "Ο λογαριασμός μόλις άλλαξε από αλλού. Αποθηκεύστε ξανά."
     },
     "login": {
         "tagline": "Καλώς ήρθατε ξανά. Το σπίτι σας σε ένα μέρος.",

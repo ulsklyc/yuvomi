@@ -51,6 +51,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createContactsMealsApp } from './contacts-meals-app.js';
+import { assertArrayLimit } from './array-limit-cases.js';
+import { MAX_CONTACT_ENTRIES, MAX_MEAL_ASSIGNMENTS } from '../server/openapi/array-limits.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const dbmod = await import('../server/db.js');
@@ -89,6 +91,8 @@ const app = await createContactsMealsApp({
     req.session = { userId: actor.id, role: actor.role };
     next();
   },
+  // As BODY_LIMIT in server/index.js: a full meal plan does not fit express' default 100 kB.
+  jsonLimit: '10mb',
 });
 const server = app.listen(0, '127.0.0.1');
 /** @type {string} */
@@ -806,4 +810,24 @@ test('only guard: what the handlers no longer check is the document\'s, as value
   for (const [path, method] of [['/api/v1/contacts/categories', 'post'], ['/api/v1/contacts/categories/{key}', 'put']]) {
     assert.deepEqual(body(path, method).properties.color.type, ['string', 'null'], `${path} color`);
   }
+});
+
+test('array limits: contact entries and a meal plan, at the limit and one above (#2810)', async () => {
+  for (const [field, entry] of /** @type {const} */ ([
+    ['phones', (/** @type {number} */ i) => ({ label: 'other', value: `0800 ${i}` })],
+    ['emails', (/** @type {number} */ i) => ({ label: 'other', value: `a${i}@example.org` })],
+    ['addresses', (/** @type {number} */ i) => ({ label: 'home', street: `Weg ${i}` })],
+  ])) {
+    const at = await assertArrayLimit((json) => call('POST', '/contacts', { json }),
+      (n) => FORM_CONTACT({ [field]: Array.from({ length: n }, (_, i) => entry(i)) }), MAX_CONTACT_ENTRIES, `body/${field}`);
+    // Below the schema bound the route's own cap of 20 answers, with its number for the form.
+    assert.equal(at.status, 400, field);
+    assert.equal(at.body.params?.limit, 20, field);
+    assert.match(at.body.reason, /^contacts_\w+_too_many$/, field);
+  }
+  const plan = (/** @type {number} */ n) => ({
+    assignments: Array.from({ length: n }, (_, i) => FORM_MEAL({ date: `2032-01-${String(1 + (i % 28)).padStart(2, '0')}`, ingredients: [] })),
+  });
+  const applied = await assertArrayLimit((json) => call('POST', '/meals/apply-plan', { json }), plan, MAX_MEAL_ASSIGNMENTS, 'body/assignments');
+  assert.equal(applied.status, 201);
 });

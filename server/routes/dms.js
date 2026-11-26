@@ -6,7 +6,7 @@
 import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { str, MAX_TITLE } from '../middleware/validate.js';
+import { str, MAX_TITLE } from '../api/formats.ts';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { getAdapter as defaultGetAdapter } from '../services/dms/index.js';
@@ -21,7 +21,8 @@ const log = createLogger('DMS');
 const router = express.Router();
 router.use('/paperless', paperlessFoldersRouter);
 
-// Jede Route dieses Routers ist Sache der Admins: Konten verwalten, und das
+// Paperless prueft den Zugriff in seinen eigenen Routen. Die Routen unter
+// diesem Riegel sind Sache der Admins: Konten verwalten, und das
 // DMS ungefiltert durchsuchen, wodurch die Sichtbarkeitsgrenzen des
 // Dokumente-Moduls umgangen wuerden. Als Router-Riegel und nicht je Route
 // (#2810, Gruppe 8): eine neue Route erbt ihn, statt ihn vergessen zu koennen,

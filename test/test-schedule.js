@@ -545,7 +545,7 @@ test('a shift type may be added by anyone but only changed by its creator or an 
 // has to come from THAT and not from any error at all - the branch used to
 // catch everything and blame the same cause, so a broken statement would have
 // told the caller the type was still in use.
-// `color()` in validate.js answers a falsy input with {value: null, error: null},
+// `color()` in api/formats.ts answers a falsy input with {value: null, error: null},
 // so an empty string passes validation and reaches the UPDATE - where the column
 // is NOT NULL. The default does not apply to an explicitly bound NULL, so this
 // used to surface as an unhandled constraint error and a bare 500. The POST
@@ -973,14 +973,14 @@ test('a pattern day carries field_values, validated against its shift type\'s at
 // its own small self-contained app for server/routes/preferences.js (this
 // file's own scheduleRouter app is unrelated).
 test('PUT /api/v1/preferences: a non-admin payload mixing schedule_hidden_templates with another valid field is rejected 403 with no partial application', async () => {
-  const prefsApp = express();
-  prefsApp.use(express.json());
   let prefsRole = 'admin';
-  prefsApp.use((req, _res, next) => { req.authUserId = ALICE.id; req.authRole = prefsRole; next(); });
-  const { default: preferencesRouter } = await import('../server/routes/preferences.js');
-  prefsApp.use('/', preferencesRouter);
+  const { createPreferencesApp, PREFERENCES_PREFIX } = await import('./preferences-app.js');
+  const prefsApp = await createPreferencesApp({
+    mount: ['preferences'],
+    auth: (req, _res, next) => { req.authUserId = ALICE.id; req.authRole = prefsRole; next(); },
+  });
   const prefsServer = prefsApp.listen(0, '127.0.0.1');
-  const prefsBaseUrl = await new Promise((r) => prefsServer.on('listening', () => r(`http://127.0.0.1:${prefsServer.address().port}`)));
+  const prefsBaseUrl = await new Promise((r) => prefsServer.on('listening', () => r(`http://127.0.0.1:${prefsServer.address().port}${PREFERENCES_PREFIX}`)));
   try {
     // Baseline, set as admin, so the "must not have changed" assertion below
     // has a known-different value to check against.

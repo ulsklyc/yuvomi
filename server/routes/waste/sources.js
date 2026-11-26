@@ -16,8 +16,9 @@ import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import { createLogger } from '../../logger.js';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import * as store from '../../services/waste-store.js';
-import { id as validateId } from '../../middleware/validate.js';
+import { id as validateId } from '../../api/formats.ts';
 import { wasteErrorResponse, currentUserId, redactSourceForReader } from './helpers.js';
 import { MAX_ICS_BYTES, MAX_ICS_MB } from '../../services/waste-import.js';
 import { createUrlSource, refreshUrlSource, fetchIcsText, minutesFromNow, classifyFetchFailure, emptyFeedAsFetchFailure } from '../../services/waste-url-source.js';
@@ -261,7 +262,7 @@ router.post('/:id/reimport/commit', validateRequest(), async (req, res) => {
     // even though its data had already changed - harmless in the sense that
     // the next fetch just redoes work, but not the atomic "one commit, one
     // outcome" the rest of this file assumes.
-    const result = db.get().transaction(() => {
+    const result = withTx(db.get(), () => {
       const committed = store.commitImport(db.get(), {
         sourceId: vId.value,
         name: body.name,
@@ -288,7 +289,7 @@ router.post('/:id/reimport/commit', validateRequest(), async (req, res) => {
         });
       }
       return committed;
-    })();
+    });
     res.json({ data: result });
   } catch (err) {
     if (emptyFeedResponse(res, source, err)) return;

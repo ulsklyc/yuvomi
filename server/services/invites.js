@@ -74,7 +74,7 @@ export function createInviteService({ db, now = () => Date.now() } = {}) {
    * desselben Tokens sehen so nur einmal changes === 1.
    *
    * Der Ablauf gehört mit ins WHERE, obwohl verifyToken ihn schon geprüft hat:
-   * dazwischen liegt beim Einlösen ein bcrypt-Hash von rund 300 ms, und in dem
+   * dazwischen liegt beim Einlösen ein Passwort-Hash (Argon2id, rund 20 ms), und in dem
    * Fenster darf die Frist nicht stillschweigend überschritten werden.
    */
   function markAccepted(token, userId) {

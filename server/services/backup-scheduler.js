@@ -9,6 +9,7 @@ import cron from 'node-cron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { createLogger } from '../logger.js';
 import * as webdav from './backup-webdav.js';
 import { remoteFailure } from '../utils/http.js';
@@ -92,7 +93,7 @@ function storeStatus(timestamp, reason) {
       ON CONFLICT(key) DO UPDATE SET value = excluded.value,
                                      updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
     `);
-    database.transaction(() => {
+    withTx(database, () => {
       upsert.run(BACKUP_STATUS_KEYS.attempt, timestamp);
       if (reason === null) {
         upsert.run(BACKUP_STATUS_KEYS.success, timestamp);
@@ -100,7 +101,7 @@ function storeStatus(timestamp, reason) {
       } else {
         upsert.run(BACKUP_STATUS_KEYS.reason, reason);
       }
-    })();
+    });
   } catch (err) {
     log.warn('Could not store the backup status; it is kept in memory until the next restart:', err);
   }

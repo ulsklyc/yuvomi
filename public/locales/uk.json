@@ -139,7 +139,8 @@
         "transferSkipped": "{{count}} уже були в ньому.",
         "transferSkipped_one": "{{count}} уже був у ньому.",
         "transferSkipped_many": "{{count}} уже були в ньому.",
-        "transferAllPresent": "Усі інгредієнти вже у списку."
+        "transferAllPresent": "Усі інгредієнти вже у списку.",
+        "errorTransferTooLarge": "Забагато інгредієнтів за раз. Разом можна перенести й скасувати щонайбільше {{limit}}."
     },
     "nav": {
         "dashboard": "Огляд",
@@ -1436,7 +1437,8 @@
         "localCalendarEdit": "Редагувати календар",
         "localCalendarNew": "Новий календар",
         "manageSubscriptionsLink": "Підписки та синхронізація",
-        "cancelled": "Скасовано"
+        "cancelled": "Скасовано",
+        "errorSeriesChanged": "Серію щойно змінили в іншому місці. Збережіть ще раз."
     },
     "noteCategories": {
         "categories": "Категорії",
@@ -3864,7 +3866,8 @@
         "remoteErrorAuthFailed": "Сервер відхилив вхід. Перевірте ім’я користувача та пароль.",
         "remoteErrorStatus": "Сервер відповів зі статусом {{status}}.",
         "remoteErrorUnreachable": "Сервер недоступний. Перевірте адресу та чи працює сервер.",
-        "remoteErrorFailed": "Запит до сервера не вдався."
+        "remoteErrorFailed": "Запит до сервера не вдався.",
+        "caldavErrorAccountChanged": "Обліковий запис щойно змінили в іншому місці. Збережіть ще раз."
     },
     "login": {
         "tagline": "З поверненням. Ваш дім - в одному місці.",

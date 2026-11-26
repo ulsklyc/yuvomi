@@ -15,7 +15,7 @@ Every table: `id INTEGER PRIMARY KEY`, `created_at TEXT`, `updated_at TEXT` (ISO
 |--------|------|-----------|
 | username | TEXT | UNIQUE NOT NULL |
 | display_name | TEXT | |
-| password_hash | TEXT | bcrypt (cost 12) of the NFC-normalized password (v1.56.1). Legacy hashes from non-normalized input are still verified and migrated to NFC on the next successful login |
+| password_hash | TEXT | Argon2id (m=19456 KiB, t=2, p=1, 16-byte salt, 32-byte tag) of the NFC-normalized password as a PHC string `$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>` (`server/utils/password.js`). Legacy bcrypt hashes (cost 12, also from non-normalized input before v1.56.1) and Argon2id hashes with weaker parameters are still verified and replaced on the next successful login. `$oidc$` marks an account without a password |
 | avatar_color | TEXT | HEX color code, `#RRGGBB` only (#2351): every member renders it inside a `style` attribute, so `PATCH /me/profile`, `POST/PATCH /users` and `POST /worker` answer 400 for anything else (empty still means the default); migration 269 reset stored values that were not `#RRGGBB` to `#007AFF` |
 | avatar_data | TEXT | Base64 data URL of profile picture (nullable) |
 | avatar_key | TEXT | Nullable (migration v251) - random key of the current profile picture, set and renewed by triggers whenever `avatar_data` changes, `NULL` without a picture. Lists read by a session or a wall display carry `/api/v1/people/{id}/avatar?v=<avatar_key>` instead of the data URL; `GET /api/v1/people/{id}/avatar` serves the picture only with the matching key (otherwise the same 404 as "no picture"), with `Cache-Control: private, no-cache` and an ETag derived from the key. API tokens keep receiving the data URL |
@@ -6988,7 +6988,7 @@ Both install routes and `DELETE` answer `403 module_web_install_disabled` while 
 
 ## API Documentation
 
-An OpenAPI 3.1 specification is served at `/api/v1/openapi.json` and `/openapi.json` to **signed-in admins** (both endpoints require an admin session or API token). Append `?download=1` to download as a file. The spec covers all authenticated endpoints and can be imported into any OpenAPI-compatible client (Insomnia, Postman, etc.). The interactive `/docs` page follows the same admin gate and is hidden entirely in production unless `ENABLE_API_DOCS=true`.
+An OpenAPI 3.1 specification is served at `/api/v1/openapi.json` and `/openapi.json` to **signed-in admins** (both endpoints require an admin session or API token). Append `?download=1` to download as a file. The spec covers all authenticated endpoints and can be imported into any OpenAPI-compatible client (Insomnia, Postman, etc.). The `/docs` page (a plain-text pointer to the spec) follows the same admin gate and returns `404` in production unless `ENABLE_API_DOCS=true`; the two spec endpoints are not affected by that switch.
 
 **"Covers all endpoints" is now a checked claim (v2.52.0).** It had not been one: 40 of 297 routes
 were missing, among them four entire modules that had never had a line of specification — quick
@@ -7019,6 +7019,61 @@ notes, contacts, birthdays, tasks and task comments, the shift schedule, houseke
 quick links and recipe providers answer this way too. Status codes and `error` texts stay as they
 were, except that the German `error` texts of those inventory, notes, contacts and birthdays
 answers are now English.
+
+**The specification is what the server checks (#2810).** Every route validates path, query and
+JSON body against its own operation in this document before the handler runs
+(`validateRequest()` in `server/api/validate-request.ts`, Ajv in strict mode for JSON Schema
+2020-12). A request that does not match is answered with
+`{ error, code: 400, reason, fields: [{ path, rule, reason? }] }`: `path` is the place plus a
+pointer (`body/title`, `query/limit`, `path/id`), `rule` the failing keyword (`type`, `required`,
+`maxLength`). `reason` is `validation`, or the route's own reason where the schema names one, so a
+client that already translates such a reason keeps doing so. Neither a value of the request nor a
+message text of the validator is ever returned. Headers are not checked, and the body is neither
+coerced nor stripped: an unknown field is ignored as before, except in the few schemas that
+forbid one (`additionalProperties: false`). `test:validate-request-coverage` holds
+that no route is left out, `test:openapi-ajv` that every schema of the document compiles.
+
+**Limits of lists in a request (#2810).** Every array in a request body carries `maxItems`; a
+longer one is a 400 with `reason: validation` and the rule `maxItems`. The body limit caps bytes,
+not the work per entry (a loop turn, a query or a write each), and OWASP API4:2023 names a missing
+maximum number of array elements as the weakness. A limit comes from use, not from one flat
+number: what the own clients send at most and how many rows the set behind it can hold, generous
+but finite; a reorder takes the whole set. The constants live in `server/openapi/array-limits.js`,
+`test:openapi-structure` refuses an array without `maxItems`, and each class has a boundary case
+(limit passes, limit + 1 is refused) in the `test:validate-*` suite of its module.
+
+| Class | Limit | Lists |
+|---|---|---|
+| Members of a household or split group | 100 | assignees, responsible people, allowed readers, caregivers, participants and splits, default assignees, the member reorder |
+| Reorder of a category-like set | 500 | categories (note categories too, which took 100 before), subcategories, locations, local calendars, budget meta rows |
+| Shopping item ids | 1000 | checked clean-up, item reorder, undo of a transfer, both hand-overs between shopping list and pantry; 1000 ids stay below the 64 KiB a browser allows for a `keepalive` body, and the shopping page splits a larger clean-up |
+| Ingredients | 200 | ingredients of a recipe or meal, `ingredientIds` and `quantities` of a recipe transfer |
+| Planned meals | 500 | `assignments` of `POST /meals/apply-plan` |
+| Attached documents | 100 | `attachment_document_ids`, `document_ids` |
+| Keys from a small fixed set | 50 | weekdays, feelings, meal types, secret field names (doubles are tolerated) |
+| Token scopes | 100 | `scopes` of an API token (core and extension modules) |
+| Raw entries the route dedupes and caps itself | 100 | task tags (32 distinct), cycle symptoms (40 distinct) |
+| Contact entries per kind | 50 | `phones`, `emails`, `addresses`; the route's own cap of 20 answers first with `params.limit` |
+| Reminder instants | 50 | `remind_ats`; the route's own cap of 5 distinct instants answers first |
+| Lab results | 200 | `results` of a lab report |
+| Shift-type fields | 100 | `fields` of a shift type |
+| Waste types | 100 | `type_ids` of a mapping or the feed selection |
+| Waste label mappings | 200 | `mappings` of an import, re-import or profile (`MAX_DISTINCT_LABELS`) |
+| Acknowledged waste events | 5000 | `skip_event_keys` (`MAX_CANDIDATE_INSTANCES`) |
+| Default-assignee backfill moves | 5000 | `moves`, one preview page |
+| Quick-link order | 100 | `ids`; creation stops at 24 |
+
+**What an answer hands out has to fit the request it goes back in.** The undo of a kitchen
+transfer to the shopping list sends the transfer's `added_ids` and `ingredient_ids` unchanged in
+one `POST /shopping/items/undo-transfer` (one request, so the undo stays atomic). The transfers
+therefore refuse more than 1000 source ingredients before writing anything: the meal-plan import
+(its preview too, so the dialog says it first), a meal, a week of meals and a recipe answer 400
+`kitchen_transfer_too_large` with `params.limit` (`server/services/kitchen-handover.js`). The
+pantry hand-over needs no check of its own: its `items` already carry the same limit.
+
+Lists that had their limit before keep it: bulk task ids 500, rotation pool 10, note categories 50
+per note, birthday import 500, tracked dates 10, reminder offsets 5, medication
+schedules 48, schedule pattern days, a backfill move's people 100.
 
 Authentication options for external integrations:
 - **Session cookie:** standard browser session after login, sliding for 90 days (see [Session lifetime](#session-lifetime-1356)). The session stores the account id only: **role and module permissions are read from `users` on every request (#2611)**, so a demotion or a changed permission applies to every signed-in device at once, including a sign-in or SSO link that was still in flight. The "at least one administrator must remain" check and the demotion happen in one statement (#2612): of two administrators demoting each other at the same moment, one is refused.
@@ -7404,6 +7459,7 @@ at 1.6 on a 24 viewBox and Lucide at 2, which at 20 px and 16 px respectively bo
 - **Vibration:** `vibrate()` from `public/utils/ux.js` - short pulses for light actions (10-40ms), pattern `[30, 50, 30]` for destructive actions (delete). Respects `prefers-reduced-motion`.
 - **Global search overlay:** Full-text search across tasks, calendar events, notes, contacts, and shopping items. Results are grouped by module and trigger deep-link navigation: contacts via `?open=<id>` (opens edit modal directly), calendar events via `?open=<id>`, notes via `?open=<id>` (the notes page opens the note in its read view and then drops the parameter from the address, #1821), birthdays via `?open=<id>` (#1821), shopping items via `?list=<id>&highlight=<id>` (activates the correct list tab and scrolls the item into view). Opened from the sidebar search item or the `/` shortcut on desktop and the More-Sheet search bar on mobile. The overlay is responsive: a full-screen bottom-sheet on mobile and a centred, top-anchored command-palette (~640px glass card over a blurred module scrim, mirroring the modal grammar) on desktop (≥768px). Before a query it shows an empty-state launcher whose tiles list the searchable areas (tasks, calendar, notes, contacts, shopping, health) and jump straight to the module; during the debounced fetch it shows a loading skeleton and announces progress and result count through an ARIA live region. The FTS5 index is diacritic-insensitive (`unicode61 remove_diacritics 2`, migration 77) and the query expands ß↔ss variants, so "muller"/"strasse" match "Müller"/"Straße". Calendar events are family-visible in search (not scoped to the creator), matching the calendar list - and, since v2.65.1 (GHSA-gjpr-85rg-587c), filtered by the same per-row visibility (`all` / creator / assignees) and subscription (shared or own) clauses as the calendar list and the calendar search; until then the global bucket applied only the module-access check and surfaced the title and date of another member's private event. **Tags are part of the indexed text (migration v117, #586)** for tasks and shopping items — a tag is free text and therefore content, and the task list already filters by it, so the same word had to lead to a hit in both places. Because the tags live in their own tables while the existing triggers hang on `tasks`/`shopping_items` and only see that row, the index is maintained from both sides: the row triggers were widened, and `task_tags`/`shopping_item_tags` got triggers of their own, so a pure tag change reaches the index without the task being touched. **An index trigger deletes before it inserts (migration v151)**, so writing the same row twice cannot leave two entries behind. That is not belt-and-braces: SQLite gives no guarantee about the order of two `AFTER INSERT` triggers on one table (measured, it is reverse creation order), and `shopping_items` carries a second one — `trg_shopping_items_sort_order` (v133) updates the row it was just given whenever `sort_order` is 0, which is every insert the app makes. Running before the index trigger, its update wrote one entry and the insert trigger then added a second. It healed itself the moment anyone touched the item, since the update trigger clears by `(entity, entity_id)` and caught both — so the duplicates were exactly the freshly created, untouched items, and the per-kind cap of five delivered half of what it claimed. `(entity, entity_id)` is unique across the index, which is the assumption every update trigger already makes; v151 also drops the rows that had accumulated.
 - **Parts of words and every module with content (2026-09-27 re-critique, S1):** a query word of three or more characters also finds the indexed words that CONTAIN it ("milch" finds "Vollmilch"): the index vocabulary (a temporary `fts5vocab` table over `search_index`) supplies the matching words as OR branches of the MATCH query, capped at `INFIX_TERM_CAP` per word, with the same accent and ß/ss folding as the index; `%` and `_` are literal text. No migration and no trigram tokenizer (that would rebuild the index and its triggers and fold accents only from SQLite 3.45). Six further result kinds are searched straight from their tables with the same folding: recipes (module `meals`), pantry, inventory, documents (the list's visibility, active only), birthdays (module `calendar`) and budget entries (title only where the viewer may see the purpose - `budgetDetailsVisibleWhere`). A module switched off for the household (Settings, active modules) returns nothing, for admins too; module permissions and token scopes apply per result kind as before. The overlay's sections and launcher tiles come from one list (`public/utils/search-sections.js`), and the tiles show only modules the viewer has in the navigation. On a phone the overview carries a search button, so the search is one tap away from the start screen. Documents, pantry, birthdays and budget hits open the module page (no single-entry deep link yet). The budget ledger has its own search across all months (`GET /budget?q=`, masked titles for shared amounts, at most 200 hits with `meta.truncated`).
+- **Search index rows (migration 284, #2810):** `search_index` is a regular FTS5 table filled by triggers on the indexed tables (title, body and tags). FTS5 has no index on its UNINDEXED columns `entity` and `entity_id`, so every row carries a fixed `rowid = (code << 40) + id`, and every trigger deletes and writes by that rowid (one lookup instead of a scan over the whole index). Codes: task 1, event 2, note 3, contact 4, item 5, medication 6, activity 7, waste_type 8. A code is never reused; a new indexed module takes the next free one (9) and writes its rows the same way (`test:search-index-rowid` refuses a trigger that deletes without rowid or inserts without it). Ids fit below 2^40. An AFTER INSERT trigger without a preceding delete uses `INSERT OR REPLACE`, so a leftover row under the same key never aborts the user's write.
 - **Coming events first (R21, v2.79.0):** the events of the global search are ordered with everything from the household's today on first, ascending, and past events after them, the most recent first (`upcomingEventsFirst()` in `server/services/search.js`, measured as instants in the household zone). The candidate query already fetches past single events last, so fifty old ones cannot push a coming one out of the 50 candidates; series count as coming, since their next occurrence can be ahead. Before, events were listed by start ascending, last year's appointment above next week's. On a computer a line under the results names the keys (arrows, Enter, Esc).
 - **Calendar search (#471):** An in-context search bar in the calendar toolbar (magnifier button, or the `f` shortcut) finds appointments across the whole timeline — past and future — even when the date is unknown. Matches title, location, and notes/description via `GET /api/v1/calendar/search?q=` (same FTS5 index; event body indexes `location` since migration 76). Results render as a chronological, date-grouped list anchored on the next upcoming hit; recurring events resolve to their next occurrence within a two-year window rather than the series start. Selecting a result jumps to that day and opens the event. Result rows are keyboard-operable (`role="button"`, Enter/Space); the count line reports "N of M" when capped at 100.
 - **PWA install prompt:** Appears only after 2 user interactions. Dismiss window 7 days; interaction counter resets after dismiss.

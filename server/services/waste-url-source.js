@@ -17,7 +17,7 @@ import { createLogger } from '../logger.js';
 import { readPrivateNetworkOptIn, createGuardedLookup, BlockedAddressError } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
 import { checkSSRF as checkSSRFWithOptIn } from './ics-subscription.js';
-import { url as validateUrl, num } from '../middleware/validate.js';
+import { url as validateUrl, num } from '../api/formats.ts';
 import { MAX_ICS_BYTES, MAX_ICS_MB } from './waste-import.js';
 import * as store from './waste-store.js';
 import { MIN_REFRESH_INTERVAL_MINUTES, MAX_REFRESH_INTERVAL_MINUTES } from './waste-fields.js';

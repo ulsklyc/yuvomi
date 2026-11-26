@@ -52,6 +52,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createShoppingDocumentsApp } from './shopping-documents-app.js';
+import { assertArrayLimit } from './array-limit-cases.js';
+import { MAX_SHOPPING_ITEMS, MAX_ORDER_ROWS } from '../server/openapi/array-limits.js';
 
 const dbmod = await import('../server/db.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
@@ -778,4 +780,17 @@ test('the categories a document may carry are the ones the options offer', async
   assert.deepEqual(r.body.data.categories, [...fields.DOCUMENT_CATEGORIES]);
   assert.deepEqual(r.body.data.visibilities, [...fields.DOCUMENT_VISIBILITIES]);
   assert.deepEqual(r.body.data.statuses, [...fields.DOCUMENT_STATUSES]);
+});
+
+test('array limits: shopping item ids and a category reorder, at the limit and one above (#2810)', async () => {
+  const list = newList('Grenze');
+  const ids = (/** @type {number} */ n) => ({ ids: Array.from({ length: n }, (_, i) => GONE + i) });
+  const checked = await assertArrayLimit((body) => call('DELETE', `/shopping/${list}/items/checked`, { json: body }),
+    ids, MAX_SHOPPING_ITEMS, 'body/ids');
+  assert.equal(checked.status, 200);
+  assert.equal(checked.body.deleted, 0, 'unknown ids delete nothing');
+  const order = (/** @type {number} */ n) => ({ order: Array.from({ length: n }, (_, i) => GONE + i) });
+  const reordered = await assertArrayLimit((body) => call('PATCH', '/shopping/categories/reorder', { json: body }),
+    order, MAX_ORDER_ROWS, 'body/order');
+  assert.equal(reordered.status, 200);
 });

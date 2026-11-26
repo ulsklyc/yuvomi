@@ -35,7 +35,6 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
 
 const db = (await import('../server/db.js')).get();
 const { expandRecurringEvents } = await import('../server/services/calendar-events.js');
@@ -46,7 +45,7 @@ const { __test: caldav } = await import('../server/services/caldav-sync.js');
 const { __test: apple } = await import('../server/services/apple-calendar.js');
 const { icsSnapshot } = await import('../server/services/outbound-echo.js');
 const { storedDayDiffersFromSeriesDay } = await import('../server/utils/timezone.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { resolveEventSearchRows } = await import('../server/services/search.js');
 const { __test: googleApi } = await import('../server/services/google-calendar.js');
 const { storedToInstantIso } = await import('../server/utils/timezone.js');
@@ -168,17 +167,19 @@ test(`TZ=${process.env.TZ}: eine Monatsletzten-Serie beginnt am Ortsletzten der 
 
 // ── Der Bestandsfall ueber die echte Route ──────────────────────────────────
 
-const app = express();
-app.use((req, _res, next) => {
-  req.authUserId = 1;
-  req.authRole = 'admin';
-  req.session = { userId: 1, role: 'admin' };
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  auth: (req, _res, next) => {
+    req.authUserId = 1;
+    req.authRole = 'admin';
+    req.session = { userId: 1, role: 'admin' };
+    next();
+  },
 });
-app.use(express.json());
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
 test.after(() => { server.closeAllConnections?.(); server.close(); });
 
 test(`TZ=${process.env.TZ}: PUT aus dem Formular schreibt Haushaltsziffern neben die tzid, der Kalender zeigt dieselbe Serie`, async () => {

@@ -565,19 +565,17 @@ test('das Zurücksetzen einer Serie nimmt die Markierung mit (#647 + #658)', asy
   // vollständig aussieht (dieselbe Falle wie bei Tags und
   // recurrence_from_completion).
   reset();
-  const { default: tasksRouter } = await import('../server/routes/tasks.js');
-  const express = (await import('express')).default;
+  const { createTasksApp } = await import('./tasks-app.js');
   const http = await import('node:http');
 
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.authUserId = ALICE;
-    req.authRole = 'admin';
-    req.session = { userId: ALICE, role: 'admin' };
-    next();
+  const app = await createTasksApp({
+    auth: (req, _res, next) => {
+      req.authUserId = ALICE;
+      req.authRole = 'admin';
+      req.session = { userId: ALICE, role: 'admin' };
+      next();
+    },
   });
-  app.use('/api/v1/tasks', tasksRouter);
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;
@@ -621,19 +619,17 @@ test('ein PUT ohne das Feld löscht eine gesetzte Markierung nicht', async () =>
   // Speichern alles andere mit. Nicht mitgeschickt heisst „nicht angefasst" -
   // sonst räumte ein fremder Client die Markierung stillschweigend ab.
   reset();
-  const { default: tasksRouter } = await import('../server/routes/tasks.js');
-  const express = (await import('express')).default;
+  const { createTasksApp } = await import('./tasks-app.js');
   const http = await import('node:http');
 
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.authUserId = ALICE;
-    req.authRole = 'admin';
-    req.session = { userId: ALICE, role: 'admin' };
-    next();
+  const app = await createTasksApp({
+    auth: (req, _res, next) => {
+      req.authUserId = ALICE;
+      req.authRole = 'admin';
+      req.session = { userId: ALICE, role: 'admin' };
+      next();
+    },
   });
-  app.use('/api/v1/tasks', tasksRouter);
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;

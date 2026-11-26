@@ -46,6 +46,7 @@
 
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { davFailureAction, createRefusalStop, MAX_OUTBOUND_ATTEMPTS } from './calendar-outbound.js';
 import { patchICSTodo, unfoldICS } from '../utils/ics-patch.js';
 import {
@@ -64,7 +65,7 @@ import { formatICSDate } from './ics-parser.js';
 import { anchorZone } from '../utils/ics-datetime.js';
 import { timedSeriesUntil } from '../utils/rrule-until.js';
 import { rruleValue, nextDueAfterCompletion } from './recurrence.js';
-import { RRULE_RE } from '../middleware/validate.js';
+import { RRULE_RE } from '../api/formats.ts';
 import { loadTags, tagsKey } from '../utils/task-tags.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { noteMoveTakenBack } from './shopping-move-notices.js';
@@ -1866,7 +1867,7 @@ async function confirmCarriedCopy(attempt, client, accountId, clientFor) {
   const copy = await inspectObjectAt(other, place, row.external_object_url, row.external_uid);
   if (copy.own) return true;
 
-  return db.get().transaction(() => {
+  return withTx(db.get(), () => {
     const now = reloadRow('shopping', attempt.row_id);
     if (!mirrorElsewhere(now) || now.external_object_url !== row.external_object_url
         || now.external_account_id !== row.external_account_id) return false;
@@ -1881,7 +1882,7 @@ async function confirmCarriedCopy(attempt, client, accountId, clientFor) {
       + `the one at ${attempt.object_url} is kept and the item follows it.`
     );
     return false;
-  })();
+  });
 }
 
 /**
@@ -1928,6 +1929,22 @@ function reportClosedLists(gate, what) {
 }
 
 /**
+ * Ist die Liste JETZT für das Modul eingeschaltet (beim Einkauf: mit dieser
+ * Zuordnung)? Synchron vor jedem Upload gefragt (#2947).
+ * @param {number} accountId
+ * @param {string} listUrl
+ * @param {'tasks'|'shopping'} module
+ * @param {number|null} [targetListId]
+ */
+function selectedListFor(accountId, listUrl, module, targetListId = null) {
+  return Boolean(db.get().prepare(`
+    SELECT 1 FROM caldav_reminder_selection
+     WHERE account_id = ? AND list_url = ? AND enabled = 1 AND target_module = ?
+       AND (? IS NULL OR target_list_id = ?)
+  `).get(accountId, listUrl, module, targetListId, targetListId));
+}
+
+/**
  * Legt wartende Aufgaben auf dem Server an und macht sie damit zu Spiegeln.
  *
  * @param {object} client       tsdav-Client
@@ -1956,7 +1973,12 @@ export async function processPendingCreations(client, accountId, module, listsBy
     const fresh = reloadRow(module, listed.id);
     if (!fresh) continue;
 
-    const collection = listsByUrl.get(fresh.target_caldav_list_url);
+    // Die Collections stammen aus einem Abruf, der die Auswahl VOR seinem
+    // await las (#2947): wurde die Liste seitdem abgewählt, gilt sie hier als
+    // weg - wie in jedem Lauf, der nach dem Abwählen beginnt.
+    const collection = selectedListFor(accountId, fresh.target_caldav_list_url, 'tasks')
+      ? listsByUrl.get(fresh.target_caldav_list_url)
+      : undefined;
     if (!collection) {
       // Die Liste ist weg oder wurde abgewählt. Das Ziel stehen zu lassen hieße,
       // es bei jedem Lauf erneut zu versuchen; die Aufgabe bleibt lokal, was der
@@ -2058,6 +2080,9 @@ export async function processPendingShoppingCreations(client, accountId, targets
 
     for (const row of pendingShoppingCreations(targetListId, accountId)) {
       if (gate.isClosed(collection.url)) continue;
+      // Noch dieselbe eingeschaltete Zuordnung (#2947)? Die Ziele wurden vor dem
+      // Listenabruf gelesen, und jeder Upload davor war ein await.
+      if (!selectedListFor(accountId, listUrl, 'shopping', targetListId)) break;
       const fresh = reloadRow('shopping', row.id);
       // Zwischenzeitlich gelöscht, schon gespiegelt oder in eine andere Liste
       // gewandert (#1881): dann wartet er nicht mehr auf den Upload HIERHER.
@@ -2134,7 +2159,7 @@ export function releaseStrandedShoppingMoves(accountId) {
   let released = 0;
   for (const row of rows) {
     if (shoppingMappingsOf(row.list_id).length) continue;
-    db.get().transaction(() => releaseShoppingMirror(row))();
+    withTx(db.get(), () => releaseShoppingMirror(row));
     released++;
     log.info(`Shopping item ${row.id} was moved to a list that is no longer mirrored; its entry on the server is removed and the item stays in Yuvomi.`);
   }
@@ -2278,7 +2303,7 @@ export function endWaitingShoppingMoves(accountId, listedUrls) {
     const from = collectionUrlOf(row.external_object_url);
     if (!from) continue;
     if (listed.length > 0 && !listed.some((url) => sameCollection(url, from))) {
-      db.get().transaction(() => releaseShoppingMirror(row))();
+      withTx(db.get(), () => releaseShoppingMirror(row));
       released++;
       log.warn(
         `The reminder list that shopping item "${row.name}" (${row.id}) was moved away from no longer exists on the server. `
@@ -2358,7 +2383,7 @@ function returnShoppingMove(row, reason) {
   // `row` ist die eben gelesene Zeile: zwischen dem Lesen beim Aufrufer und
   // hier liegt kein await.
   const now = row;
-  return db.get().transaction(() => {
+  return withTx(db.get(), () => {
     // Frisch gelesen: der Aufrufer kann eine Zeile ohne die Spalte halten.
     const movedBy = db.get().prepare('SELECT outbound_move_by FROM shopping_items WHERE id = ?').get(now.id)?.outbound_move_by ?? null;
     clearShoppingMove(now.id);
@@ -2371,7 +2396,7 @@ function returnShoppingMove(row, reason) {
       ), 0) + 1 WHERE id = ?
     `).run(home.target_list_id, home.target_list_id, now.category, now.id, now.id);
     return home.target_list_id;
-  })();
+  });
 }
 
 /**
@@ -2416,7 +2441,7 @@ function carriedContent(row, originalData) {
  * @returns {'carried'|'deleted'|'unchanged'|'released'}
  */
 function bookShoppingCarry(sent, { accountId, collectionUrl, objectUrl }) {
-  return db.get().transaction(() => {
+  return withTx(db.get(), () => {
     const now = reloadRow('shopping', sent.id);
     if (!now) return 'deleted';
     if (now.external_source !== 'caldav' || now.external_uid !== sent.external_uid
@@ -2444,7 +2469,7 @@ function bookShoppingCarry(sent, { accountId, collectionUrl, objectUrl }) {
       uid: now.external_uid, objectUrl: sent.external_object_url,
     });
     return 'carried';
-  })();
+  });
 }
 
 /**
@@ -2899,6 +2924,7 @@ export async function processPendingUpdates(client, accountId, module, objectInd
 
 /** Konten mit offener ausgehender Arbeit, samt Modul. */
 function accountsWithPendingWork() {
+  const database = db.get();
   const buckets = new Map();
   const add = (accountId, module) => {
     if (!accountId) return;
@@ -2909,14 +2935,14 @@ function accountsWithPendingWork() {
   // Ein Auftrag, der auf eine abgewählte Liste wartet (#1884), ist keine
   // Arbeit für den Sofortversuch: sonst baute jede Bearbeitung einen Client
   // für ein Konto auf, an das nichts geht.
-  for (const row of db.get().prepare(
+  for (const row of database.prepare(
     'SELECT account_id, module, object_url FROM caldav_todo_pending_deletions'
   ).all()) {
     if (row.object_url && inUnselectedList(row.account_id, row.object_url)) continue;
     add(row.account_id, row.module);
   }
   for (const [module, def] of Object.entries(MODULES)) {
-    for (const row of db.get().prepare(`
+    for (const row of database.prepare(`
       SELECT DISTINCT external_account_id AS account_id FROM ${def.table}
       WHERE outbound_dirty = 1 AND external_source = 'caldav'
     `).all()) {

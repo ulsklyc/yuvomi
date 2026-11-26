@@ -7,8 +7,8 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import express from 'express';
 import { buildRouter } from '../server/routes/push.js';
+import { createPreferencesApp, PUSH_PREFIX } from './preferences-app.js';
 import { processDuePushes } from '../server/services/push-scheduler.js';
 import { MIGRATIONS } from '../server/db.js';
 import { fetchRetry } from './fetch-retry.js';
@@ -384,17 +384,20 @@ test('PUT /wall-mode aendert nur das eigene Abo - nicht das eines anderen Nutzer
  * laeuft direkt danach - auch nach einer geworfenen Assertion.
  */
 async function startApp(db, webpush, userId = 1, { viaSession = false } = {}) {
-  const app = express();
-  app.use(express.json());
-  // Token requests carry `authUserId`, browser requests only the session.
-  app.use((req, _res, next) => {
-    if (viaSession) req.session = { userId };
-    else req.authUserId = userId;
-    next();
-  });
   const { createPushService } = await import('../server/services/push.js');
   const pushService = createPushService({ db, webpush });
-  app.use('/', buildRouter({ pushService, database: db }));
+  // The push router at its real prefix (#2810, test/preferences-app.js), built
+  // through its factory with this suite's push service and database.
+  const app = await createPreferencesApp({
+    mount: [],
+    // Token requests carry `authUserId`, browser requests only the session.
+    auth: (req, _res, next) => {
+      if (viaSession) req.session = { userId };
+      else req.authUserId = userId;
+      next();
+    },
+    after: [[PUSH_PREFIX, buildRouter({ pushService, database: db })]],
+  });
   const server = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
 
   after(async () => {
@@ -404,7 +407,7 @@ async function startApp(db, webpush, userId = 1, { viaSession = false } = {}) {
     await new Promise((r) => server.close(r));
   });
 
-  return { baseUrl: `http://127.0.0.1:${server.address().port}` };
+  return { baseUrl: `http://127.0.0.1:${server.address().port}${PUSH_PREFIX}` };
 }
 
 test('GET /vapid-public-key returns the key', async () => {
@@ -533,6 +536,39 @@ test('scheduler pushes only due, undismissed, unpushed reminders and marks them'
   const r2 = await processDuePushes({ database: db, pushService });
   assert.equal(r2.pushed, 0);
   assert.equal(webpush.calls.length, 1);
+});
+
+test('a scheduler tick while a run is still going does not start a second run (#2942)', async (t) => {
+  // Der Lauf wartet auf einen langsamen Push-Dienst laenger als ein Intervall;
+  // der naechste Tick findet ihn noch laufend und tut nichts.
+  const { startScheduler } = await import('../server/services/push-scheduler.js');
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  /** @type {Array<{ resolve: (value: unknown) => void, reject: (err: Error) => void }>} */
+  const pending = [];
+  const job = () => new Promise((resolve, reject) => { pending.push({ resolve, reject }); });
+  // Den Abschluss eines Laufs (runExternalJob, catch, Riegel loesen) durchlaufen lassen.
+  const settle = async () => { for (let i = 0; i < 10; i += 1) await Promise.resolve(); };
+  startScheduler({ job });
+
+  t.mock.timers.tick(10_000);
+  assert.equal(pending.length, 1, 'the first tick starts a run');
+  t.mock.timers.tick(60_000);
+  t.mock.timers.tick(60_000);
+  assert.equal(pending.length, 1, 'ticks during a run start nothing');
+
+  pending[0].resolve({ sent: 0 });
+  await settle();
+  t.mock.timers.tick(60_000);
+  assert.equal(pending.length, 2, 'the next tick after the run ends starts a new one');
+
+  // Ein Lauf, der scheitert, gibt den Scheduler ebenso wieder frei.
+  pending[1].reject(new Error('push service down'));
+  await settle();
+  t.mock.timers.tick(60_000);
+  assert.equal(pending.length, 3, 'a failed run does not block the next tick');
+  pending[2].resolve({ sent: 0 });
+  await settle();
+  t.mock.timers.reset();
 });
 
 test('scheduler marks pushed_at even when user has no subscriptions', async () => {

@@ -42,6 +42,7 @@ import { readSetting } from '../settings/registry.ts';
 import { isHouseholdMember } from './household-members.js';
 import { listHouseholdMembers } from './member-email.js';
 import { householdDisabledModules } from './household-modules.js';
+import { withTx } from '../db/tx.ts';
 
 // Einzige Familienrolle, die als Kind gilt (server/auth.js FAMILY_ROLES:
 // dad/mom/parent/child/grandparent/relative/other) - eine Konstante statt
@@ -287,7 +288,7 @@ export function syncCycleRemindersForUser(database, userId, now = new Date()) {
   // UNIQUE(user_id, anchor_date, kind), nicht UNIQUE(user_id, kind). Ein
   // Abbruch zwischen Lesen und Schreiben liesse sonst einen zweiten Anker
   // zurueck, den kein spaeterer Lauf mehr sieht (er sucht ja nur "den einen").
-  database.transaction(() => {
+  withTx(/** @type {import('../db/tx.ts').TxDatabase} */ (database), () => {
     // Drei Wege ins Abraeumen, eine Wirkung: Health fuer den ganzen Haushalt
     // abgeschaltet (#1279 - bis dahin kam die Meldung weiter, und ihr Tipp
     // oeffnete eine Seite, die der Routen-Guard abweist), Health fuer dieses
@@ -312,7 +313,7 @@ export function syncCycleRemindersForUser(database, userId, now = new Date()) {
     syncPeriodReminder(database, userId, settings, today, prediction);
     syncLogNudgeReminder(database, userId, settings, today);
     syncPartnerReminder(database, userId, settings, today, prediction);
-  })();
+  });
 }
 
 /**

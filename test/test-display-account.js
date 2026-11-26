@@ -525,7 +525,7 @@ test('das Display liest keine Abo-URLs, ein Mensch schon', async () => {
   // diesem Ticket schon fuer ein gescoptes Token mit `calendar:read`; gemessen
   // wird deshalb an den Scopes, nicht an der Anmeldeart.
   const created = await admin('POST', '/calendar/subscriptions', {
-    name: 'Schulferien', url: 'https://example.invalid/feed.ics?token=geheim', color: '#6366f1', shared: 1,
+    name: 'Schulferien', url: 'https://example.invalid/feed.ics?token=geheim', color: '#6366f1', shared: true,
   });
   assert.ok([200, 201].includes(created.status), `Abo anlegen: ${created.status}`);
 
@@ -626,7 +626,7 @@ test('das Display kann nicht als erledigende Person benannt werden (#1205)', asy
 test('das Display meldet sich nicht mit Passwort an - auch nicht mit einem echten', async () => {
   // DER PLATZHALTER ALLEIN IST KEIN BELEG, und der erste Anlauf dieses Tests
   // war genau das: er warf den Platzhalter als Passwort gegen den Login und sah
-  // ihn scheitern - aber das taete jeder Nicht-bcrypt-Wert, auch ohne jede
+  // ihn scheitern - aber das taete jeder Nicht-Hash-Wert, auch ohne jede
   // Sperre (per Mutation gemessen: der Test blieb gruen, nachdem die Regel
   // ausgebaut war). Die Sperre ist erst gezeigt, wenn ein Konto mit einem
   // ECHTEN, passenden Hash trotzdem abgewiesen wird.

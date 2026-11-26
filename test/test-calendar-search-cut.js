@@ -11,31 +11,32 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-// @ts-expect-error express 5 ships no type declarations (TS7016); new code type-checks clean
-import express from 'express';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.DB_PATH = ':memory:';
 
 const dbmod = await import('../server/db.js');
-const { default: calendarRouter } = await import('../server/routes/calendar.js');
+const { createCalendarApp } = await import('./calendar-app.js');
 const { todayKey, shiftDateKey } = await import('../server/utils/timezone.js');
 const db = dbmod.get();
 
 db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run();
 
-const app = express();
-app.use((/** @type {Record<string, unknown>} */ req, /** @type {unknown} */ _res, /** @type {() => void} */ next) => {
-  req.authUserId = 1;
-  req.authRole = 'admin';
-  req.session = { userId: 1, role: 'admin' };
-  req.sessionModuleAccess = null;
-  req.authScopes = null;
-  next();
+// createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody und
+// der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+const app = await createCalendarApp({
+  mount: ['calendar'],
+  auth: (/** @type {Record<string, unknown>} */ req, /** @type {unknown} */ _res, /** @type {() => void} */ next) => {
+    req.authUserId = 1;
+    req.authRole = 'admin';
+    req.session = { userId: 1, role: 'admin' };
+    req.sessionModuleAccess = null;
+    req.authScopes = null;
+    next();
+  },
 });
-app.use('/', calendarRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1/calendar`)));
 test.after(() => server.close());
 
 /** @param {string} q */

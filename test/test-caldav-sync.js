@@ -6,6 +6,7 @@
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
+import { withTransaction } from './helpers/schema-db.js';
 import { readFileSync } from 'node:fs';
 import { toICSDatetime, sync, getCalendars, updateAccount, updateCalendarSelection, deleteAccount, countAccountEvents, addAccount } from '../server/services/caldav-sync.js';
 import { pruneDeletedEvents } from '../server/services/calendar-prune.js';
@@ -1433,11 +1434,7 @@ describe('CalDAV: die eingebrannte Kalenderfarbe loest sich (#1270)', () => {
     const d = buildDb();
     // `node:sqlite` kennt kein `.transaction()`; addAccount und deleteAccount
     // brauchen eines. Derselbe Shim wie im Block zum Aufraeumen (#732).
-    d.transaction = (fn2) => (...args) => {
-      d.exec('BEGIN');
-      try { const out = fn2(...args); d.exec('COMMIT'); return out; }
-      catch (err) { d.exec('ROLLBACK'); throw err; }
-    };
+    withTransaction(d);
     _setTestDatabase(d);
     try { await fn(d); } finally { _resetTestDatabase(); d.close(); }
   }
@@ -2473,12 +2470,7 @@ describe('CalDAV: die Kalenderauswahl überlebt das Aktualisieren (#732)', () =>
     `);
     // `node:sqlite` kennt kein `.transaction()`; updateAccount schreibt das
     // Konto in einer. Derselbe Shim wie im Block zum Aufraeumen (#732).
-    d.transaction = (fn) => (...args) => {
-      d.exec('BEGIN');
-      try { const out = fn(...args); d.exec('COMMIT'); return out; }
-      catch (err) { d.exec('ROLLBACK'); throw err; }
-    };
-    return d;
+    return withTransaction(d);
   }
 
   // Der Server meldet einen Kalender mehr als beim letzten Mal - so unterscheidet
@@ -2673,18 +2665,7 @@ describe('CalDAV: das Aufräumen beim Abwählen ist eine Wahl (#732)', () => {
     // better-sqlite3, das eine mitbringt. Der Shim bildet nur deren Semantik ab
     // (Rueckgabe einer aufrufbaren Funktion, Rollback bei Fehler) - ohne ihn
     // testet diese Suite den Transaktionspfad von deleteAccount gar nicht.
-    d.transaction = (fn) => (...args) => {
-      d.exec('BEGIN');
-      try {
-        const out = fn(...args);
-        d.exec('COMMIT');
-        return out;
-      } catch (err) {
-        d.exec('ROLLBACK');
-        throw err;
-      }
-    };
-    return d;
+    return withTransaction(d);
   }
 
   const titles = (d) => d.prepare('SELECT title FROM calendar_events ORDER BY title').all().map((r) => r.title);
@@ -2830,12 +2811,7 @@ describe('CalDAV: neue Kalender sind opt-in (#732)', () => {
       );
     `);
     // addAccount schreibt in einer Transaktion (#1270); `node:sqlite` hat keine.
-    d.transaction = (fn) => (...args) => {
-      d.exec('BEGIN');
-      try { const out = fn(...args); d.exec('COMMIT'); return out; }
-      catch (err) { d.exec('ROLLBACK'); throw err; }
-    };
-    return d;
+    return withTransaction(d);
   }
 
   const client = async () => ({

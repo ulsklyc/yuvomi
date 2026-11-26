@@ -51,6 +51,8 @@ import { dropDefaultAssignee } from './default-assignees.js';
 import { deleteBirthdayArtifacts } from './birthdays.js';
 import { closeFormerMoney } from './reward-money.js';
 import { endDevicePairingCodes } from './device-pairing.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 
 /**
  * Spalten, die auf `users(id)` zeigen und trotzdem keine Spur in geteilten
@@ -381,8 +383,12 @@ function hardDelete(database, userId) {
   // sind, sonst blieben sie als verwaiste Zeilen unter fremder Bedeutung liegen.
   const patternIds = database.prepare('SELECT id FROM schedule_patterns WHERE user_id = ?').all(userId).map((row) => row.id);
   if (patternIds.length) {
-    const dayIds = database.prepare(`SELECT id FROM schedule_pattern_days WHERE pattern_id IN (${patternIds.map(() => '?').join(',')})`).all(...patternIds).map((row) => row.id);
-    if (dayIds.length) database.prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${dayIds.map(() => '?').join(',')})`).run(...dayIds);
+    const patternIdList = sqlInList(patternIds);
+    const dayIds = database.prepare(`SELECT id FROM schedule_pattern_days WHERE pattern_id IN (${patternIdList.sql})`).all(patternIdList.param).map((row) => row.id);
+    if (dayIds.length) {
+      const dayIdList = sqlInList(dayIds);
+      database.prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${dayIdList.sql})`).run(dayIdList.param);
+    }
   }
   database.prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=?)`).run(userId);
   database.prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id IN (SELECT id FROM schedule_extra_shifts WHERE user_id=?)`).run(userId);
@@ -417,7 +423,7 @@ function hardDelete(database, userId) {
  * @throws {RemovalRefused}
  */
 export function removeUser(database, userId, { refuse } = {}) {
-  return database.transaction(() => {
+  return withTx(database, () => {
     if (!database.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) {
       return { outcome: 'not_found', traces: [] };
     }
@@ -428,5 +434,5 @@ export function removeUser(database, userId, { refuse } = {}) {
     if (outcome === 'deactivated') deactivate(database, userId);
     else hardDelete(database, userId);
     return { outcome, traces };
-  })();
+  });
 }

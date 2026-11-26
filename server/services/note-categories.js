@@ -10,6 +10,8 @@ import {
 } from '../../public/utils/note-category-name.js';
 // The visibility rule itself lives in server/authorize/rows/notes.ts (phase 2, B3).
 import { categoryVisibleTo, visibleWhere } from '../authorize/index.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 export { categoryNameKey };
 
 export class NoteCategoryInputError extends Error {
@@ -45,23 +47,17 @@ export function listVisibleCategories(database, userId) {
 export function hydrateNotesWithCategories(database, notes, userId) {
   if (!notes.length) return notes.map((note) => ({ ...note, categories: [] }));
   const noteIds = notes.map((note) => Number(note.id));
-  // SQLite builds differ in MAX_VARIABLE_NUMBER. Kleine Batches halten selbst
-  // sehr grosse Pinnwaende unter dem konservativen 999-Parameter-Limit.
-  const rows = [];
-  const chunkSize = 500;
-  for (let offset = 0; offset < noteIds.length; offset += chunkSize) {
-    const chunk = noteIds.slice(offset, offset + chunkSize);
-    const placeholders = chunk.map(() => '?').join(',');
-    rows.push(...database.prepare(`
-      SELECT a.note_id, c.id, c.name, c.scope, c.owner_user_id, c.sort_order
-      FROM note_category_assignments a
-      JOIN note_categories c ON c.id = a.category_id
-      WHERE a.note_id IN (${placeholders})
-        AND ${visibleWhere('note_categories', 'c', '?')}
-      ORDER BY CASE c.scope WHEN 'household' THEN 0 ELSE 1 END,
-               c.sort_order ASC, c.name COLLATE NOCASE ASC, c.id ASC
-    `).all(...chunk, userId));
-  }
+  // Die Liste geht als ein JSON-Parameter ein, ein Variablenlimit gibt es nicht.
+  const noteIdList = sqlInList(noteIds);
+  const rows = database.prepare(`
+    SELECT a.note_id, c.id, c.name, c.scope, c.owner_user_id, c.sort_order
+    FROM note_category_assignments a
+    JOIN note_categories c ON c.id = a.category_id
+    WHERE a.note_id IN (${noteIdList.sql})
+      AND ${visibleWhere('note_categories', 'c', '?')}
+    ORDER BY CASE c.scope WHEN 'household' THEN 0 ELSE 1 END,
+             c.sort_order ASC, c.name COLLATE NOCASE ASC, c.id ASC
+  `).all(noteIdList.param, userId);
   const byNote = new Map();
   for (const row of rows) {
     if (!byNote.has(row.note_id)) byNote.set(row.note_id, []);
@@ -84,12 +80,12 @@ export function replaceEditableAssignments(database, {
   const ids = normalizedIds(categoryIds);
   let categories = [];
   if (ids.length) {
-    const placeholders = ids.map(() => '?').join(',');
+    const idList = sqlInList(ids);
     categories = database.prepare(`
       SELECT id, scope, owner_user_id
       FROM note_categories
-      WHERE id IN (${placeholders})
-    `).all(...ids);
+      WHERE id IN (${idList.sql})
+    `).all(idList.param);
     if (categories.length !== ids.length) throw new NoteCategoryInputError('Category is not available', 400, 'notes_selected_category_not_found');
     for (const category of categories) {
       if (!categoryVisibleTo(category, userId)) {
@@ -113,18 +109,8 @@ export function replaceEditableAssignments(database, {
     for (const id of ids) insert.run(noteId, id, userId);
   };
 
-  if (database.inTransaction) {
-    run();
-  } else {
-    database.exec('BEGIN');
-    try {
-      run();
-      database.exec('COMMIT');
-    } catch (error) {
-      database.exec('ROLLBACK');
-      throw error;
-    }
-  }
+  // In einer offenen Transaktion des Aufrufers wird das ein SAVEPOINT.
+  withTx(database, run);
 }
 
 export function validateCategoryName(value) {

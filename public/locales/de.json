@@ -127,7 +127,8 @@
         "transferUndone": "Von der Einkaufsliste entfernt.",
         "transferSkipped": "{{count}} standen schon darauf.",
         "transferSkipped_one": "{{count}} stand schon darauf.",
-        "transferAllPresent": "Alle Zutaten stehen schon auf der Liste."
+        "transferAllPresent": "Alle Zutaten stehen schon auf der Liste.",
+        "errorTransferTooLarge": "Das sind zu viele Zutaten auf einmal. Höchstens {{limit}} lassen sich zusammen übernehmen und wieder rückgängig machen."
     },
     "nav": {
         "dashboard": "Übersicht",
@@ -1290,7 +1291,8 @@
         "localCalendarEdit": "Kalender bearbeiten",
         "localCalendarNew": "Neuer Kalender",
         "manageSubscriptionsLink": "Abos und Synchronisation",
-        "cancelled": "Abgesagt"
+        "cancelled": "Abgesagt",
+        "errorSeriesChanged": "Die Serie wurde gerade an anderer Stelle geändert. Bitte erneut speichern."
     },
     "noteCategories": {
         "categories": "Kategorien",
@@ -3656,7 +3658,8 @@
         "remoteErrorAuthFailed": "Der Server hat die Anmeldung abgelehnt. Benutzername und Passwort prüfen.",
         "remoteErrorStatus": "Der Server hat mit Status {{status}} geantwortet.",
         "remoteErrorUnreachable": "Der Server ist nicht erreichbar. Die Adresse prüfen und ob der Server läuft.",
-        "remoteErrorFailed": "Die Anfrage an den Server ist gescheitert."
+        "remoteErrorFailed": "Die Anfrage an den Server ist gescheitert.",
+        "caldavErrorAccountChanged": "Das Konto wurde gerade an anderer Stelle geändert. Bitte erneut speichern."
     },
     "login": {
         "tagline": "Willkommen zurück. Dein Zuhause an einem Ort.",

@@ -6,6 +6,7 @@
 
 import { createLogger } from '../logger.js';
 import express from 'express';
+import { validateRequest } from '../api/validate-request.ts';
 import * as db from '../db.js';
 import { resolveCalendarSelection } from '../services/calendar-selection.js';
 import { emptyTasksOverview, tasksOverviewSlice } from '../services/tasks-slices.ts';
@@ -152,8 +153,7 @@ const router = express.Router();
  *   quicklinks:      QuickLink[]        // Haushaltslinks der Kachelreihe (#469)
  * }
  */
-router.get('/', (req, res) => {
-  try {
+router.get('/', validateRequest(), (req, res) => {
   const d = db.get();
   const result = {};
   const userId = req.authUserId || req.session.userId;
@@ -493,10 +493,6 @@ router.get('/', (req, res) => {
   // zeichnet. Hier, hinter jeder Abfrage - ein Block, den jemand oben ergaenzt,
   // erreicht die Wand erst ueber die Allowlist.
   res.json(householdAudience ? householdAudienceAnswer(result, emptyAnswer({ month: currentMonth })) : result);
-  } catch (err) {
-    log.error('Critical error:', err.message);
-    res.status(500).json({ error: 'Dashboard could not be loaded.', code: 500 });
-  }
 });
 
 export default router;

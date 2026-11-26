@@ -8,14 +8,16 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import { createHash } from 'node:crypto';
 import * as db from '../db.js';
-import { str, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
+import { withTx } from '../db/tx.ts';
+import { str, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../api/formats.ts';
 import { normalizeRecipeMealTypes } from '../../public/utils/recipe-meal-types.js';
 import { ingredientMatchKey } from '../../public/utils/ingredient-match-key.js';
 import { getAdapter } from '../services/recipe-providers/index.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
-import { handOverToShoppingList } from '../services/kitchen-handover.js';
+import { handOverToShoppingList, handoverTooLarge, handoverTooLargeAnswer } from '../services/kitchen-handover.js';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log = createLogger('Recipes');
 const router = express.Router();
@@ -81,13 +83,13 @@ function attachPantryMatches(req, ingredients) {
     return ingredients.map((ing) => ({ ...ing, pantry_item_id: null, pantry_item_name: null }));
   }
   const recipeIds = [...new Set(ingredients.map((i) => i.recipe_id))];
-  const placeholders = recipeIds.map(() => '?').join(',');
+  const recipeList = sqlInList(recipeIds);
   const rows = db.get().prepare(`
     SELECT m.recipe_id, m.ingredient_key, m.pantry_item_id, p.name AS pantry_item_name
     FROM recipe_ingredient_pantry_matches m
     JOIN pantry_items p ON p.id = m.pantry_item_id
-    WHERE m.recipe_id IN (${placeholders})
-  `).all(...recipeIds);
+    WHERE m.recipe_id IN (${recipeList.sql})
+  `).all(recipeList.param);
 
   const byKey = new Map(rows.map((r) => [`${r.recipe_id}\x00${r.ingredient_key}`, r]));
   return ingredients.map((ing) => {
@@ -139,12 +141,12 @@ router.get('/', validateRequest(), (req, res) => {
   let ingredientMap = {};
 
   if (ids.length > 0) {
-    const placeholders = ids.map(() => '?').join(',');
+    const idList = sqlInList(ids);
     const ingredients = attachPantryMatches(req, db.get().prepare(`
       SELECT * FROM recipe_ingredients
-      WHERE recipe_id IN (${placeholders})
+      WHERE recipe_id IN (${idList.sql})
       ORDER BY id ASC
-    `).all(...ids));
+    `).all(idList.param));
 
     for (const ing of ingredients) {
       if (!ingredientMap[ing.recipe_id]) ingredientMap[ing.recipe_id] = [];
@@ -219,7 +221,7 @@ router.post('/', validateRequest(), (req, res) => {
   const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage]);
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-  const recipeId = db.transaction(() => {
+  const recipeId = withTx(db.get(), () => {
     const result = db.get().prepare(`
       INSERT INTO recipes (title, notes, recipe_url, meal_types, image_data, servings, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -281,7 +283,7 @@ router.put('/:id', validateRequest(), (req, res) => {
   const errors = collectErrors([vTitle, vNotes, vRecipeUrl, vImage]);
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-  db.transaction(() => {
+  withTx(db.get(), () => {
     // COALESCE fuer das Bild: ein nicht mitgeschicktes Feld (undefined -> NULL
     // als Bindung) laesst das gespeicherte stehen. Geloescht wird nur mit
     // ausdruecklichem null/'' - dann traegt vImage.value ebenfalls null, und
@@ -602,10 +604,13 @@ router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (r
     quantities.forEach((q, i) => { ingredients[i].quantity = q?.trim() || null; });
   }
   if (!ingredients.length) return res.json({ data: { transferred: 0, skipped: 0, added_ids: [] } });
+  // Das Rueckgaengig schickt `added_ids` in EINER Anfrage zurueck; passt das
+  // nicht, 400 vor dem Schreiben (#2810, Folge 5b, services/kitchen-handover.js).
+  if (handoverTooLarge(ingredients.length)) return res.status(400).json(handoverTooLargeAnswer());
 
   // Die Regel ist die der ganzen Kueche (services/kitchen-handover.js, R23 D2):
   // dieser Weg hatte sie als einziger schon, die drei anderen nicht.
-  const result = db.transaction(() => {
+  const result = withTx(db.get(), () => {
     const { added_ids: addedIds, skipped } = handOverToShoppingList(db.get(), listId, ingredients.map(({ name, quantity, category }) => ({ name, quantity, category })));
     return { transferred: addedIds.length, skipped, added_ids: addedIds };
   });

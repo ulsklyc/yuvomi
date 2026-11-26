@@ -2,6 +2,7 @@
 import express from '../utils/http-router.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import { PaperlessHttpError, paperlessStatus } from '../services/dms/paperless-errors.js';
+import { assertGatesNow } from '../middleware/gate-now.js';
 import { paperlessErrorHandler } from '../middleware/paperless-errors.js';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
@@ -10,7 +11,7 @@ import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import { mayWriteModule } from '../authorize/index.ts';
 import { actorFromRequest, visibleWhere } from '../authorize/index.ts';
 import { getAdapter } from '../services/dms/index.js';
-import { liveAccount, liveIdentity, checkLiveTagChanges } from '../services/paperless-live-settings.js';
+import { liveAccount, liveIdentity, paperlessAccount, checkLiveTagChanges } from '../services/paperless-live-settings.js';
 import { positiveId, listFolderDocuments } from '../services/dms/paperless-views.js';
 
 const router = express.Router();
@@ -26,16 +27,14 @@ const problem = (status, reason) => new PaperlessHttpError(status, { reason });
 /** @param {import("../utils/http-router.ts").Request} req */
 const writable = (req) => isAdminRequest(req) && mayWriteModule(req, 'documents');
 /** @param {unknown} value @returns {number[]} */
-function ids(value) {
+function upstreamTagIds(value) {
   if (!Array.isArray(value) || value.length > 1000
     || value.some((id) => !Number.isSafeInteger(id) || id < 1)) throw problem(400, 'paperless_tags_invalid');
-  return [...new Set(value)].sort((a, b) => a - b);
+  return sortedTagIds(value);
 }
-/** @param {number} id @returns {import("../../types/paperless.d.ts").Account} */
-function account(id) {
-  const row = db.get().prepare("SELECT * FROM dms_accounts WHERE id = ? AND provider = 'paperless'").get(id);
-  if (!row) throw problem(404, 'paperless_account_not_found');
-  return row;
+/** @param {number[]} ids */
+function sortedTagIds(ids) {
+  return [...new Set(ids)].sort((a, b) => a - b);
 }
 /** @template T @param {Promise<T>} promise @returns {Promise<T>} */
 async function remote(promise) {
@@ -52,14 +51,13 @@ async function remote(promise) {
 
 /** @param {import("../utils/http-router.ts").Request} req */
 function resolve(req) {
-  if (!positiveId(req.params.id)) throw problem(404, 'paperless_document_not_found');
   let row;
   let documentId = 0;
   let canEdit;
   let identity;
   if (req.params.documentId !== undefined) {
-    documentId = positiveId(req.params.documentId) || 0;
-    if (!documentId) throw problem(404, 'paperless_document_not_found');
+    documentId = Number(req.params.documentId);
+    if (documentId < 1) throw problem(404, 'paperless_document_not_found');
     row = db.get().prepare(`SELECT f.* FROM paperless_view_folders f WHERE f.id = @id
       AND ${visibleWhere('paperless_folders', 'f', '@userId')}`).get({ id: req.params.id, userId: actor(req) });
     if (!row) throw problem(404, 'paperless_folder_not_found');
@@ -73,13 +71,14 @@ function resolve(req) {
     canEdit = writable(req);
     identity = [row.dms_account_id, row.storage_key, row.created_by, row.visibility];
   }
-  const source = row.view_id === undefined ? account(row.dms_account_id) : liveAccount(row.account_id, actor(req));
+  const source = row.view_id === undefined ? paperlessAccount(db.get(), row.dms_account_id) : liveAccount(db.get(), row.account_id, actor(req));
   // Include credentials in the internal identity, never in a response.
   identity.push(source.base_url, source.api_token, source.live_settings);
   return { row, source, documentId, canEdit, identity: JSON.stringify(identity) };
 }
 /** @param {import("../utils/http-router.ts").Request} req @param {ReturnType<typeof resolve>} before @param {boolean} write */
 function recheck(req, before, write = false) {
+  if (write) assertGatesNow(db.get(), req, { admin: true });
   const now = resolve(req);
   if (now.identity !== before.identity) throw problem(409, 'paperless_folder_changed');
   if (write && !now.canEdit) throw problem(403, 'Permission denied.');
@@ -99,20 +98,19 @@ router.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); 
 router.get('/tags', requireAdmin, validateRequest(), refuseWhileRestoring, async (req, res) => {
 
     if (!writable(req)) throw problem(403, 'Permission denied.');
-    const accountId = positiveId(req.query.account_id);
-    const page = positiveId(req.query.page ?? 1);
-    if (!accountId || !page || page > 100000) throw problem(400, 'paperless_tags_invalid');
+    const accountId = Number(req.query.account_id);
+    const page = Number(req.query.page ?? 1);
     let context;
     if (req.query.folder_id !== undefined) {
-      const folderId = positiveId(req.query.folder_id);
-      const folder = folderId && db.get().prepare(`SELECT f.* FROM paperless_view_folders f WHERE f.id = @id AND ${visibleWhere('paperless_folders', 'f', '@userId')}`)
+      const folderId = Number(req.query.folder_id);
+      const folder = db.get().prepare(`SELECT f.* FROM paperless_view_folders f WHERE f.id = @id AND ${visibleWhere('paperless_folders', 'f', '@userId')}`)
         .get({ id: folderId, userId: actor(req) });
       if (!folder || folder.account_id !== accountId || folder.created_by !== actor(req)) throw problem(404, 'paperless_folder_not_found');
       context = folder;
     }
-    const source = context ? liveAccount(accountId, actor(req)) : account(accountId);
+    const source = context ? liveAccount(db.get(), accountId, actor(req)) : paperlessAccount(db.get(), accountId);
     const result = await remote(adapterFactory(source).listTags({ page }));
-    const current = context ? liveAccount(accountId, actor(req)) : account(accountId);
+    const current = context ? liveAccount(db.get(), accountId, actor(req)) : paperlessAccount(db.get(), accountId);
     if (liveIdentity(current) !== liveIdentity(source)) throw problem(409, 'paperless_folder_changed');
     if (context) {
       const folder = db.get().prepare('SELECT * FROM paperless_view_folders WHERE id = ?').get(context.id);
@@ -131,7 +129,7 @@ async function readTags(req, res) {
       const adapter = adapterFactory(context.source);
       await inView(adapter, context);
       const document = await remote(adapter.getDocument(context.documentId));
-      const tagIds = ids(document.tags);
+      const tagIds = upstreamTagIds(document.tags);
       // Only names of tags actually assigned to the delegated document are shared.
       let named = [];
       try { named = await remote(adapter.getTags(tagIds)); }
@@ -152,21 +150,22 @@ async function writeTags(req, res) {
 
       const context = resolve(req);
       if (!context.canEdit) throw problem(403, 'Permission denied.');
-      const wanted = ids(req.body?.tags);
-      const expected = ids(req.body?.expected_tags);
+      const wanted = sortedTagIds(req.body.tags);
+      const expected = sortedTagIds(req.body.expected_tags);
       const adapter = adapterFactory(context.source);
       await inView(adapter, context);
       const document = await remote(adapter.getDocument(context.documentId));
-      if (JSON.stringify(ids(document.tags)) !== JSON.stringify(expected)) throw problem(409, 'paperless_tags_changed');
+      const currentTags = upstreamTagIds(document.tags);
+      if (JSON.stringify(currentTags) !== JSON.stringify(expected)) throw problem(409, 'paperless_tags_changed');
       if (context.row.view_id !== undefined) {
-        checkLiveTagChanges(ids(document.tags), wanted, context.source.live_settings?.allowed_tag_ids ?? null);
+        checkLiveTagChanges(currentTags, wanted, context.source.live_settings?.allowed_tag_ids ?? null);
       }
       await inView(adapter, context);
       recheck(req, context, true);
       const updated = await remote(adapter.setDocumentTags(context.documentId, wanted));
       recheck(req, context, true);
       // A successful tag change may intentionally remove the document from its view.
-      res.json({ data: { tag_ids: ids(updated.tags) } });
+      res.json({ data: { tag_ids: upstreamTagIds(updated.tags) } });
 
 }
 router.get('/folders/:id/documents/:documentId/tags', validateRequest(), refuseWhileRestoring, readTags);

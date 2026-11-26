@@ -14,8 +14,9 @@
 import express from 'express';
 import crypto from 'node:crypto';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { hashPassword, normalizePassword } from '../utils/password.js';
-import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { collectErrors, date as validateDate, id as validateId, str, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import {
   documentLinksFor, documentLinksOf, documentRefForViewer, documentViewer, loadDocumentLinks, replaceDocumentLinks,
@@ -35,6 +36,7 @@ import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts } from '../services/co
 import { todayKey } from '../utils/timezone.js';
 import { mayReadModule, mayWriteModule } from '../authorize/index.ts';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 import {
   CATEGORIES, FREQUENCIES, GROUP_ROLES, GROUP_TYPES, MAX_GUEST_EMAIL, MAX_GUEST_NAME, MAX_GUEST_PHONE,
   SPLIT_METHODS,
@@ -535,16 +537,16 @@ function serializeExpense(expense, prefetched, viewer) {
 function serializeExpenseList(expenses, viewer) {
   if (!expenses.length) return [];
   const ids = expenses.map((e) => e.id);
-  const placeholders = ids.map(() => '?').join(', ');
+  const idList = sqlInList(ids);
 
   const splits = new Map();
   for (const row of db.get().prepare(`
     SELECT s.expense_id, s.user_id, s.amount_minor, s.currency, u.display_name
     FROM expense_splits s
     LEFT JOIN users u ON u.id = s.user_id
-    WHERE s.expense_id IN (${placeholders})
+    WHERE s.expense_id IN (${idList.sql})
     ORDER BY ${memberOrderSql('u')}
-  `).all(...ids)) {
+  `).all(idList.param)) {
     const { expense_id, ...rest } = row;
     if (!splits.has(expense_id)) splits.set(expense_id, []);
     splits.get(expense_id).push({ ...rest, amount: minorToDecimal(rest.amount_minor, rest.currency) });
@@ -729,7 +731,7 @@ router.post('/groups', refuseSplitGuest, validateRequest(), (req, res) => {
   // ist, bekommt keine neue Mitgliedschaft.
   const staff = newNonMembers([userId(req)], { guestsAllowed: true });
   if (staff.length) return res.status(400).json({ error: staffMessage(staff), code: 400 });
-  const result = db.transaction(() => {
+  const result = withTx(db.get(), () => {
     const created = db.get().prepare(`
       INSERT INTO expense_groups (name, description, type, default_currency, default_split_method, created_by)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -792,7 +794,7 @@ router.post('/groups/:id/unarchive', validateRequest(), (req, res) => {
   // (wie Fortsetzen mit `missed: "skip"`): der Lauf hat waehrend der Archivzeit
   // nichts gebucht, und ohne das buchte er je Stunde einen Termin der Luecke
   // nach. Pausierte Serien bleiben, wie sie sind - Fortsetzen entscheidet.
-  db.transaction(() => {
+  withTx(db.get(), () => {
     const database = db.get();
     const restored = database.prepare("UPDATE expense_groups SET status = 'active', archived_at = NULL WHERE id = ? AND status = 'archived'").run(id);
     if (restored.changes !== 1) {
@@ -976,7 +978,7 @@ router.post('/groups/:id/members', validateRequest(), async (req, res) => {
 
   let memberUserId;
   try {
-    memberUserId = db.transaction(() => {
+    memberUserId = withTx(db.get(), () => {
       assertManagesGroup(groupId, req);
       const uid = vContactId.value
         ? userFromContact(db.get(), vContactId.value, userId(req), groupId, passwordHash, {
@@ -1054,7 +1056,7 @@ router.post('/groups/:id/guests', validateRequest(), async (req, res) => {
 
   let createdUserId;
   try {
-    createdUserId = db.transaction(() => {
+    createdUserId = withTx(db.get(), () => {
       assertManagesGroup(groupId, req);
       const username = requestedUsername ?? uniqueUsername(vDisplayName.value);
       const exists = db.get().prepare('SELECT 1 FROM users WHERE username = ?').get(username);
@@ -1188,7 +1190,7 @@ router.post('/groups/:id/expenses', validateRequest(), (req, res) => {
       participants,
       splits: req.body.splits,
     });
-    const createdId = db.transaction(() => {
+    const createdId = withTx(db.get(), () => {
       const result = db.get().prepare(`
         INSERT INTO expenses
           (group_id, title, description, amount_minor, currency, converted_amount_minor, converted_currency, exchange_snapshot, payer_id, category, budget_category, split_method, expense_date, created_by)
@@ -1241,7 +1243,7 @@ router.put('/expenses/:id', validateRequest(), (req, res) => {
     const refusal = membershipRefusal(db.get(), existing.group_id, payerId, participants);
     if (refusal) return res.status(400).json({ error: refusal, code: 400 });
     const splits = buildSplits({ method: parsed.method, amountMinor: parsed.convertedAmountMinor, currency: parsed.convertedCurrency, participants, splits: req.body.splits });
-    db.transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare(`
         UPDATE expenses
         SET title = ?, description = ?, amount_minor = ?, currency = ?, converted_amount_minor = ?, converted_currency = ?,
@@ -1298,7 +1300,7 @@ router.delete('/expenses/:id', validateRequest(), (req, res) => {
   if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
   const archived = archivedRefusal(existing.group_id);
   if (archived) return sendRefusal(res, archived);
-  db.transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare("UPDATE expenses SET status = 'deleted', deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(existing.id);
     const booked = db.get().prepare(`
       SELECT group_id, user_id, counterparty_id, amount_minor, currency, memo, created_by
@@ -1451,7 +1453,7 @@ router.post('/groups/:id/settlements', validateRequest(), (req, res) => {
     // Vorher wurde die rohe ID übernommen - eine geratene fremde ID hätte sich
     // so an die Zahlung heften lassen.
     const proofDocumentId = visibleDocumentRef(db.get(), req.body.proof_document_id, documentViewer(req));
-    const settlementId = db.transaction(() => {
+    const settlementId = withTx(db.get(), () => {
       const result = db.get().prepare(`
         INSERT INTO settlements (group_id, payer_id, payee_id, amount_minor, currency, notes, proof_document_id, created_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1495,7 +1497,7 @@ router.post('/groups/:id/settlements/:settlementId/reverse', validateRequest(), 
   if (!mayChangeGroupRecord(settlement, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
   const archived = archivedRefusal(groupId);
   if (archived) return sendRefusal(res, archived);
-  const outcome = db.transaction(() => {
+  const outcome = withTx(db.get(), () => {
     if (settlementReversal(db.get(), settlement.id)) return 'already_reversed';
     const booked = db.get().prepare(`
       SELECT user_id, counterparty_id, amount_minor, currency, created_by
@@ -1617,6 +1619,7 @@ function attachSettlementState(rows, groupId, req) {
     .filter((row) => row.type === 'payment_registered' && row.entity_type === 'settlement' && row.entity_id != null)
     .map((row) => row.entity_id))];
   if (!ids.length) return;
+  const idList = sqlInList(ids);
   const settlements = db.get().prepare(`
     SELECT s.id, s.group_id, s.payer_id, s.payee_id, s.amount_minor, s.currency, s.created_by,
            payer.display_name AS payer_name, payee.display_name AS payee_name,
@@ -1625,8 +1628,8 @@ function attachSettlementState(rows, groupId, req) {
     FROM settlements s
     LEFT JOIN users payer ON payer.id = s.payer_id
     LEFT JOIN users payee ON payee.id = s.payee_id
-    WHERE s.group_id = ? AND s.id IN (${ids.map(() => '?').join(', ')})
-  `).all(groupId, ...ids);
+    WHERE s.group_id = ? AND s.id IN (${idList.sql})
+  `).all(groupId, idList.param);
   const byId = new Map(settlements.map((s) => [s.id, s]));
   const manages = canManageGroup(groupId, req);
   for (const row of rows) {
@@ -1663,11 +1666,12 @@ function attachExpenseState(rows, groupId) {
   const wanted = (row) => EXPENSE_STATE_TYPES.has(row.type) && row.entity_type === 'expense' && row.entity_id != null;
   const ids = [...new Set(rows.filter(wanted).map((row) => row.entity_id))];
   if (!ids.length) return;
+  const idList = sqlInList(ids);
   const expenses = db.get().prepare(`
     SELECT id, status, deleted_at
     FROM expenses
-    WHERE group_id = ? AND id IN (${ids.map(() => '?').join(', ')})
-  `).all(groupId, ...ids);
+    WHERE group_id = ? AND id IN (${idList.sql})
+  `).all(groupId, idList.param);
   const byId = new Map(expenses.map((e) => [e.id, e]));
   for (const row of rows) {
     if (!wanted(row)) continue;
@@ -1920,7 +1924,7 @@ router.put('/recurring/:id', validateRequest(), (req, res) => {
     const sent = req.body;
     const given = (key) => sent[key] !== undefined;
     const missed = parseMissed(sent);
-    db.transaction(() => {
+    withTx(db.get(), () => {
       const existing = loadRecurring(id, req);
       if (!existing) throw new Refusal(404, 'Recurring expense not found.');
       if (!mayChangeGroupRecord(existing, req)) throw new Refusal(403, 'Not authorized.');
@@ -1988,7 +1992,7 @@ router.delete('/recurring/:id', validateRequest(), (req, res) => {
   if (!mayChangeGroupRecord(existing, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
   const archived = archivedRefusal(existing.group_id);
   if (archived) return sendRefusal(res, archived);
-  db.transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare('DELETE FROM recurring_expenses WHERE id = ?').run(existing.id);
     activity(existing.group_id, userId(req), 'recurring_deleted', 'recurring_expense', existing.id, expenseSnapshot(existing.title, existing.amount_minor, existing.currency));
   });
@@ -2009,7 +2013,7 @@ router.post('/recurring/:id/pause', validateRequest(), (req, res) => {
   // wird und von welchem Termin aus gezaehlt wird, entscheidet die Zeile, die
   // hier gelesen wird, nicht die von vor der Rechtepruefung.
   const database = db.get();
-  const updated = database.transaction(() => {
+  const updated = withTx(database, () => {
     const current = database.prepare('SELECT * FROM recurring_expenses WHERE id = ?').get(id);
     if (!current) return null;
     if (!current.paused_at) {
@@ -2029,7 +2033,7 @@ router.post('/recurring/:id/pause', validateRequest(), (req, res) => {
       activity(current.group_id, userId(req), 'recurring_resumed', 'recurring_expense', id, next.skipped ? { skipped: next.skipped } : {});
     }
     return true;
-  })();
+  });
   if (!updated) return res.status(404).json({ error: 'Recurring expense not found.', code: 404 });
   res.json({ data: recurringResponse(id, req) });
 });

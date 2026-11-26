@@ -16,13 +16,12 @@ import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
-import express from 'express';
+import { createPreferencesApp } from './preferences-app.js';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'preferences-countdown-grace-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 const { DEFAULT_OVERDUE_GRACE_DAYS } = await import('../server/settings/values.ts');
 
 const moduleDatabase = get();
@@ -63,15 +62,15 @@ const ADMIN  = seedUser('admin', 'admin');
 const MEMBER = seedUser('member', 'member');
 
 let actor = { id: ADMIN, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.id;
-  req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
-  next();
+const app = await createPreferencesApp({
+  mount: ['preferences'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.id;
+    req.authRole = actor.role;
+    req.session = { userId: actor.id, role: actor.role };
+    next();
+  },
 });
-app.use('/api/v1/preferences', preferencesRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}/api/v1`;

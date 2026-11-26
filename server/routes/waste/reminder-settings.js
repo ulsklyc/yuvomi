@@ -11,9 +11,10 @@
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
+import { withTx } from '../../db/tx.ts';
 import * as store from '../../services/waste-store.js';
 import { syncWasteRemindersForUser } from '../../services/waste-reminders.js';
-import { id as validateId } from '../../middleware/validate.js';
+import { id as validateId } from '../../api/formats.ts';
 import { wasteErrorResponse, currentUserId } from './helpers.js';
 
 const router = express.Router();
@@ -55,15 +56,15 @@ router.put('/:typeId', validateRequest(), (req, res) => {
     // deletes stale anchors/reminders before creating fresh ones, and without
     // an enclosing transaction a mid-run failure there left the setting saved
     // but the user's reminders in a half-updated state until the next tick
-    // papered over it. db.transaction() nests via SAVEPOINT, so this composes
+    // papered over it. withTx() nests via SAVEPOINT, so this composes
     // safely with syncWasteRemindersForUser's own inner transaction.
-    const row = db.get().transaction(() => {
+    const row = withTx(db.get(), () => {
       const saved = store.upsertReminderSetting(db.get(), userId, vTypeId.value, {
         enabled, offsetDays, deliveryTime,
       });
       syncWasteRemindersForUser(db.get(), userId);
       return saved;
-    })();
+    });
 
     res.json({ data: { type_id: row.type_id, enabled: !!row.enabled, offset_days: row.offset_days, delivery_time: row.delivery_time } });
   } catch (err) {

@@ -14,12 +14,552 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view in Documents, keep it private or explicitly share its current and future
   matches with selected members or the family. Source filters, ordering and pagination are read on
   demand; preview and download recheck membership. Disconnecting only removes
-  the binding. Migration 283 adds the folder and member-access tables.
+  the binding.
 - **Paperless document tags are visible and editable.** Administrators with Documents write access can assign existing tags on linked documents and saved-view members, with stale-edit detection and paginated tag selection. Family readers can view assigned tags.
+- **Live-folder credentials end when their user leaves.** Deactivation clears personal Paperless tokens and received folder grants. Deleting an otherwise empty account also clears its tokens and grants.
+- **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+
+## [2.96.0] - 2026-11-26
+
+### Foundation
+- **Each migration is its own file, and a new installation starts from a schema baseline.** The
+  284 database migrations lived in one `server/db.js` of almost 14,000 lines. Each is now its
+  own file under `server/migrations/`, and a test holds every one of them byte for byte to what
+  existing installations have already applied. A new database is created from one generated
+  baseline instead of replaying all migrations; a test checks on both SQLite drivers that the
+  baseline plus any later migration gives the same schema and the same rows as replaying them
+  from the first. `server/db.js` is down to about 1,200 lines; the migration runner, backup,
+  restore and the baseline live under `server/db/`.
+- **Every database transaction runs through one function.** Transactions were opened in about
+  25 places, each in its own way. They now all go through `withTx` in `server/db/tx.ts`, which
+  only accepts synchronous work, and a lint rule refuses a transaction opened any other way.
+  Where the server waits for something before it saves (a file upload, a feed, a connection
+  test, a password hash), it now reads again what it checked, and the rights of whoever sent
+  the request, in the same step as the write; the corrections this brought to light are listed
+  under "Fixed".
+- **One migration, so the way back is the backup.** Unlike the earlier foundation releases,
+  this one brings a migration (284, search index, see "Fixed"). Once 2.96.0 has opened a
+  database, 2.95.0 refuses to start on it, as described in the installation guide ("Going
+  back"): going back means the previous image with the backup taken before the update. Before
+  the tag, a database from 2.95.0 was updated by this build, a backup taken on 2.95.0 before the
+  update was restored on 2.95.0 afterwards, and this build started on a new database created
+  from the baseline and again on it after a restart.
+
+### Changed
+- **A new installation creates its database in one step.** The first start used to run every
+  migration since the first release one after another (284 of them, each with its own line in the
+  log); it now applies one schema baseline with the same result and logs
+  `Schema baseline applied: migrations 1 to 284`. Existing installations are not touched: they
+  keep running only the migrations they have not seen yet. If the baseline cannot be used, the
+  start falls back to the migrations and says so in the log.
 
 ### Fixed
-- **Live-folder credentials end when their user leaves.** Personal Paperless tokens and received folder grants no longer keep an otherwise empty account from being deleted, and deactivation clears them too. Live-folder API documentation includes personal credentials and selected-member visibility; translated settings and tag dialogs follow the existing form, search and typography rules.
-- **Live-folder tags show names and IDs in settings and document dialogs.** The central catalogue also loads in all-tags mode. Assigned tag names are resolved across source pages with a targeted detail fallback for incomplete batch responses; unpaginated and nested tag catalogues are normalized. Missing Paperless tag-read permissions are explained in settings and tag dialogs.
+- **A save that collides with a change made at the same moment now says so.** When a series or
+  a CalDAV account is changed elsewhere while it is being saved, the app now shows "changed
+  elsewhere, please save again" instead of a general error.
+- **Changes made while the app waits for a server or an upload are no longer lost or
+  overruled.** Several actions check something, wait for a server or a file upload, and only then
+  save; a change made in that moment was not seen. A document shared with someone, or about
+  someone, who leaves the household during the upload is now refused like before the upload, and
+  nothing is stored. A calendar import from a link no longer assigns people who left the household
+  while the feed was loading, and if the chosen calendar is deleted meanwhile, the import says so
+  (`400`, reason `calendar_selected_calendar_not_found`) instead of claiming the feed could not be
+  fetched. Refreshing the calendars, reminder lists or address books of an account that is
+  deleted meanwhile now answers "not found" instead of an error, and an account moved to another
+  server meanwhile keeps nothing from the old one. Changing the server or user of a CalDAV
+  account checks again against the account as it is after the connection test, so a password
+  saved for another server in the meantime is never sent to the old one; if the account changes
+  during each of three connection tests, the change stops with a conflict (`409`, reason
+  `caldav_account_changed`), nothing is saved, and it can be sent again. A task or shopping item
+  is no longer uploaded to a reminder list that was switched off while the list was fetched.
+  Rights now count at the moment of saving, not only when the request arrived: an administrator
+  demoted while a new member's or housekeeper's password is being prepared gets "admin access
+  required" and no account is created, and whoever loses write access to documents while an
+  event attachment uploads gets the refusal for attachments, with no attachment, copy or change
+  to the document's sharing left behind. The same holds for the right to change other people's
+  events, for read or write access to a module (calendar, documents) and for the administrator
+  role behind the CalDAV and CardDAV settings: whoever loses one of them while an attachment, a
+  document, a calendar feed or a connection test is on its way gets the same refusal as before
+  it, and nothing is saved. An account that is deactivated during that wait gets "not signed in"
+  (`401`), the answer it would get when it next opened the app, and the app signs out.
+- **Saving a series with an attachment no longer fails when the series changes at the same
+  moment.** When a change to a recurring event left single changed dates on their own, each of
+  them first got its own copy of the attachment, and only then was the series saved. If the
+  series was changed in the meantime - its repetition removed, or one changed date replaced by
+  another - the save could be refused with a wrong message or end in an error. Now the save
+  follows the series as it is after the copies, and a changed date that needs a copy gets one.
+  If the series keeps changing while the copies are made, the save stops after three tries with a
+  conflict (`409`, reason `calendar_series_changed`) instead of an error: nothing is saved, the
+  copies are removed, and the change can be sent again. This also applies to changing "this and
+  following" dates of a series. If the attached document is deleted while the copies are made,
+  the changed dates are saved without a copy of it. Changing a single date or "this and
+  following" dates with an attachment now checks the series again after the upload: if it was
+  deleted or made private in the meantime, the answer is the same "not found" as before the
+  upload and nothing is saved. A new event with an attachment likewise checks again that the
+  chosen people and the chosen CalDAV calendar are still available. A save that is refused after an attachment upload now also says why with what was checked,
+  not with what happened while the upload was being removed.
+- **Changing the document storage no longer cuts off documents stored at the same moment.** The
+  WebDAV settings and the Google Drive connection check that existing documents stay reachable,
+  but they checked before testing the new connection over the network and saved afterwards. A
+  first document stored during that test ended up behind a WebDAV connection or a Google account
+  that could not reach it, and two WebDAV changes saved at the same time could combine into a
+  connection that was never tested. Now the check is repeated on the documents and settings as
+  they are when saving; if they changed in the meantime, the change is refused and can be made
+  again. The same holds the other way round: a document or calendar attachment uploaded while the
+  storage settings are changed is no longer saved behind the old connection; the upload is
+  refused with a note to send it again, and the file is removed from where it was put.
+- **Outlook and CardDAV syncs of one account no longer get in each other's way.** When the
+  regular sync and "Sync now" (or, for Outlook, connecting the account) ran at the same time, an
+  event could be created twice in Outlook, and the extra copy stayed there for good; a CardDAV
+  sync could delete a contact the other sync had just imported, which then came back later as a
+  new contact without what was attached to it. Now only one sync runs at a time; a second one
+  waits for it and then runs once. An event made private, deleted, given another calendar or
+  left out of the automatic sync while an Outlook sync is running is no longer sent by that
+  sync, and an address book switched off during a CardDAV sync is no longer imported. An
+  Outlook account removed while its sync is creating an event no longer leaves that new copy
+  behind in Outlook: the sync deletes it again and does not report the account as synced.
+- **A reminder is no longer sent twice when a push or a channel answers slowly.** Reminders go
+  out once a minute; when sending them took longer than that (a slow push service or an ntfy,
+  Gotify, webhook or e-mail channel that answers late), the next run started anyway and sent the
+  reminders the first one had not finished yet a second time. Now a new run starts only once the
+  previous one is done, and a reminder that is being sent is never sent again in the meantime.
+  A reminder also goes out only if it is still due when its turn comes: one deleted, dismissed or
+  moved to a later time, or whose module was switched off or taken away while earlier reminders
+  were being sent, no longer goes out, and a channel switched off, deleted or made a household
+  channel in that time no longer hears it.
+- **A recipe provider sync no longer deletes a recipe another sync just imported.** When the
+  hourly sync and "Sync now" ran for the same Mealie or Tandoor account at the same time, one of
+  them could delete a recipe the other had just imported, so the meal plan lost its link to it,
+  or both tried to add the same recipe and the sync ended with an error, skipping the remaining
+  accounts. Now only one sync runs per account at a time; a second one waits for it and then
+  runs once, with the account's address and token as they are when it starts. An account that
+  is deleted meanwhile is skipped and the other accounts are still synced ("Sync now" answers
+  that the account was not found); an account switched off meanwhile is left out of the sync of
+  all accounts.
+- **A calendar chosen for an event while its changes are being sent is kept.** When several
+  events waited to go out to Google Calendar or a CalDAV server, a calendar picked for one of
+  them while an earlier one was still being sent could be dropped, and the event stayed where it
+  was while the app showed the new calendar. An event could also still be moved to the
+  calendar picked before, even after it had been set back. Now the event goes to the calendar
+  that is chosen when its turn comes, and a later choice is never cleared with an earlier one.
+- **A sync no longer undoes a change made while it runs.** A task or shopping item edited
+  while the CalDAV reminders sync was fetching from the server got the server's old state back,
+  and that old state was then sent to the server; one deleted in that moment came back. The same
+  held for a calendar event deleted during an iCloud or CalDAV sync, and for a CalDAV calendar
+  that was deselected with its events during a sync: its events were read in once more. A sync
+  now asks for each entry whether a local change is waiting at the moment it writes it.
+- **Replacing a calendar attachment no longer undoes a change made in the meantime.** While a
+  new attachment was still uploading (WebDAV or a cloud storage can take seconds), a second save
+  of the same event could change its description, location or end, and the attachment save then
+  wrote the old values back. It now keeps what the event holds when it saves, the occurrences
+  of a series stay in the calendar the series is in, and a new start that the series changed in
+  the meantime no longer allows is refused as before. Every check of the save now runs again
+  against the event as it is when it is saved: an event deleted or made private during the upload
+  answers "not found", one that got a sync target refuses a local calendar, and in every refused
+  case the uploaded file is removed again.
+- **Changing your password twice at the same time keeps one of the two.** Two password
+  changes for the same account that overlapped could both succeed, each signing out the other,
+  and the one that finished last counted. Now the second one gets the same answer as a wrong
+  current password and nobody is signed out by it.
+- **A password reset link works exactly once.** Two requests with the same link that
+  arrived at almost the same time could both set a password, and the one that finished last
+  counted. Now only the first one sets the password; the second gets the same answer as an
+  expired link. An account that is deactivated while the new password is being saved no longer
+  gets it.
+- **Large shopping lists, calendars and task lists change quickly again.** Every change to a
+  searchable entry read the whole search index, so renaming or clearing 4000 shopping items took
+  seconds and a CalDAV sync of a large calendar slowed down with every event; each entry is now
+  found in the index directly (migration 284, the index is rebuilt once on update).
+
+## [2.95.0] - 2026-11-24
+
+### Changed
+- **Every list in a request body has a maximum number of entries.** This is about your own API
+  clients; the app stays below every limit, and the shopping list now clears more than 1000
+  checked items in several requests. A list longer than its limit (for example more than 1000
+  ids in `DELETE /shopping/{listId}/items/checked`, more than 100 assignees, more than 200
+  ingredients) was accepted and worked through entry by entry; it is now a 400 with
+  `reason: validation` and `fields` naming the list and the rule `maxItems`. Each list carries
+  its limit as `maxItems` in the API description; the limits and their reasons are listed under
+  "Limits of lists in a request" in the API section of `docs/SPEC.md`. Because the undo of a
+  transfer to the shopping list sends back everything the transfer added in one request, a
+  transfer of more than 1000 ingredients (a meal-plan import over a long period, a meal or
+  recipe with that many ingredients) is now refused before anything is written, with
+  `reason: kitchen_transfer_too_large`; the import dialog says so in its preview.
+- **A calendar event with an assignee who has no account, or with an unreadable attachment, is
+  refused with 400.** This is about your own API clients; the app sends neither. `POST /calendar`
+  and `PUT /calendar/{id}` with an `assigned_to` id that belongs to no account answered 500 and
+  now answer 400 `An assigned person no longer exists.`, the sentence the occurrence routes
+  already use; `attachment_data` that is no base64 data URL (`xyz`, `data:image/png;base64,???`)
+  answered 500 and now answers 400 `attachment_data must be a base64 data URL.`. Nothing is
+  written in either case.
+- **Every calendar attachment the server cannot take is refused with 400.** This is about your
+  own API clients; the event form checks type and size before it sends. `POST /calendar`,
+  `PUT /calendar/{id}`, `PUT /calendar/{seriesId}/occurrences/{recurrenceId}` and its
+  `/following` answered 500 for an `attachment_data` with a type off the list, without bytes,
+  above the upload limit or with bytes that do not match the type, the two occurrence routes
+  also for text that is no base64 data URL. They now answer 400 with one sentence per case
+  (`attachment_data: this file type is not allowed.`, `attachment_data: the file is empty.`,
+  `attachment_data: the file may be at most 5 MB.`, `attachment_data: the content does not
+  match the declared file type.`, `attachment_data must be a base64 data URL.`), and nothing is
+  written or uploaded.
+- **An empty push `endpoint` is refused by the API description.** This is about your own API
+  clients; the app always sends the endpoint of the browser's subscription. `POST
+  /push/subscribe` and `POST /push/unsubscribe` with `endpoint: ""` still answer 400, now with
+  `reason: validation` and `fields` (`body/endpoint`, `minLength`) instead of their own sentence;
+  `PUT /push/wall-mode` with `endpoint: ""` answered 204 and changed nothing, and is now the same
+  400.
+- **The calendar subscription feeds and the API description download are checked like every
+  other route.** This is about your own scripts; the app sends nothing that is refused now.
+  `?download=` at `/openapi.json` and `/api/v1/openapi.json` takes only `1`: `download=0`,
+  `download=true`, an empty `download=` and the parameter given twice (`download=1&download=1`,
+  `download=1&download=0`) answered the document inline and are now a 400 with
+  `reason: validation`; without the parameter the document is still answered inline, and an
+  account that is not an administrator still gets its 401 or 403 first. The six subscription
+  feeds (`/feed/calendar`, `/birthdays`, `/inventory-deadlines`, `/cycle`, `/schedule`,
+  `/waste`) keep their addresses, their tokens and their answers; only an internal error is now
+  answered as JSON (`{"error":"Internal server error.","code":500}`) instead of the text
+  `Internal error`, and it is logged without the token.
+- **The calendar and the overview check every request against the published API description.**
+  This is about your own API clients; the app sends nothing that is refused now (from this
+  release on the subscription settings send `shared` as `true`/`false`, they sent `1`/`0`).
+  Under `/api/v1/calendar` (events, occurrences, local calendars, the personal feed, holidays,
+  sync targets, ICS subscriptions and the import; the Google, Apple, CalDAV and Outlook routes
+  follow) input that used to be quietly accepted, replaced or answered with a 500 is now refused
+  with a 400:
+  - a path id that is not plain digits: `1abc`, `1.0` and `1e0` reached event or subscription 1,
+    `0x1` and `1.0` local calendar 1 - also to delete it;
+  - a switch that is not `true`/`false`: `all_day` as `1`, `"false"` or `{}` made an all-day
+    event, `countdown` as `1` or text, `shared` of a subscription as `1`, `"x"` or `null` (stored
+    as 1 or 0);
+  - an id that is not a whole number: `local_calendar_id: "1"` or `true`, `assigned_to: "2"`,
+    and assignees `[1.5]` or `[-1]` (a 500) or `[0]`, `[{}]` (dropped silently); a subscription's
+    default assignees or the people of an import as text;
+  - an unknown `visibility` (silently `all`), an `icon` that is not text (`5` became `calendar`),
+    `color: ""` (no colour), `end_datetime: ""`, a start or end `2026-02-30` as a plain date, a
+    `target_*` or attachment field of the wrong type (`attachment_data: 5` was ignored);
+  - a local calendar `color: null` (became the default blue), `sort_order` as text, `null` or
+    `true`, and `PUT /calendar/calendars/{id}` with `{}` (did nothing);
+  - `POST /calendar/import` with both `ics` and `url` (the file won);
+  - query garbage: `/calendar/upcoming?limit=` `abc`, `0`, `-1`, `1.5` or given twice (5, or -1
+    unchecked; a limit above 20 is still cut to 20), `assigned_to=abc` and a `from`/`to` that is
+    no calendar day on `GET /calendar` (an empty list), `from`/`to` of `/calendar/holidays`
+    (month 13 answered an empty list; a missing day was a 400 already), `q` of the search given
+    twice.
+
+  A PUT or PATCH without a body is a 400 (it answered 200 and changed nothing). The check runs
+  before the event, series or subscription is looked up, so a bad request is a 400, not a 404 or
+  the 403 of a child without the right to change others' events; a valid one meets those as
+  before. Two refusals stay in front of it: without write access to the calendar, managing local
+  calendars answers 403 also with a malformed request, and so does an attachment without write
+  access to documents. Lengths, the calendar run of a date-time, the recurrence rule and every
+  refusal with a `reason` the app shows stay with the routes (`calendar_name_invalid`,
+  `calendar_subscription_name_invalid`, `calendar_ics_url_invalid`, `malformed_recurrence_id`,
+  `invalid_recurrence_id` and the others); a body of the wrong type now answers
+  `reason: validation` with the field. `GET /dashboard` keeps its lenient query: every value its
+  description tolerates still answers 200.
+- **The Google, Apple, CalDAV and Outlook settings routes check every request against the
+  published API description, and an unknown account answers 404.** This is about your own API
+  clients; the settings pages send nothing that is refused now. Under
+  `/api/v1/calendar/google`, `/apple`, `/caldav`, `/outlook` and `/external-calendars` input
+  that used to be quietly accepted or answered with a 500 is now refused with a 400:
+  - a switch that is not `true`/`false`: `enabled: "false"` or `{}` switched a CalDAV calendar
+    or reminder list ON, `0` or `null` off (the Google and Outlook switches and `readonly` were
+    refused already, now with `reason: validation`);
+  - a path id that is not plain digits: `PUT /caldav/accounts/1abc` changed account 1,
+    `DELETE /caldav/accounts/1abc` and `DELETE /outlook/accounts/1.0` deleted it;
+  - a value of the wrong type: `name: 5` was stored as the name of a CalDAV account,
+    `targetModule: "x"` of a reminder list and `calendarUrl: 5` answered 500, `ownerUserId` of
+    an Outlook account as text or `""` (use `null` to clear it), people as text or `0`, an
+    `expected_token` that is not 64 hex digits, a `source` other than `google`, `apple` or
+    `caldav`;
+  - `deleteEvents` and `refresh` in the query other than `true` or `false` (only `true` counted,
+    anything else meant false);
+  - `PUT /caldav/accounts/{id}` and `PUT /outlook/accounts/{id}` without a body.
+
+  A CalDAV or Outlook account in the path that does not exist now answers 404 with
+  `reason: caldav_account_not_found` or `outlook_account_not_found`. It answered 500
+  (`"Failed to delete CalDAV account."` and the like) or, for CalDAV, 502 with
+  `remote_failed` and `"The CalDAV server refused the request or could not be reached."` -
+  although no server was asked. Admin rights are checked first (a member gets 403 also with a
+  malformed request), then the request, then the account (a malformed request to an unknown
+  account is a 400). The OAuth callbacks take whatever query Google or Microsoft send and still
+  lead back to the settings. The refusals with a `reason` the app shows (`apple_url_invalid`,
+  `password_required`, the default assignees) and the checks of length and blank values stay
+  with the routes; a body of the wrong type now answers `reason: validation` with the field.
+- **The tasks check every request against the published API description.** This is about
+  your own API clients; the app sends nothing that is refused now. The description itself is
+  corrected where it refused what the app sends: the switches `is_recurring`,
+  `recurrence_from_completion`, `countdown` and `locked` take `true`/`false` and `1`/`0`,
+  `points` takes any number and is still cut to 0-10000, `priority` and `category` take `""`
+  (not given), and the filters `status`, `priority`, `assigned_to` and `category` of
+  `GET /tasks` may be repeated (`?status=open&status=done`), as the app sends them; an unknown
+  status or priority there is still a filter without a hit. Under `/api/v1/tasks` input that used
+  to be quietly accepted or replaced is now refused with a 400:
+  - a path id that is not plain digits: `DELETE /tasks/1.0`, `1e0` or ` 1` deleted task 1, and
+    the same reached it on every other task route, the comment id included;
+  - a switch that is neither `true`/`false` nor `1`/`0`: `"false"`, `5` or `{}` counted as on,
+    `null` on an update as off;
+  - `points` as text, `true` or `""` (read as 5, 1 or 0), an unknown `visibility` (silently
+    `all` or the stored one), `""` as `start_date`, `due_date`, `due_time` (stored as no date)
+    or as `status` of a new task (became `open`);
+  - an id that is not a whole number of at least 1: `assigned_to` as `"2"`, `true`, `"abc"`,
+    `[0]` or twice the same person, `done_by_user_id: true` (named user 1), `ids` of the bulk
+    actions and `rotation_pool` as text, `parent_task_id: "1"` or `-1` (a 404);
+  - a text field that is not text: `comment: 5` and a category `name: 5` were stored as "5", a
+    tag `name: 5` or `["x"]` became a tag, a tag `[5]` in `tags`;
+  - `PATCH /tasks/categories/reorder` without a list of keys (answered 200 and did nothing),
+    `PATCH /tasks/{id}/archive` with `archived: 0` or `null`, `POST /tasks/points/rebase` with
+    `to: null`, `""` or `true` (set every task on the old default to 0 points);
+  - query garbage: `limit` of `/tasks/completions` outside 1-200 or `/tasks/{id}/completions`
+    outside 1-100 (cut silently), `user_id=abc`, `before_id=x`, `assigned_to=abc` (ignored), a
+    query value given twice where it is not repeatable;
+  - a PUT or POST without a body (`PUT /tasks/{id}` answered 200 and changed nothing; only
+    `PATCH /tasks/{id}/archive` still archives without one).
+
+  These answered 500 and are now a 400: `parent_task_id: 0` or `true`, `sync_target: 5`,
+  `status: null` or `""` on `PUT /tasks/{id}`, `/tasks/completions?limit=1.5` and
+  `order: [5, {}]` on the category order. An assignee id without an account (`assigned_to: [999]`)
+  also answered 500; it is now the 400 of a non-member ("Only household members can be chosen
+  here - user 999 is not a household member."). The check runs before the task, the comment, the
+  category or the tag is looked up, so a bad request is a 400, not a 404 or the 403 of a locked
+  task or of someone else's comment; a valid one meets those as before. Two refusals stay in
+  front of it: the default-points preview and rebase answer a member 403 `admin_required`, and
+  the hand order answers 403 `reorder_not_allowed` without the right to change it, also with a
+  malformed request. Leaving out `document_ids` on `PUT /tasks/{id}/documents` still removes
+  every visible link, as the description now says. The refusals with a `reason` and the checks of
+  length, blank values, categories and the recurrence rule stay with the routes; a body of the
+  wrong type now answers `reason: validation` with the field.
+- **The preferences and the push routes check every request against the published API
+  description.** This is about your own API clients; the app sends nothing that is refused now.
+  The description itself is corrected where it refused what it promised: `lang` of
+  `/preferences/holidays/subdivisions/{countryCode}` takes any text again, an unsupported code
+  answers in English. Under `/api/v1/preferences` and `/api/v1/push` input that used to be
+  quietly accepted or replaced is now refused with a 400:
+  - `PUT /preferences` without a body or with a list instead of an object (answered 200 and
+    changed nothing);
+  - a push subscription whose `keys.p256dh` or `keys.auth` is not text or empty (`p256dh: 5` was
+    stored), or whose `endpoint` is longer than 2048 characters;
+  - `POST /push/unsubscribe` with an `endpoint` that is not text (`5` answered 204 and did
+    nothing), `POST /push/test` with a `title`, `body` or `endpoint` that is not text (sent the
+    default text instead);
+  - `lang` of the holiday regions given twice (answered in English).
+
+  `POST /push/unsubscribe` with an object as `endpoint` answered 500 and is now a 400.
+  Malformed input that was refused already (a push subscription without keys, `endpoint: 5`, a
+  wall pause without a boolean `active`, a country code `de` or a region code `x` on the holiday
+  lists) is still a 400, now with `reason: validation` and the field instead of the route's own
+  sentence. The settings registry keeps checking `PUT /preferences` field by field: the
+  description checks only that the body is an object, so a member sending an admin field still
+  gets 403 `admin_required`, also for an invalid value, every field keeps its own 400 sentence,
+  and unknown keys are still ignored. The check that a push endpoint is a public https address
+  stays with the route. `POST /push/test` still takes no body.
+- **Sign-in, setup, the session and your own account check every request against the published
+  API description.** This is about your own API clients; the app, the iOS app and the YunoHost
+  package send nothing that is refused now. The description itself is corrected where it
+  refused the app: the password change (`PATCH /auth/me/password`) is documented with the
+  `current_password` and `new_password` the settings page sends (it said `currentPassword`),
+  the profile with the phone, email and birthday fields the page sends, and accepting an
+  invitation no longer requires a password where password sign-in is turned off. Under
+  `/api/v1/auth` (sign-in, setup, password reset, invitation preview and accept, second factor,
+  signed-in devices and pairing, profile, own password, Gravatar, the changelog mark) input that
+  used to be quietly accepted or read as something else is now refused with a 400:
+  - a sign-in whose `username` or `password` is a list, a number or an object (a list with one
+    known username signed in);
+  - a password that is not text or longer than 1024 characters at setup, reset, accepting an
+    invitation and changing your own password (a number was stored as the password; a password
+    over 1024 characters could be set but never typed at the sign-in);
+  - a username longer than 64 characters at the sign-in;
+  - a reset or invitation token or a second-factor code that is not text (a number was checked
+    as text);
+  - `GET /auth/invites/preview` without `token` or with it twice (answered `valid: false`),
+    `POST /auth/forgot-password` and `/auth/reset-password/check` with an `identifier` or
+    `token` that is not text (answered 200);
+  - a profile `display_name`, `phone` or `email` that is not text (`5` was stored as `"5"`), an
+    `avatar_color` that is empty, `null` or not `#RRGGBB` (fell back to blue), an empty
+    `avatar_data`, a `birth_date` that is empty or no calendar date, a `birth_year_unknown` that
+    is not `true` or `false`;
+  - a changelog mark whose `latest` is not text (`5` was stored as `"5"`);
+  - a signed-in device id with decimals such as `1.0` in the path.
+
+  A token that is not text at `POST /auth/reset-password` and `/auth/invites/accept`, and a
+  sign-in or setup whose username is a list or an object, answered 500 and are now a 400.
+  Malformed input that was refused already (a sign-in over 64 or 1024 characters, a
+  second-factor code over 64 characters, a device field or a pairing `server` that is not text,
+  a request without a body) is still a 400, now with `reason: validation` and the field instead
+  of the route's own sentence. The answer depends on the shape of the request only, never on whether an account exists; a 400
+  counts against the sign-in, reset, second-factor and pairing rate limits like any other failed
+  attempt. Two things still come before the shape of the body: once an account exists,
+  `POST /auth/setup` answers 403 (404 in production) whatever is sent, and an API token gets 403
+  at `POST /auth/devices`, `/auth/devices/pair` and `/auth/logout-others` whatever is sent. A
+  missing second-factor code, or one that is not text, is now a 400 before the route says that
+  no sign-in is waiting or that two-factor authentication is off; the shape is public, the 400
+  says nothing about the account. The checks of length after trimming, the username format,
+  the shortest password (counted after Unicode normalization), the time zone, the language, the
+  pairing code and every second factor stay with the routes, with their own sentences and
+  reasons. Unknown fields are still ignored everywhere, at the setup above all.
+- **Account administration checks every request against the published API description.** This
+  is about your own API clients; the settings pages send nothing that is refused now. With this,
+  every route under `/api/v1/auth` does. The description itself is corrected where it fell
+  short of the app: an invitation documents the `permission_preset` the invitation dialog sends,
+  an invitation and a member change may be sent without a body (they answered 201 and 200 that
+  way, the description required one), and `PUT /auth/2fa/require` documents its body. Under
+  `/api/v1/auth` (invitations, the household two-factor requirement and overview, signing a
+  member out of every device, API tokens, member accounts) input that used to be quietly
+  accepted or read as something else is now refused with a 400:
+  - a switch that is not `true`/`false`: `system_admin: "true"` made an administrator at
+    `POST /auth/users` and `POST /auth/invites`, `system_admin` as `null`, `1` or `"x"` at
+    `PATCH /auth/users/{id}` demoted an administrator to member, `sso_only`, `send_email` and
+    `birth_year_unknown` as `1`, `"true"` or `null`; `PUT /auth/2fa/require` with
+    `required: "1"` turned the requirement on, `"true"`, `1`, `null` or `[true]` turned it off;
+  - a text field that is not text: a `display_name`, `name` of an API token, `phone` or `email`
+    of `5` was stored as `"5"`, an object as `"[object Object]"`, a `username` or password as a
+    list or a number was taken as text;
+  - a password longer than 1024 characters at `POST /auth/users` and `PATCH /auth/users/{id}`
+    (it could be set but never typed at the sign-in);
+  - `subject_user_id` of an API token as text, `true` or a list (`"2"` and `[2]` picked account
+    2, `true` account 1), or below 1;
+  - `expires_at` of an API token as a plain date such as `2999-01-01` (the description has
+    always said date and time, as the settings page sends it);
+  - a member's `avatar_color` that is empty, `null` or not `#RRGGBB` (fell back to blue, and
+    `null` answered 500 when creating a member), an empty `avatar_data`, a `birth_date` that is
+    empty or no calendar date, an unknown `permission_preset` or `family_role` (refused already,
+    now with `reason: validation`);
+  - a path id that is not plain digits: `DELETE /auth/users/5abc` deleted account 5,
+    `PATCH /auth/users/1.5` changed account 1, `DELETE /auth/invites/1.0` revoked invitation 1,
+    `DELETE /auth/api-tokens/1.0` revoked token 1; `DELETE /auth/users/abc` answered 404.
+
+  The check runs after the administrator check: anyone else still gets 401 or 403 whatever is
+  sent, and an API token still gets 403 `browser_session_required` at
+  `POST /auth/users/{id}/devices/sign-out` whatever the id. It runs before the account,
+  invitation or token is looked up, so a malformed request is a 400, not the 404 of an unknown
+  member or the 409 of a taken username; a valid one meets those as before. Leaving out
+  `required` at `PUT /auth/2fa/require` still switches the requirement off, as the description now
+  says. The shortest password (counted after Unicode normalization), the username format, the
+  length of names after trimming, the email checks for accounts without a password, the expiry in
+  the future and the known scopes stay with the routes, with their own sentences and reasons.
+  Unknown fields are still ignored.
+- **The budget and the subscriptions answer an unexpected failure with the same sentence as the
+  rest of the API.** Every route under `/api/v1/budget` said `"Internal error"` on such a 500,
+  and the subscription routes a sentence of their own (`"Subscriptions could not be loaded."`,
+  `"Subscription could not be created."` and the like); they now answer
+  `{ "error": "Internal server error.", "code": 500 }`. The status stays 500, and the app shows
+  its own message for it as before. Every other answer is unchanged.
+- **The calendar and the overview answer an unexpected failure with the same sentence as the
+  rest of the API.** The event routes under `/api/v1/calendar` said `"Internal error."` on such a
+  500 (for example with an assignee id that is no user, or an attachment that is no valid file),
+  `GET /calendar/sync-targets` said `"Failed to list sync targets."` and `GET /dashboard`
+  `"Dashboard could not be loaded."`; they now answer
+  `{ "error": "Internal server error.", "code": 500 }`, as the other calendar routes already did.
+  The status stays 500, and the app shows its own message for it as before. Every other answer
+  is unchanged.
+- **The Google, Apple, CalDAV and Outlook settings routes answer an unexpected failure with the
+  same sentence as the rest of the API.** On a server-side failure they said a sentence of their
+  own (`"Failed to update calendar selection."`, `"Failed to update reminder selection."`,
+  `"Failed to update Outlook account."`, `"Failed to fetch calendars."`, `"CalDAV sync failed."`,
+  `"Connecting the Apple calendar failed."`, `"The read-only mode could not be saved."` and the
+  like); they now answer `{ "error": "Internal server error.", "code": 500 }`. Today this is
+  reachable with a CalDAV calendar or reminder list, or an Outlook calendar, that the account does
+  not have, and with an Outlook account change the account refuses (an empty name, an owner who is
+  no user, nothing to change); the settings page shows its own message there as before. The
+  status stays 500. Where a server-side failure hit connecting a CalDAV or Apple account, an Apple
+  sync or refreshing the CalDAV calendars or reminder lists, the page framed the server's sentence
+  ("Connection failed: Failed to fetch calendars."); it now shows its general error message, as
+  for every other 500. A refusal of the foreign server keeps its class ("Connection failed: HTTP
+  401"). Every other answer is unchanged.
+- **The tasks answer an unexpected failure with the same sentence as the rest of the API.**
+  `GET /tasks/sync-targets` said `"Failed to list sync targets."` on a server-side failure; it
+  now answers `{ "error": "Internal server error.", "code": 500 }`, as every other task route
+  already did. The status stays 500. The task dialog still falls back to "local only" and the
+  task settings show their own message there, as before. Every other answer is unchanged.
+- **Push notifications answer an unexpected failure with the same sentence as the rest of the
+  API.** The routes under `/api/v1/push` (public key, subscribe, unsubscribe, wall pause, test
+  push) said `"Internal error."` on a server-side failure; they now answer
+  `{ "error": "Internal server error.", "code": 500 }`. The status stays 500. The notification
+  settings still show their own message when switching push on or off or sending a test push
+  fails, as before. Every other answer of the push and preferences routes is unchanged.
+- **Signing out and starting the SSO sign-in answer an unexpected failure with the same sentence
+  as the rest of the API.** `POST /auth/logout` said `"Logout failed."` when the session could not
+  be ended, `GET /auth/oidc/start` and `POST /auth/oidc/link/start` said
+  `"OIDC initialization failed."` when the identity provider could not be reached or the start
+  failed otherwise; they now answer `{ "error": "Internal server error.", "code": 500 }`. The
+  status stays 500, and the server log still names the provider's error at the SSO start. The app
+  signs out locally and goes to the sign-in page as before, and the account settings show their
+  own message when linking SSO fails; the SSO button of the sign-in page opens the start address
+  directly, so a browser shows the new sentence there. Every other answer of the sign-in, session
+  and own-account routes is unchanged.
+- **Setting the default assignees of a synced calendar takes the people.** This is about your
+  own API clients; the app sends them already. `PATCH /calendar/external-calendars` without
+  `default_assignee_user_ids` and without `default_assignee_user_id` emptied the calendar's default
+  assignees, so every event the sync brought in afterwards arrived unassigned. One of the two is
+  required now (a 400 with `reason: "validation"`, before the 404 of an unknown calendar);
+  `default_assignee_user_ids: []` or `default_assignee_user_id: null` still clears the set.
+- **Setting the documents of a task takes the list.** This is about your own API clients; the app
+  sends it already. `PUT /tasks/{id}/documents` without `document_ids` removed every document
+  link of the task the caller could see, with a 200 and no message. `document_ids` is required
+  now (a 400 with `reason: "validation"`, before the 404 of an unknown task and the 403 of a
+  locked one); `document_ids: []` still removes the links.
+- **Signing out a device by a negative id answers 404.** This is about your own API clients; the
+  app signs out only devices from its list. `DELETE /auth/devices/-1` and `/auth/devices/-0`
+  answered 400 `"Invalid device ID."`; like `0` and an id that is no device of yours they now
+  answer 404 `"Device not found."`. A path id that is not plain digits stays a 400.
+- **Setting the household two-factor requirement takes the switch.** This is about your own API
+  clients; the settings page always sends it. `PUT /auth/2fa/require` requires `required`: a
+  request without it used to switch the household's two-factor requirement off, now it is a 400
+  with `reason: "validation"` and nothing changes. The check still runs after the administrator
+  and CSRF checks.
+- **The MCP tool `call_api_operation` names the refused fields.** When the API refuses a request
+  for its content, the tool's error now ends with the path and rule of each refused field, for
+  example `[fields: type at body/title]` - at most ten, then "and N more". Values are never
+  named. Errors without such fields read as before.
+
+### Removed
+- **`role: "admin"` no longer makes an administrator at `POST /auth/users`.** This is about your
+  own API clients; the settings page sends `system_admin`. Next to `system_admin: true` an
+  undocumented `role: "admin"` created an administrator too. `role` is now an unknown field like
+  any other and is ignored: without `system_admin: true` the new account is a member.
+
+### Fixed
+- **Very long id lists no longer fail with an internal error.** A list of more than 32 765 ids
+  in one request, such as `DELETE /shopping/{listId}/items/checked` with `{ ids }`, answered 500
+  because SQLite takes at most 32 766 values per statement; the server now hands every such list
+  to the database as one value. A synced address book entry with that many phone numbers,
+  e-mail addresses or postal addresses is stored as well. Lists in a request body now have a
+  much lower limit of their own (see "Every list in a request body has a maximum number of
+  entries" above), so such a request is answered 400.
+- **Tasks: `updated_at` moves again when a task is actually changed.** Every database from
+  migration v4 on had silently lost the trigger that keeps `tasks.updated_at` current: the table
+  rebuilds (v4, v25, v114) dropped the table together with its triggers, and the last rebuild
+  re-created the search triggers but missed this one. Editing a task kept `updated_at` frozen at
+  the creation time, while calendar events advanced correctly. A new migration restores the
+  trigger; existing values stay as they are, only further updates advance the timestamp.
+- **A member whose stored colour is not `#RRGGBB` can change their profile again.** A colour
+  stored before the colour rule (an older installation, an import, a hand edit of the database)
+  such as `red` turned every change of the profile (`PATCH /auth/me/profile`) and every change an
+  administrator made to that member (`PATCH /auth/users/{id}`), the name included, into a 400
+  `"avatar_color must be a valid HEX color (#RRGGBB)."`, whatever the request said. Only a colour
+  that is sent is checked now, and it still has to be `#RRGGBB`; the stored one stays until it is
+  replaced.
+- **Refreshing the calendars of an Outlook account answers an expired sign-in with 409
+  `outlook_reauth_required` and a refusal of Microsoft with 502 and its class, instead of a 500.**
+
+### Security
+- **Passwords are hashed with Argon2id, and a password over 72 bytes counts in full.** New and
+  changed passwords are stored as Argon2id (RFC 9106) with the parameters of the OWASP Password
+  Storage Cheat Sheet: 19 MiB of memory (m=19456 KiB), 2 passes, parallelism 1, a 16-byte salt
+  and a 32-byte hash. It comes with Node itself (`node:crypto`), no new dependency. bcrypt read
+  only the first 72 bytes of a password: two passwords that differed only after that (after 18
+  emoji, or 72 Latin letters) were the same password. Existing bcrypt hashes stay valid and are
+  replaced by an Argon2id hash on the next successful sign-in; nobody has to reset a password.
+  A failed sign-in takes as long for an unknown account as for one with an old or a new hash, so
+  the response time does not tell which accounts exist.
+  **After this version you cannot go back to an older one without every account that has signed
+  in, been created or set a password since having to reset its password**: older versions do not
+  know Argon2id and refuse those sign-ins.
+- **A request with broken JSON no longer writes part of its body into the server log.** The
+  log line of such a 400 quoted the parser's message, and that message quotes a slice of the
+  body: at `POST /auth/login` that could be part of the password. The log now names only the
+  kind of error. The response is unchanged.
 
 ## [2.94.0] - 2026-11-22
 

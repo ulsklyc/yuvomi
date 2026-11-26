@@ -17,7 +17,8 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import { str, MAX_SHORT } from '../../middleware/validate.js';
+import { withTx } from '../../db/tx.ts';
+import { str, MAX_SHORT } from '../../api/formats.ts';
 import { validateRequest } from '../../api/validate-request.ts';
 
 const router = express.Router();
@@ -123,7 +124,7 @@ router.patch('/reorder', validateRequest(), (req, res) => {
   // Eine nicht leere Liste von Ids (ganze Zahl oder Ziffern-Text) prueft das Schema.
   const { order } = req.body;
   const update = db.get().prepare('UPDATE inventory_locations SET sort_order = ? WHERE id = ? AND parent_id IS NULL');
-  db.get().transaction(() => { order.forEach((id, i) => update.run(i, id)); })();
+  withTx(db.get(), () => { order.forEach((id, i) => update.run(i, id)); });
   res.json({ data: loadTree() });
 });
 
@@ -204,9 +205,9 @@ router.patch('/:parentId/subcategories/reorder', validateRequest(), (req, res) =
   // Eine Liste von Ids prueft das Schema; `[]` aendert nichts.
   const { order } = req.body;
   const update = db.get().prepare('UPDATE inventory_locations SET sort_order = ? WHERE id = ? AND parent_id = ?');
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     order.forEach((id, i) => update.run(i, id, req.params.parentId));
-  })();
+  });
   res.json({ data: true });
 });
 

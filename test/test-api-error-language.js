@@ -172,23 +172,25 @@ test('der Leser findet die Saetze ueberhaupt', () => {
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const holidays = await import('../server/services/holidays.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
+const { createPreferencesApp } = await import('./preferences-app.js');
 
 const ADMIN = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('admin','Admin','x','admin')").run().lastInsertRowid;
 const MEMBER = db.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('member','Member','x','member')").run().lastInsertRowid;
 
 const actor = { userId: ADMIN, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.userId;
-  req.authRole = actor.role;
-  req.session = { userId: actor.userId };
-  next();
+// The preferences at their real prefix (#2810, test/preferences-app.js): call()
+// reads `/preferences...` under `/api/v1`.
+const app = await createPreferencesApp({
+  mount: ['preferences'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.userId;
+    req.authRole = actor.role;
+    req.session = { userId: actor.userId };
+    next();
+  },
 });
-app.use('/preferences', preferencesRouter);
 const server = app.listen(0, '127.0.0.1');
-const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
+const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}/api/v1`)));
 test.after(() => { server.close(); holidays.__setFetchImpl(null); });
 
 async function call(method, route, body, { userId = ADMIN, role = 'admin' } = {}) {
@@ -296,19 +298,22 @@ test('keine Absage der Preferences-Routen traegt deutschen Wortlaut', async () =
 });
 
 test('keine Absage der Kalender-Konten (Google, Outlook) traegt deutschen Wortlaut', async () => {
-  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const { movedCandidatesLimit } = await import('../server/services/sync-assignment.js');
-  const calApp = express();
-  calApp.use(express.json({ limit: '10mb' }));
-  calApp.use((req, _res, next) => {
-    req.authUserId = ADMIN;
-    req.authRole = 'admin';
-    req.session = { userId: ADMIN, role: 'admin' };
-    next();
+  // createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody
+  // und der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+  const calApp = await createCalendarApp({
+    mount: ['calendar'],
+    jsonLimit: '10mb',
+    auth: (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    },
   });
-  calApp.use('/calendar', calendarRouter);
   const calServer = calApp.listen(0, '127.0.0.1');
-  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body) => {
@@ -328,8 +333,8 @@ test('keine Absage der Kalender-Konten (Google, Outlook) traegt deutschen Wortla
     await run('google-calendar-id', 'PATCH', '/calendar/google/calendars', {});
     await run('google-enabled', 'PATCH', '/calendar/google/calendars', { calendarId: 'c', enabled: 'yes' });
     await run('google-readonly', 'PUT', '/calendar/google/readonly', { readonly: 'yes' });
-    await run('ext-source', 'PATCH', ext, { ...ok, source: 'nope' });
-    await run('ext-id', 'PATCH', ext, { ...ok, external_id: ' ' });
+    await run('ext-source', 'PATCH', ext, { ...ok, source: 'nope', default_assignee_user_ids: [] });
+    await run('ext-id', 'PATCH', ext, { ...ok, external_id: ' ', default_assignee_user_ids: [] });
     await run('ext-assignee', 'PATCH', ext, { ...ok, default_assignee_user_id: 'abc' });
     await run('ext-assignee-unknown', 'PATCH', ext, { ...ok, default_assignee_user_id: 987654 });
     await run('ext-not-synced', 'PATCH', ext, { ...ok, default_assignee_user_id: null });
@@ -709,19 +714,21 @@ test('keine Absage der Gesundheit traegt deutschen Wortlaut', async () => {
 });
 
 test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt deutschen Wortlaut', async () => {
-  const { default: calendarRouter } = await import('../server/routes/calendar.js');
+  const { createCalendarApp } = await import('./calendar-app.js');
   const who = { userId: ADMIN, role: 'admin' };
-  const calApp = express();
-  calApp.use(express.json());
-  calApp.use((req, _res, next) => {
-    req.authUserId = who.userId;
-    req.authRole = who.role;
-    req.session = { userId: who.userId, role: who.role };
-    next();
+  // createCalendarApp (test/calendar-app.js): echter Praefix, defaultEmptyBody
+  // und der zentrale Fehlerhandler, wie validateRequest() sie braucht (#2810).
+  const calApp = await createCalendarApp({
+    mount: ['calendar'],
+    auth: (req, _res, next) => {
+      req.authUserId = who.userId;
+      req.authRole = who.role;
+      req.session = { userId: who.userId, role: who.role };
+      next();
+    },
   });
-  calApp.use('/calendar', calendarRouter);
   const calServer = calApp.listen(0, '127.0.0.1');
-  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}`)));
+  const calUrl = await new Promise((r) => calServer.on('listening', () => r(`http://127.0.0.1:${calServer.address().port}/api/v1`)));
   try {
     const seen = [];
     const run = async (label, method, route, body, as = { userId: ADMIN, role: 'admin' }) => {
@@ -774,26 +781,25 @@ test('keine Absage der Kalender-Abos, Apple-Anbindung und Kalenderziele traegt d
 
 test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortlaut', async () => {
   const { default: shoppingRouter } = await import('../server/routes/shopping.js');
-  const { default: tasksRouter } = await import('../server/routes/tasks.js');
+  const { createTasksApp } = await import('./tasks-app.js');
   const { default: pushRouter } = await import('../server/routes/push.js');
   const { buildRouter: buildWeatherRouter } = await import('../server/routes/weather.js');
-  const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
-  const gApp = express();
-  gApp.use(express.json());
-  gApp.use(defaultEmptyBody);
-  gApp.use((req, _res, next) => {
-    req.authUserId = ADMIN;
-    req.authRole = 'admin';
-    req.session = { userId: ADMIN, role: 'admin' };
-    next();
+  // The tasks, the shopping list and push at their real prefixes (#2810,
+  // test/tasks-app.js): call() maps `/tasks...`, `/shopping...` and `/push...` there.
+  const gApp = await createTasksApp({
+    auth: (req, _res, next) => {
+      req.authUserId = ADMIN;
+      req.authRole = 'admin';
+      req.session = { userId: ADMIN, role: 'admin' };
+      next();
+    },
+    after: [
+      ['/api/v1/shopping', shoppingRouter],
+      ['/api/v1/push', pushRouter],
+      // The weather router at its real prefix, with the central error handler (#2810).
+      ['/api/v1/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) })],
+    ],
   });
-  // The shopping list at its real prefix (#2810): call() maps `/shopping...` there.
-  gApp.use('/api/v1/shopping', shoppingRouter);
-  gApp.use('/tasks', tasksRouter);
-  gApp.use('/push', pushRouter);
-  // The weather router at its real prefix, with the central error handler (#2810).
-  gApp.use('/api/v1/weather', buildWeatherRouter({ fetchFn: async () => ({ ok: false, status: 404 }) }));
-  gApp.use(createErrorHandler({ warn: () => {}, error: () => {} }));
   const gServer = gApp.listen(0, '127.0.0.1');
   const gUrl = await new Promise((r) => gServer.on('listening', () => r(`http://127.0.0.1:${gServer.address().port}`)));
   try {
@@ -802,7 +808,7 @@ test('keine Absage von Einkauf, Aufgaben, Push und Wetter traegt deutschen Wortl
       const headers = {};
       let payload;
       if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
-      const url = /^\/shopping(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
+      const url = /^\/(shopping|tasks|push)(\/|\?|$)/.test(route) ? `/api/v1${route}` : route;
       const res = await fetch(`${gUrl}${url}`, { method, headers, body: payload });
       let json = null;
       try { json = JSON.parse(await res.text()); } catch { /* kein JSON */ }

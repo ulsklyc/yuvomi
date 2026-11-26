@@ -6,7 +6,8 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import * as v from '../../middleware/validate.js';
+import { withTx } from '../../db/tx.ts';
+import * as v from '../../api/formats.ts';
 import { defaultVisibilityFor } from './visibility-defaults.js';
 import {
   MAX_UNIT,
@@ -125,7 +126,7 @@ router.post('/labs', validateRequest(), (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const tx = db.get().transaction(() => {
+  const reportId = withTx(db.get(), () => {
     const rep = insertReport.run(owner.ownerId, reportDate.value, labName.value, note.value,
       b.visibility || defaultVisibilityFor(db.get(), owner.ownerId, 'labs'));
     const reportId = rep.lastInsertRowid;
@@ -134,7 +135,6 @@ router.post('/labs', validateRequest(), (req, res) => {
     }
     return reportId;
   });
-  const reportId = tx();
 
   const report = attachResults(db.get().prepare('SELECT * FROM health_lab_reports WHERE id = ?').get(reportId));
   res.status(201).json({ data: report });

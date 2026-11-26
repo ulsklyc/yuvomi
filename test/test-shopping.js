@@ -4,11 +4,10 @@
  * Ausführen: node test-shopping.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import { eachRule } from './css-rules.js';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
-import { url } from '../server/middleware/validate.js';
+import { openSchemaDb } from './helpers/schema-db.js';
+import { url } from '../server/api/formats.ts';
 import { aggregateMealIngredients, parseQuantity } from '../server/services/shopping-import.js';
 
 let passed = 0;
@@ -20,14 +19,7 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[1]);
-db.exec(MIGRATIONS_SQL[44]); // FTS5 search_index + Item-Trigger (indiziert notes)
+const db = openSchemaDb();
 
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
   VALUES ('admin', 'Admin', 'x', 'admin')`).run();
@@ -692,7 +684,7 @@ test('Detail-Refresh aktualisiert die Zeile, ohne das .shopping-item zu ersetzen
 // --------------------------------------------------------
 test('shopping-Route validiert und persistiert notes/url', () => {
   const source = readFileSync(new URL('../server/routes/shopping.js', import.meta.url), 'utf8');
-  assert(/import\s*\{[^}]*\burl\b[^}]*\}\s*from\s*'\.\.\/middleware\/validate\.js'/.test(source), 'Route muss den url()-Validator importieren');
+  assert(/import\s*\{[^}]*\burl\b[^}]*\}\s*from\s*'\.\.\/api\/formats\.ts'/.test(source), 'Route muss den url()-Validator importieren');
   assert(/url\(req\.body\.url,\s*'URL'\)/.test(source), 'POST muss req.body.url über url() validieren');
   assert(/INSERT INTO shopping_items \(list_id, name, quantity, category, notes, url\)/.test(source), 'INSERT muss notes/url enthalten');
   assert(/SET is_checked = \?, name = \?, quantity = \?, category = \?, notes = \?, url = \?/.test(source), 'UPDATE muss notes/url enthalten');

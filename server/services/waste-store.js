@@ -9,13 +9,15 @@
 
 import crypto from 'node:crypto';
 import { todayKey, shiftDateKey, householdTimeZone } from '../utils/timezone.js';
-import { str } from '../middleware/validate.js';
+import { str } from '../api/formats.ts';
 import { SOURCE_NAME_MAX, MAPPING_PROFILE_VERSION } from './waste-fields.js';
 import {
   validateType, validateOneOff, scheduleRecurrenceProblems, overrideProblems, validateRange,
   resolveOccurrences, nextPerType, expandSchedule, WEEKDAY_CODES, OCCURRENCE_RANGE_MAX_DAYS,
 } from './waste-domain.js';
 import { buildImportPreview, computeDigest, WasteImportError } from './waste-import.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 
 export class WasteValidationError extends Error {
   /**
@@ -167,7 +169,7 @@ export function deleteType(d, id) {
     throw new WasteConflictError('Waste type has schedules, pickups, or imported data and cannot be deleted; archive it instead.', 'waste_type_in_use');
   }
 
-  d.transaction(() => {
+  withTx(d, () => {
     // waste_reminder_entries cascades from waste_types (ON DELETE CASCADE),
     // but reminders.entity_id carries no real foreign key onto it (the same
     // polymorphic pattern every entity_type uses) - so the cascade silently
@@ -177,12 +179,13 @@ export function deleteType(d, id) {
     // dropAllForUser() already cleans up per-user.
     const anchorIds = d.prepare('SELECT id FROM waste_reminder_entries WHERE type_id = ?').all(id).map((r) => r.id);
     if (anchorIds.length) {
-      d.prepare(`DELETE FROM reminders WHERE entity_type = 'waste_pickup' AND entity_id IN (${anchorIds.map(() => '?').join(',')})`)
-        .run(...anchorIds);
+      const anchorIdList = sqlInList(anchorIds);
+      d.prepare(`DELETE FROM reminders WHERE entity_type = 'waste_pickup' AND entity_id IN (${anchorIdList.sql})`)
+        .run(anchorIdList.param);
     }
     pruneFeedTypeSelections(d, id);
     d.prepare('DELETE FROM waste_types WHERE id = ?').run(id);
-  })();
+  });
 }
 
 // -------------------------------------------------------------------------
@@ -286,10 +289,10 @@ export function listOverrides(d, scheduleId) {
 function loadOverridesBySchedule(d, scheduleIds) {
   const map = new Map();
   if (!scheduleIds.length) return map;
-  const placeholders = scheduleIds.map(() => '?').join(',');
+  const scheduleIdList = sqlInList(scheduleIds);
   const rows = d.prepare(
-    `SELECT * FROM waste_schedule_overrides WHERE schedule_id IN (${placeholders})`
-  ).all(...scheduleIds);
+    `SELECT * FROM waste_schedule_overrides WHERE schedule_id IN (${scheduleIdList.sql})`
+  ).all(scheduleIdList.param);
   for (const row of rows) {
     if (!map.has(row.schedule_id)) map.set(row.schedule_id, []);
     map.get(row.schedule_id).push(row);
@@ -696,7 +699,7 @@ export function updateMapping(d, sourceId, mappingId, body = {}) {
       }
     }
   }
-  d.transaction(() => setMappingTypes(d, mappingId, body.ignored ? [] : ids))();
+  withTx(d, () => setMappingTypes(d, mappingId, body.ignored ? [] : ids));
   return getMapping(d, mappingId);
 }
 
@@ -832,7 +835,7 @@ export function commitImport(d, {
     existingTypeIdsByLabel.set(label.normalized_label, ids);
   }
 
-  return d.transaction(() => {
+  return withTx(d, () => {
     // normalized_label -> the label's types, ascending (a label may name several bins, #2273).
     const resolvedTypeIdsByLabel = new Map();
     // Two labels that both say "create a new type" with the same name (after
@@ -1043,7 +1046,7 @@ export function commitImport(d, {
     }
 
     return { source: getSource(d, resolvedSourceId), diff: { added, changed, removed, coalesced } };
-  })();
+  });
 }
 
 // -------------------------------------------------------------------------
@@ -1232,7 +1235,7 @@ export function commitMappingProfileImport(d, sourceId, profile, profileDigest) 
     throw new WasteConflictError('The mapping profile changed since it was last previewed; preview it again before committing.', 'waste_profile_changed');
   }
   const preview = previewMappingProfileImport(d, sourceId, profile);
-  const applied = d.transaction(() => {
+  const applied = withTx(d, () => {
     // All applicable entries of one label together are its new type set.
     const typeIdsByMapping = new Map();
     for (const entry of preview.entries) {
@@ -1244,6 +1247,6 @@ export function commitMappingProfileImport(d, sourceId, profile, profileDigest) 
       setMappingTypes(d, mappingId, [...typeIds].sort((a, b) => a - b));
     }
     return preview.entries.filter((e) => e.status === 'applicable').length;
-  })();
+  });
   return { applied_count: applied, entries: preview.entries };
 }

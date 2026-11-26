@@ -5312,10 +5312,14 @@ test('jeder Ein-Tipp-Transfer in eine fremde Liste ist rücknehmbar', () => {
   // Einkaufsartikel löscht, lässt die Zutaten für immer als „schon übertragen"
   // zurück - weder auf der Liste noch erneut übertragbar.
   const shoppingRoute = read('../server/routes/shopping.js');
-  const undoBlock = shoppingRoute.slice(shoppingRoute.indexOf("router.post('/items/undo-transfer'"));
+  // Nur die Undo-Route selbst: bis zum naechsten `router.` danach, sonst treffen
+  // die Pruefungen unten auch spaetere Routen der Datei.
+  const undoStart = shoppingRoute.indexOf("router.post('/items/undo-transfer'");
+  const undoEnd = shoppingRoute.indexOf('router.', undoStart + 1);
+  const undoBlock = shoppingRoute.slice(undoStart, undoEnd === -1 ? undefined : undoEnd);
   assert.match(undoBlock, /UPDATE meal_ingredients SET on_shopping_list = 0/,
     'das Undo muss das Zutaten-Flag mit zurücknehmen');
-  assert.match(undoBlock, /db\.get\(\)\.transaction\(/,
+  assert.match(undoBlock, /withTx\(db\.get\(\),/,
     'die Rücknahme ist eine Handlung und gehört in eine Transaktion');
 
   // Seitenbestand: jeder Transfer meldet über den geteilten Baustein - damit
@@ -11604,27 +11608,20 @@ test('split activity feed translates every type the backend writes', () => {
     'server/services/split-expenses-scheduler.js': read('../server/services/split-expenses-scheduler.js'),
     'scripts/seed-demo.js': read('../scripts/seed-demo.js'),
     // Migrationen, die selbst in expense_activity schreiben (v226:
-    // 'ledger_restored'). Gelesen wird jeder MIGRATIONS-Eintrag, der
+    // 'ledger_restored'). Gelesen wird jede Migrationsdatei, die
     // `INSERT INTO expense_activity` enthaelt - nicht die ganze db.js: dort
     // stehen Listen wie IN ('expense', 'expense_reversal', ...) oder
-    // ('admin', 'member'), die das Regex als Typen laese.
+    // ('admin', 'member'), die das Regex als Typen laese. Welche Dateien
+    // Migrationen sind, sagt server/migrations/index.ts (die Laufliste).
     ...(() => {
-      const db = read('../server/db.js');
-      const start = db.indexOf('const MIGRATIONS = [');
-      assert.ok(start !== -1, 'const MIGRATIONS = [ in server/db.js nicht gefunden');
-      const end = db.indexOf('\n];', start);
-      assert.ok(end !== -1, 'Ende von MIGRATIONS in server/db.js nicht gefunden');
-      const block = db.slice(start, end);
-      const entries = block.split(/\n  \{\n    version: /).slice(1);
-      // Jeder `version:`-Schluessel muss als eigener Eintrag zerlegt sein - ein
-      // anders formatierter Eintrag klebte sonst am Vorgaenger und fiele mit
-      // seinem Aktivitaetstyp still durch.
-      const versionKeys = (block.match(/\bversion:\s*\d+/g) || []).length;
-      assert.equal(entries.length, versionKeys, `MIGRATIONS-Zerlegung: ${entries.length} Eintraege, aber ${versionKeys} version-Schluessel`);
+      const index = read('../server/migrations/index.ts');
+      const files = [...index.matchAll(/^import m\d{4} from '\.\/(\d{4}\.ts)';$/gm)].map((m) => m[1]);
+      assert.ok(files.length >= 284, `server/migrations/index.ts nennt nur ${files.length} Migrationen - Leser passt nicht mehr`);
       const writers = {};
-      for (const entry of entries) {
+      for (const file of files) {
+        const entry = read(`../server/migrations/${file}`);
         if (!entry.includes('INSERT INTO expense_activity')) continue;
-        writers[`server/db.js (v${entry.match(/^\d+/)[0]})`] = entry;
+        writers[`server/migrations/${file}`] = entry;
       }
       assert.ok(Object.keys(writers).length >= 1, 'keine Migration schreibt in expense_activity - Zerlegung von MIGRATIONS passt nicht mehr');
       return writers;

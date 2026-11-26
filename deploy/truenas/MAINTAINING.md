@@ -64,7 +64,7 @@ niemand mehr setzen muss. Hier geändert am 2026-11-04:
 - `db_encryption_key`: nur die **Beschreibung** neu formuliert. Sie sagt jetzt,
   dass der Server bei einer neuen Installation selbst einen Schlüssel erzeugt,
   dass ein leeres Feld auf einer bereits verschlüsselten Datenbank *keinen*
-  neuen erzeugt (der Start wird abgewiesen, `server/db.js:647-660`), und sie
+  neuen erzeugt (der Start wird abgewiesen, `assertKeyForEncryptedDatabase()` in `server/db.js`), und sie
   verweist für `DB_ENCRYPTION_AUTO_KEY=false` auf *Additional Environment
   Variables* statt auf ein Feld „below", das es im Formular nie gab. Label,
   Name, Pfad und Schema bleiben unverändert.

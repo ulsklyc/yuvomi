@@ -1,5 +1,6 @@
 import { op, jsonBody, idParam, withCaseReasons } from '../helpers.js';
 import { DATE_PATTERN } from '../../utils/datetime-pattern.js';
+import { HANDOVER_LIMIT_NOTE, MAX_ORDER_ROWS, MAX_SHOPPING_ITEMS } from '../array-limits.js';
 
 const schema = (name) => ({ 'application/json': { schema: { $ref: `#/components/schemas/${name}` } } });
 const apiError = (description) => ({ description, content: schema('ApiError') });
@@ -116,6 +117,7 @@ export function shoppingPaths() {
           order: {
             type: 'array',
             minItems: 1,
+            maxItems: MAX_ORDER_ROWS,
             items: { anyOf: [ROW_ID, { type: 'string', pattern: '^0*[1-9][0-9]*$' }] },
             description: 'Category ids: positive integers. A string of decimal digits is read as the same id (the older form the app sent until v2.93).',
           },
@@ -194,8 +196,8 @@ export function shoppingPaths() {
         tag: 'Shopping',
         stateChanging: true,
         requestBody: body({
-          ids: { type: 'array', items: ROW_ID, description: 'The `added_ids` of the transfer. Without it, or empty, nothing is removed.' },
-          ingredient_ids: { type: 'array', items: ROW_ID, description: 'The `ingredient_ids` of the transfer.' },
+          ids: { type: 'array', maxItems: MAX_SHOPPING_ITEMS, items: ROW_ID, description: 'The `added_ids` of the transfer. Without it, or empty, nothing is removed.' },
+          ingredient_ids: { type: 'array', maxItems: MAX_SHOPPING_ITEMS, items: ROW_ID, description: 'The `ingredient_ids` of the transfer.' },
         }),
         responses: answers({ 200: { description: 'Successful response' }, 403: { $ref: '#/components/responses/Forbidden' } }),
       }),
@@ -272,6 +274,7 @@ export function shoppingPaths() {
         requestBody: body({
           items: {
             type: 'array',
+            maxItems: MAX_SHOPPING_ITEMS,
             description: 'The entries to add; an empty list adds nothing. An entry whose batch or product does not exist counts in `skipped`.',
             items: {
               type: 'object',
@@ -344,7 +347,7 @@ export function shoppingPaths() {
         summary: 'Reorder the items of one category', tag: 'Shopping', stateChanging: true, params: [listId()],
         requestBody: body({
           category: { type: 'string', description: 'The name of an existing category.' },
-          order: { type: 'array', minItems: 1, items: ROW_ID, description: 'Every item id of the category, in the new order.' },
+          order: { type: 'array', minItems: 1, maxItems: MAX_SHOPPING_ITEMS, items: ROW_ID, description: 'Every item id of the category, in the new order.' },
         }, ['order']),
         responses: answers({ 200: { description: 'Successful response' }, 404: LIST_NOT_FOUND }),
         description: 'Per category rather than across the whole list: the category order is already its own handle and models the route through the shop; a second, list-wide rank beside it would make two statements about the same order. The request must name EVERY item of the category - a subset would let the ranks of the omitted ones collide with the newly assigned ones, and creation time would decide again.' }),
@@ -360,7 +363,7 @@ export function shoppingPaths() {
           to: DAY,
           preview: { type: 'boolean', description: 'With `true` nothing is written. Up to v2.93 the text `"true"` ran the real import; it is a 400 now.' },
         }, ['from', 'to']),
-        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). Meals planned from a recipe are included. ' + 'Body: { from, to, preview? }. With `preview: true` nothing is written - it only counts (`added` new items, `skipped` already on the list), for the "X ingredients from Y meals" line in the import dialog; meals planned from a recipe are read from it there instead of being copied. The import answers `added_ids` and `ingredient_ids` for POST /api/v1/shopping/items/undo-transfer. Marks the imported ingredients as transferred, which is meal-plan data, so it requires write access to the `meals` module in addition to `shopping` - a credential scoped to the shopping list alone is refused with 403, for the preview as well.',
+        description: 'An open (unchecked) item of the same name on the list - compared trimmed, with whitespace collapsed and case-insensitive - means the ingredient is skipped and counted in `skipped` instead of being added twice; rows of one name in one transfer become one item. This is the one rule of every kitchen path to the shopping list (recipe, meal, meal-plan import, pantry). Meals planned from a recipe are included. ' + 'Body: { from, to, preview? }. With `preview: true` nothing is written - it only counts (`added` new items, `skipped` already on the list), for the "X ingredients from Y meals" line in the import dialog; meals planned from a recipe are read from it there instead of being copied. The import answers `added_ids` and `ingredient_ids` for POST /api/v1/shopping/items/undo-transfer. Marks the imported ingredients as transferred, which is meal-plan data, so it requires write access to the `meals` module in addition to `shopping` - a credential scoped to the shopping list alone is refused with 403, for the preview as well.' + HANDOVER_LIMIT_NOTE,
         responses: answers({ 200: { description: 'Successful response' }, 403: { $ref: '#/components/responses/Forbidden' }, 404: LIST_NOT_FOUND }),
       }),
     },

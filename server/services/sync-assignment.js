@@ -13,6 +13,7 @@ const FOLLOW_ASSIGNMENT = Object.freeze({ grantAssigneesOnly: true });
 import { sqlIsOwnEventUidOfRow } from '../utils/own-uid.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 import { readDefaultAssignees, readAllDefaultAssignees } from './default-assignees.js';
+import { withTx } from '../db/tx.ts';
 
 // --------------------------------------------------------
 // Standard-Zuweisung für synchronisierte Termine (#459, #1897).
@@ -622,7 +623,7 @@ export function backfillCandidatesToken(candidates) {
  * kuenftige kommen wie gewohnt. Ein Termin, dessen Anleger nur vergangene
  * Erinnerungen hat, nimmt den teuren Weg gar nicht erst.
  *
- * @param {import('../authorize/index.ts').Database} d better-sqlite3 Datenbank-Handle
+ * @param {import('../authorize/index.ts').Database & import('../db/tx.ts').TxDatabase} d better-sqlite3 Datenbank-Handle
  * @param {{ eventId: number, userIds: number[], fromUserIds?: number[] }[]} [candidates]
  *   bestätigte Liste; Standard: die aktuelle des Nachtragens. Ein Eintrag mit
  *   `fromUserIds` ist ein einzeln abgehakter umgezogener Termin (#1307): er wird
@@ -670,7 +671,7 @@ export async function applyDefaultAssigneesToExisting(
   let assigned = 0;
   for (let start = 0; start < candidates.length; start += batchSize) {
     const batch = candidates.slice(start, start + batchSize);
-    assigned += d.transaction(() => {
+    assigned += withTx(d, () => {
       let written = 0;
       for (const { eventId, userIds, fromUserIds } of batch) {
         if (fromUserIds != null) {
@@ -697,7 +698,7 @@ export async function applyDefaultAssigneesToExisting(
         written += 1;
       }
       return written;
-    })();
+    });
     if (start + batchSize < candidates.length) await new Promise((resolve) => setImmediate(resolve));
   }
   return assigned;

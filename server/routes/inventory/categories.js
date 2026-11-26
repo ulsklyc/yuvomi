@@ -12,7 +12,8 @@
 
 import express from 'express';
 import * as db from '../../db.js';
-import { str, MAX_SHORT } from '../../middleware/validate.js';
+import { withTx } from '../../db/tx.ts';
+import { str, MAX_SHORT } from '../../api/formats.ts';
 import { uniqueKey } from './helpers.js';
 import { validateRequest } from '../../api/validate-request.ts';
 
@@ -96,13 +97,13 @@ router.delete('/:key', validateRequest(), (req, res) => {
   const cat = db.get().prepare('SELECT * FROM inventory_categories WHERE key = ?').get(req.params.key);
   if (!cat) return res.status(404).json({ error: 'Category not found.', code: 404, reason: 'inventory_category_not_found' });
 
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     const reassigned = db.get()
       .prepare("UPDATE inventory_items SET category = 'other' WHERE category = ?")
       .run(cat.key).changes;
     db.get().prepare('DELETE FROM inventory_categories WHERE key = ?').run(cat.key);
     return { reassigned };
-  })();
+  });
 
   res.json({ ok: true, reassigned: result.reassigned });
 });
@@ -125,7 +126,7 @@ router.patch('/reorder', validateRequest(), (req, res) => {
   }
 
   const update = db.get().prepare('UPDATE inventory_categories SET sort_order = ? WHERE key = ?');
-  db.get().transaction(() => { order.forEach((key, i) => update.run(i, key)); })();
+  withTx(db.get(), () => { order.forEach((key, i) => update.run(i, key)); });
   // Return categories in the specified order
   const stmt = db.get().prepare('SELECT * FROM inventory_categories WHERE key = ?');
   const result = order.map(key => stmt.get(key));

@@ -19,8 +19,9 @@
 
 import express from 'express';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { validateRequest } from '../api/validate-request.ts';
-import { str, collectErrors, MAX_SHORT } from '../middleware/validate.js';
+import { str, collectErrors, MAX_SHORT } from '../api/formats.ts';
 import { isAdminRequest } from '../middleware/require-admin.js';
 import { normalizeQuickLinkUrl } from '../../public/utils/quick-link-url.js';
 import { dataUrlContentMatches } from '../utils/file-signature.js';
@@ -250,7 +251,7 @@ router.put('/order', validateRequest(), (req, res) => {
   const visible = new Set(listQuickLinksFor(me).map((s) => s.id));
   const ordered = ids.filter((id) => visible.has(id));
 
-  db.transaction(() => {
+  withTx(db.get(), () => {
     const stmt = db.get().prepare('UPDATE quick_links SET position = ? WHERE id = ?');
     ordered.forEach((id, index) => stmt.run(index, id));
   });

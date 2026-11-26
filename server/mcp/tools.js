@@ -16,7 +16,7 @@
  *   (`internalApiRequest`: `fetch` → eigener HTTP-Server) und erben exakt die
  *   Rechte des aufrufenden Tokens; Rollen-, Scope- und CSRF-Prüfung greifen
  *   serverseitig auf `/api/v1/*` wie bei jedem anderen Client.
- * Abhängigkeiten: server/middleware/validate.js, server/openapi.js,
+ * Abhängigkeiten: server/api/formats.ts, server/openapi.js,
  *                  server/scopes.js + server/authorize/ (Rechte-Durchsetzung)
  *
  * Architektur: Jedes Tool ist EIN Eintrag in der Registry (Definition + Handler
@@ -28,7 +28,7 @@
  * dahinter schon (server/middleware/csrf.js nimmt nur `api_token` aus).
  */
 
-import * as v from '../middleware/validate.js';
+import * as v from '../api/formats.ts';
 import { readFileSync } from 'node:fs';
 import { buildOpenApiSpec } from '../openapi.js';
 import { authorize, visibleWhere } from '../authorize/index.ts';
@@ -36,24 +36,26 @@ import { todayKey } from '../utils/timezone.js';
 import { taskScopeNeedsToday, taskScopeWhere } from '../services/task-scope.js';
 import { getUpcomingEvents } from '../services/calendar-event-reader.js';
 import { loadTagsFor, normalizeTags, tagKey } from '../utils/task-tags.js';
+import { TASK_PRIORITIES } from '../services/task-fields.js';
 import { readBindAddress, selfCallHost } from '../utils/bind-address.js';
 import { createLogger } from '../logger.js';
 
 const log = createLogger('MCP');
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 
-// Spiegelt server/routes/tasks.js. Diese Liste ist dort ebenfalls fest
-// verdrahtet; die Kategorien stehen dagegen in der Datenbank und werden
-// deshalb nicht mehr hier aufgezählt (#2616).
-const VALID_PRIORITIES = ['none', 'low', 'medium', 'high', 'urgent'];
+// Dieselbe Liste wie die Route und das OpenAPI-Dokument (task-fields.js,
+// #2810); die Kategorien stehen dagegen in der Datenbank und werden deshalb
+// nicht hier aufgezählt (#2616).
+const VALID_PRIORITIES = TASK_PRIORITIES;
 
 /**
  * Fehler mit für den aufrufenden Client (LLM) sichtbarer Nachricht.
  *
- * Kommt er aus einer Routenantwort (`internalApiRequest`), tragen die drei
+ * Kommt er aus einer Routenantwort (`internalApiRequest`), tragen die vier
  * Felder deren Angaben - nur für Aufrufer im Prozess und Tests (#2616). Ein
  * MCP-Client sieht sie nie: `protocol.js` gibt nur `message` hinaus, `reason`
- * steht dort als `[reason: ...]` im Text.
+ * steht dort als `[reason: ...]` im Text, Pfad und Regel der `fields` als
+ * `[fields: ...]` (#2810).
  */
 class ToolError extends Error {
   /** @type {number|null} HTTP-Status der Routenantwort, sonst null. */
@@ -62,6 +64,38 @@ class ToolError extends Error {
   code = null;
   /** @type {string|null} `reason` der Routenantwort, sonst null. */
   reason = null;
+  /** @type {{ path: string, rule: string }[]|null} Pfad und Regel der abgewiesenen `fields`, sonst null. */
+  fields = null;
+}
+
+/** So viele abgewiesene Felder nennt die Meldung, der Rest steht als "and N more". */
+const MAX_NAMED_FIELDS = 10;
+
+/**
+ * Pfad und Regel je abgewiesenem Feld der Routenantwort (#2810), sonst null.
+ * NUR diese zwei: kein `reason`, kein `value`, keine Ajv-`params` - nichts,
+ * was Nutzdaten tragen kann, wandert in die Meldung.
+ * @param {any} body
+ * @returns {{ path: string, rule: string }[]|null}
+ */
+function refusedFields(body) {
+  if (!body || !Array.isArray(body.fields)) return null;
+  const fields = body.fields
+    .filter((/** @type {any} */ f) => f && typeof f.path === 'string' && typeof f.rule === 'string')
+    .map((/** @type {{ path: string, rule: string }} */ f) => ({ path: f.path, rule: f.rule }));
+  return fields.length > 0 ? fields : null;
+}
+
+/**
+ * ` [fields: <rule> at <path>, ...]` fuer die Meldung, hoechstens
+ * MAX_NAMED_FIELDS Eintraege plus ", and N more"; ohne Felder ''.
+ * @param {{ path: string, rule: string }[]|null} fields
+ */
+function fieldsNote(fields) {
+  if (!fields) return '';
+  const named = fields.slice(0, MAX_NAMED_FIELDS).map((f) => `${f.rule} at ${f.path}`);
+  const more = fields.length - named.length;
+  return ` [fields: ${named.join(', ')}${more > 0 ? `, and ${more} more` : ''}]`;
 }
 
 // --------------------------------------------------------
@@ -225,6 +259,11 @@ function idempotencyHeader(args) {
 }
 
 async function createTask(ctx, args) {
+  // A missing or empty title is said here, in the route's own words (#2810):
+  // the route checks the form of the body first, and there a missing title is
+  // the schema's 400, whose message the tool answer carries without the
+  // field. The sentence tells the model what to fix.
+  if (args.title == null || args.title === '') throw new ToolError('title is required.');
   const data = await internalApiRequest(ctx, 'POST', '/api/v1/tasks', {
     // Validation, the category check and the fallbacks all belong to the route
     // (#2616): the fixed list here refused a household's own category and still
@@ -319,6 +358,11 @@ function listUpcomingEvents(db, actorId, args) {
 }
 
 async function createEvent(ctx, args) {
+  // A missing or empty start is said here, in the route's own words (#2810):
+  // the route checks the form of the body first, and there a missing or
+  // empty `start_datetime` is the schema's 400, whose message the tool
+  // answer carries without the field. The sentence tells the model what to fix.
+  if (args.start_datetime == null || args.start_datetime === '') throw new ToolError('start_datetime is required.');
   const data = await internalApiRequest(ctx, 'POST', '/api/v1/calendar', {
     // The same path as any other client (#1364 included): a `Z` or an offset -
     // the obvious form for an LLM client - is converted into the household zone
@@ -603,7 +647,7 @@ const EXTRA_REQUEST_HEADERS = new Set(['idempotency-key']);
  * @param {string} path
  * @param {{ query?: object, payload?: any, contentData?: string, contentType?: string, headers?: object }} [options]
  * @returns {Promise<any>} der geparste Antwortrumpf
- * @throws {ToolError} bei `!response.ok`, mit `status`, `code` und `reason`
+ * @throws {ToolError} bei `!response.ok`, mit `status`, `code`, `reason` und `fields`
  */
 async function internalApiRequest(ctx, method, path, {
   query, payload, contentData, contentType, headers: extraHeaders,
@@ -697,10 +741,12 @@ async function internalApiRequest(ctx, method, path, {
     // einer in der Antwort, haengt er sichtbar an der Meldung; ohne ihn bleibt
     // der Text Zeichen fuer Zeichen der von vorher.
     const reason = body && typeof body.reason === 'string' ? body.reason : null;
-    const error = new ToolError(reason ? `${message} [reason: ${reason}]` : `${message}`);
+    const fields = refusedFields(body);
+    const error = new ToolError(`${reason ? `${message} [reason: ${reason}]` : `${message}`}${fieldsNote(fields)}`);
     error.status = response.status;
     error.code = body && body.code !== undefined ? body.code : null;
     error.reason = reason;
+    error.fields = fields;
     throw error;
   }
   return data;

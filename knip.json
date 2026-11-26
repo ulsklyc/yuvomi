@@ -29,5 +29,6 @@
     "test/**/*.{js,mjs}"
   ],
   "ignore": ["public/vendor/**", "test/fixtures/lint/**"],
-  "ignoreDependencies": ["oxlint", "dependency-cruiser", "@swc/core", "knip"]
+  "ignoreDependencies": ["oxlint", "dependency-cruiser", "@swc/core", "knip"],
+  "ignoreBinaries": ["jq"]
 }

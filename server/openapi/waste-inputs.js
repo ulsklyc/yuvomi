@@ -13,7 +13,8 @@
  *        server/openapi.js muss ohne sie ladbar bleiben.
  */
 
-import { MAX_URL } from '../middleware/validate.js';
+import { MAX_URL } from '../api/formats.ts';
+import { MAX_KEYS, MAX_WASTE_EVENT_KEYS, MAX_WASTE_MAPPINGS, MAX_WASTE_TYPES } from './array-limits.js';
 import { COLOR_PATTERN, DATE_PATTERN, TIME_PATTERN } from '../utils/datetime-pattern.js';
 import {
   MAPPING_PROFILE_VERSION, MAX_OFFSET_DAYS, MAX_REFRESH_INTERVAL_MINUTES, MIN_OFFSET_DAYS, MIN_REFRESH_INTERVAL_MINUTES,
@@ -60,7 +61,7 @@ const typeFields = {
 // public/pages/waste.js), das versteckte Feld `weekdays` geht nie in den Koerper.
 const weekdaysField = {
   anyOf: [
-    { type: 'array', items: { type: 'string', enum: [...WEEKDAY_CODES] } },
+    { type: 'array', maxItems: MAX_KEYS, items: { type: 'string', enum: [...WEEKDAY_CODES] } },
     { type: ['string', 'null'], enum: [...WEEKDAY_CODES, null] },
   ],
   description: 'weekly: the BYDAY codes as an array (`["MO","TH"]`). '
@@ -102,6 +103,7 @@ const pickupDate = {
 
 const mappingTypeIds = {
   type: ['array', 'null'],
+  maxItems: MAX_WASTE_TYPES,
   items: { type: 'integer' },
   description: 'The label\'s whole type set, whole numbers. `null` is the same as left out.',
 };
@@ -121,6 +123,7 @@ const mappingProfileInput = {
     source_name: { type: 'string', description: 'Informational only, as exported.' },
     mappings: {
       type: 'array',
+      maxItems: MAX_WASTE_MAPPINGS,
       'x-reason': 'waste_profile_invalid',
       items: {
         type: 'object',
@@ -149,8 +152,8 @@ const mappingDecision = {
 
 const commitFields = {
   ics: { type: 'string', description: 'The raw ICS file text of a FILE source (re-parsed on commit). A URL source fetches its own address and ignores it. Missing or empty for a file is the route\'s 400 `waste_import_empty_file`; its upload limit counts UTF-8 bytes and stays the route\'s.' },
-  mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteImportMappingDecision' } },
-  skip_event_keys: { type: 'array', items: { type: 'string' }, description: 'Blocking-diagnostic event_key values explicitly acknowledged and excluded.' },
+  mappings: { type: 'array', maxItems: MAX_WASTE_MAPPINGS, items: { $ref: '#/components/schemas/WasteImportMappingDecision' } },
+  skip_event_keys: { type: 'array', maxItems: MAX_WASTE_EVENT_KEYS, items: { type: 'string' }, description: 'Blocking-diagnostic event_key values explicitly acknowledged and excluded.' },
   preview_digest: { type: ['string', 'null'], description: 'The digest returned by the matching preview; a mismatch (the parsed content changed since that preview) is refused with 409.' },
 };
 
@@ -299,7 +302,7 @@ export function wasteInputSchemas() {
       required: ['type_ids'],
       properties: {
         type_ids: {
-          type: ['array', 'null'], items: { type: 'integer' },
+          type: ['array', 'null'], maxItems: MAX_WASTE_TYPES, items: { type: 'integer' },
           description: 'Waste type ids to include, or null to include every active type again.',
         },
       },

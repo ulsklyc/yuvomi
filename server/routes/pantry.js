@@ -31,7 +31,8 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { str, oneOf, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../middleware/validate.js';
+import { withTx } from '../db/tx.ts';
+import { str, oneOf, date, id as idParam, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT } from '../api/formats.ts';
 import { normalizePantryUnit, normalizePantryQuantity, convertPantryQuantity } from '../../public/utils/pantry-units.js';
 import { syncPantryExpiryReminder, resolvePantryAccess } from '../services/pantry-reminders.js';
 import { assignPantryProduct, productKey, writeMinimumThrough } from '../services/pantry-products.js';
@@ -249,9 +250,9 @@ router.patch('/locations/reorder', validateRequest(), (req, res) => {
   // Laut Schema eine nicht leere Liste von IDs (ganze Zahl oder Ziffern-Text, #2810).
   const { order } = req.body;
   const update = db.get().prepare('UPDATE pantry_locations SET sort_order = ? WHERE id = ?');
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     order.forEach((locId, idx) => update.run(idx, locId));
-  })();
+  });
 
   res.json({ data: loadLocations() });
 });
@@ -405,7 +406,7 @@ router.post('/import-shopping', requireShoppingRead, validateRequest(), (req, re
   // und die Schleife laeuft synchron in einer Transaktion.
   const today = householdToday(db.get());
 
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     const sameLocation = db.get().prepare(
       'SELECT id, name, quantity, unit, expires_on FROM pantry_items WHERE location_id IS ? ORDER BY id ASC',
     );
@@ -486,7 +487,7 @@ router.post('/import-shopping', requireShoppingRead, validateRequest(), (req, re
     }
 
     return { added, merged, skipped, changes };
-  })();
+  });
 
   res.json({ data: result });
 });
@@ -526,7 +527,7 @@ router.post('/import-shopping/undo', validateRequest(), (req, res) => {
   const access = resolvePantryAccess(db.get());
   const today = householdToday(db.get());
 
-  const result = db.get().transaction(() => {
+  const result = withTx(db.get(), () => {
     const remove = db.get().prepare('DELETE FROM pantry_items WHERE id = ?');
     const removeReminder = db.get().prepare("DELETE FROM reminders WHERE entity_type = 'pantry_item' AND entity_id = ?");
     const reduce = db.get().prepare('UPDATE pantry_items SET quantity = ?, expires_on = ? WHERE id = ?');
@@ -547,7 +548,7 @@ router.post('/import-shopping/undo', validateRequest(), (req, res) => {
       reduced += 1;
     }
     return { removed, reduced };
-  })();
+  });
 
   res.json({ data: result });
 });
@@ -582,7 +583,7 @@ router.delete('/products/:productId', validateRequest(), (req, res) => {
   const vId = idParam(req.params.productId, 'productId');
   if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
-  const outcome = db.get().transaction(() => {
+  const outcome = withTx(db.get(), () => {
     const product = db.get().prepare('SELECT id FROM pantry_products WHERE id = ?').get(vId.value);
     if (!product) return { status: 404 };
     const { batches } = db.get()
@@ -590,7 +591,7 @@ router.delete('/products/:productId', validateRequest(), (req, res) => {
     if (batches > 0) return { status: 409, batches };
     db.get().prepare('DELETE FROM pantry_products WHERE id = ?').run(vId.value);
     return { status: 204 };
-  })();
+  });
 
   if (outcome.status === 404) return res.status(404).json({ error: 'Product not found.', code: 404 });
   if (outcome.status === 409) {
@@ -616,7 +617,7 @@ router.post('/', validateRequest(), (req, res) => {
   // Schreiben und Erinnerung in EINER Transaktion, wie in
   // server/routes/inventory/items.js: sonst kann der Artikel stehen und die
   // Erinnerung fehlen, ohne dass die Antwort davon erzählt.
-  const created = db.get().transaction(() => {
+  const created = withTx(db.get(), () => {
     const result = db.get().prepare(`
       INSERT INTO pantry_items
         (name, quantity, unit, location_id, category, expires_on, min_quantity, notes, created_by)
@@ -634,7 +635,7 @@ router.post('/', validateRequest(), (req, res) => {
     const item = getItem(result.lastInsertRowid);
     syncReminder(item);
     return item;
-  })();
+  });
 
   res.status(201).json({ data: created });
 });
@@ -655,7 +656,7 @@ router.put('/:itemId', validateRequest(), (req, res) => {
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
   const minGiven = 'min_quantity' in values;
 
-  const updated = db.get().transaction(() => {
+  const updated = withTx(db.get(), () => {
     db.get().prepare(`
       UPDATE pantry_items
       SET name = ?, quantity = ?, unit = ?, location_id = ?, category = ?,
@@ -678,7 +679,7 @@ router.put('/:itemId', validateRequest(), (req, res) => {
     const fresh = getItem(item.id);
     syncReminder(fresh);
     return fresh;
-  })();
+  });
 
   res.json({ data: updated });
 });
@@ -704,7 +705,7 @@ router.patch('/:itemId', validateRequest(), (req, res) => {
   const fields = Object.keys(values);
   if (!fields.length) return res.json({ data: item });
 
-  const updated = db.get().transaction(() => {
+  const updated = withTx(db.get(), () => {
     db.get().prepare(`
       UPDATE pantry_items SET ${fields.map((f) => `${f} = ?`).join(', ')} WHERE id = ?
     `).run(...fields.map((f) => values[f]), item.id);
@@ -725,7 +726,7 @@ router.patch('/:itemId', validateRequest(), (req, res) => {
     const fresh = getItem(item.id);
     syncReminder(fresh);
     return fresh;
-  })();
+  });
 
   res.json({ data: updated });
 });
@@ -738,7 +739,7 @@ router.delete('/:itemId', validateRequest(), (req, res) => {
   const vId = idParam(req.params.itemId, 'itemId');
   if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
 
-  const removed = db.get().transaction(() => {
+  const removed = withTx(db.get(), () => {
     const result = db.get().prepare('DELETE FROM pantry_items WHERE id = ?').run(vId.value);
     if (result.changes === 0) return false;
 
@@ -747,7 +748,7 @@ router.delete('/:itemId', validateRequest(), (req, res) => {
     // zeigen. Aufräumen ist deshalb Sache des Routers, wie im Inventar auch.
     db.get().prepare("DELETE FROM reminders WHERE entity_type = 'pantry_item' AND entity_id = ?").run(vId.value);
     return true;
-  })();
+  });
   if (!removed) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
   res.status(204).end();

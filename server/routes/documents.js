@@ -7,10 +7,13 @@
 import express from 'express';
 import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
+import { assertGatesNow, RefusedNowError } from '../middleware/gate-now.js';
 import { createLogger } from '../logger.js';
-import { str, date as validateDate, num, collectErrors, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { str, date as validateDate, num, collectErrors, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_VISIBILITIES,
 } from '../services/document-fields.js';
@@ -36,7 +39,9 @@ import { getAdapter as defaultGetDmsAdapter } from '../services/dms/index.js';
 import { getStatus as getGoogleDriveStatus } from '../services/google-drive-storage.js';
 import { refuseWhileRestoring } from '../middleware/restore-gate.js';
 import {
+  STORAGE_CONFIG_CHANGED_MESSAGE,
   StorageError,
+  assertStagedTargetCurrent,
   assertWebdavTargetAllowed,
   cleanupStagedUpload,
   deleteDocumentContent,
@@ -56,7 +61,7 @@ import {
   verifyExistingWebdavDocument,
 } from '../services/document-storage.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../utils/upload-limit.js';
-import { contentMatchesMime } from '../utils/file-signature.js';
+import { readDataUrlFile } from '../utils/data-url-file.js';
 import { todayKey } from '../utils/timezone.js';
 import { remoteFailure } from '../utils/http.js';
 
@@ -71,6 +76,14 @@ class DmsDocumentUnavailableError extends Error {}
 
 /** Der Zielordner verschwand, waehrend die Datei abgelegt wurde (#1909). */
 class SelectedFolderGoneError extends Error {}
+/**
+ * Wer nach dem Ablegen der Datei nicht mehr in Frage kommt (#2947): in der
+ * Freigabeliste oder als Person, um die es geht. Dieselbe 400 wie davor.
+ */
+class AccessStrangersError extends Error {
+  /** @param {number[]} strangers */
+  constructor(strangers) { super('access strangers'); this.strangers = strangers; }
+}
 
 const log = createLogger('Documents');
 
@@ -305,27 +318,24 @@ function parseMemberIds(value) {
   return [...new Set(value.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
 }
 
+// Der Satz und Grund je Befund von readDataUrlFile (#1909); der Ablauf selbst
+// ist mit dem Termin-Anhang geteilt (server/utils/data-url-file.js, #2810).
+const DATA_URL_REFUSALS = {
+  shape: { error: 'File content must be a valid base64 data URL.' },
+  type: { error: 'File type is not allowed.', reason: 'documents_file_type_not_allowed' },
+  empty: { error: 'File content is empty.', reason: 'documents_file_empty' },
+  size: { error: `File may be at most ${MAX_UPLOAD_MB} MB.` },
+  content: { error: 'File content does not match its declared type.', reason: 'documents_file_content_mismatch' },
+};
+
+/**
+ * @param {unknown} dataUrl
+ * @returns {{ file: import('../utils/data-url-file.js').DataUrlFile, error?: undefined, reason?: undefined }
+ *   | { file?: undefined, error: string, reason?: string }}
+ */
 function parseDataUrl(dataUrl) {
-  const raw = String(dataUrl || '');
-  // Der Inhalt darf leer sein: eine leere Datei liest der Browser als
-  // `data:<typ>;base64,` - das ist der Fall "Datei ist leer" (#1909), keine
-  // kaputte Data-URL.
-  const match = raw.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=\s]*)$/);
-  if (!match) return { error: 'File content must be a valid base64 data URL.' };
-  const mime = match[1].toLowerCase();
-  if (!ALLOWED_MIME.has(mime)) return { error: 'File type is not allowed.', reason: 'documents_file_type_not_allowed' };
-  const base64 = match[2].replace(/\s/g, '');
-  const buffer = Buffer.from(base64, 'base64');
-  if (!buffer.length) return { error: 'File content is empty.', reason: 'documents_file_empty' };
-  if (buffer.length > MAX_FILE_BYTES) return { error: `File may be at most ${MAX_UPLOAD_MB} MB.` };
-  // Bis hier war nur GEPRUEFT, was der Absender BEHAUPTET: der Typ steht im
-  // data-URL-Praefix und kommt aus seinem Browser. Ein Dokument, das sich als
-  // PDF ausgibt und keins ist, faellt sonst erst auf, wenn es jemand braucht
-  // (#937). Typen ohne Signatur - text/plain, text/csv - passieren weiter.
-  if (!contentMatchesMime(buffer, mime)) {
-    return { error: 'File content does not match its declared type.', reason: 'documents_file_content_mismatch' };
-  }
-  return { mime, base64, size: buffer.length, buffer };
+  const read = readDataUrlFile(String(dataUrl || ''), { allowed: ALLOWED_MIME, maxBytes: MAX_FILE_BYTES });
+  return read.fault === null ? { file: read.file } : DATA_URL_REFUSALS[read.fault];
 }
 
 function documentSelect() {
@@ -416,7 +426,10 @@ function sendThumbnail(res, thumb) {
 
 function sendStorageError(res, error, fallbackMessage, { configText = false, adminDetail = false } = {}) {
   if (!(error instanceof StorageError)) return false;
-  const status = error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED'
+  // A change of the storage settings during an upload (#2946) is a 409 with
+  // its own sentence: the client may send the upload again.
+  const changed = error.storageCode === 'DOCUMENT_STORAGE_CONFIG_CHANGED';
+  const status = error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED' || changed
     ? 409
     : (
         error.storageCode === 'DOCUMENT_STORAGE_INVALID_CONFIG'
@@ -434,7 +447,9 @@ function sendStorageError(res, error, fallbackMessage, { configText = false, adm
   // the case without the class.
   const detail = status === 502 && adminDetail ? remoteFailure(error)?.detail : undefined;
   res.status(status).json({
-    error: configText && status !== 502 ? error.message : fallbackMessage,
+    error: changed
+      ? STORAGE_CONFIG_CHANGED_MESSAGE
+      : configText && status !== 502 ? error.message : fallbackMessage,
     code: status,
     storage_code: error.storageCode,
     // Der Speicher hat nicht mitgespielt (#1909): ein Fall, den jeder Nutzer
@@ -510,20 +525,78 @@ router.get('/storage/config', requireAdmin, validateRequest(), (req, res) => {
   }
 });
 
+function firstWebdavDocument() {
+  return db.get().prepare(`
+    SELECT *
+    FROM family_documents
+    WHERE storage_backend = 'webdav'
+    ORDER BY id
+    LIMIT 1
+  `).get();
+}
+
+/**
+ * @param {ReturnType<typeof getStorageConfig>} a
+ * @param {ReturnType<typeof getStorageConfig>} b
+ */
+function webdavConnectionDiffers(a, b) {
+  return getEffectiveTarget(a) !== getEffectiveTarget(b)
+    || a.username !== b.username
+    || a.password !== b.password;
+}
+
+// Existing WebDAV documents protect the connection that reaches them: required
+// fields stay, and a changed connection needs the admin's confirmation. Throws
+// those refusals and answers whether the proposed connection still has to
+// prove that it reads an existing document.
+/**
+ * @param {Record<string, any>} body
+ * @param {unknown} existing
+ * @param {ReturnType<typeof getStorageConfig>} current
+ * @param {ReturnType<typeof getStorageConfig>} proposed
+ */
+function webdavChangeNeedsVerification(body, existing, current, proposed) {
+  if (!existing) return false;
+  const deletingRequiredField = (
+    (!current.envControlled.url
+      && Object.hasOwn(body, 'url')
+      && String(body.url ?? '').trim() === '')
+    || (!current.envControlled.username
+      && Object.hasOwn(body, 'username')
+      && String(body.username ?? '').trim() === '')
+    || (!current.envControlled.password && body.clear_password === true)
+    || (!current.envControlled.path
+      && (Object.hasOwn(body, 'path') || Object.hasOwn(body, 'basePath'))
+      && String(body.path ?? body.basePath ?? '').trim() === '')
+  );
+  if (
+    deletingRequiredField
+    || !proposed.url
+    || !proposed.username
+    || !proposed.password
+    || !proposed.basePath
+  ) {
+    throw configProtected(
+      'Required WebDAV connection data cannot be removed while documents exist.'
+    );
+  }
+  if (!webdavConnectionDiffers(proposed, current)) return false;
+  if (body.confirm_existing_access !== true) {
+    throw configProtected(
+      'Changing WebDAV connection data requires explicit confirmation.'
+    );
+  }
+  return true;
+}
+
 router.put('/storage/config', requireAdmin, validateRequest(), async (req, res) => {
   try {
     // `selected_upload_backend` (one of DOCUMENT_UPLOAD_BACKENDS),
     // `confirm_existing_access` and `clear_password` (booleans) are the
     // schema's checks (#2810); the service checks the backend again.
-    const existing = db.get().prepare(`
-      SELECT *
-      FROM family_documents
-      WHERE storage_backend = 'webdav'
-      ORDER BY id
-      LIMIT 1
-    `).get();
+    const existing = firstWebdavDocument();
     const current = getStorageConfig();
-    const proposed = resolveConfig(req.body);
+    let proposed = resolveConfig(req.body);
     const targetChanged = (
       (!current.envControlled.url && Object.hasOwn(req.body, 'url'))
       || (!current.envControlled.path
@@ -533,55 +606,41 @@ router.put('/storage/config', requireAdmin, validateRequest(), async (req, res) 
       await assertWebdavTargetAllowed(proposed);
     }
 
-    if (existing) {
-      const deletingRequiredField = (
-        (!current.envControlled.url
-          && Object.hasOwn(req.body, 'url')
-          && String(req.body.url ?? '').trim() === '')
-        || (!current.envControlled.username
-          && Object.hasOwn(req.body, 'username')
-          && String(req.body.username ?? '').trim() === '')
-        || (!current.envControlled.password && req.body.clear_password === true)
-        || (!current.envControlled.path
-          && (Object.hasOwn(req.body, 'path') || Object.hasOwn(req.body, 'basePath'))
-          && String(req.body.path ?? req.body.basePath ?? '').trim() === '')
-      );
-      if (
-        deletingRequiredField
-        || !proposed.url
-        || !proposed.username
-        || !proposed.password
-        || !proposed.basePath
-      ) {
+    let verified = null;
+    if (webdavChangeNeedsVerification(req.body, existing, current, proposed)) {
+      try {
+        await verifyExistingWebdavDocument(existing, proposed);
+      } catch (error) {
+        if (error instanceof StorageError
+          && error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED') {
+          throw error;
+        }
         throw configProtected(
-          'Required WebDAV connection data cannot be removed while documents exist.'
+          'The proposed WebDAV configuration cannot read an existing document.',
+          { cause: error }
         );
       }
+      verified = proposed;
+    }
 
-      const connectionChanged = (
-        getEffectiveTarget(proposed) !== getEffectiveTarget(current)
-        || proposed.username !== current.username
-        || proposed.password !== current.password
+    // The awaits above let other requests run (#2946): a document may have
+    // been stored in WebDAV, or another change saved. The protection is
+    // decided again on the documents and the configuration as they are now;
+    // nothing below awaits before the write. A connection verified above
+    // counts only if it is still the one that would be saved.
+    proposed = resolveConfig(req.body);
+    if (
+      webdavChangeNeedsVerification(
+        req.body,
+        firstWebdavDocument(),
+        getStorageConfig(),
+        proposed
+      )
+      && !(verified && !webdavConnectionDiffers(verified, proposed))
+    ) {
+      throw configProtected(
+        'The proposed WebDAV configuration cannot read an existing document.'
       );
-      if (connectionChanged) {
-        if (req.body.confirm_existing_access !== true) {
-          throw configProtected(
-            'Changing WebDAV connection data requires explicit confirmation.'
-          );
-        }
-        try {
-          await verifyExistingWebdavDocument(existing, proposed);
-        } catch (error) {
-          if (error instanceof StorageError
-            && error.storageCode === 'DOCUMENT_STORAGE_CONFIG_PROTECTED') {
-            throw error;
-          }
-          throw configProtected(
-            'The proposed WebDAV configuration cannot read an existing document.',
-            { cause: error }
-          );
-        }
-      }
     }
 
     const selectorProvided = Object.hasOwn(req.body, 'selected_upload_backend');
@@ -677,17 +736,16 @@ function allFolders() {
  * nur Backend und Key.
  */
 function visibleFolderDocuments(req, folderIds) {
-  const folderParams = Object.fromEntries(folderIds.map((value, i) => [`f${i}`, value]));
-  const folderPlaceholders = folderIds.map((_v, i) => `@f${i}`).join(',');
+  const folderList = sqlInList(folderIds, 'folders');
   return db.get()
     .prepare(`
       SELECT d.id, d.name, d.storage_backend, d.storage_key, d.created_by
       FROM family_documents d
-      WHERE d.folder_id IN (${folderPlaceholders})
+      WHERE d.folder_id IN (${folderList.sql})
         AND ${visibleWhere('documents', 'd', '@userId')}
       ORDER BY d.id ASC
     `)
-    .all({ ...folderParams, userId: userId(req) });
+    .all({ folders: folderList.param, userId: userId(req) });
 }
 
 /** Bind a destructive confirmation to exact folder and document identities. */
@@ -726,10 +784,9 @@ function folderDeleteSnapshot(folderIds, documentIds, linkedState) {
  * Die geteilten Ausgaben haengen am Modulrecht `budget` (scopes.js).
  */
 function folderDeleteLinkedState(req, documentIds) {
-  const params = Object.fromEntries(documentIds.map((value, index) => [`d${index}`, value]));
-  const placeholders = documentIds.map((_value, index) => `@d${index}`).join(',');
+  const documentList = sqlInList(documentIds, 'documents');
   const ids = (sql) => (documentIds.length
-    ? db.get().prepare(sql).all({ ...params, userId: userId(req) }).map((row) => row.identity)
+    ? db.get().prepare(sql).all({ documents: documentList.param, userId: userId(req) }).map((row) => row.identity)
     : []);
   const reads = (moduleKey) => mayReadModule(req, moduleKey);
   const groupVisible = (column) => (isAdminRequest(req) ? '1=1' : `EXISTS (
@@ -741,49 +798,49 @@ function folderDeleteLinkedState(req, documentIds) {
   return {
     calendar_events: readsCalendar ? ids(`
       SELECT e.id AS identity FROM calendar_events e
-       WHERE e.attachment_document_id IN (${placeholders})
+       WHERE e.attachment_document_id IN (${documentList.sql})
          AND ${visibleWhere('ics_subscriptions', 'e', '@userId')}
          AND ${visibleWhere('events', 'e', '@userId')}
        ORDER BY e.id
     `) : null,
     housekeeping_work_sessions: reads('housekeeping') ? ids(`
       SELECT h.id AS identity FROM housekeeping_work_sessions h
-       WHERE h.receipt_document_id IN (${placeholders})
+       WHERE h.receipt_document_id IN (${documentList.sql})
        ORDER BY h.id
     `) : null,
     expense_groups: readsBudget ? ids(`
       SELECT g.id AS identity FROM expense_groups g
-       WHERE g.avatar_document_id IN (${placeholders}) AND ${groupVisible('g.id')}
+       WHERE g.avatar_document_id IN (${documentList.sql}) AND ${groupVisible('g.id')}
        ORDER BY g.id
     `) : null,
     settlements: readsBudget ? ids(`
       SELECT s.id AS identity FROM settlements s
-       WHERE s.proof_document_id IN (${placeholders}) AND ${groupVisible('s.group_id')}
+       WHERE s.proof_document_id IN (${documentList.sql}) AND ${groupVisible('s.group_id')}
        ORDER BY s.id
     `) : null,
     expense_attachments: readsBudget ? ids(`
       SELECT a.id AS identity FROM expense_attachments a
         JOIN expenses x ON x.id = a.expense_id
-       WHERE a.document_id IN (${placeholders}) AND ${groupVisible('x.group_id')}
+       WHERE a.document_id IN (${documentList.sql}) AND ${groupVisible('x.group_id')}
        ORDER BY a.id
     `) : null,
     task_documents: readsTasks ? ids(`
       SELECT printf('%d:%d', td.task_id, td.document_id) AS identity FROM task_documents td
         JOIN tasks t ON t.id = td.task_id
-       WHERE td.document_id IN (${placeholders})
+       WHERE td.document_id IN (${documentList.sql})
          AND ${visibleWhere('tasks', 't', '@userId')}
        ORDER BY identity
     `) : null,
     budget_entry_attachments: readsBudget ? ids(`
       SELECT a.id AS identity FROM budget_entry_attachments a
         JOIN budget_entries b ON b.id = a.entry_id
-       WHERE a.document_id IN (${placeholders})
+       WHERE a.document_id IN (${documentList.sql})
          AND ${budgetDetailsVisibleWhere('b', '@userId', { mode: resolveBudgetMode(db.get()) })}
        ORDER BY a.id
     `) : null,
     inventory_item_documents: reads('inventory') ? ids(`
       SELECT i.id AS identity FROM inventory_item_documents i
-       WHERE i.document_id IN (${placeholders})
+       WHERE i.document_id IN (${documentList.sql})
        ORDER BY i.id
     `) : null,
   };
@@ -1237,9 +1294,9 @@ router.get('/', validateRequest(), (req, res) => {
   /* Benannte Platzhalter auch fuer die Liste: die uebrige Abfrage laeuft
    * ueber `@userId`/`@status`, und better-sqlite3 nimmt benannte und
    * positionelle Parameter nicht im selben Aufruf. */
-  const folderParams = Object.fromEntries((subtree ?? []).map((value, i) => [`f${i}`, value]));
+  const folderList = sqlInList(subtree ?? [], 'folders');
   const folderClause = subtree
-    ? `AND d.folder_id IN (${subtree.map((_v, i) => `@f${i}`).join(',')})`
+    ? `AND d.folder_id IN (${folderList.sql})`
     : '';
   const params = {
     userId: userId(req), status, category, expiringWithinDays, subjectUserId,
@@ -1249,7 +1306,7 @@ router.get('/', validateRequest(), (req, res) => {
     // task-scope.js hat dieselbe Falle). `todayKey()` bindet stattdessen den
     // Haushalts-Tagesschluessel als Parameter.
     today: todayKey(db.get()),
-    ...folderParams,
+    ...(subtree ? { folders: folderList.param } : {}),
   };
   const expiringClause = expiringWithinDays !== null
     ? "AND d.expires_at IS NOT NULL AND date(d.expires_at) <= date(@today, '+' || @expiringWithinDays || ' days')"
@@ -1269,6 +1326,7 @@ router.get('/', validateRequest(), (req, res) => {
 });
 
 router.post('/', validateRequest(), async (req, res) => {
+  /** @type {any} */
   let stagedUpload;
   try {
     const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
@@ -1302,26 +1360,42 @@ router.post('/', validateRequest(), async (req, res) => {
     }
     if (selectedFolderMissing(selectedFolderId)) return selectedFolderGone(res);
     const parsed = parseDataUrl(req.body.content_data);
-    if (parsed.error) {
+    if (!parsed.file) {
       return res.status(400).json({ error: parsed.error, code: 400, ...(parsed.reason ? { reason: parsed.reason } : {}) });
     }
+    const upload = parsed.file;
 
     const allowedIds = visibility === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
     // Freigeben laesst sich ein neues Dokument nur Haushaltsmitgliedern (#1207).
     const strangers = accessStrangers(allowedIds);
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     stagedUpload = await stageUpload({
-      buffer: parsed.buffer,
-      mime: parsed.mime,
+      buffer: upload.buffer,
+      mime: upload.mime,
       category,
       originalName: vOriginalName.value,
     });
     const database = db.get();
-    const row = database.transaction(() => {
+    const row = withTx(database, () => {
       // NOCHMAL, OHNE YIELD DAZWISCHEN: die Pruefung oben lag vor dem await des
       // Ablegens, und dort kann ein anderes Loeschen den Ordner nehmen (Review
       // zu #1994). Erst hier ist das Ergebnis bis zum INSERT verbindlich.
       if (selectedFolderMissing(selectedFolderId)) throw new SelectedFolderGoneError();
+      // Das Modul-Gate gilt am Schreiben (#2947): wer waehrend des Ablegens das
+      // Schreibrecht an Dokumenten verlor, bekommt die Absage des Gates.
+      assertGatesNow(database, req);
+      // Ebenso das Ziel der Ablage (#2946): wurden die Speicher-Einstellungen
+      // waehrend des Ablegens geaendert, stuende die Zeile hinter einer
+      // Verbindung, die nicht mehr gilt. 409, die Datei raeumt der catch weg.
+      assertStagedTargetCurrent(stagedUpload);
+      // Und die Freigabeliste (#2947): wer waehrend des Ablegens aus dem
+      // Haushalt fiel, bekommt keinen Zugriff, sondern dieselbe 400 wie vorher.
+      const strangersNow = accessStrangers(allowedIds);
+      if (strangersNow.length) throw new AccessStrangersError(strangersNow);
+      // Ebenso die Person, um die es geht: dieselbe Pruefung wie vSubjectUserId().
+      if (vSubjectField.value != null && !isHouseholdMember(vSubjectField.value)) {
+        throw new AccessStrangersError([vSubjectField.value]);
+      }
       const folderId = selectedFolderId ?? ensureFolder(folderKey, vFolderName.value, userId(req));
       const expiresAt = vExpiresAtField.value ?? null;
       const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
@@ -1339,8 +1413,8 @@ router.post('/', validateRequest(), async (req, res) => {
         visibility,
         folderId,
         vOriginalName.value,
-        parsed.mime,
-        parsed.size,
+        upload.mime,
+        upload.size,
         stagedUpload.content_data,
         stagedUpload.storage_provider,
         stagedUpload.storage_backend,
@@ -1363,10 +1437,10 @@ router.post('/', validateRequest(), async (req, res) => {
         WHERE d.id = ?
         GROUP BY d.id
       `).get(result.lastInsertRowid);
-    })();
+    });
     res.status(201).json({ data: normalizeDocument(row) });
   } catch (err) {
-    if (err instanceof StorageError) {
+    if (err instanceof StorageError && !stagedUpload) {
       log.error('POST / storage error:', err);
       return sendStorageError(res, err, 'Document storage upload failed.');
     }
@@ -1386,6 +1460,11 @@ router.post('/', validateRequest(), async (req, res) => {
       }
     }
     if (folderGone) return selectedFolderGone(res);
+    if (err instanceof AccessStrangersError) return res.status(400).json({ error: nonMemberMessage(err.strangers), code: 400 });
+    if (err instanceof RefusedNowError) return err.respond(res);
+    // A storage refusal after staging (#2946: the settings changed meanwhile),
+    // answered once the staged file is gone.
+    if (err instanceof StorageError) return sendStorageError(res, err, 'Document storage upload failed.');
     throw err;
   }
 });

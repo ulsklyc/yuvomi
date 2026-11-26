@@ -184,6 +184,26 @@ test('ids written as text are a 400: category_ids, contact_id; non-numbers in co
   }
 });
 
+test('array limits: a quick-link order, at the limit and one above (#2810)', async () => {
+  const { assertArrayLimit } = await import('./array-limit-cases.js');
+  const { MAX_QUICK_LINK_ORDER } = await import('../server/openapi/array-limits.js');
+  const at = await assertArrayLimit((body) => call('PUT', '/quick-links/order', body),
+    (n) => ({ ids: Array.from({ length: n }, (_, i) => 900000 + i) }), MAX_QUICK_LINK_ORDER, 'body/ids');
+  assert.equal(at.status, 200, 'ids the caller cannot see are ignored');
+});
+
+test('array limits: the note category reorder takes MAX_ORDER_ROWS like every reorder (#2810)', async () => {
+  const { assertArrayLimit } = await import('./array-limit-cases.js');
+  const { MAX_ORDER_ROWS } = await import('../server/openapi/array-limits.js');
+  // A whole set of that size: the route answers 200 only when every id is a category of the caller.
+  /** @type {number[]} */
+  const ids = [];
+  for (let i = 0; i < MAX_ORDER_ROWS; i++) ids.push(await newCategory(`Grenze ${i}`));
+  const at = await assertArrayLimit((body) => call('PATCH', '/notes/categories/reorder', body),
+    (n) => ({ order: n <= ids.length ? ids.slice(0, n).reverse() : [...ids, 999999] }), MAX_ORDER_ROWS, 'body/order');
+  assert.equal(at.status, 200, JSON.stringify(at.body)?.slice(0, 300));
+});
+
 test('order of a category reorder takes ids and digit text, nothing else (the category manager sends text)', async () => {
   for (const bad of ['x', '', 1.5, null, '3 ', '0', 0, '03']) {
     assertRefused(await call('PATCH', '/notes/categories/reorder', { order: [bad] }), 'body/order/0');

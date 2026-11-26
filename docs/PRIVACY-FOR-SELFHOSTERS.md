@@ -775,7 +775,7 @@ konkrete Konfiguration ein und ergänze um eigene Verarbeitungen.
 
 | # | Bezeichnung | Zweck | Rechtsgrundlage | Kategorien Betroffener | Kategorien Daten | Empfänger | Drittland | Löschfrist | TOMs |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Nutzerkonten / Authentifizierung | Login, Identifizierung | Art. 6 Abs. 1 lit. b | Nutzer der Instanz | E-Mail, Username, Passwort-Hash | <<OIDC-Provider falls aktiv>> | <<EU/Drittland>> | bis Account-Löschung | bcrypt-Hash (Cost 12), HTTPS |
+| 1 | Nutzerkonten / Authentifizierung | Login, Identifizierung | Art. 6 Abs. 1 lit. b | Nutzer der Instanz | E-Mail, Username, Passwort-Hash | <<OIDC-Provider falls aktiv>> | <<EU/Drittland>> | bis Account-Löschung | Argon2id-Hash (m=19456 KiB, t=2, p=1), HTTPS |
 | 2 | Kalender / Termine | Haushaltskoordination | Art. 6 Abs. 1 lit. b; bei Gesundheitsangaben im Freitext zusätzlich Art. 9 Abs. 2 lit. a | Nutzer, ggf. Eingeladene | Termintitel, Teilnehmer, Ort, Freitext-Notizen (ggf. Gesundheitsangaben) | CalDAV-Server, Google Calendar und/oder Outlook/Microsoft Graph (falls Sync) | <<je nach Anbieter; Google/Microsoft ggf. USA>> | bis Löschung durch Nutzer; Outlook-Push löscht erst im nächsten Sync-Lauf, beim Trennen gar nicht | TLS, AVV (für private Microsoft-Konten nicht abschließbar, siehe 2.16) |
 | 3 | Kontakte / CardDAV | Adressbuch | Art. 6 Abs. 1 lit. b/f | Nutzer, Kontakte | Name, Adresse, Telefon, E-Mail | CardDAV-Server (falls Sync) | <<je nach Anbieter>> | bis Löschung | TLS, AVV |
 | 4 | Wetter | Anzeige Vorhersage | Art. 6 Abs. 1 lit. b | Nutzer | Koordinaten/Ortsname | Open-Meteo (CH); ggf. OpenWeather (UK) | CH/UK Angemessenheit | sofort nach Anfrage | TLS |

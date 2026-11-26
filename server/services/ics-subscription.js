@@ -14,8 +14,9 @@ import dns from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { createLogger } from '../logger.js';
 import * as db from '../db.js';
+import { withTx } from '../db/tx.ts';
 import { assignDefaultToEvent, settlePastInheritedReminders } from './sync-assignment.js';
-import { assigneeFields, readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
+import { assigneeFields, readAllDefaultAssignees, readDefaultAssignees, validateAssigneeIds, writeDefaultAssignees } from './default-assignees.js';
 import { setEventAssignments } from './event-assignments.ts';
 import { remindAtCompareKey } from '../utils/reminder-schedule.js';
 import { parseICS, expandRRULE, normalizeRecurrenceOverrides, providerStatusOf } from './ics-parser.js';
@@ -266,7 +267,7 @@ async function syncOne(sub, { rethrowFetch = false } = {}) {
     // im Regelfall aber keine einzige Änderung.
     let changedEvents = 0;
 
-    db.get().transaction(() => {
+    withTx(db.get(), () => {
       for (const ev of flatEvents) {
         try {
           // NUR die Eigenfarbe des Termins (RFC 7986 COLOR); die Abo-Farbe ist
@@ -324,7 +325,7 @@ async function syncOne(sub, { rethrowFetch = false } = {}) {
 
       db.get().prepare(`UPDATE ics_subscriptions SET last_sync = ?, etag = ?, last_modified = ? WHERE id = ?`)
         .run(new Date().toISOString(), newEtag, newLastModified, sub.id);
-    })();
+    });
 
     // Ein Lauf, der nichts verändert hat, gehört nicht ins Standard-Log: er
     // wiederholt sich bei jedem Scheduler-Tick.
@@ -430,6 +431,22 @@ function toLocalRRule(raw) {
 }
 
 /**
+ * Der Kalender oder die Personen eines Imports kommen nach dem Laden des Feeds
+ * nicht mehr in Frage (#2947): dieselbe Absage, die die Route vor dem Laden
+ * gegeben haette. Ein TypeError wie die Kalender-Absage davor: Aufrufer, die
+ * den Dienst direkt rufen, sehen dieselbe Art Fehler.
+ */
+class ImportRefusedAfterFeed extends TypeError {
+  /** @param {string} error @param {string | undefined} reason */
+  constructor(error, reason) {
+    super(error);
+    this.name = 'ImportRefusedAfterFeed';
+    /** The 400 the route gives for this before the feed was loaded. */
+    this.answer = { error, reason };
+  }
+}
+
+/**
  * Einmaliger Import von Terminen aus einer ICS-Datei (roher Text) oder einem
  * geteilten Kalender-Feed (URL) in echte, bearbeitbare lokale Termine
  * (external_source='local', subscription_id=NULL). Anders als ein Abonnement
@@ -453,7 +470,7 @@ function toLocalRRule(raw) {
  *   `assigned`: schon vorhandene Termine, die dabei eine Person dazubekamen
  *   (sie zaehlen auch in `skipped`).
  */
-async function importToLocal(userId, { ics, url, color, localCalendarId = null, assigneeIds = [] } = {}) {
+async function importToLocal(userId, { ics, url, color, localCalendarId = null, assigneeIds = [], assertStillAllowed = () => {} } = {}) {
   let rawEvents;
   if (typeof ics === 'string' && ics.trim()) {
     rawEvents = parseICS(ics);
@@ -463,8 +480,24 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   } else {
     throw new Error('Either an ICS file or a URL is required.');
   }
-  const calendarCheck = validateCalendarId(db.get(), localCalendarId);
-  if (calendarCheck.error) throw new TypeError(calendarCheck.error);
+  // Die Gates der Route (Modulrecht) gelten nach dem Laden des Feeds (#2947).
+  assertStillAllowed();
+  const database = db.get();
+  const calendarCheck = validateCalendarId(database, localCalendarId);
+  // Der Kalender wurde waehrend des Ladens geloescht (#2947): dieselbe 400 wie
+  // davor, mit dem Grund nur fuer "gibt es nicht mehr" - wie die Route.
+  if (calendarCheck.error) {
+    throw new ImportRefusedAfterFeed(calendarCheck.error,
+      calendarCheck.reason === 'calendar_selected_calendar_not_found' ? calendarCheck.reason : undefined);
+  }
+  // Ebenso die Personen (#2947): die Route hat sie vor dem Laden des Feeds
+  // geprueft; wer seitdem aus dem Haushalt fiel, bekommt keinen Termin.
+  if (assigneeIds?.length) {
+    const assigneeCheck = validateAssigneeIds(database, { assignee_user_ids: assigneeIds }, {
+      listField: 'assignee_user_ids', singleField: 'assignee_user_id',
+    });
+    if ('error' in assigneeCheck && assigneeCheck.error) throw new ImportRefusedAfterFeed(assigneeCheck.error, assigneeCheck.reason);
+  }
   // RECURRENCE-ID-Overrides zusammenführen: Master behält die Serie, geänderte
   // Einzel-Vorkommen werden eigenständige Termine statt die Serie zu killen (#549).
   rawEvents = normalizeRecurrenceOverrides(rawEvents);
@@ -475,7 +508,7 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   // koennte - seit es lokale Kalender gibt, hat er einen, und die kopierte
   // Farbe hielt ihn bei jedem Umfaerben auf der alten fest. Eine COLOR aus der
   // Datei selbst bleibt wie im Abo-Sync (#891) die Farbe dieses Termins.
-  const { color: fallbackColor, chosen: fallbackChosen } = importedEventColor(db.get(), localCalendarId, color);
+  const { color: fallbackColor, chosen: fallbackChosen } = importedEventColor(database, localCalendarId, color);
   // `series_authored = 1`: die Termine gehoeren nach dem Import dem Nutzer und
   // sind lokale Zeilen wie jede hier angelegte - so hat sie der ausgehende Weg
   // schon behandelt, als er noch `external_source` las (#1935).
@@ -534,7 +567,7 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   let assigned = 0;
   const total  = rawEvents.length;
 
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     for (const ev of rawEvents) {
       if (!ev.dtstart) { skipped++; continue; }
       // Ein abgesagter Termin wird gar nicht erst uebernommen (#2499): ohne
@@ -583,7 +616,7 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
         skipped++;
       }
     }
-  })();
+  });
 
   log.info(`Imported ${imported}/${total} events for user ${userId} (${skipped} skipped, ${assigned} assigned).`);
   return { imported, skipped, assigned, total };
@@ -594,14 +627,14 @@ async function create(userId, { name, url, color, shared, default_assignee_user_
   await checkSSRF(normalizedUrl);
   // Die Zuweisung steht VOR dem ersten syncOne() in der Zeile - danach gesetzt
   // hätte sie die eben eingelesenen Termine nicht mehr erreicht (#730).
-  const subId = db.get().transaction(() => {
+  const subId = withTx(db.get(), () => {
     const id = Number(db.get().prepare(
       `INSERT INTO ics_subscriptions (name,url,color,shared,created_by)
        VALUES (?,?,?,?,?)`
     ).run(name, normalizedUrl, color, shared ? 1 : 0, userId).lastInsertRowid);
     writeDefaultAssignees(db.get(), 'subscription', id, default_assignee_user_ids);
     return id;
-  })();
+  });
   const newSub = db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId);
   // Das Abo steht; ein gescheiterter erster Abruf ist eine Warnung, kein
   // Fehlschlag des Anlegens. `syncError` ist der Fehler selbst, die Route
@@ -618,13 +651,13 @@ function update(userId, subId, fields, isAdmin) {
   const name   = fields.name   !== undefined ? fields.name   : sub.name;
   const color  = fields.color  !== undefined ? fields.color  : sub.color;
   const shared = fields.shared !== undefined ? (fields.shared ? 1 : 0) : sub.shared;
-  db.get().transaction(() => {
+  withTx(db.get(), () => {
     db.get().prepare(`UPDATE ics_subscriptions SET name = ?, color = ?, shared = ? WHERE id = ?`)
       .run(name, color, shared, subId);
     if (fields.default_assignee_user_ids !== undefined) {
       writeDefaultAssignees(db.get(), 'subscription', subId, fields.default_assignee_user_ids);
     }
-  })();
+  });
   return withAssignees(db.get().prepare('SELECT * FROM ics_subscriptions WHERE id = ?').get(subId));
 }
 
@@ -636,4 +669,4 @@ function remove(userId, subId, isAdmin) {
   return true;
 }
 
-export { sync, getAll, getOne, create, update, remove, importToLocal, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };
+export { sync, getAll, getOne, create, update, remove, importToLocal, ImportRefusedAfterFeed, toLocalRRule, fetchAndParse, normalizeUrl, checkSSRF, isPrivateNetworkAllowed };

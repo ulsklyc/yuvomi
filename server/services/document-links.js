@@ -36,6 +36,8 @@
 
 import { mayReadModule, visibleWhere, filterVisible } from '../authorize/index.ts';
 import { assertDocumentsNotDeleting } from './document-deletion-lock.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
+import { withTx } from '../db/tx.ts';
 
 /** Felder, die ein Beleg preisgibt. Bewusst ohne Dateiinhalt. */
 const DOCUMENT_COLUMNS = 'd.name, d.original_name, d.mime_type, d.file_size';
@@ -105,15 +107,15 @@ export function loadDocumentLinks(database, { table, ownerColumn, ownerIds, view
   const byOwner = new Map();
   if (!ids.length || !readsDocuments(viewer)) return byOwner;
 
-  const placeholders = ids.map(() => '?').join(', ');
+  const idList = sqlInList(ids);
   const extra = extraColumns.length ? `, ${extraColumns.map((c) => `a.${c}`).join(', ')}` : '';
   const rows = database.prepare(`
     SELECT a.${ownerColumn} AS ownerId, a.id, a.document_id, a.created_at${extra}, ${DOCUMENT_COLUMNS}
     FROM ${table} a
     JOIN family_documents d ON d.id = a.document_id
-    WHERE a.${ownerColumn} IN (${placeholders}) AND ${visibleWhere('documents', 'd', '@userId')}
+    WHERE a.${ownerColumn} IN (${idList.sql}) AND ${visibleWhere('documents', 'd', '@userId')}
     ORDER BY a.id ASC
-  `).all(...ids, { userId: viewer?.userId ?? null });
+  `).all(idList.param, { userId: viewer?.userId ?? null });
 
   for (const { ownerId, ...attachment } of rows) {
     if (!byOwner.has(ownerId)) byOwner.set(ownerId, []);
@@ -183,12 +185,12 @@ export function replaceDocumentLinks(database, { table, ownerColumn, ownerId, do
     `DELETE FROM ${table} WHERE ${ownerColumn} = ? AND document_id = ?`
   );
 
-  database.transaction(() => {
+  withTx(database, () => {
     for (const documentId of remove) drop.run(ownerId, documentId);
     for (const documentId of wanted) {
       insert.run(ownerId, documentId, viewer.userId, ...extraNames.map((name) => extraValues[name]));
     }
-  })();
+  });
 }
 
 /**

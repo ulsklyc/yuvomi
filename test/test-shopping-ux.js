@@ -1923,6 +1923,133 @@ test('Abgehakte loeschen: hat der Server WENIGER entfernt als die Seite, laedt d
     'die Zeile, die jemand im Undo-Fenster zurueckgeholt hat, kommt nur durch das Nachladen her');
 });
 
+// --------------------------------------------------------
+// Mehr Abgehakte als ein DELETE fassen darf (#2810, Folge 5b): das Schema nimmt
+// hoechstens MAX_SHOPPING_ITEMS Ids. Die Seite teilt, schickt alle Happen im
+// selben Takt ab (beim Verlassen der Seite laeuft nach dem ersten `await`
+// nichts mehr) und quittiert nur, wenn die Summe von `deleted` ihre eigene
+// Zahl ist - nichts wird still verworfen.
+// --------------------------------------------------------
+
+/** Untyped handles on the stubs and the page state, as the older cases use them. */
+const stubs = /** @type {any} */ (globalThis);
+const page = /** @type {any} */ (__test);
+const win = /** @type {any} */ (global.window);
+
+/** @param {number} n */
+const manyChecked = (n) => Array.from({ length: n }, (_, i) => ({
+  id: 100 + i, name: `Artikel ${i}`, is_checked: 1, category: 'Sonstiges', sort_order: i,
+}));
+
+test('Abgehakte loeschen: die Happengroesse ist die Grenze des Schemas', async () => {
+  const { MAX_SHOPPING_ITEMS } = await import('../server/openapi/array-limits.js');
+  const { buildOpenApiSpec } = await import('../server/openapi.js');
+  const spec = /** @type {any} */ (buildOpenApiSpec({}, 'test'));
+  const ids = spec.components.schemas.ShoppingCheckedDeleteInput.properties.ids;
+  assert.equal(ids.maxItems, MAX_SHOPPING_ITEMS);
+  assert.equal(page.CHECKED_DELETE_BATCH, MAX_SHOPPING_ITEMS);
+  // Der groesste keepalive-Rumpf bleibt mit Abstand unter 64 KiB, auch bei
+  // Ids an der Grenze der JSON-sicheren Zahlen.
+  const worst = JSON.stringify({ ids: Array.from({ length: MAX_SHOPPING_ITEMS }, () => Number.MAX_SAFE_INTEGER) });
+  assert.ok(Buffer.byteLength(worst) < 32 * 1024, `${Buffer.byteLength(worst)} Bytes`);
+});
+
+test('Abgehakte loeschen: mehr als ein Happen geht in mehreren DELETEs raus, alle im selben Takt', async () => {
+  resetShoppingState();
+  const batch = page.CHECKED_DELETE_BATCH;
+  const items = manyChecked(batch * 2 + 5);
+  page.state.lists = [{ id: 1, name: 'Einkauf', item_total: items.length, item_checked: items.length }];
+  page.state.items = items;
+  win.yuvomi.showToast = () => {};
+  const undo = /** @type {any} */ (captureUndo());
+  /** @type {{ path: string, keepalive: boolean, ids: number[] }[]} */
+  const sent = [];
+  /** @type {Array<() => void>} */
+  const gates = [];
+  stubs.__apiStub = {
+    delete: (/** @type {string} */ path, /** @type {any} */ opts) => {
+      const body = JSON.parse(opts.body);
+      sent.push({ path, keepalive: opts.keepalive, ids: body.ids });
+      const gate = /** @type {any} */ (deferred());
+      gates.push(() => gate.resolve({ deleted: body.ids.length, list_change: { list_id: 1, before: gates.length, after: gates.length + 1 } }));
+      return gate.promise;
+    },
+  };
+  try {
+    page.clearCheckedUndoable(makeNullContainer());
+    const committing = undo.last.commit({ keepalive: true });
+    // Noch keine Antwort da, und doch sind alle drei unterwegs.
+    assert.equal(sent.length, 3, 'alle Happen sind abgeschickt, bevor eine Antwort kommt');
+    assert.deepEqual(sent.map((s) => s.ids.length), [batch, batch, 5]);
+    assert.ok(sent.every((s) => s.path === '/shopping/1/items/checked' && s.keepalive === true));
+    assert.deepEqual(sent.flatMap((s) => s.ids), items.map((i) => i.id), 'jede Id genau einmal, in ihrer Reihenfolge');
+    gates.forEach((open) => open());
+    await committing;
+  } finally {
+    delete stubs.__apiStub;
+    delete stubs.__undoStub;
+    delete win.yuvomi.showToast;
+  }
+});
+
+/**
+ * Wie reloadsOnNextPoll, aber mit drei Happen; `short` zieht einem Happen eine Zeile ab.
+ * @param {{ short: boolean }} options
+ */
+async function reloadsAfterBatches({ short }) {
+  resetShoppingState();
+  const batch = page.CHECKED_DELETE_BATCH;
+  const items = manyChecked(batch * 2 + 5);
+  page.state.lists = [{ id: 1, name: 'Einkauf', item_total: items.length, item_checked: items.length }];
+  page.state.items = items;
+  win.yuvomi.showToast = () => {};
+  const undo = /** @type {any} */ (captureUndo());
+  let versions = [{ list_id: 1, version: 4 }];
+  /** @type {string[]} */
+  const calls = [];
+  let next = 4;
+  stubs.__apiStub = {
+    get: async (/** @type {string} */ path) => {
+      calls.push(path);
+      if (path === '/shopping/versions') return { data: versions };
+      return { data: [listRow(0)] };
+    },
+    getWithSource: async (/** @type {string} */ path) => { calls.push(path); return { data: { data: [] }, fromCache: false }; },
+    delete: async (/** @type {string} */ _path, /** @type {any} */ opts) => {
+      const n = JSON.parse(opts.body).ids.length;
+      const before = next;
+      next += 1;
+      return { deleted: short && before === 5 ? n - 1 : n, list_change: { list_id: 1, before, after: next } };
+    },
+  };
+  const route = new AbortController();
+  try {
+    page.wireLiveUpdates(makeNullContainer(), route.signal);
+    await settle();
+    page.clearCheckedUndoable(makeNullContainer());
+    await undo.last.commit({ keepalive: false });
+    versions = [{ list_id: 1, version: 7 }];
+    calls.length = 0;
+    await page.getLiveFeedForTest().poll();
+    await settle();
+    return calls.includes('/shopping/1/items');
+  } finally {
+    route.abort();
+    page.abortLiveUpdatesForTest();
+    delete stubs.__apiStub;
+    delete stubs.__undoStub;
+    delete win.yuvomi.showToast;
+  }
+}
+
+test('Abgehakte loeschen in Happen: stimmt die Summe, quittiert jeder Happen, und nichts laedt nach', async () => {
+  assert.equal(await reloadsAfterBatches({ short: false }), false);
+});
+
+test('Abgehakte loeschen in Happen: fehlt in einem Happen eine Zeile, laedt die naechste Abfrage nach', async () => {
+  assert.equal(await reloadsAfterBatches({ short: true }), true);
+});
+
 test('loadItems: die Laufnummer der Artikel-Antwort wird der Stand des Feeds - in beide Richtungen', async () => {
   const run = async ({ feedSays, itemsCarry, thenFeedSays }) => {
     resetShoppingState();

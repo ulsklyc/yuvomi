@@ -5,8 +5,12 @@
 
 import { createLogger } from '../../logger.js';
 import express from 'express';
+import { validateRequest } from '../../api/validate-request.ts';
+import { sqlInList } from '../../utils/sql-in-list.ts';
+import { MAX_REMINDER_OFFSETS } from '../../services/calendar-fields.js';
 import * as db from '../../db.js';
-import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../middleware/validate.js';
+import { withTx } from '../../db/tx.ts';
+import { str, color, datetime, rrule, textShape, collectErrors, MAX_TITLE, MAX_TEXT, DATE_RE } from '../../api/formats.ts';
 import { hasAnyOccurrence, endsBeforeStart } from '../../services/recurrence.js';
 import { startOrRuleChanged } from '../../services/outbound-dtstart.js';
 import { resolveProjectedEventRows } from '../../services/calendar-event-reader.js';
@@ -25,10 +29,12 @@ import {
   isOccurrenceKey, occurrenceSlotOf, SOURCE_CALENDAR_COLUMNS, SOURCE_CALENDAR_JOIN,
 } from '../../services/calendar-events.js';
 import { newNonMembers, nonMemberMessage } from '../../services/household-members.js';
+import { documentDeleteIsActive } from '../../services/document-deletion-lock.js';
 import { documentViewer } from '../../services/document-links.js';
 import {
   mayChangeRecord,
   mayWriteModule,
+  requestAsOfNow,
   sendNotOwner,
   normalizeVisibility,
   ATTACHMENT_NARROW_ONLY,
@@ -59,13 +65,14 @@ import {
   followInboundStartChange,
 } from '../../services/calendar-occurrence-overrides.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
+import { gateRefusalNow } from '../../middleware/gate-now.js';
 import {
   ASSIGNED_USERS_SQL,
   getUserId,
   eventIcon,
   parseAttachment,
-  attachmentUploadRefused, storedAttachmentLocked,
-  ATTACHMENT_UPLOAD_REFUSAL, ATTACHMENT_CHANGE_REFUSAL,
+  refuseUploadWithoutDocumentsWrite, sendAttachmentUploadRefused, storedAttachmentLocked,
+  ATTACHMENT_CHANGE_REFUSAL,
   caldavTarget,
   caldavTargetOffered,
   cloneAttachmentDocument,
@@ -80,6 +87,15 @@ import {
 
 const log = createLogger('Calendar');
 const router = express.Router();
+
+/**
+ * Die Kennung im Pfad: das Schema laesst nur Dezimalziffern durch (#2810).
+ * @param {any} req
+ * @param {string} [name]
+ */
+function pathId(req, name = 'id') {
+  return Number(req.params[name]);
+}
 
 // #1909: die Faelle, die ein Nutzer beim Speichern, Zuruecksetzen oder Loeschen
 // eines Termins erreicht, tragen einen `reason`; die App sagt dazu ihren Satz
@@ -130,59 +146,138 @@ function sendSeriesWithoutOccurrence(res) {
  * sonst saehe die ganze Familie den Anhang eines Termins fuer Zugewiesene.
  */
 function attachmentRights(req) {
-  const actor = {
-    actorId: getUserId(req),
-    isAdmin: isAdminRequest(req),
-    documentsWritable: mayWriteModule(req, 'documents'),
+  // DAS RECHT GILT AM SCHREIBEN, NICHT AM EINGANG (#2947). Jede Frage liest
+  // Rolle und Modulrechte des Kontos neu (`requestAsOfNow`) - gestellt wird sie
+  // im synchronen Teil des Schreibens, nach dem Upload und nach den Kopien. Wer
+  // waehrenddessen Admin- oder Dokumente-Recht verlor, gleicht kein fremdes
+  // Dokument mehr ab, kopiert keins und legt keinen Anhang mehr an. Das Recht
+  // vom Eingang bleibt Bedingung: neu gelesen wird nur enger, nie weiter.
+  const atEntry = { isAdmin: isAdminRequest(req), documentsWritable: mayWriteModule(req, 'documents') };
+  const actorNow = () => {
+    const now = requestAsOfNow(db.get(), req);
+    return {
+      actorId: getUserId(req),
+      isAdmin: atEntry.isAdmin && Boolean(now) && isAdminRequest(now),
+      documentsWritable: atEntry.documentsWritable && Boolean(now) && mayWriteModule(now, 'documents'),
+    };
   };
-  const mayManage = documentWidenPredicate(db.get(), actor);
   const createdHere = new Set();
   return {
     // Voll abgleichen: nur wer das Dokument auch verwalten darf; ein hier neu
     // angelegtes nur verengen; alles andere bleibt unangetastet.
-    mayWidenAttachment: (documentId) => {
-      if (mayManage(documentId)) return true;
+    mayWidenAttachment: (/** @type {any} */ documentId) => {
+      if (documentWidenPredicate(db.get(), actorNow())(documentId)) return true;
       return createdHere.has(Number(documentId)) ? ATTACHMENT_NARROW_ONLY : false;
     },
     // Kopieren: wer es sieht und Dokumente schreiben darf.
-    mayCloneAttachment: documentClonePredicate(db.get(), actor),
-    createAttachmentDocument: (...args) => {
-      const documentId = createAttachmentDocument(...args);
+    mayCloneAttachment: (/** @type {any} */ documentId) => documentClonePredicate(db.get(), actorNow())(documentId),
+    createAttachmentDocument: (
+      /** @type {any} */ database, /** @type {any} */ attachment, /** @type {any} */ staged,
+      /** @type {any} */ body, /** @type {number} */ ownerId,
+    ) => {
+      // Ein hochgeladener Anhang braucht das Dokumente-Schreibrecht, das
+      // `refuseUploadWithoutDocumentsWrite` am Eingang fragte: dieselbe Absage.
+      // Dieselbe Bedingung wie in createAttachmentDocument(): nur wo ein
+      // Dokument entstuende.
+      const createsDocument = Boolean(attachment?.buffer && staged);
+      if (createsDocument && !actorNow().documentsWritable) {
+        throw new RefusedAfterUploadError((r) => sendAttachmentUploadRefused(r));
+      }
+      const documentId = createAttachmentDocument(database, attachment, staged, body, ownerId);
       if (documentId) createdHere.add(Number(documentId));
       return documentId;
     },
   };
 }
 
-async function runWithAttachmentClonePlan(database, stagedClones, operation, { mayClone = () => false } = {}) {
+/**
+ * Der Plan der Kopien gilt nicht mehr (#2956): das zweite Speichern verlangt
+ * eine Kopie, die vor dem await niemand verlangt hatte. Die Transaktion rollt
+ * zurueck, und der Plan wird gegen die Zeile von jetzt neu gemacht.
+ */
+class ClonePlanChangedError extends Error {}
+
+/** Wie oft der Plan neu gemacht wird, bevor die Anfrage aufgibt. */
+const CLONE_PLAN_ROUNDS = 3;
+
+async function runWithAttachmentClonePlan(database, stagedClones, operation, { mayClone = /** @type {(documentId: any) => boolean} */ (() => false) } = {}) {
+  let requests;
   try {
     return operation({});
   } catch (error) {
     if (!(error instanceof CalendarAttachmentCloneRequiredError)) throw error;
+    requests = error.requests;
+  }
 
-    const contents = new Map();
+  // LESEN, AWAIT, SCHREIBEN (#2956). Zwischen dem Plan (welche Ausnahme
+  // braucht welche Kopie) und dem zweiten Speichern liegen Lesen und Hochladen
+  // der Kopien (await); eine zweite Anfrage kann in dieser Zeit die Ausnahmen
+  // der Serie austauschen. Das zweite Speichern fragt deshalb wieder die Zeile
+  // von jetzt; verlangt es eine Kopie, die nicht bereitliegt, wird neu geplant.
+  // Bereitgestellte Dateien derselben Quelle werden dabei wiederverwendet.
+  // Puffer und Dateien gelten ueber alle Runden: den Inhalt einer Dokument-ID
+  // (storage_key, storage_backend, storage_provider, content_data, mime_type,
+  // file_size) schreibt nach dem Anlegen
+  // niemand mehr um - die Dokument-Route aendert nur Metadaten, und die nimmt
+  // `consume` aus der frisch gelesenen Zeile. Erzwungen von der harten
+  // Lint-Regel DOC-CONTENT (scripts/generate-oxlint-overrides.mjs): ein UPDATE
+  // auf eine Inhaltsspalte von family_documents unter server/ ist rot, die
+  // Migrationen ausgenommen. Eine geloeschte ID kommt nicht
+  // wieder: family_documents zaehlt mit AUTOINCREMENT (baseline.sql).
+  const contents = new Map();
+  /** @type {{ sourceDocumentId: number, staged: any, written?: boolean }[]} */
+  const files = [];
+  for (let round = 1; ; round += 1) {
     const prepared = [];
-    for (const request of error.requests) {
-      // Keine Kopie ohne Recht: weder gelesen noch gestaged, `consume` liefert `null`.
-      if (!mayClone(request.sourceDocumentId)) {
+    const reserved = new Set();
+    for (const request of requests) {
+      const sourceId = Number(request.sourceDocumentId);
+      // Keine Kopie ohne Recht und keine ohne Quelle: weder gelesen noch
+      // gestaged, `consume` liefert `null`. Die Zeile wird nach den awaits der
+      // Anfragen davor gelesen; ein inzwischen geloeschtes Dokument ist wie
+      // eine verweigerte Kopie, nicht ein Serverfehler (wie `fresh` in `consume`).
+      // Ebenso eines, dessen Loeschung laeuft: DELETE /documents/:id sperrt es,
+      // loescht erst die Datei (await) und dann die Zeile.
+      const sourceGone = () => !database.prepare('SELECT 1 FROM family_documents WHERE id = ?').get(sourceId)
+        || !mayClone(request.sourceDocumentId)
+        || documentDeleteIsActive(sourceId);
+      const sourceDocument = database.prepare('SELECT * FROM family_documents WHERE id = ?')
+        .get(request.sourceDocumentId);
+      if (!sourceDocument || sourceGone()) {
         prepared.push({ request, refused: true, used: false });
         continue;
       }
-      const sourceDocument = database.prepare('SELECT * FROM family_documents WHERE id = ?')
-        .get(request.sourceDocumentId);
-      if (!sourceDocument) throw new Error('Attachment clone source document no longer exists.');
-      if (!contents.has(request.sourceDocumentId)) {
-        contents.set(request.sourceDocumentId, await readDocumentContent(sourceDocument));
+      let file = files.find((entry) => entry.sourceDocumentId === sourceId && !reserved.has(entry));
+      if (!file) {
+        // Kategorie und Name bestimmen hier nur den Speicherpfad der Datei;
+        // was die Kopie zeigt (Name, Kategorie, Dateiname, Typ, Groesse),
+        // nimmt cloneAttachmentDocument aus der frisch gelesenen Zeile.
+        let staged;
+        try {
+          if (!contents.has(sourceId)) {
+            contents.set(sourceId, await readDocumentContent(sourceDocument));
+          }
+          const content = contents.get(sourceId);
+          staged = await stageDocumentUpload({
+            buffer: content.buffer,
+            mime: content.mime,
+            category: sourceDocument.category,
+            originalName: sourceDocument.original_name,
+          });
+        } catch (error) {
+          // Ist die Quelle waehrend des Lesens oder Bereitstellens verschwunden
+          // (oder in Loeschung), ist das dieselbe verweigerte Kopie wie davor;
+          // gefragt synchron nach dem await. Sonst bleibt es der Speicherfehler.
+          if (!sourceGone()) throw error;
+          prepared.push({ request, refused: true, used: false });
+          continue;
+        }
+        stagedClones.push(staged);
+        file = { sourceDocumentId: sourceId, staged };
+        files.push(file);
       }
-      const content = contents.get(request.sourceDocumentId);
-      const staged = await stageDocumentUpload({
-        buffer: content.buffer,
-        mime: content.mime,
-        category: sourceDocument.category,
-        originalName: sourceDocument.original_name,
-      });
-      stagedClones.push(staged);
-      prepared.push({ request, sourceDocument, staged, used: false });
+      reserved.add(file);
+      prepared.push({ request, file, staged: file.staged, used: false });
     }
 
     const consume = (owner, childId, sourceDocumentId) => {
@@ -190,7 +285,7 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
         && entry.request.owner === owner
         && (owner !== 'detached' || Number(entry.request.childId) === Number(childId))
         && Number(entry.request.sourceDocumentId) === Number(sourceDocumentId));
-      if (!clone) throw new Error('No staged attachment clone matches the detached owner.');
+      if (!clone) throw new ClonePlanChangedError('No staged attachment clone matches the owner.');
       clone.used = true;
       if (clone.refused) return null;
       // KEIN AWAIT ZWISCHEN LESEN UND SCHREIBEN (CLAUDE.md, #1358). Die Quelle
@@ -213,19 +308,46 @@ async function runWithAttachmentClonePlan(database, stagedClones, operation, { m
       };
     };
 
-    const result = operation({
-      cloneAttachment: (sourceDocumentId) =>
-        consume('successor', null, sourceDocumentId),
-      cloneDetachedAttachment: (childId, sourceDocumentId) =>
-        consume('detached', childId, sourceDocumentId),
-    });
-    for (const clone of prepared) {
-      if (clone.refused) continue;
-      const index = stagedClones.indexOf(clone.staged);
+    /** @type {Set<any>} */
+    let written;
+    let result;
+    try {
+      result = operation({
+        cloneAttachment: (sourceDocumentId) =>
+          consume('successor', null, sourceDocumentId),
+        cloneDetachedAttachment: (childId, sourceDocumentId) =>
+          consume('detached', childId, sourceDocumentId),
+      });
+      written = new Set(prepared.filter((clone) => clone.written).map((clone) => clone.file));
+    } catch (error) {
+      if (!(error instanceof ClonePlanChangedError)) throw error;
+      // Nach der letzten Runde ist es ein Konflikt mit dem Stand der Serie,
+      // kein Serverfehler: 409, gespeichert ist nichts (die Transaktion ist
+      // zurueckgerollt), die Kopien raeumt der catch der Route weg, und die
+      // Anfrage darf wiederholt werden.
+      if (round >= CLONE_PLAN_ROUNDS) {
+        throw new CalendarOccurrenceError('The series changed while attachment copies were uploaded.', {
+          status: 409,
+          code: 'calendar_series_changed',
+        });
+      }
+      // Neu planen gegen die Zeile von jetzt, synchron: braucht sie gar keine
+      // Kopie mehr, ist dieser Aufruf schon das Speichern.
+      try {
+        result = operation({});
+        written = new Set();
+      } catch (replan) {
+        if (!(replan instanceof CalendarAttachmentCloneRequiredError)) throw replan;
+        requests = replan.requests;
+        continue;
+      }
+    }
+    for (const file of files) {
+      const index = stagedClones.indexOf(file.staged);
       if (index >= 0) stagedClones.splice(index, 1);
-      if (!clone.written) {
+      if (!written.has(file)) {
         try {
-          await cleanupStagedUpload(clone.staged);
+          await cleanupStagedUpload(file.staged);
         } catch (cleanupError) {
           log.warn('Unused attachment clone cleanup failed after calendar commit:', cleanupError);
         }
@@ -258,9 +380,10 @@ function validateOccurrenceAssignments(database, value) {
     return { value: null, error: 'Assignment: choose each person at most once.' };
   }
   if (ids.length > 0) {
+    const idList = sqlInList(ids);
     const found = database.prepare(`
-      SELECT COUNT(*) AS count FROM users WHERE id IN (${ids.map(() => '?').join(',')})
-    `).get(...ids).count;
+      SELECT COUNT(*) AS count FROM users WHERE id IN (${idList.sql})
+    `).get(idList.param).count;
     if (Number(found) !== ids.length) {
       return { value: null, error: 'An assigned person no longer exists.' };
     }
@@ -327,7 +450,7 @@ class AttachmentLockedError extends Error {}
 
 function assertAttachmentStillChangeable(req, database, storedDocumentId, { replacementRequested, removalRequested }) {
   if (!(replacementRequested || removalRequested)) return;
-  if (storedAttachmentLocked(req, database, storedDocumentId)) throw new AttachmentLockedError();
+  if (attachmentLockedNow(req, database, storedDocumentId)) throw new AttachmentLockedError();
 }
 
 /** Anhang inzwischen gesperrt: gestagte Uploads wegraeumen, dann dieselbe 403 wie die fruehe Pruefung. */
@@ -352,6 +475,37 @@ async function sendNonMemberAssignment(res, err, staged) {
     }
   }
   return res.status(400).json({ error: err.message, code: 400 });
+}
+
+/**
+ * Eine Absage, die erst gegen die Zeile beim Schreiben faellt (#2940): der
+ * Termin ist weg, nicht mehr sichtbar oder aenderbar, oder eine Pruefung des
+ * PUT faellt gegen den neuen Stand anders aus. Eigene Klasse wie die beiden
+ * darueber: gestagte Uploads wegraeumen, dann dieselbe Antwort wie vor dem
+ * Upload (`respond` ist die Antwortfunktion der Pruefung).
+ */
+class RefusedAfterUploadError extends Error {
+  /** @param {(res: any) => any} respond */
+  constructor(respond) {
+    super('Refused against the row the write found.');
+    this.respond = respond;
+  }
+}
+
+/**
+ * @param {any} res
+ * @param {(res: any) => any} respond
+ * @param {any[]} staged
+ */
+async function sendRefusalAfterUpload(res, respond, staged) {
+  if (staged.length > 0) {
+    try {
+      await cleanupCalendarUploads(staged);
+    } catch (cleanupError) {
+      return sendStorageError(res, cleanupError, 'Calendar attachment storage cleanup failed.');
+    }
+  }
+  return respond(res);
 }
 
 /**
@@ -409,10 +563,7 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
       values[field] = null;
       return;
     }
-    if (typeof body[field] !== 'string') {
-      errors.push(`${label} must be text${nullable ? ' or null' : ''}.`);
-      return;
-    }
+    // Text (oder null, wo erlaubt) sagt das Schema davor (#2810).
     const result = str(body[field], label, {
       max: options.max,
       required: options.required !== false,
@@ -443,34 +594,22 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
   validateDateTime('end_datetime', 'end_datetime', { nullable: true });
   validateString('location', 'location', { max: MAX_TITLE, required: false, nullable: true });
 
+  // Die Form der Felder - Text oder null, `all_day`/`countdown` als Boolean,
+  // `visibility` aus EVENT_VISIBILITY - sagt das Schema beider Routen davor
+  // (CalendarOccurrenceOnlyMutation, CalendarOccurrenceFollowingMutation,
+  // #2810); hier bleibt der Inhalt.
   if (Object.hasOwn(body, 'color')) {
-    if (body.color !== null && typeof body.color !== 'string') {
-      errors.push('color must be text or null.');
-    } else {
-      const result = color(body.color, 'color');
-      if (result.error) errors.push('color: choose a valid color in the format #RRGGBB.');
-      else values.color = result.value;
-    }
+    const result = color(body.color, 'color');
+    if (result.error) errors.push('color: choose a valid color in the format #RRGGBB.');
+    else values.color = result.value;
   }
   if (following && Object.hasOwn(body, 'recurrence_rule')) {
-    if (body.recurrence_rule !== null && typeof body.recurrence_rule !== 'string') {
-      errors.push('recurrence_rule must be text or null.');
-    } else {
-      const result = rrule(body.recurrence_rule, 'recurrence_rule');
-      if (result.error) errors.push('recurrence_rule is invalid.');
-      else values.recurrence_rule = result.value;
-    }
+    const result = rrule(body.recurrence_rule, 'recurrence_rule');
+    if (result.error) errors.push('recurrence_rule is invalid.');
+    else values.recurrence_rule = result.value;
   }
-  for (const field of ['all_day', 'countdown']) {
-    if (Object.hasOwn(body, field)) {
-      if (typeof body[field] !== 'boolean') errors.push(`${field} must be true or false.`);
-      else values[field] = body[field];
-    }
-  }
-  if (Object.hasOwn(body, 'visibility')) {
-    if (!['all', 'assignees', 'private'].includes(body.visibility)) {
-      errors.push('visibility must be one of: all, assignees, private.');
-    } else values.visibility = body.visibility;
+  for (const field of ['all_day', 'countdown', 'visibility']) {
+    if (Object.hasOwn(body, field)) values[field] = body[field];
   }
   const assignments = validateOccurrenceAssignments(database, body.assigned_to);
   if (assignments.error) errors.push(assignments.error);
@@ -486,66 +625,72 @@ function validateOccurrenceMutationBody(database, body, { following = false, mas
 // Einzelnen Termin abrufen.
 // Response: { data: Event }
 // --------------------------------------------------------
-router.get('/:id', (req, res) => {
-  try {
-    const id    = parseInt(req.params.id, 10);
-    // A paired display reads under the wall rule (rowReader), people under the row rule.
-    const reader = rowReader(req);
-    const event = db.get().prepare(`
-      SELECT e.*,
-             u_assigned.display_name AS assigned_name,
-             u_assigned.avatar_color AS assigned_color,
-             u_created.display_name  AS creator_name,
-             -- Derselbe Name und dieselbe geerbte Farbe wie im Lesepfad, damit
-             -- jede Antwort dieses Moduls dasselbe Event-Objekt liefert:
-             -- CalDAV/Google ueber calendar_ref_id, ICS-Abos ueber
-             -- subscription_id (#891). Der Name fehlte hier ganz (#1064): die
-             -- Zusage dieser Zeilen galt nur der Farbe, und ein frisch
-             -- angelegter oder geaenderter Termin kam ohne ihn zurueck.
-             COALESCE(ec.name, isub.name)   AS cal_name,
-             COALESCE(ec.color, isub.color) AS cal_color,
-             lc.id AS local_calendar_id,
-             lc.name  AS local_calendar_name,
-             ${localCalendarColorSql()} AS local_calendar_color,
-             ${SOURCE_CALENDAR_COLUMNS},
-             COALESCE(bd.name, nd.name) AS birthday_name,
-             CASE WHEN bd.year_unknown = 1 THEN NULL ELSE bd.birth_date END AS birthday_date,
-             nd.name_day   AS name_day,
-             CASE WHEN nd.id IS NOT NULL THEN 'name_day'
-                  WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
-             ${ASSIGNED_USERS_SQL},
-             (SELECT hws.id FROM housekeeping_work_sessions hws WHERE hws.calendar_event_id = e.id LIMIT 1) AS housekeeping_visit_id
-      FROM calendar_events e
-      LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
-      LEFT JOIN users u_created  ON u_created.id  = e.created_by
-      LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
-      LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
-      ${SOURCE_CALENDAR_JOIN}
-      LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
-      LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
-      LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
-      WHERE e.id = ?
-        AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '?')}
-        AND ${readerVisibleWhere(reader, 'events', 'e', '?')}
-    `).get(id, ...readerBinds(reader, 'ics_subscriptions'), ...readerBinds(reader, 'events'));
+router.get('/:id', validateRequest(), (req, res) => {
+  const id    = pathId(req);
+  // A paired display reads under the wall rule (rowReader), people under the row rule.
+  const reader = rowReader(req);
+  const event = db.get().prepare(`
+    SELECT e.*,
+           u_assigned.display_name AS assigned_name,
+           u_assigned.avatar_color AS assigned_color,
+           u_created.display_name  AS creator_name,
+           -- Derselbe Name und dieselbe geerbte Farbe wie im Lesepfad, damit
+           -- jede Antwort dieses Moduls dasselbe Event-Objekt liefert:
+           -- CalDAV/Google ueber calendar_ref_id, ICS-Abos ueber
+           -- subscription_id (#891). Der Name fehlte hier ganz (#1064): die
+           -- Zusage dieser Zeilen galt nur der Farbe, und ein frisch
+           -- angelegter oder geaenderter Termin kam ohne ihn zurueck.
+           COALESCE(ec.name, isub.name)   AS cal_name,
+           COALESCE(ec.color, isub.color) AS cal_color,
+           lc.id AS local_calendar_id,
+           lc.name  AS local_calendar_name,
+           ${localCalendarColorSql()} AS local_calendar_color,
+           ${SOURCE_CALENDAR_COLUMNS},
+           COALESCE(bd.name, nd.name) AS birthday_name,
+           CASE WHEN bd.year_unknown = 1 THEN NULL ELSE bd.birth_date END AS birthday_date,
+           nd.name_day   AS name_day,
+           CASE WHEN nd.id IS NOT NULL THEN 'name_day'
+                WHEN bd.id IS NOT NULL THEN 'birthday' END AS birthday_event_kind,
+           ${ASSIGNED_USERS_SQL},
+           (SELECT hws.id FROM housekeeping_work_sessions hws WHERE hws.calendar_event_id = e.id LIMIT 1) AS housekeeping_visit_id
+    FROM calendar_events e
+    LEFT JOIN users u_assigned ON u_assigned.id = e.assigned_to
+    LEFT JOIN users u_created  ON u_created.id  = e.created_by
+    LEFT JOIN external_calendars ec ON ec.id = e.calendar_ref_id
+    LEFT JOIN local_calendars lc ON lc.id = ${localCalendarIdSql()}
+    ${SOURCE_CALENDAR_JOIN}
+    LEFT JOIN ics_subscriptions isub ON isub.id = e.subscription_id
+    LEFT JOIN birthdays bd ON bd.calendar_event_id = e.id
+    LEFT JOIN birthdays nd ON nd.name_day_calendar_event_id = e.id
+    WHERE e.id = ?
+      AND ${readerVisibleWhere(reader, 'ics_subscriptions', 'e', '?')}
+      AND ${readerVisibleWhere(reader, 'events', 'e', '?')}
+  `).get(id, ...readerBinds(reader, 'ics_subscriptions'), ...readerBinds(reader, 'events'));
 
-    if (!event) return sendEventGone(res);
-    const database = db.get();
-    const resolved = resolveProjectedEventRows(database, [event])[0];
-    res.json({ data: serializeEvent(resolved, {
-      viewer: documentViewer(req),
-      database,
-      actorId: getUserId(req),
-      isAdmin: isAdminRequest(req),
-    }) });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
-  }
+  if (!event) return sendEventGone(res);
+  const database = db.get();
+  const resolved = resolveProjectedEventRows(database, [event])[0];
+  res.json({ data: serializeEvent(resolved, {
+    viewer: documentViewer(req),
+    database,
+    actorId: getUserId(req),
+    isAdmin: isAdminRequest(req),
+  }) });
 });
 
 // --------------------------------------------------------
 const SERIES_ENDS_BEFORE_START = 'recurrence_rule: the series ends before the start date.';
+
+/**
+ * Die beiden Absagen der Seriengrenzen im PUT (#960, #1607), aus einer Stelle,
+ * damit die Absage nach dem Upload (#2940) dieselbe ist wie die davor.
+ * @param {any} res
+ * @param {string} refusal
+ */
+function sendSeriesRefusal(res, refusal) {
+  if (refusal === 'no_occurrence') return sendSeriesWithoutOccurrence(res);
+  return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400, reason: 'calendar_series_ends_before_start' });
+}
 
 // POST /api/v1/calendar
 // Neuen Termin anlegen.
@@ -554,7 +699,7 @@ const SERIES_ENDS_BEFORE_START = 'recurrence_rule: the series ends before the st
 //         recurrence_rule?, countdown? }
 // Response: { data: Event }
 // --------------------------------------------------------
-router.post('/', async (req, res) => {
+router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (req, res) => {
   let stagedUpload;
   try {
     const userId = getUserId(req);
@@ -567,10 +712,8 @@ router.post('/', async (req, res) => {
       });
       return res.status(401).json({ error: 'Not authenticated.', code: 401 });
     }
-    // Hochladen braucht das Dokumente-Schreibrecht (DECISIONS.md Eintrag 10).
-    if (attachmentUploadRefused(req)) {
-      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
-    }
+    // Hochladen braucht das Dokumente-Schreibrecht (DECISIONS.md Eintrag 10):
+    // `refuseUploadWithoutDocumentsWrite` steht vor der Pruefung der Anfrage.
 
     const vTitle = str(req.body.title, 'title', { max: MAX_TITLE });
     const vDesc  = str(req.body.description, 'description', { max: MAX_TEXT, required: false });
@@ -592,13 +735,15 @@ router.post('/', async (req, res) => {
     const vGoogle = googleTarget(req.body);
     const vOutlook = outlookTarget(req.body);
     const vLocalCalendar = validateCalendarId(db.get(), req.body.local_calendar_id);
-    // Die Form vor dem Inhalt: `str()` machte aus einer Zahl Text ("5").
-    const shapes = [
-      textShape(req.body.title, 'title'),
-      textShape(req.body.description, 'description', { nullable: true }),
-      textShape(req.body.location, 'location', { nullable: true }),
-    ];
-    const checks = [...shapes, vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar];
+    // Eine Person ohne Konto lief bis in den Fremdschluessel von
+    // `event_assignments` (500); dieselbe Pruefung wie an den Vorkommen (#2810).
+    const vAssigned = validateOccurrenceAssignments(db.get(), req.body.assigned_to);
+    // Ein Anhang, den die Route nicht nehmen kann, ist eine 400 vor jedem
+    // Schreiben (#2810); bis dahin warf parseAttachment, und es wurde 500.
+    const vAttachment = parseAttachment(req.body.attachment_data);
+    // Die Form (Text, bei Beschreibung und Ort auch null) prueft das Schema
+    // davor (CalendarEventCreateInput, #2810); `str()` prueft den Inhalt.
+    const checks = [vTitle, vDesc, vStart, vEnd, vColor, vLoc, vRrule, vCaldav, vGoogle, vOutlook, vLocalCalendar, vAssigned, vAttachment];
     if (collectErrors(checks).length) return sendValidationErrors(res, checks);
     if (req.body.local_calendar_id !== undefined
         && ((req.body.external_source && req.body.external_source !== 'local')
@@ -636,9 +781,8 @@ router.post('/', async (req, res) => {
     const userIds  = parseAssignedTo(req.body.assigned_to);
     const firstUid = userIds[0] ?? null;
 
-    const attachment = req.body.attachment_data
-      ? parseAttachment(req.body.attachment_data)
-      : { mime: null, size: null, buffer: null };
+    // Ein Befund ist oben schon eine 400 geworden.
+    const attachment = /** @type {import('./helpers.js').Attachment} */ (vAttachment.value);
     if (attachment.buffer) {
       stagedUpload = await stageDocumentUpload({
         buffer: attachment.buffer,
@@ -648,13 +792,29 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const calendarCheck = validateCalendarId(db.get(), vLocalCalendar.value);
-    if (calendarCheck.error) {
+    // Was an der Datenbank haengt, gilt nach dem Upload wieder (#2956): der
+    // Kalender, das angebotene CalDAV-Ziel und die Personen koennen sich in
+    // der Zwischenzeit geaendert haben. Dieselbe Absage wie ohne Upload.
+    const checksNow = [
+      validateCalendarId(db.get(), vLocalCalendar.value),
+      ...(vCaldavForm.error ? [] : [caldavTargetOffered(db.get(), /** @type {any} */ (vCaldavForm.value))]),
+      validateOccurrenceAssignments(db.get(), req.body.assigned_to),
+    ];
+    const checkErrorsNow = collectErrors(checksNow).length > 0;
+    const strangersNow = checkErrorsNow ? [] : newNonMembers(parseAssignedTo(req.body.assigned_to));
+    if (checkErrorsNow || strangersNow.length) {
       if (stagedUpload) await cleanupStagedUpload(stagedUpload);
-      return sendValidationErrors(res, [calendarCheck]);
+      if (strangersNow.length) return res.status(400).json({ error: nonMemberMessage(strangersNow), code: 400 });
+      return sendValidationErrors(res, checksNow);
+    }
+    // Das Modul-Gate gilt am Schreiben (#2947): dieselbe Absage wie am Eingang.
+    const gateNow = gateRefusalNow(db.get(), req);
+    if (gateNow) {
+      if (stagedUpload) await cleanupStagedUpload(stagedUpload);
+      return gateNow(res);
     }
     const rights = attachmentRights(req);
-    const eventId = db.get().transaction(() => {
+    const eventId = withTx(db.get(), () => {
       const documentId = rights.createAttachmentDocument(
         db.get(),
         attachment,
@@ -698,7 +858,7 @@ router.post('/', async (req, res) => {
         previous: null, // neuer Termin: das Dokument bekommt seine Rechte hier
       });
       return result.lastInsertRowid;
-    })();
+    });
 
     const event = db.get().prepare(`
       SELECT e.*,
@@ -750,7 +910,12 @@ router.post('/', async (req, res) => {
       log.error('POST / storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
-    log.error('', err);
+    // Das Dokumente-Recht ging waehrend des Uploads verloren (#2947).
+    if (err instanceof RefusedAfterUploadError) {
+      return sendRefusalAfterUpload(res, err.respond, [stagedUpload].filter(Boolean));
+    }
+    // Ein unerwarteter Fehler geht an den zentralen Handler (#2810) - aber
+    // erst, wenn der bereitgestellte Anhang wieder weg ist.
     if (stagedUpload) {
       try {
         await cleanupStagedUpload(stagedUpload);
@@ -763,7 +928,11 @@ router.post('/', async (req, res) => {
         );
       }
     }
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    // A storage refusal after the upload (#2946: the settings changed meanwhile).
+    if (err instanceof StorageError) {
+      return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
+    }
+    throw err;
   }
 });
 
@@ -804,6 +973,46 @@ function refuseForeignEvent(req, res, event) {
   return true;
 }
 
+/**
+ * DAS RECHT GILT AM SCHREIBEN (#2947). Darf die Anfrage den Termin aendern -
+ * mit dem Recht vom Eingang UND mit Rolle und Rechten des Kontos von jetzt
+ * (`requestAsOfNow`)? Gefragt nach dem letzten await (Upload, Kopien), im
+ * selben synchronen Schritt wie das Schreiben; neu gelesen wird nur enger.
+ * @param {any} req
+ * @param {any} event
+ */
+function mayEditEventNow(req, event) {
+  if (!mayChangeRecord(db.get(), req, 'calendar_edit_others', ownsEvent(event, req))) return false;
+  const now = requestAsOfNow(db.get(), req);
+  return Boolean(now) && mayChangeRecord(db.get(), now, 'calendar_edit_others', ownsEvent(event, now));
+}
+
+/**
+ * Der gespeicherte Anhang ist fuer die Anfrage gesperrt - am Eingang ODER jetzt
+ * (#2947): das Dokumente-Leserecht gilt am Schreiben wie das Bearbeitungsrecht.
+ * @param {any} req
+ * @param {any} database
+ * @param {number | null | undefined} storedDocumentId
+ */
+function attachmentLockedNow(req, database, storedDocumentId) {
+  if (storedAttachmentLocked(req, database, storedDocumentId)) return true;
+  const now = requestAsOfNow(database, req);
+  return !now || storedAttachmentLocked(now, database, storedDocumentId);
+}
+
+/**
+ * Modul-Gate und Bearbeitungsrecht am Schreiben (#2947): faellt eines weg,
+ * dieselbe Absage wie am Eingang, als RefusedAfterUploadError - der catch der
+ * Route raeumt Upload und Kopien weg.
+ * @param {any} req
+ * @param {any} event
+ */
+function assertCalendarRightsNow(req, event) {
+  const gate = gateRefusalNow(db.get(), req);
+  if (gate) throw new RefusedAfterUploadError(gate);
+  if (!mayEditEventNow(req, event)) throw new RefusedAfterUploadError((r) => sendNotOwner(r));
+}
+
 const CALENDAR_OCCURRENCE_ERRORS = {
   calendar_series_not_found: 'Calendar series not found.',
   not_authorized: 'Not authorized to change this calendar series.',
@@ -817,6 +1026,7 @@ const CALENDAR_OCCURRENCE_ERRORS = {
   calendar_occurrence_route_required: 'Use the occurrence endpoint to change a linked recurring occurrence.',
   empty_successor_series: 'The successor series has no occurrence on or after its start date.',
   invalid_successor_override: 'An occurrence override does not fit the successor series.',
+  calendar_series_changed: 'The series changed while attachment copies were uploaded. Nothing was saved; send the request again.',
 };
 
 function sendCalendarOccurrenceError(res, error) {
@@ -830,15 +1040,20 @@ function sendCalendarOccurrenceError(res, error) {
   });
 }
 
-function rejectLinkedOccurrenceResource(res, event, req) {
-  if (event.recurrence_parent_id == null) return false;
+/**
+ * Die Absage fuer ein verknuepftes Vorkommen (404, 403 oder 400), gebaut aus
+ * der Serie, wie sie JETZT steht. Synchron gelesen, damit eine Absage nach
+ * einem await beschreibt, was die Pruefung sah (#2956).
+ * @param {any} event
+ * @param {any} req
+ */
+function linkedOccurrenceRefusal(event, req) {
   const parent = loadVisibleEvent(Number(event.recurrence_parent_id), req);
   if (!parent) {
-    sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
+    return new CalendarOccurrenceError(
       'Calendar series not found.',
       { status: 404, code: 'calendar_series_not_found' },
-    ));
-    return true;
+    );
   }
   const eligibility = isEligibleLocalSeries(
     db.get(),
@@ -847,16 +1062,73 @@ function rejectLinkedOccurrenceResource(res, event, req) {
   );
   if (!eligibility.eligible) {
     const unauthorized = eligibility.reason === 'not_authorized';
-    sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
+    return new CalendarOccurrenceError(
       unauthorized ? 'Not authorized.' : 'This calendar series cannot use occurrence overrides.',
       { status: unauthorized ? 403 : 400, code: eligibility.reason },
-    ));
-    return true;
+    );
   }
-  sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
+  return new CalendarOccurrenceError(
     'Use the occurrence endpoint to modify a linked recurring occurrence.',
     { status: 400, code: 'calendar_occurrence_route_required' },
-  ));
+  );
+}
+
+/**
+ * Die Serie, wie sie nach dem letzten await steht (#2956): geloescht oder fuer
+ * die Person nicht mehr sichtbar ist dieselbe 404 wie vor dem Upload. Synchron
+ * gelesen; den Upload raeumt der catch der Route weg.
+ * @param {number} seriesId
+ * @param {any} req
+ */
+function seriesAfterUpload(seriesId, req) {
+  const current = loadVisibleEvent(seriesId, req);
+  if (!current) {
+    throw new CalendarOccurrenceError('Calendar series not found.', {
+      status: 404,
+      code: 'calendar_series_not_found',
+    });
+  }
+  // Ebenso Modul-Gate und Bearbeitungsrecht (#2947): die Route fragte sie am
+  // Eingang, vor dem Upload.
+  assertCalendarRightsNow(req, current);
+  return current;
+}
+
+const LOCAL_NEXT_TO_TARGET = 'Choose either a sync target or a local calendar.';
+
+/**
+ * Die Folge-Route je Lauf (#2956): die Serie von jetzt, ob sie Ausnahmen
+ * tragen kann und Sync-Ziel gegen lokalen Kalender - in der Reihenfolge der
+ * Pruefung vor dem Upload. Gibt die Serie und die Aenderungen dieses Laufs
+ * zurueck (`local_calendar_id` nach dem Ziel), ohne `baseChanges` anzufassen.
+ * @param {{ seriesId: number, req: any, actorId: any, baseChanges: Record<string, any>, syncTargetOf: (row: any) => any }} args
+ * @returns {{ now: any, changes: Record<string, any> }}
+ */
+function followingSeriesNow({ seriesId, req, actorId, baseChanges, syncTargetOf }) {
+  const now = seriesAfterUpload(seriesId, req);
+  const eligibility = isEligibleLocalSeries(db.get(), now, actorId);
+  if (!eligibility.eligible) {
+    const unauthorized = eligibility.reason === 'not_authorized';
+    throw new CalendarOccurrenceError(
+      unauthorized ? 'Not authorized.' : 'This calendar series cannot use occurrence overrides.',
+      { status: unauthorized ? 403 : 400, code: eligibility.reason },
+    );
+  }
+  const syncTarget = syncTargetOf(now);
+  const localAsked = Object.hasOwn(req.body, 'local_calendar_id');
+  if (localAsked && syncTarget) {
+    throw new RefusedAfterUploadError((r) => r.status(400).json({ error: LOCAL_NEXT_TO_TARGET, code: 400 }));
+  }
+  // Je Lauf eine eigene Kopie der Aenderungen: das Ziel dieses Laufs entscheidet
+  // ueber den lokalen Kalender, nichts davon bleibt fuer den naechsten Lauf stehen.
+  const runChanges = { ...baseChanges };
+  if (syncTarget) runChanges.local_calendar_id = null;
+  return { now, changes: runChanges };
+}
+
+function rejectLinkedOccurrenceResource(res, event, req) {
+  if (event.recurrence_parent_id == null) return false;
+  sendCalendarOccurrenceError(res, linkedOccurrenceRefusal(event, req));
   return true;
 }
 
@@ -866,199 +1138,273 @@ function rejectLinkedOccurrenceResource(res, event, req) {
 // Body: alle Felder optional außer title + start_datetime
 // Response: { data: Event }
 // --------------------------------------------------------
-router.put('/:id', async (req, res) => {
+router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (req, res) => {
   let stagedUpload;
   const stagedClones = [];
   try {
-    // Vor der Suche: die Absage verraet nicht, ob es den Termin gibt.
-    if (attachmentUploadRefused(req)) {
-      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
-    }
-    const id    = parseInt(req.params.id, 10);
-    const event = loadVisibleEvent(id, req);
-    if (!event) return sendEventGone(res);
-    if (refuseForeignEvent(req, res, event)) return;
-    if (rejectLinkedOccurrenceResource(res, event, req)) return;
+    // Das Dokumente-Schreibrecht fragt `refuseUploadWithoutDocumentsWrite` vor
+    // der Suche: die Absage verraet nicht, ob es den Termin gibt.
+    const id    = pathId(req);
     const rights = attachmentRights(req);
-
-    const checks = [];
-    // GESPEICHERT WIRD DER GEPRUEFTE WERT, NICHT DER ROHE (#1364). Bis hierher
-    // pruefte PUT mit `datetime()` und schrieb dann `req.body.start_datetime`:
-    // dieselbe Eingabe landete per POST gekuerzt und per PUT roh in der Zeile,
-    // und eine Serie mit rohem `Z`-Start wiederholte ihren UTC-Suffix und
-    // rutschte ueber die Zeitumstellung um eine Stunde. Ganztaegig ist, was der
-    // Body sagt, sonst was schon gespeichert ist.
-    //
-    // DER START IST PFLICHT, AUCH HIER. Mitgeschickt als '' oder `null` ist er
-    // ein 400 mit derselben Meldung wie bei POST: '' landete bis v2.68.0 roh in
-    // der Zeile, und mit dem geprueften Wert haette es den Start still stehen
-    // lassen - eine Anfrage, die leeren will, bekaeme 200, und nichts geschaehe.
-    // Das Ende ist optional und darf geleert werden (ein Termin ohne Ende ist
-    // gueltig, das Formular schickt dann `null`).
-    const zoneOpts = {
-      to: 'wall',
-      zone: householdTimeZone(db.get()),
-      allDay: req.body.all_day !== undefined ? !!req.body.all_day : !!event.all_day,
-    };
-    const vStart = req.body.start_datetime !== undefined
-      ? datetime(req.body.start_datetime, 'start_datetime', true, zoneOpts) : null;
-    const vEnd = req.body.end_datetime !== undefined
-      ? datetime(req.body.end_datetime, 'end_datetime', false, zoneOpts) : null;
-    // Ein mitgeschickter Titel muss Text sein und darf nicht leer sein: eine Zahl
-    // lief in `.trim()` auf einen 500, '' wurde gespeichert, und `null` blieb
-    // still ohne Wirkung. Fehlt er, bleibt der alte (Kuerzen einer Serie).
-    checks.push(
-      textShape(req.body.title, 'title'),
-      textShape(req.body.description, 'description', { nullable: true }),
-      textShape(req.body.location, 'location', { nullable: true }),
-    );
-    if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: typeof req.body.title === 'string' }));
-    if (req.body.description    !== undefined) checks.push(str(req.body.description, 'description', { max: MAX_TEXT, required: false }));
-    if (vStart) checks.push(vStart);
-    if (vEnd)   checks.push(vEnd);
-    if (req.body.color          !== undefined) checks.push(color(req.body.color, 'color'));
-    if (req.body.location       !== undefined) checks.push(str(req.body.location, 'location', { max: MAX_TITLE, required: false }));
-    // Der unveränderte Bestandswert kommt ohne Prüfung durch: Die Regel steht
-    // bereits so in der Datenbank, und der Validator kennt nur das Vokabular der
-    // eigenen Oberfläche (FREQ/INTERVAL/BYDAY/UNTIL/COUNT, ohne „RRULE:"-Präfix).
-    // Eine aus CalDAV eingelesene Serie trägt regelmäßig mehr als das - Präfix,
-    // WKST, BYMONTHDAY. Ohne diese Ausnahme scheiterte jede Änderung an einem
-    // anderen Feld (Zuweisung, Titel) an der Wiederholung, die der Nutzer gar
-    // nicht angefasst hat (#756). Geändert wird weiterhin nur, was der Validator
-    // zulässt.
-    if (req.body.recurrence_rule !== undefined
-        && req.body.recurrence_rule !== event.recurrence_rule) {
-      checks.push(rrule(req.body.recurrence_rule, 'recurrence_rule'));
-    }
-    // CalDAV-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
-    const caldavProvided = req.body.target_caldav_account_id !== undefined
-      || req.body.target_caldav_calendar_url !== undefined;
-    const vCaldav = caldavProvided ? caldavTarget(req.body) : null;
-    if (vCaldav) checks.push(vCaldav);
-    // Ein NEUES Ziel muss angeboten sein; das unveränderte kommt durch (#1860).
-    if (vCaldav && !vCaldav.error) checks.push(caldavTargetOffered(db.get(), vCaldav.value, event));
-    // Google-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
-    const googleProvided = req.body.target_google_calendar_id !== undefined;
-    const vGoogle = googleProvided ? googleTarget(req.body) : null;
-    if (vGoogle) checks.push(vGoogle);
-    // Outlook-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
-    const outlookProvided = req.body.target_outlook_account_id !== undefined
-      || req.body.target_outlook_calendar_id !== undefined;
-    const vOutlook = outlookProvided ? outlookTarget(req.body) : null;
-    if (vOutlook) checks.push(vOutlook);
-    const localCalendarProvided = req.body.local_calendar_id !== undefined;
-    if (localCalendarProvided && resolveLocalCalendarId(db.get(), event.id) === null) {
-      return res.status(400).json({ error: 'Local calendars can only hold local events.', code: 400 });
-    }
-    const vLocalCalendar = localCalendarProvided
-      ? validateCalendarId(db.get(), req.body.local_calendar_id, { required: true })
-      : null;
-    if (vLocalCalendar) checks.push(vLocalCalendar);
-    if (collectErrors(checks).length) return sendValidationErrors(res, checks);
-    if (event.recurrence_rule && req.body.confirmed_orphan_count !== undefined
-        && (!Number.isInteger(req.body.confirmed_orphan_count)
-          || req.body.confirmed_orphan_count < 0)) {
-      return res.status(400).json({
-        error: 'confirmed_orphan_count must be a whole number from 0.',
-        code: 400,
-      });
-    }
-    const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : event.icon;
-    if (!vIcon) return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
-    if (
-      req.body.remove_attachment !== undefined
-      && typeof req.body.remove_attachment !== 'boolean'
-    ) {
-      return res.status(400).json({
-        error: 'remove_attachment must be a boolean.',
-        code: 400,
-      });
-    }
     const {
       title, description,
       all_day, color: colorVal, recurrence_rule,
     } = req.body;
-    const location = locationAfterEdit(req.body.location, event.location);
-    // `undefined` = nicht mitgeschickt. Ein Start ist danach nie leer (siehe
-    // oben), ein Ende mit '' oder `null` kommt als null an und leert es.
-    const start_datetime = vStart ? vStart.value : undefined;
-    const end_datetime   = vEnd ? vEnd.value : undefined;
+    const attachmentDataProvided = Object.hasOwn(req.body, 'attachment_data');
+    const replacementRequested = typeof req.body.attachment_data === 'string'
+      && req.body.attachment_data.trim() !== '';
+    const removalRequested = req.body.remove_attachment === true
+      || (attachmentDataProvided && req.body.attachment_data === null);
+    const vAttachment = parseAttachment(req.body.attachment_data);
 
-    // AUCH BEIM BEARBEITEN DARF KEINE LEERE SERIE ENTSTEHEN (#960) - aber nur
-    // dann abweisen, wenn DIESE Anfrage sie leer macht.
-    //
-    // NICHT DIE ANWESENHEIT DER FELDER PRUEFEN, SONDERN IHRE WERTE. Beide
-    // Formulare schicken bei jedem Speichern das ganze Objekt mit
-    // (`public/pages/calendar.js`, `public/pages/tasks.js`); "hat der Aufrufer
-    // das Feld geschickt?" ist deshalb immer wahr und taugt nicht als Frage.
-    // Wer nur den Titel aendert, wuerde sonst an einer eingelesenen Serie
-    // scheitern, die schon vorher kein Vorkommen hatte - ein Datensatz, den
-    // niemand mehr bearbeiten koennte.
-    //
-    // Ein leerer Start kommt hier nicht mehr an, er ist oben schon ein 400
-    // (#1364); fehlt das Feld, gilt der gespeicherte. Der Tagesvergleich
-    // reicht, weil `hasAnyOccurrence` ohnehin nur den Tag liest.
-    // DIESELBE FORMEL WIE DAS UPDATE UNTEN, sonst prueft der Guard einen
-    // Zustand, den es nie geben wird. `recurrence_rule` steht NICHT unter
-    // COALESCE: `null` loescht die Regel, statt sie stehen zu lassen. Wer die
-    // Wiederholung abschaltet und dabei das Startdatum aendert, wurde sonst
-    // gegen die ALTE Regel geprueft und mit 400 abgewiesen - fuer eine Serie,
-    // die es nach dem Speichern gar nicht mehr gibt.
-    const regelDanach = recurrence_rule !== undefined
-      ? (recurrence_rule || null)
-      : event.recurrence_rule;
-    const startDanach = start_datetime !== undefined && start_datetime !== null
-      ? start_datetime
-      : event.start_datetime;
-    const serieBeruehrt = regelDanach !== event.recurrence_rule
-      || String(startDanach ?? '').slice(0, 10) !== String(event.start_datetime ?? '').slice(0, 10);
-    // DER GUARD MUSS DENSELBEN KALENDERTAG MEINEN WIE DIE EXPANSION. Ein
-    // eingelesener Termin kann eine eigene Zone tragen: 31. Januar 20:00 in New
-    // York steht als 1. Februar 01:00 UTC in der Zeile. Fuer "am letzten Tag des
-    // Monats" zaehlt der Ortstag, also der 31. - ohne den Hinweis sah der Guard
-    // den Ersten, hielt die Serie fuer leer und wies eine gueltige Bearbeitung
-    // mit 400 ab. `expandRecurringEvents` nimmt die Pruefung im selben Fall
-    // zurueck (`zonenUnsicher`); nur `tzid` kann diesen Zustand erzeugen, die
-    // Route selbst nimmt das Feld nicht entgegen.
-    // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
-    const wandUhr = event.tzid ? storedToWall(String(startDanach ?? ''), event.tzid, zoneOpts.zone) : null;
-    const zonenUnsicher = storedDayDiffersFromSeriesDay(String(startDanach ?? ''), event.tzid, zoneOpts.zone);
-    if (serieBeruehrt
-      && !hasAnyOccurrence(startDanach, regelDanach, { utcDiffersFromLocal: zonenUnsicher })) {
-      return sendSeriesWithoutOccurrence(res);
-    }
-    // EIN ENDE VOR DEM START (#1607): nur wenn DIESE Anfrage Regel oder
-    // Starttag aendert. Eine eingelesene Serie, die schon so in der Zeile
-    // steht, bleibt bearbeitbar.
-    //
-    // "STARTTAG GEAENDERT" WIRD IN EINER DARSTELLUNG VERGLICHEN, anders als
-    // `serieBeruehrt` oben. Das Formular schickt die Wanduhrzeit des Haushalts;
-    // ein synchronisierter Termin liegt als Instant in der Zeile, und dessen
-    // UTC-Tag kann der Nachbartag sein. Am rohen Text verglichen waere ein
-    // reiner Titel-Edit dort eine Startaenderung. Fuer die Pruefung darueber
-    // ist das unschaedlich (sie wird dadurch nur OEFTER gefragt und nimmt sich
-    // im Zweifel selbst zurueck), hier wuerde es eine Bearbeitung abweisen.
-    const gespeicherterStart = String(event.start_datetime ?? '');
-    const gespeicherterTag = hasExplicitZone(gespeicherterStart)
-      ? (utcToWall(gespeicherterStart, zoneOpts.zone)?.date ?? gespeicherterStart.slice(0, 10))
-      : gespeicherterStart.slice(0, 10);
-    const startTag = String(startDanach ?? '').slice(0, 10);
-    const regelGeaendert = regelDanach !== event.recurrence_rule;
-    const startTagGeaendert = start_datetime !== undefined && start_datetime !== null
-      && startTag !== gespeicherterTag;
-    // WO DER STARTTAG VON DER LESART ABHAENGT, WIRD NICHT GERATEN - ABER AUCH
-    // NICHT WEGGESEHEN. Ein Termin mit eigener Zone hat zwei Kandidaten (der
-    // UTC-Tag der Zeile und der Ortstag); ohne aufloesbare Zone liegt der Ortstag
-    // hoechstens einen Tag daneben. Abgewiesen wird dort nur ein Ende, das vor
-    // JEDEM Kandidaten liegt, und nur bei geaenderter REGEL: die ist in jeder
-    // Darstellung dieselbe Zeichenkette.
-    const startKandidaten = zonenUnsicher
-      ? [startTag, wandUhr?.date ?? shiftDateKey(startTag, -1)]
-      : [startTag];
-    const endeGefragt = zonenUnsicher ? regelGeaendert : (regelGeaendert || startTagGeaendert);
-    if (endeGefragt && startKandidaten.every((tag) => endsBeforeStart(tag, regelDanach))) {
-      return res.status(400).json({ error: SERIES_ENDS_BEFORE_START, code: 400, reason: 'calendar_series_ends_before_start' });
-    }
+    // EINE PRUEFUNG, ZWEI STAENDE (#2940). Jede Pruefung und jeder Wert, der an
+    // der Zeile haengt, steht in `evaluate(row)`: einmal gegen den geladenen
+    // Termin fuer die schnelle Absage vor dem Upload, einmal im synchronen Teil
+    // des Schreibens gegen die Zeile, die es vorfindet - waehrend des Uploads
+    // (await) kann eine zweite Anfrage sie geaendert oder geloescht haben. Eine
+    // Absage ist eine Antwortfunktion: davor wird sie gesendet, danach als
+    // `RefusedAfterUploadError` geworfen, der catch raeumt den Upload weg und
+    // sendet dieselbe Antwort.
+    /** @param {(r: any) => any} respond */
+    const refuse = (respond) => ({ refuse: respond });
+    const evaluate = (/** @type {any} */ row) => {
+      if (!row) return refuse((r) => sendEventGone(r));
+      // Modul-Gate und Bearbeitungsrecht, wie sie JETZT stehen (#2947): beim
+      // zweiten Lauf nach dem Upload sonst noch der Stand vom Eingang.
+      const gate = gateRefusalNow(db.get(), req);
+      if (gate) return refuse(gate);
+      if (!mayEditEventNow(req, row)) {
+        return refuse((r) => sendNotOwner(r));
+      }
+      // Ein verknuepftes Vorkommen hat seinen eigenen Weg; die Absage (404, 403
+      // oder 400) liest die Serie hier, nicht erst beim Senden: nach dem Upload
+      // liegt davor noch das Aufraeumen (await, #2956).
+      if (row.recurrence_parent_id != null) {
+        const answer = linkedOccurrenceRefusal(row, req);
+        return refuse((r) => sendCalendarOccurrenceError(r, answer));
+      }
+
+      /** @type {any[]} */
+      const checks = [];
+      // GESPEICHERT WIRD DER GEPRUEFTE WERT, NICHT DER ROHE (#1364). Bis hierher
+      // pruefte PUT mit `datetime()` und schrieb dann `req.body.start_datetime`:
+      // dieselbe Eingabe landete per POST gekuerzt und per PUT roh in der Zeile,
+      // und eine Serie mit rohem `Z`-Start wiederholte ihren UTC-Suffix und
+      // rutschte ueber die Zeitumstellung um eine Stunde. Ganztaegig ist, was der
+      // Body sagt, sonst was schon gespeichert ist.
+      //
+      // DER START IST PFLICHT, AUCH HIER. Mitgeschickt als '' oder `null` ist er
+      // ein 400 mit derselben Meldung wie bei POST: '' landete bis v2.68.0 roh in
+      // der Zeile, und mit dem geprueften Wert haette es den Start still stehen
+      // lassen - eine Anfrage, die leeren will, bekaeme 200, und nichts geschaehe.
+      // Das Ende ist optional und darf geleert werden (ein Termin ohne Ende ist
+      // gueltig, das Formular schickt dann `null`).
+      const zoneOpts = {
+        to: 'wall',
+        zone: householdTimeZone(db.get()),
+        allDay: req.body.all_day !== undefined ? !!req.body.all_day : !!row.all_day,
+      };
+      const vStart = req.body.start_datetime !== undefined
+        ? datetime(req.body.start_datetime, 'start_datetime', true, zoneOpts) : null;
+      const vEnd = req.body.end_datetime !== undefined
+        ? datetime(req.body.end_datetime, 'end_datetime', false, zoneOpts) : null;
+      // Ein mitgeschickter Titel muss Text sein und darf nicht leer sein: eine Zahl
+      // lief in `.trim()` auf einen 500, '' wurde gespeichert, und `null` blieb
+      // still ohne Wirkung. Fehlt er, bleibt der alte (Kuerzen einer Serie).
+      // Die Form von Beschreibung und Ort prueft das Schema davor (#2810); die
+      // des Titels bleibt, weil das Update unten `title.trim()` auf dem Rohwert
+      // ruft (Senke, nicht Route).
+      checks.push(textShape(req.body.title, 'title'));
+      if (req.body.title          !== undefined) checks.push(str(req.body.title, 'title', { max: MAX_TITLE, required: typeof req.body.title === 'string' }));
+      if (req.body.description    !== undefined) checks.push(str(req.body.description, 'description', { max: MAX_TEXT, required: false }));
+      if (vStart) checks.push(vStart);
+      if (vEnd)   checks.push(vEnd);
+      if (req.body.color          !== undefined) checks.push(color(req.body.color, 'color'));
+      if (req.body.location       !== undefined) checks.push(str(req.body.location, 'location', { max: MAX_TITLE, required: false }));
+      // Der unveränderte Bestandswert kommt ohne Prüfung durch: Die Regel steht
+      // bereits so in der Datenbank, und der Validator kennt nur das Vokabular der
+      // eigenen Oberfläche (FREQ/INTERVAL/BYDAY/UNTIL/COUNT, ohne „RRULE:"-Präfix).
+      // Eine aus CalDAV eingelesene Serie trägt regelmäßig mehr als das - Präfix,
+      // WKST, BYMONTHDAY. Ohne diese Ausnahme scheiterte jede Änderung an einem
+      // anderen Feld (Zuweisung, Titel) an der Wiederholung, die der Nutzer gar
+      // nicht angefasst hat (#756). Geändert wird weiterhin nur, was der Validator
+      // zulässt.
+      if (req.body.recurrence_rule !== undefined
+          && req.body.recurrence_rule !== row.recurrence_rule) {
+        checks.push(rrule(req.body.recurrence_rule, 'recurrence_rule'));
+      }
+      // CalDAV-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
+      const caldavProvided = req.body.target_caldav_account_id !== undefined
+        || req.body.target_caldav_calendar_url !== undefined;
+      const vCaldav = caldavProvided ? caldavTarget(req.body) : null;
+      if (vCaldav) checks.push(vCaldav);
+      // Ein NEUES Ziel muss angeboten sein; das unveränderte kommt durch (#1860).
+      if (vCaldav && !vCaldav.error) checks.push(caldavTargetOffered(db.get(), vCaldav.value, row));
+      // Google-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
+      const googleProvided = req.body.target_google_calendar_id !== undefined;
+      const vGoogle = googleProvided ? googleTarget(req.body) : null;
+      if (vGoogle) checks.push(vGoogle);
+      // Outlook-Ziel nur prüfen, wenn der Client es mitschickt; sonst bestehenden Wert behalten.
+      const outlookProvided = req.body.target_outlook_account_id !== undefined
+        || req.body.target_outlook_calendar_id !== undefined;
+      const vOutlook = outlookProvided ? outlookTarget(req.body) : null;
+      if (vOutlook) checks.push(vOutlook);
+      const localCalendarProvided = req.body.local_calendar_id !== undefined;
+      if (localCalendarProvided && resolveLocalCalendarId(db.get(), row.id) === null) {
+        return refuse((r) => r.status(400).json({ error: 'Local calendars can only hold local events.', code: 400 }));
+      }
+      const vLocalCalendar = localCalendarProvided
+        ? validateCalendarId(db.get(), req.body.local_calendar_id, { required: true })
+        : null;
+      if (vLocalCalendar) checks.push(vLocalCalendar);
+      // Eine Person ohne Konto und ein unlesbarer Anhang endeten als 500 (#2810).
+      if (req.body.assigned_to !== undefined) checks.push(validateOccurrenceAssignments(db.get(), req.body.assigned_to));
+      checks.push(vAttachment);
+      if (collectErrors(checks).length) return refuse((r) => sendValidationErrors(r, checks));
+      const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : row.icon;
+      if (!vIcon) return refuse((r) => r.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 }));
+      // `undefined` = nicht mitgeschickt. Ein Start ist danach nie leer (siehe
+      // oben), ein Ende mit '' oder `null` kommt als null an und leert es.
+      const start_datetime = vStart ? vStart.value : undefined;
+      const end_datetime   = vEnd ? vEnd.value : undefined;
+
+      // AUCH BEIM BEARBEITEN DARF KEINE LEERE SERIE ENTSTEHEN (#960) - aber nur
+      // dann abweisen, wenn DIESE Anfrage sie leer macht.
+      //
+      // NICHT DIE ANWESENHEIT DER FELDER PRUEFEN, SONDERN IHRE WERTE. Beide
+      // Formulare schicken bei jedem Speichern das ganze Objekt mit
+      // (`public/pages/calendar.js`, `public/pages/tasks.js`); "hat der Aufrufer
+      // das Feld geschickt?" ist deshalb immer wahr und taugt nicht als Frage.
+      // Wer nur den Titel aendert, wuerde sonst an einer eingelesenen Serie
+      // scheitern, die schon vorher kein Vorkommen hatte - ein Datensatz, den
+      // niemand mehr bearbeiten koennte.
+      //
+      // Ein leerer Start kommt hier nicht mehr an, er ist oben schon ein 400
+      // (#1364); fehlt das Feld, gilt der gespeicherte. Der Tagesvergleich
+      // reicht, weil `hasAnyOccurrence` ohnehin nur den Tag liest.
+      // DIESELBE FORMEL WIE DAS UPDATE UNTEN, sonst prueft der Guard einen
+      // Zustand, den es nie geben wird. `recurrence_rule` steht NICHT unter
+      // COALESCE: `null` loescht die Regel, statt sie stehen zu lassen. Wer die
+      // Wiederholung abschaltet und dabei das Startdatum aendert, wurde sonst
+      // gegen die ALTE Regel geprueft und mit 400 abgewiesen - fuer eine Serie,
+      // die es nach dem Speichern gar nicht mehr gibt.
+      // SERIENGRENZEN gegen eine Zeile (#2940): hier gegen den geladenen
+      // Termin, in applyUpdate noch einmal gegen die Zeile, die das Schreiben
+      // vorfindet - waehrend des Uploads kann eine zweite Anfrage Regel oder
+      // Start geaendert haben.
+      const seriesCheck = (/** @type {any} */ row) => {
+        const regelDanach = recurrence_rule !== undefined
+          ? (recurrence_rule || null)
+          : row.recurrence_rule;
+        const startDanach = start_datetime !== undefined && start_datetime !== null
+          ? start_datetime
+          : row.start_datetime;
+        const serieBeruehrt = regelDanach !== row.recurrence_rule
+          || String(startDanach ?? '').slice(0, 10) !== String(row.start_datetime ?? '').slice(0, 10);
+        // DER GUARD MUSS DENSELBEN KALENDERTAG MEINEN WIE DIE EXPANSION. Ein
+        // eingelesener Termin kann eine eigene Zone tragen: 31. Januar 20:00 in New
+        // York steht als 1. Februar 01:00 UTC in der Zeile. Fuer "am letzten Tag des
+        // Monats" zaehlt der Ortstag, also der 31. - ohne den Hinweis sah der Guard
+        // den Ersten, hielt die Serie fuer leer und wies eine gueltige Bearbeitung
+        // mit 400 ab. `expandRecurringEvents` nimmt die Pruefung im selben Fall
+        // zurueck (`zonenUnsicher`); nur `tzid` kann diesen Zustand erzeugen, die
+        // Route selbst nimmt das Feld nicht entgegen.
+        // Zonenlose Ziffern sind Wanduhr des Haushalts, nie der Prozesszone (#1993).
+        const wandUhr = row.tzid ? storedToWall(String(startDanach ?? ''), row.tzid, zoneOpts.zone) : null;
+        const zonenUnsicher = storedDayDiffersFromSeriesDay(String(startDanach ?? ''), row.tzid, zoneOpts.zone);
+        if (serieBeruehrt
+          && !hasAnyOccurrence(startDanach, regelDanach, { utcDiffersFromLocal: zonenUnsicher })) {
+          return { regelDanach, startDanach, refusal: 'no_occurrence' };
+        }
+        // EIN ENDE VOR DEM START (#1607): nur wenn DIESE Anfrage Regel oder
+        // Starttag aendert. Eine eingelesene Serie, die schon so in der Zeile
+        // steht, bleibt bearbeitbar.
+        //
+        // "STARTTAG GEAENDERT" WIRD IN EINER DARSTELLUNG VERGLICHEN, anders als
+        // `serieBeruehrt` oben. Das Formular schickt die Wanduhrzeit des Haushalts;
+        // ein synchronisierter Termin liegt als Instant in der Zeile, und dessen
+        // UTC-Tag kann der Nachbartag sein. Am rohen Text verglichen waere ein
+        // reiner Titel-Edit dort eine Startaenderung. Fuer die Pruefung darueber
+        // ist das unschaedlich (sie wird dadurch nur OEFTER gefragt und nimmt sich
+        // im Zweifel selbst zurueck), hier wuerde es eine Bearbeitung abweisen.
+        const gespeicherterStart = String(row.start_datetime ?? '');
+        const gespeicherterTag = hasExplicitZone(gespeicherterStart)
+          ? (utcToWall(gespeicherterStart, zoneOpts.zone)?.date ?? gespeicherterStart.slice(0, 10))
+          : gespeicherterStart.slice(0, 10);
+        const startTag = String(startDanach ?? '').slice(0, 10);
+        const regelGeaendert = regelDanach !== row.recurrence_rule;
+        const startTagGeaendert = start_datetime !== undefined && start_datetime !== null
+          && startTag !== gespeicherterTag;
+        // WO DER STARTTAG VON DER LESART ABHAENGT, WIRD NICHT GERATEN - ABER AUCH
+        // NICHT WEGGESEHEN. Ein Termin mit eigener Zone hat zwei Kandidaten (der
+        // UTC-Tag der Zeile und der Ortstag); ohne aufloesbare Zone liegt der Ortstag
+        // hoechstens einen Tag daneben. Abgewiesen wird dort nur ein Ende, das vor
+        // JEDEM Kandidaten liegt, und nur bei geaenderter REGEL: die ist in jeder
+        // Darstellung dieselbe Zeichenkette.
+        const startKandidaten = zonenUnsicher
+          ? [startTag, wandUhr?.date ?? shiftDateKey(startTag, -1)]
+          : [startTag];
+        const endeGefragt = zonenUnsicher ? regelGeaendert : (regelGeaendert || startTagGeaendert);
+        if (endeGefragt && startKandidaten.every((tag) => endsBeforeStart(tag, regelDanach))) {
+          return { regelDanach, startDanach, refusal: 'ends_before_start' };
+        }
+        return { regelDanach, startDanach, refusal: null };
+      };
+      const { regelDanach, startDanach, refusal: seriesRefusal } = seriesCheck(row);
+      if (seriesRefusal) return refuse((r) => sendSeriesRefusal(r, seriesRefusal));
+
+      if (replacementRequested && removalRequested) {
+        return refuse((r) => r.status(400).json({
+          error: 'attachment_data and remove_attachment contradict each other.',
+          code: 400,
+        }));
+      }
+      if ((replacementRequested || removalRequested)
+          && attachmentLockedNow(req, db.get(), row.attachment_document_id)) {
+        return refuse((r) => r.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' }));
+      }
+
+      // WER START ODER REGEL IN YUVOMI AENDERT, HAT SIE VERFASST (#1935) - auch
+      // an einer eingelesenen Serie. Die Marke entscheidet, ob der ausgehende
+      // Weg den Start auf die eigene Regel ausrichtet (services/outbound-dtstart.js).
+      // Verglichen wird der BEGINN, nicht der Text: das Formular schickt die
+      // Wanduhrzeit des Haushalts, ein eingelesener Termin liegt als Zeitpunkt in
+      // der Zeile. Am Text gemessen setzte jede Titelaenderung die Marke, und die
+      // eingelesene Serie ginge danach mit einem anderen DTSTART zurueck (#756).
+      const seriesAuthoredHere = startOrRuleChanged(row, {
+        start_datetime: startDanach,
+        all_day: all_day !== undefined ? all_day : row.all_day,
+        recurrence_rule: regelDanach,
+      }, zoneOpts.zone);
+
+      // NICHT MITGESCHICKT HEISST: WIE DIE ZEILE (#2940).
+      const targetsOf = () => {
+        const caldavAccountId = vCaldav ? vCaldav.value.accountId : row.target_caldav_account_id;
+        const googleTargetId = vGoogle ? vGoogle.value : row.target_google_calendar_id;
+        return {
+          caldavAccountId,
+          caldavCalendarUrl: vCaldav ? vCaldav.value.calendarUrl : row.target_caldav_calendar_url,
+          googleTargetId,
+          outlookAccountId: vOutlook ? vOutlook.value.accountId : row.target_outlook_account_id,
+          outlookCalendarId: vOutlook ? vOutlook.value.calendarId : row.target_outlook_calendar_id,
+          localCalendarId: (caldavAccountId || googleTargetId) ? null
+            : vLocalCalendar ? vLocalCalendar.value : row.local_calendar_id,
+        };
+      };
+      const targets = targetsOf();
+      if (localCalendarProvided && (targets.caldavAccountId || targets.googleTargetId)) {
+        return refuse((r) => r.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 }));
+      }
+
+      return {
+        row, vIcon, start_datetime, end_datetime, regelDanach, startDanach,
+        seriesAuthoredHere, targets, caldavProvided, googleProvided, outlookProvided,
+        localCalendarProvided, locationNow: locationAfterEdit(req.body.location, row.location),
+      };
+    };
+    const checked = evaluate(loadVisibleEvent(id, req));
+    if ('refuse' in checked) return checked.refuse(res);
+    const event = checked.row;
 
     // JEDE ABWEISUNG GEHOERT VOR DAS STAGING. Ab hier laedt
     // `stageDocumentUpload` den Anhang in den Speicher (lokaler Ordner, WebDAV
@@ -1066,23 +1412,9 @@ router.put('/:id', async (req, res) => {
     // fruehes `return` dazwischen laesst die hochgeladene Datei als Waise
     // liegen - sichtbar wird das nie, weil der Aufrufer seine 400 bekommt.
     // Der Serien-Guard oben stand genau deshalb schon einmal falsch herum.
-    const attachmentDataProvided = Object.hasOwn(req.body, 'attachment_data');
-    const replacementRequested = typeof req.body.attachment_data === 'string'
-      && req.body.attachment_data.trim() !== '';
-    const removalRequested = req.body.remove_attachment === true
-      || (attachmentDataProvided && req.body.attachment_data === null);
-    if (replacementRequested && removalRequested) {
-      return res.status(400).json({
-        error: 'attachment_data and remove_attachment contradict each other.',
-        code: 400,
-      });
-    }
-    if ((replacementRequested || removalRequested)
-        && storedAttachmentLocked(req, db.get(), event.attachment_document_id)) {
-      return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
-    }
+    // Ein Befund ist oben schon eine 400 geworden.
     const attachment = replacementRequested
-      ? parseAttachment(req.body.attachment_data)
+      ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
       : null;
     if (attachment?.buffer) {
       stagedUpload = await stageDocumentUpload({
@@ -1098,10 +1430,9 @@ router.put('/:id', async (req, res) => {
     const colorTouched = Object.hasOwn(req.body, 'color');
 
     const assignedTouched = req.body.assigned_to !== undefined;
-    const userIds  = assignedTouched
-      ? parseAssignedTo(req.body.assigned_to)
-      : db.get().prepare('SELECT user_id FROM event_assignments WHERE event_id = ?')
-          .all(id).map((r) => r.user_id);
+    // Nicht mitgeschickt: die Zuweisungen liest applyUpdate aus der Zeile, die
+    // es vorfindet (#2940).
+    const userIds = assignedTouched ? parseAssignedTo(req.body.assigned_to) : undefined;
 
     // `assigned_to` ist die PRIMAERE Zuweisung, nicht bloss die erste Zeile: das
     // Formular schickt seine Reihenfolge mit, und `userIds[0]` traegt sie. Beim
@@ -1115,11 +1446,9 @@ router.put('/:id', async (req, res) => {
     // `assigned_to` genannten Person, ein Termin ohne eigene Farbe wechselt also
     // die Farbe, ohne dass jemand die Zuweisung angefasst hat. Dieselbe Regel wie
     // bei `color`: nicht mitgeschickt heisst nicht angefasst.
-    const firstUid = assignedTouched
-      ? (userIds[0] ?? null)
-      : (userIds.includes(event.assigned_to) ? event.assigned_to : (userIds[0] ?? null));
-
-    const userModified = event.external_source !== 'local' ? 1 : event.user_modified;
+    const firstUidOf = (/** @type {any} */ row, /** @type {number[]} */ ids) => (assignedTouched
+      ? (ids[0] ?? null)
+      : (ids.includes(row.assigned_to) ? row.assigned_to : (ids[0] ?? null)));
 
     // Die Farbe führt ihren eigenen Zustand (#899). `user_modified` bedeutet
     // "an diesem Termin wurde etwas bearbeitet" und wird oben bei JEDEM Feld
@@ -1139,72 +1468,61 @@ router.put('/:id', async (req, res) => {
     // aufeinander - der Sync legt seinen Hex in Großbuchstaben ab
     // (`utils/ical-color.js`). Der Farbwähler im Client vergleicht aus
     // demselben Grund über `sameColor()`.
-    // WER START ODER REGEL IN YUVOMI AENDERT, HAT SIE VERFASST (#1935) - auch
-    // an einer eingelesenen Serie. Die Marke entscheidet, ob der ausgehende
-    // Weg den Start auf die eigene Regel ausrichtet (services/outbound-dtstart.js).
-    // Verglichen wird der BEGINN, nicht der Text: das Formular schickt die
-    // Wanduhrzeit des Haushalts, ein eingelesener Termin liegt als Zeitpunkt in
-    // der Zeile. Am Text gemessen setzte jede Titelaenderung die Marke, und die
-    // eingelesene Serie ginge danach mit einem anderen DTSTART zurueck (#756).
-    const seriesAuthoredHere = startOrRuleChanged(event, {
-      start_datetime: startDanach,
-      all_day: all_day !== undefined ? all_day : event.all_day,
-      recurrence_rule: regelDanach,
-    }, zoneOpts.zone);
-
     const asColorKey = (c) => (c == null ? null : String(c).toLowerCase());
-    const colorChanged = colorTouched && asColorKey(colorVal) !== asColorKey(event.color);
-    const colorModified = colorChanged ? 1 : event.color_modified;
+    const colorChangedFrom = (/** @type {any} */ row) => colorTouched && asColorKey(colorVal) !== asColorKey(row.color);
 
-    const caldavAccountId = vCaldav ? vCaldav.value.accountId : event.target_caldav_account_id;
-    const caldavCalendarUrl = vCaldav ? vCaldav.value.calendarUrl : event.target_caldav_calendar_url;
-    const googleTargetId = vGoogle ? vGoogle.value : event.target_google_calendar_id;
-    const outlookAccountId = vOutlook ? vOutlook.value.accountId : event.target_outlook_account_id;
-    const outlookCalendarId = vOutlook ? vOutlook.value.calendarId : event.target_outlook_calendar_id;
-    if (localCalendarProvided && (caldavAccountId || googleTargetId)) {
-      return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
-    }
-    const localCalendarId = (caldavAccountId || googleTargetId) ? null
-      : vLocalCalendar ? vLocalCalendar.value : event.local_calendar_id;
-
+    /** @type {any} */
+    let rowBeforeWrite = null;
     const applyUpdate = () => {
       // Der Anhang gegen den Stand, den dieses Schreiben vorfindet (#1358) -
       // und die Sichtbarkeit davor, gegen die setEventAssignments() prueft, ob
       // sich das Publikum des Anhangs aendert (#1443).
-      const stored = db.get().prepare('SELECT attachment_document_id, visibility FROM calendar_events WHERE id = ?').get(id);
-      assertAttachmentStillChangeable(req, db.get(), stored?.attachment_document_id,
-        { replacementRequested, removalRequested });
+      // Und jedes Feld, das diese Anfrage nicht mitschickt (#2940): es gilt,
+      // wie es JETZT in der Zeile steht. `event` wurde vor dem Upload geladen;
+      // ein PUT, das in der Zwischenzeit Beschreibung oder Ort aenderte, ginge
+      // sonst still verloren. Ist der Termin inzwischen geloescht, antwortet
+      // die Route 404 und schreibt nichts nach.
+      // Dieselbe Pruefung wie vor dem Upload, gegen die Zeile von jetzt.
+      const fresh = evaluate(loadVisibleEvent(id, req));
+      if ('refuse' in fresh) throw new RefusedAfterUploadError(fresh.refuse);
+      const stored = fresh.row;
+      rowBeforeWrite = stored;
+      const storedAssignees = storedEventAssignees(db.get(), id);
       // Neu nur Haushaltsmitglieder (#1207), gegen den Stand, den dieses Schreiben vorfindet.
-      if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedEventAssignees(db.get(), id));
+      if (assignedTouched) assertNoNewNonMembers(db.get(), userIds, storedAssignees);
+      const assignees = assignedTouched ? userIds : storedAssignees;
+      const firstUid = firstUidOf(stored, assignees);
+      const colorChanged = colorChangedFrom(stored);
+      const { targets, locationNow } = fresh;
       const documentId = replacementRequested
         ? rights.createAttachmentDocument(
             db.get(),
             attachment,
             stagedUpload,
             req.body,
-            event.created_by
+            stored.created_by
           )
         : removalRequested
           ? null
-          : event.attachment_document_id;
+          : stored.attachment_document_id;
       const attachmentName = replacementRequested
         ? (req.body.attachment_name || 'Attachment')
         : removalRequested
           ? null
-          : event.attachment_name;
+          : stored.attachment_name;
       const attachmentMime = replacementRequested
         ? attachment.mime
         : removalRequested
           ? null
-          : event.attachment_mime;
+          : stored.attachment_mime;
       const attachmentSize = replacementRequested
         ? attachment.size
         : removalRequested
           ? null
-          : event.attachment_size;
+          : stored.attachment_size;
       const attachmentData = replacementRequested || removalRequested
         ? null
-        : event.attachment_data;
+        : stored.attachment_data;
       db.get().prepare(`
         UPDATE calendar_events
         SET title           = COALESCE(?, title),
@@ -1251,119 +1569,147 @@ router.put('/:id', async (req, res) => {
         WHERE id = ?
       `).run(
         title?.trim()  ?? null,
-        description !== undefined ? (description || null) : event.description,
-        start_datetime ?? null,
-        end_datetime !== undefined ? (end_datetime || null) : event.end_datetime,
+        description !== undefined ? (description || null) : stored.description,
+        fresh.start_datetime ?? null,
+        fresh.end_datetime !== undefined ? (fresh.end_datetime || null) : stored.end_datetime,
         all_day !== undefined ? (all_day ? 1 : 0) : null,
-        location !== undefined ? (location || null) : event.location,
+        locationNow !== undefined ? (locationNow || null) : stored.location,
         colorTouched ? 1 : 0, colorVal ?? null,
-        req.body.icon !== undefined ? vIcon : null,
-        firstUid !== undefined ? firstUid : event.assigned_to,
-        recurrence_rule !== undefined ? (recurrence_rule || null) : event.recurrence_rule,
+        req.body.icon !== undefined ? fresh.vIcon : null,
+        firstUid,
+        recurrence_rule !== undefined ? (recurrence_rule || null) : stored.recurrence_rule,
         attachmentName,
         attachmentMime,
         attachmentSize,
         attachmentData,
         documentId,
-        caldavAccountId,
-        caldavCalendarUrl,
-        googleTargetId,
-        outlookAccountId,
-        outlookCalendarId,
-        localCalendarId,
+        targets.caldavAccountId,
+        targets.caldavCalendarUrl,
+        targets.googleTargetId,
+        targets.outlookAccountId,
+        targets.outlookCalendarId,
+        targets.localCalendarId,
         req.body.visibility !== undefined
-          ? normalizeVisibility(req.body.visibility, event.visibility)
-          : event.visibility,
-        req.body.countdown !== undefined ? (req.body.countdown ? 1 : 0) : event.countdown,
-        userModified,
-        colorModified,
-        seriesAuthoredHere ? 1 : 0,
+          ? normalizeVisibility(req.body.visibility, stored.visibility)
+          : stored.visibility,
+        req.body.countdown !== undefined ? (req.body.countdown ? 1 : 0) : stored.countdown,
+        stored.external_source !== 'local' ? 1 : stored.user_modified,
+        colorChanged ? 1 : stored.color_modified,
+        fresh.seriesAuthoredHere ? 1 : 0,
         id
       );
       // Eine lokale Farbwahl macht einen gespiegelten Termin dauerhaft zu
       // keiner Altlast der Farb-Heilung mehr (#1270), auch wenn er spaeter
       // wieder die alte Farbe bekommt oder die Wahl den Server nie erreicht.
-      if (colorChanged && event.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
-      setEventAssignments(db.get(), id, userIds, {
+      if (colorChanged && stored.external_source === 'caldav') recordLocalColorChoice(db.get(), [id]);
+      setEventAssignments(db.get(), id, assignees, {
         mayWidenAttachment: rights.mayWidenAttachment,
-        previous: { visibility: stored?.visibility },
+        previous: { visibility: stored.visibility },
         attachmentSet: replacementRequested,
       });
+      return stored;
     };
 
-    const linkedOverrideCount = db.get().prepare(`
-      SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
-    `).get(id).count;
-    const occurrenceBoundaryTouched = Boolean(event.recurrence_rule) && [
-      'start_datetime',
-      'recurrence_rule',
-      'target_google_calendar_id',
-      'target_caldav_account_id',
-      'target_caldav_calendar_url',
-      'target_outlook_account_id',
-      'target_outlook_calendar_id',
-    ].some((field) => Object.hasOwn(req.body, field));
-    const canUseOccurrenceTransaction = occurrenceBoundaryTouched
-      && isEligibleLocalSeries(
-        db.get(),
-        event,
-        getUserId(req),
-      ).eligible;
-    if (linkedOverrideCount > 0
-        || (event.recurrence_rule && Object.hasOwn(req.body, 'confirmed_orphan_count'))
-        || canUseOccurrenceTransaction) {
+    // Der Weg (Serie mit Ausnahmen oder einfaches Update) nach der Zeile von
+    // jetzt, nicht der von vor dem Upload - und nicht der von vor den Kopien:
+    // braucht eine Ausnahme eine eigene Kopie des Anhangs, speichert
+    // runWithAttachmentClonePlan nach deren Upload (await) ein zweites Mal,
+    // und dieses Speichern waehlt den Weg wieder selbst (#2956).
+    const usesSeriesPath = (/** @type {any} */ current) => {
+      const linkedOverrideCount = db.get().prepare(`
+        SELECT COUNT(*) AS count FROM calendar_events WHERE recurrence_parent_id = ?
+      `).get(id).count;
+      const occurrenceBoundaryTouched = Boolean(current.recurrence_rule) && [
+        'start_datetime',
+        'recurrence_rule',
+        'target_google_calendar_id',
+        'target_caldav_account_id',
+        'target_caldav_calendar_url',
+        'target_outlook_account_id',
+        'target_outlook_calendar_id',
+      ].some((field) => Object.hasOwn(req.body, field));
+      const canUseOccurrenceTransaction = occurrenceBoundaryTouched
+        && isEligibleLocalSeries(
+          db.get(),
+          current,
+          getUserId(req),
+        ).eligible;
+      return linkedOverrideCount > 0
+        || Boolean(current.recurrence_rule && Object.hasOwn(req.body, 'confirmed_orphan_count'))
+        || canUseOccurrenceTransaction;
+    };
+    // WAS AN DIE AUSNAHMEN GEHT, KOMMT AUS DER ZEILE BEIM SCHREIBEN (#2940),
+    // wie beim Master in applyUpdate: Kalender, Ort und Sichtbarkeit haengen
+    // an ihr, und waehrend des Uploads kann eine zweite Anfrage die Serie in
+    // einen anderen Kalender gelegt haben. Geprueft und gelesen wird im
+    // Aufruf unten, nach dem letzten await und vor der Transaktion, ohne
+    // await dazwischen.
+    const seriesChangesFor = (/** @type {any} */ v) => {
+      const { targets, locationNow, row, start_datetime, end_datetime, vIcon } = v;
+      const { caldavProvided, googleProvided, outlookProvided, localCalendarProvided } = v;
+      /** @type {Record<string, any>} */
       const seriesChanges = {};
       if (title !== undefined) seriesChanges.title = title?.trim() || null;
       if (description !== undefined) seriesChanges.description = description || null;
       if (start_datetime !== undefined) seriesChanges.start_datetime = start_datetime;
       if (end_datetime !== undefined) seriesChanges.end_datetime = end_datetime || null;
       if (all_day !== undefined) seriesChanges.all_day = all_day ? 1 : 0;
-      if (location !== undefined) seriesChanges.location = location || null;
+      if (locationNow !== undefined) seriesChanges.location = locationNow || null;
       if (colorTouched) seriesChanges.color = colorVal ?? null;
       if (req.body.icon !== undefined) seriesChanges.icon = vIcon;
       if (recurrence_rule !== undefined) seriesChanges.recurrence_rule = recurrence_rule || null;
       if (caldavProvided) {
-        seriesChanges.target_caldav_account_id = caldavAccountId;
-        seriesChanges.target_caldav_calendar_url = caldavCalendarUrl;
+        seriesChanges.target_caldav_account_id = targets.caldavAccountId;
+        seriesChanges.target_caldav_calendar_url = targets.caldavCalendarUrl;
       }
-      if (googleProvided) seriesChanges.target_google_calendar_id = googleTargetId;
+      if (googleProvided) seriesChanges.target_google_calendar_id = targets.googleTargetId;
       if (outlookProvided) {
-        seriesChanges.target_outlook_account_id = outlookAccountId;
-        seriesChanges.target_outlook_calendar_id = outlookCalendarId;
+        seriesChanges.target_outlook_account_id = targets.outlookAccountId;
+        seriesChanges.target_outlook_calendar_id = targets.outlookCalendarId;
       }
-      if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = localCalendarId;
+      if (localCalendarProvided || caldavProvided || googleProvided) seriesChanges.local_calendar_id = targets.localCalendarId;
       if (req.body.visibility !== undefined) {
-        seriesChanges.visibility = normalizeVisibility(req.body.visibility, event.visibility);
+        seriesChanges.visibility = normalizeVisibility(req.body.visibility, row.visibility);
       }
       if (req.body.countdown !== undefined) seriesChanges.countdown = req.body.countdown ? 1 : 0;
-      await runWithAttachmentClonePlan(
-        db.get(),
-        stagedClones,
-        (cloneOptions) => updateSeriesWithOverrides(db.get(), {
+      return seriesChanges;
+    };
+    // Der einfache Weg braucht keine Kopie und laeuft im ersten Aufruf, ohne
+    // await davor; der Serienweg kann einen zweiten Aufruf nach den Kopien
+    // brauchen. Beide fragen Pruefung und Weg gegen die Zeile von jetzt.
+    await runWithAttachmentClonePlan(
+      db.get(),
+      stagedClones,
+      (cloneOptions) => {
+        const now = evaluate(loadVisibleEvent(id, req));
+        if ('refuse' in now) throw new RefusedAfterUploadError(now.refuse);
+        if (!usesSeriesPath(now.row)) {
+          withTx(db.get(), () => {
+            const before = applyUpdate();
+            // Ausnahmen tragen den Originalstart (#2034, Format A): aendert sich
+            // die Uhr der Serie, wandern sie in derselben Transaktion mit.
+            if (before.recurrence_rule) {
+              const after = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+              rekeySeriesAfterUpdate(db.get(), before, after, householdTimeZone(db.get()));
+            }
+          });
+          return undefined;
+        }
+        return updateSeriesWithOverrides(db.get(), {
           mayWidenAttachment: rights.mayWidenAttachment,
           seriesId: id,
           actorId: getUserId(req),
           isAdmin: isAdminRequest(req),
-          changes: seriesChanges,
+          changes: seriesChangesFor(now),
           assignments: assignedTouched ? userIds : undefined,
           confirmedOrphanCount: req.body.confirmed_orphan_count,
           applyUpdate,
           authorizeActor: false,
           ...cloneOptions,
-        }),
-        { mayClone: rights.mayCloneAttachment },
-      );
-    } else {
-      db.get().transaction(() => {
-        applyUpdate();
-        // Ausnahmen tragen den Originalstart (#2034, Format A): aendert sich
-        // die Uhr der Serie, wandern sie in derselben Transaktion mit.
-        if (event.recurrence_rule) {
-          const after = db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
-          rekeySeriesAfterUpdate(db.get(), event, after, householdTimeZone(db.get()));
-        }
-      })();
-    }
+        });
+      },
+      { mayClone: rights.mayCloneAttachment },
+    );
     stagedUpload = null;
 
     // Änderung an einem synchronisierten Termin beim Provider nachziehen (#593):
@@ -1373,7 +1719,7 @@ router.put('/:id', async (req, res) => {
     // anstehenden Umzug, und ohne ihn filterte die Seite den Termin bis zum
     // nächsten Laden weiter als Teil des alten Kalenders (#1064).
     const pending = markEventOutbound(
-      event,
+      rowBeforeWrite ?? event,
       db.get().prepare('SELECT * FROM calendar_events WHERE id = ?').get(id),
     );
 
@@ -1425,12 +1771,13 @@ router.put('/:id', async (req, res) => {
       return sendCalendarOccurrenceError(res, err);
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
-    if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
+    if (err instanceof RefusedAfterUploadError) return sendRefusalAfterUpload(res, err.respond, staged);
     if (err instanceof StorageError && staged.length === 0) {
       log.error('PUT /:id storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
-    log.error('', err);
+    // Ein unerwarteter Fehler geht an den zentralen Handler (#2810) - aber
+    // erst, wenn Anhang und Kopien wieder weg sind.
     if (staged.length > 0) {
       try {
         await cleanupCalendarUploads(staged);
@@ -1447,7 +1794,7 @@ router.put('/:id', async (req, res) => {
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    throw err;
   }
 });
 
@@ -1455,19 +1802,16 @@ router.put('/:id', async (req, res) => {
 // PUT /api/v1/calendar/:seriesId/occurrences/:recurrenceId
 // Creates or updates one linked local recurrence replacement atomically.
 // --------------------------------------------------------
-router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
+router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsWrite, validateRequest(), async (req, res) => {
   if (Object.hasOwn(req.body, 'local_calendar_id')) {
     return res.status(400).json({ error: 'Calendar membership applies to the whole series.', code: 400 });
   }
   let stagedUpload;
   try {
-    const seriesId = parseInt(req.params.seriesId, 10);
+    const seriesId = pathId(req, 'seriesId');
     const actorId = getUserId(req);
     const isAdmin = isAdminRequest(req);
-    if (attachmentUploadRefused(req)) {
-      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
-    }
-    const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
+    const master = loadVisibleEvent(seriesId, req);
     if (!master) {
       return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
         'Calendar series not found.',
@@ -1487,19 +1831,20 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     baseOccurrenceFor(master, req.params.recurrenceId, householdTimeZone(db.get()), { ambiguous: 'reject' });
 
     const mutation = validateOccurrenceMutationBody(db.get(), req.body, { master });
-    const { values: validated, errors } = mutation;
+    const { values: validated } = mutation;
+    // Ein Anhang, den die Route nicht nehmen kann, ist eine 400 vor jedem
+    // Hochladen und Schreiben (#2810); bis dahin warf parseAttachment (500).
+    const vAttachment = parseAttachment(req.body.attachment_data);
+    const errors = vAttachment.error ? [...mutation.errors, vAttachment.error] : mutation.errors;
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const vIcon = req.body.icon !== undefined ? eventIcon(req.body.icon) : undefined;
     if (req.body.icon !== undefined && !vIcon) {
       return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
     }
-    if (req.body.remove_attachment !== undefined && typeof req.body.remove_attachment !== 'boolean') {
-      return res.status(400).json({ error: 'remove_attachment must be a boolean.', code: 400 });
-    }
     if (req.body.reminder_offsets !== undefined
         && (!Array.isArray(req.body.reminder_offsets)
-          || req.body.reminder_offsets.length > 5
+          || req.body.reminder_offsets.length > MAX_REMINDER_OFFSETS
           || new Set(req.body.reminder_offsets).size !== req.body.reminder_offsets.length
           || req.body.reminder_offsets.some((value) =>
             !Number.isInteger(value) || value < 0))) {
@@ -1524,8 +1869,9 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
         && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
       return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
+    // Ein Befund ist oben schon eine 400 geworden.
     const parsedAttachment = replacementRequested
-      ? parseAttachment(req.body.attachment_data)
+      ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
       : null;
     if (parsedAttachment?.buffer) {
       stagedUpload = await stageDocumentUpload({
@@ -1547,10 +1893,12 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     if (vIcon !== undefined) changes.icon = vIcon;
 
-    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), master, req.params.recurrenceId));
-    // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
+    // Synchron nach dem letzten await: die Serie, Bestandsliste und Anhang,
+    // wie sie JETZT stehen (#1358, #2956) - nicht die Zeile von vor dem Upload.
+    const current = seriesAfterUpload(seriesId, req);
+    assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), current, req.params.recurrenceId));
     assertAttachmentStillChangeable(req, db.get(),
-      storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
+      storedOccurrenceAttachmentDocument(db.get(), current, req.params.recurrenceId),
       { replacementRequested, removalRequested });
     const rights = attachmentRights(req);
     const result = upsertOccurrenceOverride(db.get(), {
@@ -1573,7 +1921,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
               parsedAttachment,
               stagedUpload,
               req.body,
-              master.created_by,
+              current.created_by,
             ),
           })
         : undefined,
@@ -1588,7 +1936,7 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
         database: db.get(),
         actorId,
         isAdmin,
-        master,
+        master: current,
       }),
     });
   } catch (err) {
@@ -1601,7 +1949,12 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, [stagedUpload].filter(Boolean));
     if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, [stagedUpload].filter(Boolean));
-    log.error('PUT occurrence failed:', err);
+    // Das Dokumente-Recht ging waehrend des Uploads verloren (#2947).
+    if (err instanceof RefusedAfterUploadError) {
+      return sendRefusalAfterUpload(res, err.respond, [stagedUpload].filter(Boolean));
+    }
+    // Ein unerwarteter Fehler geht an den zentralen Handler (#2810) - aber
+    // erst, wenn der bereitgestellte Anhang wieder weg ist.
     if (stagedUpload) {
       try {
         await cleanupStagedUpload(stagedUpload);
@@ -1614,22 +1967,23 @@ router.put('/:seriesId/occurrences/:recurrenceId', async (req, res) => {
         );
       }
     }
+    // A storage refusal after the upload (#2946: the settings changed meanwhile).
+    if (err instanceof StorageError) {
+      return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
+    }
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    throw err;
   }
 });
 
-router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) => {
+router.put('/:seriesId/occurrences/:recurrenceId/following', refuseUploadWithoutDocumentsWrite, validateRequest(), async (req, res) => {
   let stagedUpload;
   const stagedClones = [];
   try {
-    const seriesId = parseInt(req.params.seriesId, 10);
+    const seriesId = pathId(req, 'seriesId');
     const actorId = getUserId(req);
     const isAdmin = isAdminRequest(req);
-    if (attachmentUploadRefused(req)) {
-      return res.status(403).json({ error: ATTACHMENT_UPLOAD_REFUSAL, code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' });
-    }
-    const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
+    const master = loadVisibleEvent(seriesId, req);
     if (!master) {
       return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
         'Calendar series not found.',
@@ -1658,9 +2012,12 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     const vCaldav = caldavProvided ? caldavTarget(req.body) : null;
     const vGoogle = googleProvided ? googleTarget(req.body) : null;
     const vOutlook = outlookProvided ? outlookTarget(req.body) : null;
+    // Ein Anhang, den die Route nicht nehmen kann, ist eine 400 vor jedem
+    // Hochladen und Schreiben (#2810); bis dahin warf parseAttachment (500).
+    const vAttachment = parseAttachment(req.body.attachment_data);
     const errors = [
       ...mutation.errors,
-      ...[vCaldav, vGoogle, vOutlook].filter(Boolean),
+      ...[vCaldav, vGoogle, vOutlook, vAttachment].filter(Boolean),
       // Ein NEUES Ziel muss angeboten sein; das der Serie kommt durch (#1860).
       ...(vCaldav && !vCaldav.error ? [caldavTargetOffered(db.get(), vCaldav.value, master)] : []),
     ].flatMap((result) => typeof result === 'string' ? [result] : (result.error ? [result.error] : []));
@@ -1675,20 +2032,9 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     if (req.body.icon !== undefined && !vIcon) {
       return res.status(400).json({ error: 'icon: invalid calendar event icon.', code: 400 });
     }
-    if (req.body.remove_attachment !== undefined && typeof req.body.remove_attachment !== 'boolean') {
-      return res.status(400).json({ error: 'remove_attachment must be a boolean.', code: 400 });
-    }
-    if (req.body.confirmed_orphan_count !== undefined
-        && (!Number.isInteger(req.body.confirmed_orphan_count)
-          || req.body.confirmed_orphan_count < 0)) {
-      return res.status(400).json({
-        error: 'confirmed_orphan_count must be a whole number from 0.',
-        code: 400,
-      });
-    }
     if (req.body.reminder_offsets !== undefined
         && (!Array.isArray(req.body.reminder_offsets)
-          || req.body.reminder_offsets.length > 5
+          || req.body.reminder_offsets.length > MAX_REMINDER_OFFSETS
           || new Set(req.body.reminder_offsets).size !== req.body.reminder_offsets.length
           || req.body.reminder_offsets.some((value) =>
             !Number.isInteger(value) || value < 0))) {
@@ -1720,8 +2066,13 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
         && storedAttachmentLocked(req, db.get(), storedOccurrenceAttachmentDocument(db.get(), master, req.params.recurrenceId))) {
       return res.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' });
     }
+    // Ziel oder lokaler Kalender: hier gegen die geladene Zeile, je Lauf gegen die von jetzt (#2956).
+    const syncTargetOf = (/** @type {any} */ row) => (caldavProvided ? vCaldav.value.accountId : row.target_caldav_account_id)
+      || (googleProvided ? vGoogle.value : row.target_google_calendar_id);
+    if (Object.hasOwn(req.body, 'local_calendar_id') && syncTargetOf(master)) return res.status(400).json({ error: LOCAL_NEXT_TO_TARGET, code: 400 });
+    // Ein Befund ist oben schon eine 400 geworden.
     const parsedAttachment = replacementRequested
-      ? parseAttachment(req.body.attachment_data)
+      ? /** @type {import('./helpers.js').Attachment} */ (vAttachment.value)
       : null;
     if (parsedAttachment?.buffer) {
       stagedUpload = await stageDocumentUpload({
@@ -1751,14 +2102,9 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       changes.target_outlook_account_id = vOutlook.value.accountId;
       changes.target_outlook_calendar_id = vOutlook.value.calendarId;
     }
-    const syncTarget = (caldavProvided ? vCaldav.value.accountId : master.target_caldav_account_id)
-      || (googleProvided ? vGoogle.value : master.target_google_calendar_id);
-    if (Object.hasOwn(req.body, 'local_calendar_id') && syncTarget) {
-      return res.status(400).json({ error: 'Choose either a sync target or a local calendar.', code: 400 });
-    }
-    if (syncTarget) changes.local_calendar_id = null;
     if (vIcon !== undefined) changes.icon = vIcon;
     const rights = attachmentRights(req);
+    let seriesNow = /** @type {any} */ (master);
     const commonOptions = {
       mayWidenAttachment: rights.mayWidenAttachment,
       seriesId,
@@ -1779,7 +2125,7 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
               parsedAttachment,
               stagedUpload,
               req.body,
-              master.created_by,
+              seriesNow.created_by,
             ),
           })
         : undefined,
@@ -1792,12 +2138,13 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       db.get(),
       stagedClones,
       (cloneOptions) => {
-        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), master, req.params.recurrenceId));
-        // Synchron nach dem letzten await: der Anhang, wie er jetzt gilt (#1358).
+        // Je Lauf, synchron nach dem letzten await: alles, wie es JETZT steht (#1358, #2956).
+        const run = followingSeriesNow({ seriesId, req, actorId, baseChanges: changes, syncTargetOf }); seriesNow = run.now;
+        assertNoNewNonMembers(db.get(), mutation.assignments, storedOccurrenceAssignees(db.get(), seriesNow, req.params.recurrenceId));
         assertAttachmentStillChangeable(req, db.get(),
-          storedOccurrenceAttachmentDocument(db.get(), loadVisibleEvent(seriesId, req) ?? master, req.params.recurrenceId),
+          storedOccurrenceAttachmentDocument(db.get(), seriesNow, req.params.recurrenceId),
           { replacementRequested, removalRequested });
-        return splitSeries(db.get(), { ...commonOptions, ...cloneOptions });
+        return splitSeries(db.get(), { ...commonOptions, changes: run.changes, ...cloneOptions });
       },
       { mayClone: rights.mayCloneAttachment },
     );
@@ -1820,7 +2167,9 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, staged);
     if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, staged);
-    log.error('PUT occurrence following failed:', err);
+    if (err instanceof RefusedAfterUploadError) return sendRefusalAfterUpload(res, err.respond, staged);
+    // Ein unerwarteter Fehler geht an den zentralen Handler (#2810) - aber
+    // erst, wenn Anhang und Kopien wieder weg sind.
     if (staged.length > 0) {
       try {
         await cleanupCalendarUploads(staged);
@@ -1836,14 +2185,14 @@ router.put('/:seriesId/occurrences/:recurrenceId/following', async (req, res) =>
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    throw err;
   }
 });
 
-router.delete('/:seriesId/occurrences/:recurrenceId', (req, res) => {
+router.delete('/:seriesId/occurrences/:recurrenceId', validateRequest(), (req, res) => {
   try {
-    const seriesId = parseInt(req.params.seriesId, 10);
-    const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
+    const seriesId = pathId(req, 'seriesId');
+    const master = loadVisibleEvent(seriesId, req);
     if (!master) {
       return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
         'Calendar series not found.',
@@ -1860,15 +2209,14 @@ router.delete('/:seriesId/occurrences/:recurrenceId', (req, res) => {
     res.status(204).end();
   } catch (err) {
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    log.error('DELETE occurrence failed:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    throw err;
   }
 });
 
-router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
+router.delete('/:seriesId/occurrences/:recurrenceId/following', validateRequest(), (req, res) => {
   try {
-    const seriesId = parseInt(req.params.seriesId, 10);
-    const master = Number.isInteger(seriesId) ? loadVisibleEvent(seriesId, req) : null;
+    const seriesId = pathId(req, 'seriesId');
+    const master = loadVisibleEvent(seriesId, req);
     if (!master) {
       return sendCalendarOccurrenceError(res, new CalendarOccurrenceError(
         'Calendar series not found.',
@@ -1885,8 +2233,7 @@ router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
     res.status(204).end();
   } catch (err) {
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    log.error('DELETE occurrence following failed:', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    throw err;
   }
 });
 
@@ -1896,66 +2243,60 @@ router.delete('/:seriesId/occurrences/:recurrenceId/following', (req, res) => {
 // Nur Event-Creator, Subscription-Creator oder Admin.
 // Response: { data: { reset: true } }
 // --------------------------------------------------------
-router.post('/:id/reset', (req, res) => {
-  try {
-    const id    = parseInt(req.params.id, 10);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
-    const event = db.get().prepare(`
-      SELECT e.*, s.created_by AS sub_created_by
-      FROM calendar_events e
-      LEFT JOIN ics_subscriptions s ON s.id = e.subscription_id
-      WHERE e.id = ?
-    `).get(id);
-    // Unsichtbar heisst auch hier "gibt es nicht" (wie GET/PUT/DELETE /:id):
-    // sonst verriete die 400 einen fremden privaten Termin und die 403 einen
-    // Termin aus einem fremden ungeteilten Abo, und ein Admin setzte einen
-    // Termin zurueck, den er nicht sieht. Die Rechteregel darunter bleibt.
-    if (!event || !loadVisibleEvent(id, req)) return sendEventGone(res);
-    if (event.external_source !== 'ics')
-      return res.status(400).json({ error: 'Only events from an ICS subscription can be reset.', code: 400 });
+router.post('/:id/reset', validateRequest(), (req, res) => {
+  const id    = pathId(req);
+  const event = db.get().prepare(`
+    SELECT e.*, s.created_by AS sub_created_by
+    FROM calendar_events e
+    LEFT JOIN ics_subscriptions s ON s.id = e.subscription_id
+    WHERE e.id = ?
+  `).get(id);
+  // Unsichtbar heisst auch hier "gibt es nicht" (wie GET/PUT/DELETE /:id):
+  // sonst verriete die 400 einen fremden privaten Termin und die 403 einen
+  // Termin aus einem fremden ungeteilten Abo, und ein Admin setzte einen
+  // Termin zurueck, den er nicht sieht. Die Rechteregel darunter bleibt.
+  if (!event || !loadVisibleEvent(id, req)) return sendEventGone(res);
+  if (event.external_source !== 'ics')
+    return res.status(400).json({ error: 'Only events from an ICS subscription can be reset.', code: 400 });
 
-    const userId  = getUserId(req);
-    const isAdmin = isAdminRequest(req);
-    if (!isAdmin && event.created_by !== userId && event.sub_created_by !== userId)
-      return res.status(403).json({ error: 'Not authorized.', code: 403 });
+  const userId  = getUserId(req);
+  const isAdmin = isAdminRequest(req);
+  if (!isAdmin && event.created_by !== userId && event.sub_created_by !== userId)
+    return res.status(403).json({ error: 'Not authorized.', code: 403 });
 
-    // D#2330: der gespeicherte Feed-Stand stellt den Termin sofort her, ohne Netz.
-    // Fehlt er (Altbestand vor Migration 273 oder unlesbar), wird nur das Flag
-    // zurückgenommen und restored=false gemeldet: der nächste Abgleich schreibt
-    // den Stand, bis dahin ist der Reset nicht vollständig.
-    let feed = null;
-    if (event.feed_original) {
-      try { feed = JSON.parse(event.feed_original); } catch { feed = null; }
-    }
-
-    // `color_modified` geht mit: Zurücksetzen heisst "der Feed führt diesen
-    // Termin wieder", und das schliesst seine Farbe ein (#899).
-    db.get().transaction(() => {
-      if (feed) {
-        // Titel und Start sind NOT NULL: fehlt der Wert im Feed-Stand, bleibt der aktuelle.
-        const startDt = feed.start_datetime ?? event.start_datetime;
-        db.get().prepare(`
-          UPDATE calendar_events
-          SET user_modified = 0, color_modified = 0,
-              title = ?, description = ?, start_datetime = ?, end_datetime = ?,
-              all_day = ?, location = ?, color = ?
-          WHERE id = ?
-        `).run(
-          feed.title ?? event.title, feed.description ?? null, startDt, feed.end_datetime ?? null,
-          feed.all_day ? 1 : 0, feed.location ?? null, feed.color ?? null, id,
-        );
-        // Ein verlegter Start zieht die Erinnerungen mit, wie beim Abgleich (#1377).
-        if (startDt !== event.start_datetime)
-          followInboundStartChange(db.get(), id, event.start_datetime, startDt);
-      } else {
-        db.get().prepare('UPDATE calendar_events SET user_modified = 0, color_modified = 0 WHERE id = ?').run(id);
-      }
-    })();
-    res.json({ data: { reset: true, restored: feed !== null } });
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+  // D#2330: der gespeicherte Feed-Stand stellt den Termin sofort her, ohne Netz.
+  // Fehlt er (Altbestand vor Migration 273 oder unlesbar), wird nur das Flag
+  // zurückgenommen und restored=false gemeldet: der nächste Abgleich schreibt
+  // den Stand, bis dahin ist der Reset nicht vollständig.
+  let feed = null;
+  if (event.feed_original) {
+    try { feed = JSON.parse(event.feed_original); } catch { feed = null; }
   }
+
+  // `color_modified` geht mit: Zurücksetzen heisst "der Feed führt diesen
+  // Termin wieder", und das schliesst seine Farbe ein (#899).
+  withTx(db.get(), () => {
+    if (feed) {
+      // Titel und Start sind NOT NULL: fehlt der Wert im Feed-Stand, bleibt der aktuelle.
+      const startDt = feed.start_datetime ?? event.start_datetime;
+      db.get().prepare(`
+        UPDATE calendar_events
+        SET user_modified = 0, color_modified = 0,
+            title = ?, description = ?, start_datetime = ?, end_datetime = ?,
+            all_day = ?, location = ?, color = ?
+        WHERE id = ?
+      `).run(
+        feed.title ?? event.title, feed.description ?? null, startDt, feed.end_datetime ?? null,
+        feed.all_day ? 1 : 0, feed.location ?? null, feed.color ?? null, id,
+      );
+      // Ein verlegter Start zieht die Erinnerungen mit, wie beim Abgleich (#1377).
+      if (startDt !== event.start_datetime)
+        followInboundStartChange(db.get(), id, event.start_datetime, startDt);
+    } else {
+      db.get().prepare('UPDATE calendar_events SET user_modified = 0, color_modified = 0 WHERE id = ?').run(id);
+    }
+  });
+  res.json({ data: { reset: true, restored: feed !== null } });
 });
 
 // --------------------------------------------------------
@@ -1969,10 +2310,9 @@ router.post('/:id/reset', (req, res) => {
 // Nur lokale (nicht extern synchronisierte) wiederkehrende Termine.
 // Response: 201 { data: { event_id, exception_date } }
 // --------------------------------------------------------
-router.post('/:id/exceptions', (req, res) => {
+router.post('/:id/exceptions', validateRequest(), (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid ID.', code: 400 });
+    const id = pathId(req);
 
     const requested = req.body?.recurrence_id ?? req.body?.date;
     // Beide Formfehler tragen einen Grund (#1909-Muster): der Browser sagt dazu
@@ -2015,8 +2355,7 @@ router.post('/:id/exceptions', (req, res) => {
     res.status(201).json({ data: { event_id: id, exception_date: exceptionKey, recurrence_id: exceptionKey } });
   } catch (err) {
     if (err instanceof CalendarOccurrenceError) return sendCalendarOccurrenceError(res, err);
-    log.error('', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    throw err;
   }
 });
 
@@ -2027,50 +2366,46 @@ router.post('/:id/exceptions', (req, res) => {
 // mitsamt der Google-Event-ID weg), ausgeführt asynchron nach der Antwort.
 // Response: 204 No Content
 // --------------------------------------------------------
-router.delete('/:id', (req, res) => {
-  try {
-    const id    = parseInt(req.params.id, 10);
-    const event = loadVisibleEvent(id, req);
-    if (!event) return sendEventGone(res);
-    if (refuseForeignEvent(req, res, event)) return;
-    if (rejectLinkedOccurrenceResource(res, event, req)) return;
-    const queued = queueEventDeletion(event);
+router.delete('/:id', validateRequest(), (req, res) => {
+  const id    = pathId(req);
+  const event = loadVisibleEvent(id, req);
+  if (!event) return sendEventGone(res);
+  if (refuseForeignEvent(req, res, event)) return;
+  if (rejectLinkedOccurrenceResource(res, event, req)) return;
+  const queued = queueEventDeletion(event);
 
-    // Die Erinnerungen abzuraeumen ist seit Migration v217 Sache eines
-    // AFTER-DELETE-Triggers auf `calendar_events` - dieser Block hier ist
-    // seitdem der Guertel zum Hosentraeger und findet im Normalfall nichts
-    // mehr. Er bleibt stehen, weil er die Absicht an der Stelle ausspricht, an
-    // der sie entsteht; die Regel selbst darf nur nicht in dieser Route WOHNEN
-    // (Google-/ICS-/CalDAV-Sync und calendar-prune.js loeschen Termine ohne je
-    // hier vorbeizukommen).
-    const result = db.get().transaction(() => {
-      const ownedIds = db.get().prepare(`
-        SELECT id FROM calendar_events
-        WHERE id = ? OR recurrence_parent_id = ?
-      `).all(id, id).map((row) => Number(row.id));
-      if (ownedIds.length) {
-        db.get().prepare(`
-          DELETE FROM reminders
-          WHERE entity_type = 'event'
-            AND entity_id IN (${ownedIds.map(() => '?').join(',')})
-        `).run(...ownedIds);
-      }
-      return db.get().prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
-    })();
-    if (result.changes === 0) return sendEventGone(res);
-
-    res.status(204).end();
-
-    // Bewusst nach der Antwort: der Provider-Aufruf darf das lokale Löschen weder
-    // verzögern noch scheitern lassen. Schlägt er fehl, bleibt der Tombstone
-    // liegen und der nächste Sync-Lauf holt die Löschung nach.
-    if (queued) {
-      flushOutbound()
-        .catch((err) => log.warn('Löschung vorgemerkt, Sofortversuch fehlgeschlagen:', err.message));
+  // Die Erinnerungen abzuraeumen ist seit Migration v217 Sache eines
+  // AFTER-DELETE-Triggers auf `calendar_events` - dieser Block hier ist
+  // seitdem der Guertel zum Hosentraeger und findet im Normalfall nichts
+  // mehr. Er bleibt stehen, weil er die Absicht an der Stelle ausspricht, an
+  // der sie entsteht; die Regel selbst darf nur nicht in dieser Route WOHNEN
+  // (Google-/ICS-/CalDAV-Sync und calendar-prune.js loeschen Termine ohne je
+  // hier vorbeizukommen).
+  const result = withTx(db.get(), () => {
+    const ownedIds = db.get().prepare(`
+      SELECT id FROM calendar_events
+      WHERE id = ? OR recurrence_parent_id = ?
+    `).all(id, id).map((row) => Number(row.id));
+    if (ownedIds.length) {
+      const ownedList = sqlInList(ownedIds);
+      db.get().prepare(`
+        DELETE FROM reminders
+        WHERE entity_type = 'event'
+          AND entity_id IN (${ownedList.sql})
+      `).run(ownedList.param);
     }
-  } catch (err) {
-    log.error('', err);
-    res.status(500).json({ error: 'Internal error.', code: 500 });
+    return db.get().prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+  });
+  if (result.changes === 0) return sendEventGone(res);
+
+  res.status(204).end();
+
+  // Bewusst nach der Antwort: der Provider-Aufruf darf das lokale Löschen weder
+  // verzögern noch scheitern lassen. Schlägt er fehl, bleibt der Tombstone
+  // liegen und der nächste Sync-Lauf holt die Löschung nach.
+  if (queued) {
+    flushOutbound()
+      .catch((err) => log.warn('Löschung vorgemerkt, Sofortversuch fehlgeschlagen:', err.message));
   }
 });
 

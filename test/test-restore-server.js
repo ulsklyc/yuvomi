@@ -344,23 +344,23 @@ test('#1431 ein Restore ueber /api/v1/backup/restore/ (mit Schraegstrich) wartet
 // ---------------------------------------------------------------------------
 
 /**
- * Die Anmeldung an `bcrypt.compare` anhalten: sie hat den Nutzer dann schon
- * gelesen und schreibt die Sitzung erst danach - genau die Luecke, in die ein
- * Restore fallen kann.
+ * Die Anmeldung an der Passwortpruefung (`crypto.argon2`, das
+ * server/utils/password.js erst beim Aufruf vom geteilten Modulobjekt liest)
+ * anhalten: sie hat den Nutzer dann schon gelesen und schreibt die Sitzung
+ * erst danach - genau die Luecke, in die ein Restore fallen kann.
  */
 async function holdLoginAtPasswordCheck() {
-  const bcrypt = (await import('bcrypt')).default;
-  const realCompare = bcrypt.compare;
+  const crypto = (await import('node:crypto')).default;
+  const realArgon2 = crypto.argon2;
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
   let reached;
   const atCompare = new Promise((resolve) => { reached = resolve; });
-  bcrypt.compare = async (...args) => {
+  crypto.argon2 = (...args) => {
     reached();
-    await gate;
-    return realCompare.apply(bcrypt, args);
+    gate.then(() => realArgon2.apply(crypto, args));
   };
-  return { atCompare, release, restoreCompare: () => { bcrypt.compare = realCompare; } };
+  return { atCompare, release, restoreCompare: () => { crypto.argon2 = realArgon2; } };
 }
 
 /** Eine frische Anmeldung per http.request, damit der Test sie abbrechen kann. */

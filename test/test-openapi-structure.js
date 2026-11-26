@@ -602,11 +602,17 @@ test('#2062 events_calendar an GET /dashboard ist als Query-Parameter deklariert
   assert.ok(param, 'Query-Parameter events_calendar fehlt');
   assert.equal(param.in, 'query');
   assert.equal(param.required, false);
+  // Seit #2810 (Gruppe 10, Entscheidung 9) traegt das Schema die zugesagte
+  // Toleranz: Text ohne Muster und ohne Hoechstzahl, denn validateRequest()
+  // liest es, und ein fremder Schluessel faellt laut Beschreibung weg. Form
+  // und Grenze stehen in der Beschreibung.
   assert.equal(param.schema?.type, 'array');
-  assert.equal(param.schema.maxItems, 50);
-  assert.equal(param.schema.items?.pattern, '^(local|cal|sub):[1-9][0-9]{0,14}$');
+  assert.equal(param.schema.maxItems, undefined);
+  assert.deepEqual(param.schema.items, { type: 'string' });
   assert.equal(param.explode, true);
   assert.match(param.description, /GET \/calendar\/calendars/, 'nennt den Katalog');
+  assert.match(param.description, /`local:<id>`.*`cal:<id>`.*`sub:<id>`/, 'nennt die Form');
+  assert.match(param.description, /capped at 50; a value of any other shape is dropped/, 'nennt Grenze und Toleranz');
 });
 
 test('#2062 GET /calendar/calendars beschreibt sources neben data', () => {
@@ -619,4 +625,97 @@ test('#2062 GET /calendar/calendars beschreibt sources neben data', () => {
   assert.deepEqual(item.required, ['key', 'name', 'color']);
   assert.equal(item.properties.key.pattern, '^(local|cal|sub):[1-9][0-9]{0,14}$');
   assert.match(get.description, /`sources`/);
+});
+
+/**
+ * Jedes Array in einem Request-Body traegt `maxItems` (Refs #2810, Folge 5b).
+ *
+ * Die Body-Grenze (`BODY_LIMIT`) deckelt Bytes, nicht die Arbeit je Element:
+ * eine Liste kurzer Ids passt zu Zehntausenden in ein Megabyte, und jede davon
+ * kostet eine Schleife, eine Abfrage oder einen Schreibvorgang. OWASP API4:2023
+ * nennt die fehlende Hoechstzahl je Array ausdruecklich. Die Grenzen selbst
+ * stehen in `server/openapi/array-limits.js`, je Klasse mit ihrem Grund.
+ *
+ * Gelaufen wird durch jeden Body jeder Operation (jeder Medientyp), durch
+ * `$ref`, `properties`, `items`, `prefixItems`, `additionalProperties`,
+ * `allOf`/`anyOf`/`oneOf`, `not`, `if`/`then`/`else`, `contains`. Ein Array ist
+ * ein Knoten mit `type: 'array'` (auch in einer Typ-Liste) oder mit `items`
+ * ohne `type`. Gemeldet wird jeder Knoten einmal, mit dem ersten Weg, auf dem
+ * er erreicht wird.
+ */
+const ARRAY_WALK_KEYS = ['items', 'additionalProperties', 'not', 'if', 'then', 'else', 'contains'];
+const ARRAY_WALK_LISTS = ['allOf', 'anyOf', 'oneOf', 'prefixItems'];
+
+/**
+ * @param {any} doc
+ * @returns {string[]} where each array without `maxItems` is first reached
+ */
+function bodyArraysWithoutMaxItems(doc) {
+  const seen = new Set();
+  /** @type {string[]} */
+  const missing = [];
+  /** @type {(node: any, where: string, refs: Set<string>) => void} */
+  const walk = (node, where, refs) => {
+    if (!node || typeof node !== 'object') return;
+    if (typeof node.$ref === 'string') {
+      if (refs.has(node.$ref)) return;
+      walk(resolveRef(doc, node.$ref), node.$ref.split('/').pop(), new Set([...refs, node.$ref]));
+      return;
+    }
+    if (seen.has(node)) return;
+    seen.add(node);
+    const types = Array.isArray(node.type) ? node.type : [node.type];
+    const isArray = types.includes('array') || (node.type === undefined && node.items !== undefined);
+    if (isArray && !(Number.isInteger(node.maxItems) && node.maxItems >= 0)) missing.push(where);
+    for (const [name, prop] of Object.entries(node.properties ?? {})) walk(prop, `${where}.${name}`, refs);
+    for (const key of ARRAY_WALK_KEYS) {
+      if (node[key] && typeof node[key] === 'object') walk(node[key], `${where}.${key}`, refs);
+    }
+    for (const key of ARRAY_WALK_LISTS) {
+      (Array.isArray(node[key]) ? node[key] : []).forEach((branch, i) => walk(branch, `${where}.${key}[${i}]`, refs));
+    }
+  };
+  for (const [path, item] of Object.entries(doc.paths ?? {})) {
+    for (const [method, operation] of Object.entries(item ?? {})) {
+      const content = operation?.requestBody?.content ?? {};
+      for (const [type, media] of Object.entries(content)) {
+        walk(media?.schema, `${method.toUpperCase()} ${path} (${type})`, new Set());
+      }
+    }
+  }
+  return missing;
+}
+
+test('der maxItems-Sammler findet ein Array ohne Grenze hinter $ref, anyOf und items (Fixture)', () => {
+  const fixture = {
+    paths: {
+      '/x': {
+        post: { requestBody: { content: { 'application/json': { schema: { $ref: '#/components/schemas/In' } } } } },
+        put: { requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { ok: { type: 'array', maxItems: 3, items: { type: 'integer' } } } } } } } },
+      },
+    },
+    components: {
+      schemas: {
+        In: {
+          type: 'object',
+          properties: {
+            plain: { type: 'array', items: { type: 'integer' } },
+            nullable: { type: ['array', 'null'], maxItems: 5, items: { type: 'object', properties: { inner: { items: { type: 'string' } } } } },
+            either: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'string' }] },
+            bounded: { type: 'array', maxItems: 10, items: { $ref: '#/components/schemas/In' } },
+          },
+        },
+      },
+    },
+  };
+  assert.deepEqual(bodyArraysWithoutMaxItems(fixture), [
+    'In.plain',
+    'In.nullable.items.inner',
+    'In.either.anyOf[0]',
+  ]);
+});
+
+test('jedes Array in einem Request-Body traegt maxItems (OWASP API4, Refs #2810)', () => {
+  const missing = bodyArraysWithoutMaxItems(refSpec);
+  assert.deepEqual(missing, [], `${missing.length} Arrays ohne maxItems:\n${missing.join('\n')}`);
 });

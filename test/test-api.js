@@ -924,12 +924,17 @@ const REASONS_PASSED_THROUGH = new Map([
   ['routes/calendar/google.js: checked.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['routes/calendar/caldav.js: checked.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
   ['routes/calendar/subscriptions.js: assignees.reason', { sites: 3, at403: [], why: 'feste 400 (calendar_assignee_*)' }],
+  // Dieselben Pruefungen nach dem Laden des Feeds (#2947, ImportRefusedAfterFeed
+  // in services/ics-subscription.js): dieselbe feste 400.
+  ['routes/calendar/subscriptions.js: err.answer.reason', { sites: 1, at403: [], why: 'feste 400 (calendar_assignee_*, calendar_selected_calendar_not_found)' }],
   ['services/calendar-occurrence-overrides.js: eligible ? null : \'ineligible_series\'', { sites: 1, at403: [],
     why: 'keine Antwort; wird zu error.code und reist mit 400' }],
   // authorize() (phase 2 B2): the Verdict type and the allowed verdict. No response:
   // in B2 every caller reads `allowed` only, no route sends the reason.
   ['authorize/modules.ts: string | null', { sites: 1, at403: [], why: 'keine Antwort; Typ des Verdict von authorize()' }],
   ['authorize/modules.ts: null', { sites: 1, at403: [], why: 'keine Antwort; das erlaubte Verdict von authorize()' }],
+  // server/db/backup.ts (phase 2 F3): the type of restoreError()'s parameter, no response.
+  ['db/backup.ts: string', { sites: 1, at403: [], why: 'keine Antwort; Typ des Parameters von restoreError()' }],
   ['routes/tasks.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],
     why: 'displayActingPerson: 400 ohne Grund oder 403 mit diesem' }],
   ['routes/rewards.js: actor.reason', { sites: 1, at403: [['acting_person_no_access', 'services/display-acting.js']],

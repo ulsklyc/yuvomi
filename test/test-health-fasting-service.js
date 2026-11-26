@@ -203,14 +203,10 @@ test('lifecycle and active-goal settings enter an immediate transaction before r
   let immediateCalls = 0;
   const guarded = new Proxy(database, {
     get(target, property) {
-      if (property === 'transaction') return (operation) => {
-        const tx = target.transaction(operation);
-        const wrapped = (...args) => tx(...args);
-        wrapped.immediate = (...args) => {
-          immediateCalls += 1;
-          return tx.immediate(...args);
-        };
-        return wrapped;
+      // withTx() takes the writer lock with exec('BEGIN IMMEDIATE') when asked for it.
+      if (property === 'exec') return (sql) => {
+        if (sql === 'BEGIN IMMEDIATE') immediateCalls += 1;
+        return target.exec(sql);
       };
       if (property === 'prepare') return (sql) => {
         if (/FROM health_fasts/.test(sql) && !target.inTransaction) throw new Error('health_fasts read outside transaction');

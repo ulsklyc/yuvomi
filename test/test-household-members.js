@@ -33,7 +33,6 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
 import rateLimit from 'express-rate-limit';
 
 const dbmod = await import('../server/db.js');
@@ -41,7 +40,7 @@ const { router: authRouter, sessionMiddleware, requireAuth } = await import('../
 const { default: familyRouter } = await import('../server/routes/family.js');
 const { default: scheduleRouter } = await import('../server/routes/schedule.js');
 const { default: scheduleExtrasRouter } = await import('../server/routes/schedule-extras.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { default: calendarRouter } = await import('../server/routes/calendar.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
@@ -49,8 +48,6 @@ const { default: rewardsRouter } = await import('../server/routes/rewards.js');
 const { default: splitRouter } = await import('../server/routes/split-expenses.js');
 const { default: permissionsRouter } = await import('../server/routes/permissions.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
-const { defaultEmptyBody } = await import('../server/middleware/empty-body.js');
-const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { householdOverview } = await import('../server/services/two-factor.js');
 const { listEmailableMembers } = await import('../server/services/member-email.js');
 const { householdMemberSql, isHouseholdMember, memberOrderSql } = await import('../server/services/household-members.js');
@@ -134,40 +131,45 @@ assert.deepEqual(byId(EVERYONE), [...EVERYONE].reverse(), 'Vorbedingung: ids lau
 // --------------------------------------------------------------------------
 
 let actor = ANNA;
-const app = express();
-app.use(express.json());
-app.use(defaultEmptyBody);
-app.use(sessionMiddleware);
-app.use((req, _res, next) => {
-  if (actor) {
-    req.session.userId = actor;
-    req.session.role = ROLE[actor];
-  }
-  next();
-});
-app.use('/auth', authRouter);
-app.use('/api/v1/family', requireAuth, familyRouter);
-// At their real prefixes, in the mount order of server/index.js (#2810).
-app.use('/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter);
-app.use('/api/v1/schedule', requireAuth, scheduleRouter);
-app.use('/tasks', requireAuth, tasksRouter);
-app.use('/calendar', requireAuth, calendarRouter);
-// At its real prefix: validateRequest() finds its operation by the mount (#2810).
-// In server/index.js the general API limiter stands in front of it, here a
-// generous one does, far above what this suite sends.
+// At their real prefixes, in the mount order of server/index.js (#2810). In
+// server/index.js the general API limiter stands in front of the routers,
+// here a generous one does, far above what this suite sends.
+const tasksLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+const calendarLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
 const budgetLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
-app.use('/api/v1/budget', budgetLimiter, requireAuth, budgetRouter);
-app.use('/dashboard', requireAuth, dashboardRouter);
-app.use('/api/v1/rewards', requireAuth, rewardsRouter);
-app.use('/api/v1/split-expenses', requireAuth, splitRouter);
-// At its real prefix: validateRequest() finds its operation by the mount (#2810).
-app.use('/api/v1/permissions', requireAuth, permissionsRouter);
-// At its real prefix (#2810). The documents router reads and writes files;
-// in server/index.js the general API limiter stands in front of it, here a
-// generous one does, far above what this suite sends.
+const dashboardLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
+// The documents router reads and writes files.
 const documentsLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
-app.use('/api/v1/documents', documentsLimiter, requireAuth, documentsRouter);
-app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
+// The tasks at their real prefix through test/tasks-app.js: validateRequest()
+// finds its operation by the mount.
+const app = await createTasksApp({
+  auth: [
+    sessionMiddleware,
+    (req, _res, next) => {
+      if (actor) {
+        req.session.userId = actor;
+        req.session.role = ROLE[actor];
+      }
+      next();
+    },
+  ],
+  before: [
+    ['/api/v1/auth', authRouter],
+    ['/api/v1/family', requireAuth, familyRouter],
+    ['/api/v1/schedule/extras', requireAuth, scheduleExtrasRouter],
+    ['/api/v1/schedule', requireAuth, scheduleRouter],
+    ['/api/v1/tasks', tasksLimiter, requireAuth],
+  ],
+  after: [
+    ['/api/v1/calendar', calendarLimiter, requireAuth, calendarRouter],
+    ['/api/v1/budget', budgetLimiter, requireAuth, budgetRouter],
+    ['/api/v1/dashboard', dashboardLimiter, requireAuth, dashboardRouter],
+    ['/api/v1/rewards', requireAuth, rewardsRouter],
+    ['/api/v1/split-expenses', requireAuth, splitRouter],
+    ['/api/v1/permissions', requireAuth, permissionsRouter],
+    ['/api/v1/documents', documentsLimiter, requireAuth, documentsRouter],
+  ],
+});
 const server = http.createServer(app);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -234,26 +236,26 @@ test('accounts: the 2FA overview lists every account', async () => {
   // Der zweite Faktor schuetzt Konten, nicht Mitgliedschaft (Entscheidung
   // vom 15.09.2026, #1207): die Admin-Uebersicht listet deshalb jedes Konto.
   assert.deepEqual(idsOf(householdOverview(db, memberOrderSql('u')), 'user_id'), EVERYONE);
-  const r = await call('GET', '/auth/2fa/overview');
+  const r = await call('GET', '/api/v1/auth/2fa/overview');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data, 'user_id'), EVERYONE);
 });
 
 test('members only: GET /tasks/meta/options', async () => {
-  const r = await call('GET', '/tasks/meta/options');
+  const r = await call('GET', '/api/v1/tasks/meta/options');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.users), MEMBERS);
 });
 
 test('members only: a task comment mention notifies neither staff nor guests', async () => {
-  const task = await call('POST', '/tasks', { body: { title: 'Wer hilft?', visibility: 'all' } });
+  const task = await call('POST', '/api/v1/tasks', { body: { title: 'Wer hilft?', visibility: 'all' } });
   assert.equal(task.status, 201);
 
   const pushed = [];
   const original = pushService.sendPushToUser;
   pushService.sendPushToUser = async (userId) => { pushed.push(userId); };
   try {
-    const r = await call('POST', `/tasks/${task.body.data.id}/comments`, {
+    const r = await call('POST', `/api/v1/tasks/${task.body.data.id}/comments`, {
       body: { comment: '@Ben @Clara @Dora wer uebernimmt das?' },
     });
     assert.equal(r.status, 201);
@@ -266,7 +268,7 @@ test('members only: a task comment mention notifies neither staff nor guests', a
 });
 
 test('members only: the dashboard user list, reward standings and participant count', async () => {
-  const r = await call('GET', '/dashboard');
+  const r = await call('GET', '/api/v1/dashboard');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.users), MEMBERS);
   assert.deepEqual(idsOf(r.body.rewards.standings), MEMBERS);
@@ -284,7 +286,7 @@ test('members only: reward balances, participant count and the participant list'
 });
 
 test('members only: householdSize at /auth/me counts neither staff nor guests', async () => {
-  const r = await call('GET', '/auth/me');
+  const r = await call('GET', '/api/v1/auth/me');
   assert.equal(r.status, 200);
   assert.equal(r.body.householdSize, MEMBERS.length);
 });
@@ -307,7 +309,7 @@ test('split member candidates: members plus the guests of this group, not of ano
 // --------------------------------------------------------------------------
 
 test('accounts: API token subjects are every account except guests, as before', async () => {
-  const r = await call('GET', '/auth/api-tokens');
+  const r = await call('GET', '/api/v1/auth/api-tokens');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.subjects), ACCOUNTS_WITHOUT_GUESTS);
 });
@@ -316,11 +318,11 @@ const SCOPES = { [ANNA]: 'family', [BEN]: 'family', [CLARA]: 'family', [DORA]: '
 const scopesOf = (rows) => Object.fromEntries(rows.map((row) => [row.id, row.access_scope]));
 
 test('accounts: GET /auth/users lists everyone and marks staff and guests', async () => {
-  const r = await call('GET', '/auth/users');
+  const r = await call('GET', '/api/v1/auth/users');
   assert.equal(r.status, 200);
   assert.deepEqual(idsOf(r.body.data), EVERYONE);
   assert.deepEqual(scopesOf(r.body.data), SCOPES);
-  const asMember = await call('GET', '/auth/users', { as: BEN });
+  const asMember = await call('GET', '/api/v1/auth/users', { as: BEN });
   assert.equal(asMember.status, 200);
   assert.deepEqual(idsOf(asMember.body.data), EVERYONE);
   assert.deepEqual(scopesOf(asMember.body.data), SCOPES);
@@ -335,7 +337,7 @@ test('accounts: GET /permissions/catalog lists everyone with access_scope', asyn
 
 test('access_scope: /auth/me and the login answer name a guest a split_guest', async () => {
   for (const id of [BEN, DORA]) {
-    const me = await call('GET', '/auth/me', { as: id });
+    const me = await call('GET', '/api/v1/auth/me', { as: id });
     assert.equal(me.status, 200);
     assert.equal(me.body.user.access_scope, SCOPES[id]);
   }
@@ -344,7 +346,7 @@ test('access_scope: /auth/me and the login answer name a guest a split_guest', a
   const anonymous = await fetch(`${base}/auth/me`);
   const cookies = anonymous.headers.getSetCookie().map((raw) => raw.split(';')[0]).join('; ');
   for (const [id, username] of [[BEN, 'ben'], [DORA, 'dora']]) {
-    const res = await fetch(`${base}/auth/login`, {
+    const res = await fetch(`${base}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookies },
       body: JSON.stringify({ username, password: PASSWORD }),
@@ -365,14 +367,14 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   const ALL_NAMES = ['Anna', 'Ben', 'Clara', 'Dora', 'Emil'];
   const sorted = (names) => [...names].sort();
 
-  const me = await call('GET', '/auth/me', { as: ANNA });
+  const me = await call('GET', '/api/v1/auth/me', { as: ANNA });
   assert.equal(me.status, 200);
   assert.deepEqual(sorted(me.body.initialsRoster), ALL_NAMES, 'members, staff and guests - every account /auth/users lists');
-  const staff = await call('GET', '/auth/me', { as: CLARA });
+  const staff = await call('GET', '/api/v1/auth/me', { as: CLARA });
   assert.deepEqual(sorted(staff.body.initialsRoster), ALL_NAMES, 'staff sees the same discs as a member');
   // Ein Gast erreicht nur die geteilten Ausgaben; die Namen des Haushalts
   // gehen ihn nichts an.
-  const guest = await call('GET', '/auth/me', { as: DORA });
+  const guest = await call('GET', '/api/v1/auth/me', { as: DORA });
   assert.equal(guest.status, 200);
   assert.deepEqual(guest.body.initialsRoster, [], 'a split guest gets no names');
 
@@ -382,10 +384,10 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   const display = addUser('wall', 'Wand', 'member', 'other');
   db.prepare('INSERT INTO display_accounts (user_id, created_by) VALUES (?, ?)').run(display, ANNA);
   try {
-    const after = await call('GET', '/auth/me', { as: ANNA });
+    const after = await call('GET', '/api/v1/auth/me', { as: ANNA });
     assert.equal(after.status, 200);
     assert.deepEqual(sorted(after.body.initialsRoster), ALL_NAMES, 'Ben is deactivated and still listed; the display is not');
-    const listed = await call('GET', '/auth/users', { as: ANNA });
+    const listed = await call('GET', '/api/v1/auth/users', { as: ANNA });
     assert.deepEqual(sorted(listed.body.data.map((row) => row.display_name)), ALL_NAMES, 'the same accounts as /auth/users');
     assert.ok(listed.body.data.find((row) => row.id === BEN).deactivated_at, 'control: Ben really is deactivated');
   } finally {
@@ -396,7 +398,7 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
   actor = null;
   const anonymous = await fetch(`${base}/auth/me`);
   const cookies = anonymous.headers.getSetCookie().map((raw) => raw.split(';')[0]).join('; ');
-  const res = await fetch(`${base}/auth/login`, {
+  const res = await fetch(`${base}/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookies },
     body: JSON.stringify({ username: 'ben', password: PASSWORD }),
@@ -412,28 +414,28 @@ test('initialsRoster: /auth/me and the login answer name every account, also a d
 const assignedIds = (table, key, id) => byId(db.prepare(`SELECT user_id FROM ${table} WHERE ${key} = ?`).all(id).map((r) => r.user_id));
 
 test('tasks: a new assignee must be a household member', async () => {
-  const ok = await call('POST', '/tasks', { body: { title: 'Mitglied', assigned_to: [BEN] } });
+  const ok = await call('POST', '/api/v1/tasks', { body: { title: 'Mitglied', assigned_to: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('POST', '/tasks', { body: { title: 'Personal', assigned_to: [CLARA] } }), 'staff assignee');
-  assertRejectsNonMember(await call('POST', '/tasks', { body: { title: 'Gast', assigned_to: [BEN, DORA] } }), 'guest assignee');
+  assertRejectsNonMember(await call('POST', '/api/v1/tasks', { body: { title: 'Personal', assigned_to: [CLARA] } }), 'staff assignee');
+  assertRejectsNonMember(await call('POST', '/api/v1/tasks', { body: { title: 'Gast', assigned_to: [BEN, DORA] } }), 'guest assignee');
 });
 
 test('tasks: a stored staff assignee stays saveable, a newly added guest does not', async () => {
   const taskId = Number(db.prepare("INSERT INTO tasks (title, visibility, created_by) VALUES ('Fenster', 'all', ?)").run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(taskId, CLARA);
 
-  const kept = await call('PUT', `/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('task_assignments', 'task_id', taskId), byId([BEN, CLARA]));
 
-  assertRejectsNonMember(await call('PUT', `/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
+  assertRejectsNonMember(await call('PUT', `/api/v1/tasks/${taskId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
   assert.deepEqual(assignedIds('task_assignments', 'task_id', taskId), byId([BEN, CLARA]), 'a rejected PUT writes nothing');
 });
 
 test('calendar: a new attendee must be a household member', async () => {
-  const ok = await call('POST', '/calendar', { body: { title: 'Arzt', start_datetime: '2030-03-01T10:00:00', assigned_to: [BEN] } });
+  const ok = await call('POST', '/api/v1/calendar', { body: { title: 'Arzt', start_datetime: '2030-03-01T10:00:00', assigned_to: [BEN] } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assertRejectsNonMember(await call('POST', '/calendar', { body: { title: 'Gast', start_datetime: '2030-03-01T11:00:00', assigned_to: [EMIL] } }), 'guest attendee');
+  assertRejectsNonMember(await call('POST', '/api/v1/calendar', { body: { title: 'Gast', start_datetime: '2030-03-01T11:00:00', assigned_to: [EMIL] } }), 'guest attendee');
 });
 
 test('calendar: a stored staff attendee stays saveable, a newly added guest does not', async () => {
@@ -442,11 +444,11 @@ test('calendar: a stored staff attendee stays saveable, a newly added guest does
   `).run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(eventId, CLARA);
 
-  const kept = await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', eventId), byId([BEN, CLARA]));
 
-  assertRejectsNonMember(await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
+  assertRejectsNonMember(await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, CLARA, DORA] } }), 'added guest');
   assert.deepEqual(assignedIds('event_assignments', 'event_id', eventId), byId([BEN, CLARA]), 'a rejected PUT writes nothing');
 });
 
@@ -457,10 +459,10 @@ test('calendar: a single occurrence keeps the series attendees and takes no new 
   `).run(ANNA).lastInsertRowid);
   db.prepare('INSERT INTO event_assignments (event_id, user_id) VALUES (?, ?)').run(seriesId, CLARA);
 
-  const kept = await call('PUT', `/calendar/${seriesId}/occurrences/2030-04-03`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-04-03`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-04-04`, { body: { assigned_to: [CLARA, DORA] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-04-04`, { body: { assigned_to: [CLARA, DORA] } }),
     'guest added to one occurrence',
   );
 });
@@ -567,11 +569,11 @@ test('synced calendars: a new ICS subscription default assignee must be a househ
   // Kein Netz: 127.0.0.1 weist die SSRF-Pruefung vor jedem Abruf ab. Ein
   // Mitglied kommt an der Personenpruefung vorbei und scheitert erst dort - die
   // Positivkontrolle dafuer, dass die Ablehnung darunter die Mitgliedschaft meint.
-  const member = await call('POST', '/calendar/subscriptions', { body: { ...body, default_assignee_user_id: BEN } });
+  const member = await call('POST', '/api/v1/calendar/subscriptions', { body: { ...body, default_assignee_user_id: BEN } });
   assert.equal(member.status, 400, JSON.stringify(member.body));
   assert.match(String(member.body?.error), /private IP/i);
   assertRejectsNonMember(
-    await call('POST', '/calendar/subscriptions', { body: { ...body, default_assignee_user_id: CLARA } }),
+    await call('POST', '/api/v1/calendar/subscriptions', { body: { ...body, default_assignee_user_id: CLARA } }),
     'staff as default assignee of a new subscription',
   );
 });
@@ -585,11 +587,11 @@ test('synced calendars: a stored ICS subscription assignee stays saveable, a new
   db.prepare('INSERT INTO ics_subscription_assignees (subscription_id, user_id) VALUES (?, ?)').run(subId, CLARA);
   const assignee = () => db.prepare('SELECT user_id AS a FROM ics_subscription_assignees WHERE subscription_id = ?').get(subId)?.a;
 
-  const kept = await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { name: 'Verein neu', default_assignee_user_id: CLARA } });
+  const kept = await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { name: 'Verein neu', default_assignee_user_id: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  assertRejectsNonMember(await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: DORA } }), 'guest as default assignee');
+  assertRejectsNonMember(await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: DORA } }), 'guest as default assignee');
   assert.equal(assignee(), CLARA, 'a rejected PATCH writes nothing');
-  const member = await call('PATCH', `/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: BEN } });
+  const member = await call('PATCH', `/api/v1/calendar/subscriptions/${subId}`, { body: { default_assignee_user_id: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assert.equal(assignee(), BEN);
 });
@@ -601,14 +603,14 @@ test('synced calendars: an external calendar default assignee (Google, Apple, Ca
   db.prepare('INSERT INTO external_calendar_assignees (calendar_id, user_id) VALUES (?, ?)').run(calId, CLARA);
   const assignee = () => db.prepare('SELECT user_id AS a FROM external_calendar_assignees WHERE calendar_id = ?').get(calId)?.a;
 
-  const kept = await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } });
+  const kept = await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  assertRejectsNonMember(await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: EMIL } }), 'guest as default assignee');
+  assertRejectsNonMember(await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: EMIL } }), 'guest as default assignee');
   assert.equal(assignee(), CLARA, 'a rejected PATCH writes nothing');
-  const member = await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: BEN } });
+  const member = await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assertRejectsNonMember(
-    await call('PATCH', '/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } }),
+    await call('PATCH', '/api/v1/calendar/external-calendars', { body: { ...target, default_assignee_user_id: CLARA } }),
     'staff chosen again after being replaced',
   );
 });
@@ -619,13 +621,13 @@ test('synced calendars: a stored Outlook account owner stays saveable, a new non
   `).run(CLARA).lastInsertRowid);
   const owner = () => db.prepare('SELECT owner_user_id AS o FROM outlook_accounts WHERE id = ?').get(accountId).o;
 
-  const kept = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { name: 'Arbeit neu', ownerUserId: CLARA } });
+  const kept = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { name: 'Arbeit neu', ownerUserId: CLARA } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
-  const guestOwner = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } });
+  const guestOwner = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: DORA } });
   assertRejectsNonMember(guestOwner, 'guest as owner');
   assert.equal(guestOwner.body.reason, 'calendar_assignee_not_member', 'die App sagt den Satz (#1909)');
   assert.equal(owner(), CLARA, 'a rejected PUT writes nothing');
-  const member = await call('PUT', `/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: BEN } });
+  const member = await call('PUT', `/api/v1/calendar/outlook/accounts/${accountId}`, { body: { ownerUserId: BEN } });
   assert.equal(member.status, 200, JSON.stringify(member.body));
   assert.equal(owner(), BEN);
 });
@@ -666,7 +668,7 @@ test('calendar: the series path of PUT keeps a stored staff attendee and takes n
   const seriesId = addSeries('Wochenplan', '2030-05-01T08:00:00', [CLARA]);
   // Ein abgewandeltes Vorkommen zwingt PUT /:id in den Serienpfad
   // (updateSeriesWithOverrides) statt in das einfache Update.
-  const occurrence = await call('PUT', `/calendar/${seriesId}/occurrences/2030-05-03`, { body: { title: 'Anders' } });
+  const occurrence = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-05-03`, { body: { title: 'Anders' } });
   assert.equal(occurrence.status, 200, JSON.stringify(occurrence.body));
   assert.ok(db.prepare('SELECT 1 FROM calendar_events WHERE recurrence_parent_id = ?').get(seriesId), 'Vorbedingung: ein verknuepftes Vorkommen existiert');
 
@@ -676,10 +678,10 @@ test('calendar: the series path of PUT keeps a stored staff attendee and takes n
     rows: eventRows(),
   });
   const before = series();
-  assertRejectsNonMember(await call('PUT', `/calendar/${seriesId}`, { body: { assigned_to: [CLARA, DORA] } }), 'guest added to a series with an override');
+  assertRejectsNonMember(await call('PUT', `/api/v1/calendar/${seriesId}`, { body: { assigned_to: [CLARA, DORA] } }), 'guest added to a series with an override');
   assert.deepEqual(series(), before, 'a rejected series PUT writes nothing');
 
-  const kept = await call('PUT', `/calendar/${seriesId}`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 200, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', seriesId), byId([BEN, CLARA]));
 });
@@ -693,12 +695,12 @@ test('calendar: this-and-following keeps a stored staff attendee and takes no ne
   });
   const before = series();
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [CLARA, EMIL] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [CLARA, EMIL] } }),
     'guest added to this and the following occurrences',
   );
   assert.deepEqual(series(), before, 'a rejected split writes nothing: same series, no following series');
 
-  const kept = await call('PUT', `/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [BEN, CLARA] } });
+  const kept = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-06-05/following`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(kept.status, 201, JSON.stringify(kept.body));
   assert.deepEqual(assignedIds('event_assignments', 'event_id', kept.body.data.id), byId([BEN, CLARA]));
 });
@@ -709,21 +711,21 @@ test('calendar: an occurrence that owns its attendees is the stored state, not t
   // gespeichert - sie wieder hinzuzufuegen ist eine neue Wahl. Genau so
   // bestimmt upsertOccurrenceOverride() den geltenden Stand.
   const seriesId = addSeries('Einkauf', '2030-08-01T09:00:00', [CLARA]);
-  const removed = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN] } });
+  const removed = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN] } });
   assert.equal(removed.status, 200, JSON.stringify(removed.body));
   const child = db.prepare('SELECT id, overridden_fields FROM calendar_events WHERE recurrence_parent_id = ? AND recurrence_id = ?').get(seriesId, '2030-08-03T09:00:00');
   assert.match(String(child?.overridden_fields), /assignments/, 'Vorbedingung: das Vorkommen besitzt seine Zuweisungen');
   assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN]);
 
   assertRejectsNonMember(
-    await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN, CLARA] } }),
+    await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-03`, { body: { assigned_to: [BEN, CLARA] } }),
     'staff re-added to an occurrence that had removed them',
   );
   assert.deepEqual(assignedIds('event_assignments', 'event_id', child.id), [BEN], 'a rejected PUT writes nothing');
 
   // Gegenprobe: ein Vorkommen ohne eigene Zuweisung erbt die der Serie, dort
   // bleibt Clara gespeichert.
-  const inherited = await call('PUT', `/calendar/${seriesId}/occurrences/2030-08-04`, { body: { assigned_to: [BEN, CLARA] } });
+  const inherited = await call('PUT', `/api/v1/calendar/${seriesId}/occurrences/2030-08-04`, { body: { assigned_to: [BEN, CLARA] } });
   assert.equal(inherited.status, 200, JSON.stringify(inherited.body));
 });
 
@@ -745,12 +747,12 @@ test('calendar: a rejected attendee leaves no staged attachment behind', async (
     const dataUrl = `data:text/plain;base64,${Buffer.from('Anhang').toString('base64')}`;
 
     // Gegenprobe zuerst: legt dieser Aufbau ueberhaupt eine Datei ab?
-    const ok = await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN], attachment_data: dataUrl, attachment_name: 'gut.txt' } });
+    const ok = await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN], attachment_data: dataUrl, attachment_name: 'gut.txt' } });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
     assert.equal(await files(), 1, 'Vorbedingung: ein gelungener Anhang liegt im Ordner');
 
     assertRejectsNonMember(
-      await call('PUT', `/calendar/${eventId}`, { body: { assigned_to: [BEN, DORA], attachment_data: dataUrl, attachment_name: 'waise.txt' } }),
+      await call('PUT', `/api/v1/calendar/${eventId}`, { body: { assigned_to: [BEN, DORA], attachment_data: dataUrl, attachment_name: 'waise.txt' } }),
       'guest added together with an attachment',
     );
     assert.equal(await files(), 1, 'the attachment staged for the rejected request was cleaned up');
@@ -840,7 +842,7 @@ test('rewards: an old enrolment of an account that is not a member earns, redeem
   // Clara (Hauspersonal) ist seit der Fixture eingeschrieben (enabled = 1).
   const taskId = Number(db.prepare("INSERT INTO tasks (title, status, points, created_by) VALUES ('Fenster', 'open', 5, ?)").run(ANNA).lastInsertRowid);
   for (const id of [BEN, CLARA]) db.prepare('INSERT INTO task_assignments (task_id, user_id) VALUES (?, ?)').run(taskId, id);
-  const done = await call('PATCH', `/tasks/${taskId}/status`, { body: { status: 'done' } });
+  const done = await call('PATCH', `/api/v1/tasks/${taskId}/status`, { body: { status: 'done' } });
   assert.equal(done.status, 200, JSON.stringify(done.body));
   const earned = db.prepare("SELECT user_id FROM reward_ledger WHERE task_id = ? AND type = 'earn' ORDER BY user_id").all(taskId)
     .map((row) => row.user_id);
@@ -869,7 +871,7 @@ test('auth: othersCanRead names the modules another account can read, staff incl
     ON CONFLICT(subject_type, subject_id, resource_type, resource_key) DO UPDATE SET access = excluded.access
   `).run(String(userId), key, access);
   const readers = async () => {
-    const me = await call('GET', '/auth/me', { as: ANNA });
+    const me = await call('GET', '/api/v1/auth/me', { as: ANNA });
     assert.equal(me.status, 200);
     return me.body.othersCanRead;
   };
@@ -960,7 +962,7 @@ function othersCanReadByAuthorize(viewerId) {
 
 test('B9: othersCanRead per kind of other account and level - production, literal, authorize agree', async () => {
   const readersAs = async (/** @type {number} */ viewer) => {
-    const me = await call('GET', '/auth/me', { as: viewer });
+    const me = await call('GET', '/api/v1/auth/me', { as: viewer });
     assert.equal(me.status, 200);
     return me.body.othersCanRead;
   };

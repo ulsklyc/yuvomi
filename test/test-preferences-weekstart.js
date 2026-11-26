@@ -10,20 +10,19 @@ process.env.DB_PATH = ':memory:';
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import express from 'express';
+import { createPreferencesApp, PREFERENCES_PREFIX } from './preferences-app.js';
 
 await import('../server/db.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 
 let currentRole = 'member';
-function startApp() {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => { req.authUserId = 1; req.authRole = currentRole; next(); });
-  app.use('/', preferencesRouter);
+async function startApp() {
+  const app = await createPreferencesApp({
+    mount: ['preferences'],
+    auth: (req, _res, next) => { req.authUserId = 1; req.authRole = currentRole; next(); },
+  });
   return new Promise((resolve) => {
     const s = app.listen(0, '127.0.0.1', () => resolve({
-      baseUrl: `http://127.0.0.1:${s.address().port}`,
+      baseUrl: `http://127.0.0.1:${s.address().port}${PREFERENCES_PREFIX}`,
       close: () => new Promise((r) => s.close(r)),
     }));
   });

@@ -117,9 +117,9 @@ export default {
     },
     {
       name: 'lower-layers-not-to-routes',
-      comment: 'Services, utils, middleware and the MCP adapter never import a route module.',
+      comment: 'Services, utils, middleware, the MCP adapter and the API layer (server/api/) never import a route module.',
       severity: 'error',
-      from: { path: '^server/(services|utils|middleware|mcp)/' },
+      from: { path: '^server/(services|utils|middleware|mcp|api)/' },
       to: { path: '^server/routes/' },
     },
     // THE SENDERS (#2602, #2598). Every file that hands household data to a device or

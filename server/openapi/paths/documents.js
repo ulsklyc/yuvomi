@@ -4,6 +4,7 @@ import { MODULE_FOLDER_KEYS } from '../../services/document-folders.js';
 import {
   DOCUMENT_CATEGORIES, DOCUMENT_STATUSES, DOCUMENT_VISIBILITIES,
 } from '../../services/document-fields.js';
+import { MAX_MEMBER_IDS } from '../array-limits.js';
 
 // ---------------------------------------------------------------------------
 // Bausteine der Anfrage-Schemata (#2810, Gruppe 8). Das Schema traegt Typ und
@@ -56,6 +57,7 @@ const EXPIRY_REMINDER_DAYS = {
 };
 const ALLOWED_MEMBER_IDS = {
   type: 'array',
+  maxItems: MAX_MEMBER_IDS,
   items: { type: 'integer', minimum: 1 },
   description: 'The household members who may see a `restricted` document; read only for `restricted`. An id without an account or of someone who is not a household member is the route\'s 400.',
 };
@@ -392,6 +394,7 @@ export function documentsPaths() {
           },
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
+          409: { description: 'The document storage settings changed while the file was uploaded (`storage_code` `DOCUMENT_STORAGE_CONFIG_CHANGED`); no document is created and the uploaded file is removed again, the upload may be sent again', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
           502: { description: 'Document-storage operation failed', content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } },
           500: { $ref: '#/components/responses/InternalServerError' },
         },
@@ -722,6 +725,12 @@ const STORAGE_FAILED = '`documents_storage_failed` (502, the storage backend fai
 const STORAGE_FAILED_ADMIN = '`documents_storage_failed` (502, the storage backend failed; a refused or unreachable WebDAV store adds its class in `detail`, such as `HTTP 401` or `ECONNREFUSED`, never its text)';
 const FILE_CASES = '`documents_file_type_not_allowed`, `documents_file_content_mismatch`, `documents_file_empty` (400), `documents_storage_failed` (502, the storage backend failed)';
 const CASE_REASONS = {
+  '/api/v1/documents/dms/paperless/folders': {
+    post: '`paperless_folder_invalid` (400, a restricted audience is empty or a filter tag is unavailable)',
+  },
+  '/api/v1/documents/dms/paperless/folders/{id}': {
+    put: '`paperless_folder_invalid` (400, a restricted audience is empty)',
+  },
   '/api/v1/documents/folders': { post: `${SELECTED_FOLDER_GONE}, ${FOLDER_TREE}` },
   '/api/v1/documents/folders/{id}': {
     put: `${FOLDER_GONE}, ${SELECTED_FOLDER_GONE}, ${FOLDER_TREE}`,
@@ -758,6 +767,8 @@ const CASE_REASONS = {
   },
 };
 
+const PAPERLESS_ID = { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER };
+
 /** Virtual-folder IDs belong to their own namespace, never family_documents. */
 function paperlessTagPaths() {
   const root = '/api/v1/documents/dms/paperless';
@@ -777,8 +788,8 @@ function paperlessTagPaths() {
   const result = {
     [`${root}/tags`]: { get: op({ summary: 'Browse existing Paperless tags', tag: 'Documents', admin: true,
       description: 'Requires documents:write. Returns data [{id,name}], meta {page,count,has_more}; 100 source tags per page. Optional folder_id restricts the catalogue to a folder owned by the caller, its token mode and centrally enabled tag IDs. Without folder_id, uses the central connection. Never follows absolute pagination URLs.',
-      params: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } },
-        { name: 'folder_id', in: 'query', schema: { type: 'integer', minimum: 1 } },
+      params: [{ name: 'account_id', in: 'query', required: true, schema: PAPERLESS_ID },
+        { name: 'folder_id', in: 'query', schema: PAPERLESS_ID },
         { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100000, default: 1 } }], responses }) },
   };
   for (const folder of [false, true]) {
@@ -796,7 +807,11 @@ function paperlessTagPaths() {
       get: op({ summary: 'Read assigned Paperless document tags', tag: 'Documents', params, description, responses }),
       put: op({ summary: 'Set existing Paperless document tags', tag: 'Documents', admin: true, stateChanging: true, params, description,
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['tags', 'expected_tags'],
-          properties: Object.fromEntries(['tags', 'expected_tags'].map((name) => [name, { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 } }])) } } } }, responses }),
+          'x-reason': 'paperless_tags_invalid',
+          properties: Object.fromEntries(['tags', 'expected_tags'].map((name) => [name, {
+            type: 'array', maxItems: 1000, 'x-reason': 'paperless_tags_invalid',
+            items: { ...PAPERLESS_ID, 'x-reason': 'paperless_tags_invalid' },
+          }])) } } } }, responses }),
     };
   }
   return result;
@@ -809,7 +824,7 @@ function paperlessFolderPaths() {
   const error = { content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } };
   const responses = {
     200: { description: 'Successful response. Lists contain data plus meta {page, count, has_more}; every page has at most 50 items.' },
-    400: { ...error, description: 'paperless_folder_invalid or paperless_share_confirmation' },
+    400: { ...error, description: 'Validation fields, paperless_folder_invalid, a non-household recipient or paperless_share_confirmation' },
     401: { $ref: '#/components/responses/Unauthorized' },
     403: { ...error, description: 'Module/scope denied or creating administrator required; generic permission refusal' },
     404: { ...error, description: 'paperless_folder_not_found, paperless_document_not_found or paperless_account_not_found' },
@@ -820,7 +835,7 @@ function paperlessFolderPaths() {
     500: { $ref: '#/components/responses/InternalServerError' },
   };
   const note = 'Requires Documents module access (documents:read for reads, documents:write for mutations). '
-    + 'Private folders are visible only to their creator; restricted folders additionally admit allowed_member_ids; family folders delegate read/download of all current and future view matches. '
+    + 'Private folders are visible only to their creator; restricted folders additionally admit selected household members; family folders delegate read/download of all current and future view matches. '
     + 'The configured shared or personal token must also be authorized by Paperless; personal mode never falls back to the central token. '
     + 'Only the creating administrator may edit or disconnect a binding. No files or local document references are created or deleted. '
     + 'Responses use Cache-Control: no-store.';
@@ -832,27 +847,27 @@ function paperlessFolderPaths() {
     ...(create ? { oneOf: [
       { required: ['view_id'], properties: { view_id: {} } },
       { required: ['tag_filter'], properties: { tag_filter: {} } },
-    ] } : {}),
+    ] } : { 'x-reason': 'paperless_folder_invalid' }),
     properties: {
-      name: { type: 'string', minLength: 1, maxLength: 200 },
-      visibility: { type: 'string', enum: ['private', 'restricted', 'family'], default: 'private' },
-      allowed_member_ids: { type: 'array', maxItems: 1000, items: { type: 'integer', minimum: 1 }, description: 'Required for restricted visibility; selected household member IDs.' },
+      name: { type: 'string', minLength: 1, maxLength: 200, pattern: '\\S', 'x-reason': 'paperless_folder_invalid' },
+      visibility: { type: 'string', enum: ['private', 'restricted', 'family'], default: 'private', 'x-reason': 'paperless_folder_invalid' },
+      allowed_member_ids: { type: 'array', maxItems: 1000, items: PAPERLESS_ID, description: 'Required for restricted visibility; selected household member IDs.' },
       confirm_share: { type: 'boolean', description: 'Must be true when widening the audience, including adding selected members.' },
-      ...(create ? { account_id: { type: 'integer', minimum: 1 }, view_id: { type: 'integer', minimum: 1 },
+      ...(create ? { account_id: PAPERLESS_ID, view_id: PAPERLESS_ID,
         tag_filter: { type: 'object', required: ['match', 'tag_ids'], properties: {
           match: { type: 'string', enum: ['all', 'any'] },
-          tag_ids: { type: 'array', minItems: 1, maxItems: 1000, items: { type: 'integer', minimum: 1 } },
+          tag_ids: { type: 'array', minItems: 1, maxItems: 1000, items: PAPERLESS_ID },
         }, description: 'Local Live-folder filter. All IDs must be readable with the creator Live-folder token. Source and filters are immutable after creation.' },
-      } : {}),
+      } : { account_id: false, view_id: false, tag_filter: false }),
     },
   } } } });
   return {
     [`${root}/filter-tags`]: { get: operation('List tags for a local Live-folder filter', {
-      admin: true, params: [page, { name: 'account_id', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } }],
+      admin: true, params: [page, { name: 'account_id', in: 'query', required: true, schema: PAPERLESS_ID }],
       description: `${note} Uses the configured Live-folder credentials, including personal mode. Tag-edit allowlists do not restrict filtering. Returns only tag IDs and names.`,
     }) },
     [`${root}/saved-views`]: { get: operation('List available saved Paperless views', {
-      admin: true, params: [page, { name: 'account_id', in: 'query', required: true, schema: { type: 'integer', minimum: 1 } }],
+      admin: true, params: [page, { name: 'account_id', in: 'query', required: true, schema: PAPERLESS_ID }],
       description: `${note} Admin-only picker; data items contain only {id, name}.`,
     }) },
     [`${root}/folders`]: {
@@ -882,7 +897,7 @@ function paperlessFolderPaths() {
 function paperlessLiveSettingsPaths() {
   const root = '/api/v1/documents/dms/paperless/live-settings';
   const id = idParam();
-  const allowedTags = { type: ['array', 'null'], maxItems: 1000, items: { type: 'integer', minimum: 1 },
+  const allowedTags = { type: ['array', 'null'], maxItems: 1000, items: PAPERLESS_ID,
     description: 'null permits all tags; an empty array permits no tag changes. Other existing assignments must be preserved.' };
   const mode = { type: 'string', enum: ['shared', 'personal'] };
   const error = { content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } } };
@@ -912,7 +927,7 @@ function paperlessLiveSettingsPaths() {
       stateChanging: true, params: [id], description: 'Requires documents:write. expected_revision must match the current revision; a successful write increments it. '
         + 'Returns data {token_mode,allowed_tag_ids,display_fields,revision}. Optional display_fields selects overview metadata; omission preserves it and [] clears it. Personal mode requires each reader\'s own Paperless credentials.',
       requestBody: body(['token_mode', 'allowed_tag_ids', 'expected_revision'], {
-        token_mode: mode, allowed_tag_ids: allowedTags, expected_revision: { type: 'integer', minimum: 0 },
+        token_mode: mode, allowed_tag_ids: allowedTags, expected_revision: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
         display_fields: { type: 'array', maxItems: 8, items: { type: 'string', enum: ['created', 'added', 'modified', 'correspondent', 'document_type', 'tags', 'archive_serial_number', 'filename'] } },
       }), responses }) },
     [`${root}/{id}/tags`]: { get: op({ summary: 'Browse the central Live-folder tag catalogue', tag: 'Documents', admin: true,
@@ -925,6 +940,7 @@ function paperlessLiveSettingsPaths() {
       put: op({ summary: 'Save my personal Paperless token', tag: 'Documents', stateChanging: true, params: [id],
         description: `${tokenNote} Returns data {has_personal_token:true}.`,
         requestBody: body(['api_token'], { api_token: { type: 'string', minLength: 1, maxLength: 500, writeOnly: true,
+          pattern: '^(?![\\s\\S]*[\\u0000\\r\\n])(?=[\\s\\S]*\\S)', 'x-reason': 'paperless_personal_token_invalid',
           description: 'Non-blank token without line breaks or NUL characters.' } }), responses }),
       delete: op({ summary: 'Remove my personal Paperless token', tag: 'Documents', stateChanging: true, params: [id],
         description: tokenNote, responses: { ...Object.fromEntries(Object.entries(responses).filter(([code]) => code !== '200')),

@@ -621,8 +621,8 @@ const README_FACTS = [
     holds: (s) => /async function openPantryTransfer/.test(s.shoppingPage) && /pantry-transfer__qty/.test(s.shoppingPage) && /pantry-transfer__unit/.test(s.shoppingPage),
     what: 'Uebernahme-Dialog Einkauf -> Vorrat mit Menge und Einheit (public/pages/shopping.js openPantryTransfer)' },
   { says: { en: /Inventory,\s+Waste collection and Schedule start switched off/, de: /Inventar,\s+Entsorgung und Schichtplan sind anfangs aus/ },
-    holds: (s) => ['inventory', 'waste', 'schedule'].every((m) => new RegExp(`disabled\\.push\\('${m}'\\)`).test(s.db) && s.toggleable.includes(m)),
-    what: 'Migrationen in server/db.js schalten die drei ab, TOGGLEABLE_MODULES (server/settings/values.ts, seit Phase 2 C3 importiert) kennt sie' },
+    holds: (s) => ['inventory', 'waste', 'schedule'].every((m) => new RegExp(`disabled\\.push\\('${m}'\\)`).test(s.migrations) && s.toggleable.includes(m)),
+    what: 'Migrationen in server/migrations/ schalten die drei ab, TOGGLEABLE_MODULES (server/settings/values.ts, seit Phase 2 C3 importiert) kennt sie' },
   { says: { en: /amd64 and arm64 \(Raspberry Pi 4\/5\)/, de: /amd64 und arm64 \(Raspberry Pi 4\/5\)/ },
     holds: (s) => /platforms:\s*linux\/amd64,\s*linux\/arm64/.test(s.dockerPublish),
     what: 'Multi-Arch-Build (.github/workflows/docker-publish.yml platforms)' },
@@ -720,6 +720,9 @@ function factSources() {
     // Seit R23 (D2) liest der Import den Essensplan ueber die geteilte Quelle.
     kitchenHandover: src('server/services/kitchen-handover.js'),
     db: src('server/db.js'),
+    // Die Migrationen, eine Datei je Version.
+    migrations: readdirSync(resolve(ROOT, 'server/migrations')).filter((f) => /^\d{4}\.ts$/.test(f)).sort()
+      .map((f) => src(`server/migrations/${f}`)).join('\n'),
     // Die Liste steht seit Phase 2, C3 im Einstellungs-Register: importiert, nicht geschnitten.
     toggleable: [...TOGGLEABLE_MODULES],
     dockerPublish: src('.github/workflows/docker-publish.yml'),
@@ -802,8 +805,8 @@ test('der Guard aus (6) erkennt den Schaden, gegen den er gebaut ist', () => {
   // Der Code verliert, woran die Zusage haengt.
   const f5 = factFindings({ ...real, installer: real.installer.replace("server.listen(PORT, '127.0.0.1'", "server.listen(PORT, '0.0.0.0'") });
   assert.ok(hit(f5, /haengt an Web-Installer lauscht nur auf 127\.0\.0\.1/), f5.join(' | '));
-  const f6 = factFindings({ ...real, db: real.db.replace("disabled.push('waste')", "void 0") });
-  assert.ok(hit(f6, /haengt an Migrationen in server\/db\.js/), f6.join(' | '));
+  const f6 = factFindings({ ...real, migrations: real.migrations.replace("disabled.push('waste')", "void 0") });
+  assert.ok(hit(f6, /haengt an Migrationen in server\/migrations\//), f6.join(' | '));
   const f7 = factFindings({ ...real, dockerPublish: real.dockerPublish.replace('linux/amd64,linux/arm64', 'linux/amd64') });
   assert.ok(hit(f7, /haengt an Multi-Arch-Build/), f7.join(' | '));
   const f8 = factFindings({ ...real, display: real.display.replace(/method: 'PATCH'/, "method: 'GET'") });

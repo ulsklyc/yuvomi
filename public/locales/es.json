@@ -127,7 +127,8 @@
         "transferUndone": "Eliminado de la lista de la compra.",
         "transferSkipped": "{{count}} ya estaban en ella.",
         "transferSkipped_one": "{{count}} ya estaba en ella.",
-        "transferAllPresent": "Todos los ingredientes ya están en la lista."
+        "transferAllPresent": "Todos los ingredientes ya están en la lista.",
+        "errorTransferTooLarge": "Son demasiados ingredientes a la vez. Como máximo se pueden pasar, y deshacer, {{limit}} juntos."
     },
     "nav": {
         "dashboard": "Inicio",
@@ -1272,7 +1273,8 @@
         "localCalendarEdit": "Editar calendario",
         "localCalendarNew": "Nuevo calendario",
         "manageSubscriptionsLink": "Suscripciones y sincronización",
-        "cancelled": "Cancelado"
+        "cancelled": "Cancelado",
+        "errorSeriesChanged": "La serie acaba de cambiarse en otro lugar. Vuelve a guardar."
     },
     "noteCategories": {
         "categories": "Categorías",
@@ -3638,7 +3640,8 @@
         "remoteErrorAuthFailed": "El servidor rechazó el inicio de sesión. Comprueba el nombre de usuario y la contraseña.",
         "remoteErrorStatus": "El servidor respondió con el estado {{status}}.",
         "remoteErrorUnreachable": "No se puede acceder al servidor. Comprueba la dirección y si el servidor está en marcha.",
-        "remoteErrorFailed": "La solicitud al servidor ha fallado."
+        "remoteErrorFailed": "La solicitud al servidor ha fallado.",
+        "caldavErrorAccountChanged": "La cuenta acaba de cambiarse en otro lugar. Vuelve a guardar."
     },
     "login": {
         "tagline": "Bienvenido de nuevo. Tu hogar en un solo lugar.",

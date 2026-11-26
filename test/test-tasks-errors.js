@@ -21,7 +21,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { readFileSync } from 'node:fs';
-import express from 'express';
 import Database from 'better-sqlite3-multiple-ciphers';
 
 process.env.DB_PATH = ':memory:';
@@ -42,7 +41,7 @@ globalThis.window.yuvomi = {
 Object.defineProperty(globalThis, 'navigator', { value: { ...globalThis.navigator, onLine: true }, configurable: true, writable: true });
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { setPermissions } = await import('../public/permissions.js');
 const { __test: tasks } = await import('../public/pages/tasks.js');
 const { CASE_MESSAGES, GONE_REASONS } = await import('../public/utils/friendly-error.js');
@@ -73,15 +72,15 @@ test.after(() => db.close());
 const admin = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
   VALUES ('ada', 'Ada', '$2b$12$x', 'admin')`).run().lastInsertRowid;
 
-const app = express();
-app.use(express.json({ limit: '1mb' }));
-app.use((req, _res, next) => {
-  req.authUserId = admin;
-  req.authRole = 'admin';
-  req.session = { userId: admin, role: 'admin' };
-  next();
+const app = await createTasksApp({
+  auth: (req, _res, next) => {
+    req.authUserId = admin;
+    req.authRole = 'admin';
+    req.session = { userId: admin, role: 'admin' };
+    next();
+  },
+  jsonLimit: '1mb',
 });
-app.use('/api/v1/tasks', tasksRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 test.after(() => new Promise((r) => server.close(r)));

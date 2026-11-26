@@ -1,5 +1,5 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
-import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../middleware/validate.js';
+import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { DATE_PATTERN, OPTIONAL_DATE_PATTERN, OPTIONAL_DATETIME_PATTERN } from '../../utils/datetime-pattern.js';
 import { MAX_AVATAR_DATA_LENGTH } from '../../utils/avatar-limits.js';
 import {

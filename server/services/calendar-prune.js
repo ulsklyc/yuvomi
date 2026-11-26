@@ -12,6 +12,7 @@
 
 import { createLogger } from '../logger.js';
 import { parseOwnUid, installationId } from '../utils/own-uid.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 const log = createLogger('CalendarPrune');
 
 /**
@@ -173,10 +174,10 @@ function backToLocal(database, eventId, { source, accountId, calRefId }) {
 /** Die external_calendars-Zeilen eines Kalenders bzw. aller Kalender einer Auswahl. */
 function calendarRefIds(database, externalIds) {
   if (!externalIds.length) return [];
-  const marks = externalIds.map(() => '?').join(',');
+  const externalIdList = sqlInList(externalIds);
   return database.prepare(
-    `SELECT id FROM external_calendars WHERE source IN ('caldav','apple') AND external_id IN (${marks})`
-  ).all(...externalIds).map((r) => r.id);
+    `SELECT id FROM external_calendars WHERE source IN ('caldav','apple') AND external_id IN (${externalIdList.sql})`
+  ).all(externalIdList.param).map((r) => r.id);
 }
 
 /**
@@ -194,12 +195,12 @@ function calendarRefIds(database, externalIds) {
 export function countMirroredEvents(database, externalIds, { accountId = null } = {}) {
   const refIds = calendarRefIds(database, externalIds);
   if (!refIds.length) return 0;
-  const marks = refIds.map(() => '?').join(',');
+  const refIdList = sqlInList(refIds);
   const ofAccount = accountId == null ? '' : ' AND caldav_account_id = ?';
   return database.prepare(
     `SELECT COUNT(*) AS n FROM calendar_events
-     WHERE calendar_ref_id IN (${marks}) AND external_source IN ('caldav','apple')${ofAccount}`
-  ).get(...refIds, ...(accountId == null ? [] : [accountId])).n;
+     WHERE calendar_ref_id IN (${refIdList.sql}) AND external_source IN ('caldav','apple')${ofAccount}`
+  ).get(refIdList.param, ...(accountId == null ? [] : [accountId])).n;
 }
 
 /**
@@ -221,12 +222,12 @@ export function countMirroredEvents(database, externalIds, { accountId = null } 
 export function deleteMirroredEvents(database, externalIds, { accountId = null } = {}) {
   const refIds = calendarRefIds(database, externalIds);
   if (!refIds.length) return 0;
-  const marks = refIds.map(() => '?').join(',');
+  const refIdList = sqlInList(refIds);
   const ofAccount = accountId == null ? '' : ' AND caldav_account_id = ?';
   const result = database.prepare(
     `DELETE FROM calendar_events
-     WHERE calendar_ref_id IN (${marks}) AND external_source IN ('caldav','apple')${ofAccount}`
-  ).run(...refIds, ...(accountId == null ? [] : [accountId]));
+     WHERE calendar_ref_id IN (${refIdList.sql}) AND external_source IN ('caldav','apple')${ofAccount}`
+  ).run(refIdList.param, ...(accountId == null ? [] : [accountId]));
   const removed = Number(result.changes) || 0;
   if (removed) log.info(`Removed ${removed} mirrored event(s) on user request.`);
   return removed;

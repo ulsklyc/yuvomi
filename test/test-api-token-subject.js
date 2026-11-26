@@ -10,13 +10,12 @@ import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import express from 'express';
+import { createAuthApp } from './auth-app.js';
 import rateLimit from 'express-rate-limit';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, requireAuth } = await import('../server/auth.js');
 const { csrfMiddleware } = await import('../server/middleware/csrf.js');
-const { createErrorHandler } = await import('../server/middleware/error-handler.js');
 const { default: budgetRouter } = await import('../server/routes/budget.js');
 const { buildOpenApiSpec } = await import('../server/openapi.js');
 const database = dbmod.get();
@@ -35,21 +34,23 @@ database.prepare(`
   VALUES ('Test admin', ?, 'yuvomi_subj', ?)
 `).run(crypto.createHash('sha256').update(adminToken).digest('hex'), adminId);
 
-const app = express();
-app.use(express.json());
-app.use('/auth', authRouter);
-app.get('/auth-context', requireAuth, (req, res) => res.json({
-  user_id: req.authUserId,
-  role: req.authRole,
-  module_access: req.sessionModuleAccess,
-}));
-// At its real prefix with the central error handler: validateRequest() finds its
-// operation by the mount and answers through next(err) (#2810).
-// In server/index.js the general API limiter stands in front of it, here a
-// generous one does, far above what this suite sends.
+// The auth router and the budget at their real prefixes with the central error
+// handler: validateRequest() finds its operation by the mount and answers
+// through next(err) (#2810).
+// In server/index.js the general API limiter stands in front of the budget,
+// here a generous one does, far above what this suite sends.
 const budgetLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: false, legacyHeaders: false });
-app.use('/api/v1/budget', budgetLimiter, requireAuth, csrfMiddleware, budgetRouter);
-app.use(createErrorHandler({ warn: () => {}, error: () => {} }));
+const app = await createAuthApp({
+  routers: [authRouter],
+  after: [
+    ['/auth-context', requireAuth, (req, res) => res.json({
+      user_id: req.authUserId,
+      role: req.authRole,
+      module_access: req.sessionModuleAccess,
+    })],
+    ['/api/v1/budget', budgetLimiter, requireAuth, csrfMiddleware, budgetRouter],
+  ],
+});
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolve) => server.on('listening', () => resolve(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
@@ -64,7 +65,7 @@ async function call(method, route, token, body) {
 }
 
 test('admin may create a scoped token for a selected member and token writes belong to that member', async () => {
-  const created = await call('POST', '/auth/api-tokens', adminToken, {
+  const created = await call('POST', '/api/v1/auth/api-tokens', adminToken, {
     name: 'Akahu for member',
     subject_user_id: memberId,
     scopes: ['budget:write'],
@@ -73,7 +74,7 @@ test('admin may create a scoped token for a selected member and token writes bel
   assert.equal(created.body.data.created_by, adminId);
   assert.equal(created.body.data.subject_user_id, memberId);
   assert.equal(created.body.data.subject_name, 'Subject Member');
-  const listed = await call('GET', '/auth/api-tokens', adminToken);
+  const listed = await call('GET', '/api/v1/auth/api-tokens', adminToken);
   assert.equal(listed.status, 200);
   assert.ok(listed.body.subjects.some((subject) => subject.id === memberId));
 
@@ -116,7 +117,7 @@ test('subject token schema is documented and deleting its subject removes the to
     INSERT INTO users(username, display_name, password_hash, role)
     VALUES ('subject-disposable', 'Disposable', 'x', 'member')
   `).run().lastInsertRowid);
-  const created = await call('POST', '/auth/api-tokens', adminToken, { name: 'Disposable integration', subject_user_id: disposable });
+  const created = await call('POST', '/api/v1/auth/api-tokens', adminToken, { name: 'Disposable integration', subject_user_id: disposable });
   assert.equal(created.status, 201);
   database.prepare('DELETE FROM users WHERE id=?').run(disposable);
   assert.equal(database.prepare('SELECT count(*) AS count FROM api_tokens WHERE id=?').get(created.body.data.id).count, 0);
@@ -129,7 +130,7 @@ test('a split-expense guest cannot be selected as an integration-token subject',
   `).run().lastInsertRowid);
   const groupId = Number(database.prepare("INSERT INTO expense_groups(name, default_currency, created_by) VALUES ('Guest group', 'EUR', ?)").run(adminId).lastInsertRowid);
   database.prepare('INSERT INTO split_expense_guest_users(user_id, group_id, created_by) VALUES (?, ?, ?)').run(guestId, groupId, adminId);
-  const response = await call('POST', '/auth/api-tokens', adminToken, { name: 'Invalid guest integration', subject_user_id: guestId });
+  const response = await call('POST', '/api/v1/auth/api-tokens', adminToken, { name: 'Invalid guest integration', subject_user_id: guestId });
   assert.equal(response.status, 400);
   assert.match(response.body.error, /guest|subject/i);
 });
@@ -146,7 +147,7 @@ test('the token form refusals name their case (#1909)', async () => {
     [{ name: 'Past', expires_at: '2020-01-01T00:00:00.000Z' }, 'api_tokens_expiry_past'],
     [{ name: 'Gone subject', subject_user_id: 987654 }, 'api_tokens_subject_unknown'],
   ]) {
-    const response = await call('POST', '/auth/api-tokens', adminToken, body);
+    const response = await call('POST', '/api/v1/auth/api-tokens', adminToken, body);
     assert.equal(response.status, 400, JSON.stringify(body));
     assert.equal(response.body.reason, reason, JSON.stringify(response.body));
   }

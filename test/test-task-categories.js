@@ -5,12 +5,10 @@
  * Ausführen: node test/test-task-categories.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import express from 'express';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { migrateTo, openSchemaDb } from './helpers/schema-db.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -26,21 +24,16 @@ function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlge
 console.log('\n[Task-Categories-Test] Migration + CRUD-Routen\n');
 
 // --------------------------------------------------------
-// 1) Migration-Transform (raw MIGRATIONS_SQL[1] + [83])
+// 1) Migration-Transform: echte Migrationen bis 82, Altzeilen, dann 83
 // --------------------------------------------------------
 {
-  const db = new DatabaseSync(':memory:');
-  db.exec('PRAGMA foreign_keys = ON;');
-  db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-    version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-    applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')));`);
-  db.exec(MIGRATIONS_SQL[1]);
+  const db = openSchemaDb({ upTo: 82 });
   db.prepare("INSERT INTO users (username, display_name, password_hash) VALUES ('u', 'U', 'x')").run();
   // Legacy-Aufgaben VOR der Migration: 'Sonstiges' + ein freier Custom-Wert.
   db.prepare("INSERT INTO tasks (title, category, created_by) VALUES ('a', 'Sonstiges', 1)").run();
   db.prepare("INSERT INTO tasks (title, category, created_by) VALUES ('b', 'household', 1)").run();
   db.prepare("INSERT INTO tasks (title, category, created_by) VALUES ('c', 'Garten', 1)").run();
-  db.exec(MIGRATIONS_SQL[83]);
+  migrateTo(db, 83);
 
   test('Seed: 8 Bestands-Keys mit label_key, name NULL', () => {
     const rows = db.prepare('SELECT key, name, label_key FROM task_categories WHERE label_key IS NOT NULL ORDER BY sort_order').all();
@@ -66,18 +59,17 @@ import { freshTestDbPath } from './tmp-db.js';
 freshTestDbPath('taskcat');
 process.env.SESSION_SECRET = 'task-categories-test-secret-32bytes-long';
 const db = await import('../server/db.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 db.init();
 const database = db.get();
 database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('owner', 'Owner', 'x', 'admin')").run();
 
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); });
-app.use('/tasks', tasksRouter);
+const app = await createTasksApp({
+  auth: (req, _res, next) => { req.authUserId = 1; req.authRole = 'admin'; req.session = { userId: 1 }; next(); },
+});
 const server = app.listen(0, '127.0.0.1');
 await new Promise((r) => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}/tasks`;
+const base = `http://127.0.0.1:${server.address().port}/api/v1/tasks`;
 const jget = async (u) => { const r = await fetch(u); return { status: r.status, body: await r.json().catch(() => null) }; };
 const jsend = async (u, method, body) => {
   const r = await fetch(u, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });

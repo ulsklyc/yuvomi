@@ -25,13 +25,12 @@ process.env.DB_PATH = ':memory:';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const { router: authRouter, requireAuth } = await import('../server/auth.js');
 const { default: housekeepingRouter } = await import('../server/routes/housekeeping.js');
 const { default: dashboardRouter } = await import('../server/routes/dashboard.js');
-const { default: tasksRouter } = await import('../server/routes/tasks.js');
+const { createTasksApp } = await import('./tasks-app.js');
 const { default: searchRouter } = await import('../server/routes/search.js');
 const { callTool } = await import('../server/mcp/tools.js');
 const {
@@ -73,13 +72,20 @@ function moduleGate(moduleKey) {
   };
 }
 
-const app = express();
-app.use(express.json());
-app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/housekeeping', requireAuth, moduleGate('housekeeping'), housekeepingRouter);
-app.use('/api/v1/dashboard', requireAuth, dashboardRouter);
-app.use('/api/v1/tasks', requireAuth, tasksRouter);
-app.use('/api/v1/search', requireAuth, searchRouter);
+// As server/index.js: a missing body is `{}`, and the 400 of validateRequest()
+// (#2810) goes to the central error handler behind the routers
+// (test/tasks-app.js).
+const app = await createTasksApp({
+  before: [
+    ['/api/v1/auth', authRouter],
+    ['/api/v1/housekeeping', requireAuth, moduleGate('housekeeping'), housekeepingRouter],
+    ['/api/v1/dashboard', requireAuth, dashboardRouter],
+    ['/api/v1/tasks', requireAuth],
+  ],
+  after: [
+    ['/api/v1/search', requireAuth, searchRouter],
+  ],
+});
 const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());

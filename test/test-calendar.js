@@ -5,9 +5,8 @@
  * Ausführen: node test-calendar.js
  */
 
-import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
-import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
+import { openSchemaDb } from './helpers/schema-db.js';
 import { eachRule } from './css-rules.js';
 import { installMiniDom } from './mini-dom.js';
 import { createHarness } from './plain-harness.js';
@@ -206,13 +205,7 @@ test('Serientermin-Speichern legt kanonische Reminder-Offsets in den atomaren Bo
     'ein ausgeschalteter Reminder muss als explizit leeres Offset-Set gesendet werden');
 });
 
-const db = new DatabaseSync(':memory:');
-db.exec('PRAGMA foreign_keys = ON;');
-db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-  version INTEGER PRIMARY KEY, description TEXT NOT NULL,
-  applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);`);
-db.exec(MIGRATIONS_SQL[1]);
+const db = openSchemaDb();
 
 // Benutzer
 const u1 = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
@@ -1403,7 +1396,7 @@ test('der Farbwaehler zeigt eine Farbe, die nicht aus seiner Palette stammt', ()
 test('der Farbwaehler nimmt nur an, was wie eine Farbe aussieht', () => {
   // Der Wert landet in einem style-Attribut. esc() verhindert das Ausbrechen,
   // nicht aber eine zweite CSS-Deklaration dahinter - und die Sync-Dienste
-  // schreiben direkt in die Tabelle, an COLOR_RE aus validate.js vorbei.
+  // schreiben direkt in die Tabelle, an COLOR_RE aus api/formats.ts vorbei.
   const { pickerColors, EVENT_COLORS } = calendarHelpers;
   for (const bad of ['red; background-image:url(x)', 'rgb(1,2,3)', '#FFF', '#12345', '#GGGGGG', '', 'javascript:x']) {
     assert(pickerColors({ color: bad }).length === EVENT_COLORS.length,

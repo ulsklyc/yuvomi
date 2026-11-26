@@ -127,7 +127,8 @@
         "transferUndone": "Inalis sa listahan ng pamimili.",
         "transferSkipped": "{{count}} ang nandoon na.",
         "transferSkipped_one": "{{count}} ang nandoon na.",
-        "transferAllPresent": "Nasa listahan na ang lahat ng sangkap."
+        "transferAllPresent": "Nasa listahan na ang lahat ng sangkap.",
+        "errorTransferTooLarge": "Masyadong maraming sangkap nang sabay-sabay. Hanggang {{limit}} lang ang maililipat, at maa-undo, nang magkakasama."
     },
     "nav": {
         "dashboard": "Pangkalahatang-tanaw",
@@ -1290,7 +1291,8 @@
         "localCalendarEdit": "I-edit ang kalendaryo",
         "localCalendarNew": "Bagong kalendaryo",
         "manageSubscriptionsLink": "Mga subscription at sync",
-        "cancelled": "Kinansela"
+        "cancelled": "Kinansela",
+        "errorSeriesChanged": "Kababago lang ng serye sa ibang lugar. Pakisave muli."
     },
     "noteCategories": {
         "categories": "Mga kategorya",
@@ -3656,7 +3658,8 @@
         "remoteErrorAuthFailed": "Tinanggihan ng server ang pag-sign in. Suriin ang username at password.",
         "remoteErrorStatus": "Sumagot ang server ng status na {{status}}.",
         "remoteErrorUnreachable": "Hindi maabot ang server. Suriin ang address at kung tumatakbo ang server.",
-        "remoteErrorFailed": "Nabigo ang kahilingan sa server."
+        "remoteErrorFailed": "Nabigo ang kahilingan sa server.",
+        "caldavErrorAccountChanged": "Kababago lang ng account sa ibang lugar. Pakisave muli."
     },
     "login": {
         "tagline": "Maligayang pagbabalik. Ang iyong tahanan sa iisang lugar.",

@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { contentMatchesMime, hasSignature, dataUrlContentMatches } from '../server/utils/file-signature.js';
+import { readDataUrlFile } from '../server/utils/data-url-file.js';
 
 // Echte Dateiköpfe, so kurz wie möglich - der Rest der Datei spielt keine Rolle.
 const HEADS = {
@@ -216,8 +217,27 @@ const ACCEPTS_UPLOAD = /data:image\/|data:\(\[\^|ALLOWED_MIME|;base64,/;
 // und zaehlte damit die Import-Zeile als Beleg: die Gegenprobe - Aufruf raus,
 // Import stehen lassen - blieb gruen, also genau im Fehlerzustand. Gesucht wird
 // deshalb `name(` mit einem Argument, und Import-Zeilen fallen vorher weg.
-const CHECKS_CONTENT = /\b(?:contentMatchesMime|dataUrlContentMatches)\s*\([^)]/;
+// `readDataUrlFile` (server/utils/data-url-file.js, #2810) ist der geteilte
+// Leser von Dokument und Termin-Anhang; dass er den Inhalt prueft, haelt der
+// Fall "readDataUrlFile" unten am Verhalten, nicht am Text.
+const CHECKS_CONTENT = /\b(?:contentMatchesMime|dataUrlContentMatches|readDataUrlFile)\s*\([^)]/;
 const withoutImports = (src) => src.replace(/^\s*import\s[^;]*;/gm, '');
+
+test('readDataUrlFile: der geteilte Leser prueft Form, Typ, Leere, Grenze und Inhalt, in dieser Reihenfolge', () => {
+  const limits = { allowed: new Set(['application/pdf', 'text/plain']), maxBytes: 16 };
+  const url = (/** @type {string} */ mime, /** @type {Buffer} */ bytes) => `data:${mime};base64,${bytes.toString('base64')}`;
+  const pdf = HEADS['application/pdf'].subarray(0, 8);
+  assert.equal(readDataUrlFile('xyz', limits).fault, 'shape');
+  assert.equal(readDataUrlFile(url('image/png', HEADS['image/png']), limits).fault, 'type');
+  assert.equal(readDataUrlFile('data:text/plain;base64,', limits).fault, 'empty');
+  assert.equal(readDataUrlFile(url('text/plain', Buffer.alloc(17, 0x61)), limits).fault, 'size');
+  assert.equal(readDataUrlFile(url('application/pdf', Buffer.from('kein pdf')), limits).fault, 'content');
+  const { file, fault } = readDataUrlFile(url('APPLICATION/PDF', pdf), limits);
+  assert.equal(fault, null);
+  assert.deepEqual({ ...file, buffer: [...file.buffer] }, { mime: 'application/pdf', base64: pdf.toString('base64'), size: 8, buffer: [...pdf] });
+  // Text ohne Signatur passiert (siehe oben), die Grenze gilt inklusive.
+  assert.equal(readDataUrlFile(url('text/plain', Buffer.alloc(16, 0x61)), limits).fault, null);
+});
 
 test('jede Route, die eine data-URL annimmt, prueft auch deren Inhalt', () => {
   const offenders = [];

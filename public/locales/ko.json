@@ -127,7 +127,8 @@
         "transferUndone": "쇼핑 목록에서 삭제했습니다.",
         "transferSkipped": "{{count}}개는 이미 있었습니다.",
         "transferSkipped_one": "{{count}}개는 이미 있었습니다.",
-        "transferAllPresent": "모든 재료가 이미 목록에 있습니다."
+        "transferAllPresent": "모든 재료가 이미 목록에 있습니다.",
+        "errorTransferTooLarge": "한 번에 옮기기에는 재료가 너무 많습니다. 한꺼번에 옮기고 되돌릴 수 있는 것은 최대 {{limit}}개입니다."
     },
     "nav": {
         "dashboard": "개요",
@@ -1290,7 +1291,8 @@
         "localCalendarEdit": "캘린더 편집",
         "localCalendarNew": "새 캘린더",
         "manageSubscriptionsLink": "구독 및 동기화",
-        "cancelled": "취소됨"
+        "cancelled": "취소됨",
+        "errorSeriesChanged": "반복 일정이 방금 다른 곳에서 변경되었습니다. 다시 저장해 주세요."
     },
     "noteCategories": {
         "categories": "카테고리",
@@ -3656,7 +3658,8 @@
         "remoteErrorAuthFailed": "서버가 로그인을 거부했습니다. 사용자 이름과 비밀번호를 확인하세요.",
         "remoteErrorStatus": "서버가 상태 {{status}}(으)로 응답했습니다.",
         "remoteErrorUnreachable": "서버에 연결할 수 없습니다. 주소와 서버가 실행 중인지 확인하세요.",
-        "remoteErrorFailed": "서버 요청이 실패했습니다."
+        "remoteErrorFailed": "서버 요청이 실패했습니다.",
+        "caldavErrorAccountChanged": "계정이 방금 다른 곳에서 변경되었습니다. 다시 저장해 주세요."
     },
     "login": {
         "tagline": "다시 오신 것을 환영합니다. 우리 집의 모든 일을 한곳에서.",

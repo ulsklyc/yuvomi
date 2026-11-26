@@ -102,6 +102,11 @@ export function tagFilter(value) {
     || filter.tag_ids.some((id) => !Number.isSafeInteger(id) || id < 1)) {
     throw new PaperlessViewError('Invalid tag filter.');
   }
+  return normalizeTagFilter(filter);
+}
+
+/** @param {import('../../../types/paperless.d.ts').TagFilter} filter */
+export function normalizeTagFilter(filter) {
   return { match: filter.match, tag_ids: [...new Set(filter.tag_ids)].sort((a, b) => a - b) };
 }
 

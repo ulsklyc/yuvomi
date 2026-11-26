@@ -6,13 +6,15 @@
 
 import express from 'express';
 import * as db from '../db.js';
-import { str, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../middleware/validate.js';
+import { withTx } from '../db/tx.ts';
+import { str, date, collectErrors, MAX_TITLE, MAX_TEXT, MAX_SHORT, DATE_RE } from '../api/formats.ts';
 import { addDays, mealWeekday, datesForTemplateInRange } from '../services/meal-recurrence.js';
 import { todayKey } from '../utils/timezone.js';
 import { mayWriteModule } from '../authorize/index.ts';
-import { handOverToShoppingList, mealPlanSource } from '../services/kitchen-handover.js';
+import { handOverToShoppingList, handoverTooLarge, handoverTooLargeAnswer, mealPlanSource } from '../services/kitchen-handover.js';
 import { MEAL_COOK_COLUMNS_SQL, MEAL_COOK_JOIN_SQL, cookField, cookForNewOccurrence, cookRefusal } from '../services/meal-cook.js';
 import { validateRequest } from '../api/validate-request.ts';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 // Ein unerwarteter Fehler geht an den zentralen Fehlerhandler
 // (server/middleware/error-handler.js, 500 `Internal server error.`). Die
@@ -211,7 +213,7 @@ function materializeRecurringMeals(from, to) {
   const pending = pendingOccurrences(from, to);
   if (!pending.length) return;
 
-  const createMeals = db.get().transaction(() => {
+  withTx(db.get(), () => {
     const templateIngredients = db.get().prepare(`
       SELECT name, quantity, category
       FROM meal_recurrence_ingredients
@@ -252,8 +254,6 @@ function materializeRecurringMeals(from, to) {
       insertMealIngredients(result.lastInsertRowid, ingredientsByTemplate.get(template.id));
     }
   });
-
-  createMeals();
 }
 
 // --------------------------------------------------------
@@ -351,12 +351,12 @@ router.get('/', validateRequest(), (req, res) => {
   let ingredientMap = {};
 
   if (mealIds.length > 0) {
-    const placeholders = mealIds.map(() => '?').join(',');
+    const mealList = sqlInList(mealIds);
     const ingredients  = db.get().prepare(`
       SELECT * FROM meal_ingredients
-      WHERE meal_id IN (${placeholders})
+      WHERE meal_id IN (${mealList.sql})
       ORDER BY id ASC
-    `).all(...mealIds);
+    `).all(mealList.param);
 
     for (const ing of ingredients) {
       if (!ingredientMap[ing.meal_id]) ingredientMap[ing.meal_id] = [];
@@ -374,11 +374,12 @@ router.get('/', validateRequest(), (req, res) => {
   const fromRecipe = meals.filter((m) => m.recipe_id && !(ingredientMap[m.id]?.length));
   if (fromRecipe.length > 0) {
     const recipeIds = [...new Set(fromRecipe.map((m) => m.recipe_id))];
+    const recipeList = sqlInList(recipeIds);
     const counts = db.get().prepare(`
       SELECT recipe_id, COUNT(*) AS c FROM recipe_ingredients
-      WHERE recipe_id IN (${recipeIds.map(() => '?').join(',')})
+      WHERE recipe_id IN (${recipeList.sql})
       GROUP BY recipe_id
-    `).all(...recipeIds);
+    `).all(recipeList.param);
     const byRecipe = Object.fromEntries(counts.map((r) => [r.recipe_id, r.c]));
     for (const m of fromRecipe) recipeCountMap[m.id] = byRecipe[m.recipe_id] ?? 0;
   }
@@ -438,7 +439,7 @@ router.post('/', validateRequest(), (req, res) => {
   const cookError = cookRefusal(vCook.value);
   if (cookError) return res.status(400).json({ error: cookError, code: 400 });
 
-  const meal = db.transaction(() => {
+  const meal = withTx(db.get(), () => {
     const cleanIngredients = sanitizedIngredients(ingredients);
     let recurrenceTemplateId = null;
 
@@ -553,7 +554,7 @@ router.post('/apply-plan', validateRequest(), (req, res) => {
   }
 
   const skipped = [];
-  const created = db.transaction(() => {
+  const created = withTx(db.get(), () => {
     const actorId = req.authUserId || req.session.userId;
     if (skipOccupied) {
       // "Besetzt" zaehlt gegen den Stand VOR dem Aufruf: erst alle Slots
@@ -665,7 +666,7 @@ router.put('/:id', validateRequest(), (req, res) => {
       nEndDate = vRepeatUntil.value;
     }
 
-    db.transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare(`
         UPDATE meal_recurrence_templates
         SET meal_type = ?, title = ?, notes = ?, recipe_url = ?, recipe_id = ?, end_date = ?
@@ -775,7 +776,7 @@ router.delete('/:id', validateRequest(), (req, res) => {
   // dem Template explizit gelöscht werden, sonst blieben sie als Einzel-Mahlzeiten zurück.
   if (req.query.scope === 'series' && meal.recurrence_template_id) {
     const templateId = meal.recurrence_template_id;
-    db.transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ?').run(templateId);
       db.get().prepare('DELETE FROM meal_recurrence_templates WHERE id = ?').run(templateId);
     });
@@ -792,7 +793,7 @@ router.delete('/:id', validateRequest(), (req, res) => {
     const tpl = db.get().prepare('SELECT start_date FROM meal_recurrence_templates WHERE id = ?').get(templateId);
     const newEnd = addDays(meal.date, -1);
 
-    db.transaction(() => {
+    withTx(db.get(), () => {
       db.get().prepare('DELETE FROM meals WHERE recurrence_template_id = ? AND date >= ?')
         .run(templateId, meal.date);
 
@@ -959,8 +960,12 @@ router.post('/:id/to-shopping-list', requireShoppingWrite, validateRequest(), (r
 
   // Rezept-Mahlzeiten bekommen beim ersten Transfer ihre Rezeptzutaten als
   // echte meal_ingredients (materializeRecipeIngredients, dort begruendet) -
-  // seit R23 derselbe Weg wie im Wochen- und im Listenimport.
-  const result = db.transaction(() => {
+  // seit R23 derselbe Weg wie im Wochen- und im Listenimport. Passt das
+  // Rueckgaengig nicht in eine Anfrage, 400 vor dem Schreiben (#2810, Folge 5b).
+  if (handoverTooLarge(mealPlanSource(db.get(), /** @type {any} */ ({ mealId }), { materialize: false }).ingredients.length)) {
+    return res.status(400).json(handoverTooLargeAnswer());
+  }
+  const result = withTx(db.get(), () => {
     const { rows } = mealPlanSource(db.get(), { mealId });
     if (!rows.length) return null;
     return handOverToShoppingList(db.get(), listId, rows);
@@ -999,7 +1004,11 @@ router.post('/week-to-shopping-list', requireShoppingWrite, validateRequest(), (
   const from = weekStart(week);
   const to   = weekEnd(week);
 
-  const result = db.transaction(() => {
+  // Wie beim Einzel-Transfer: das Rueckgaengig muss in eine Anfrage passen (#2810, Folge 5b).
+  if (handoverTooLarge(mealPlanSource(db.get(), { from, to }, { materialize: false }).ingredients.length)) {
+    return res.status(400).json(handoverTooLargeAnswer());
+  }
+  const result = withTx(db.get(), () => {
     const { rows } = mealPlanSource(db.get(), { from, to });
     if (!rows.length) return null;
     return handOverToShoppingList(db.get(), listId, rows);

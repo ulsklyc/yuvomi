@@ -26,26 +26,25 @@ process.env.TZ = 'UTC';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import express from 'express';
+import { createPreferencesApp, PREFERENCES_PREFIX } from './preferences-app.js';
 
 const dbmod = await import('../server/db.js');
 const db = dbmod.get();
 const holidays = await import('../server/services/holidays.js');
-const { default: preferencesRouter } = await import('../server/routes/preferences.js');
 
 // Modulweiter Akteur; die Middleware liest ihn zur Request-Zeit.
 const actor = { userId: 1, role: 'admin' };
-const app = express();
-app.use(express.json());
-app.use((req, _res, next) => {
-  req.authUserId = actor.userId;
-  req.authRole = actor.role;
-  next();
+const app = await createPreferencesApp({
+  mount: ['preferences'],
+  auth: (req, _res, next) => {
+    req.authUserId = actor.userId;
+    req.authRole = actor.role;
+    next();
+  },
 });
-app.use('/', preferencesRouter);
 const server = http.createServer(app);
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
+const base = `http://127.0.0.1:${server.address().port}${PREFERENCES_PREFIX}`;
 
 test.after(() => { server.close(); holidays.__setFetchImpl(null); });
 // Deterministisch nach JEDEM Test zuruecksetzen, damit ein Fehlschlag (z. B. in
@@ -834,9 +833,16 @@ test('GET /holidays/subdivisions/:cc?lang=: Namen in der UI-Sprache, sonst Engli
     // Eine App-Sprache, die die API fuer dieses Land nicht fuehrt.
     assert.deepEqual(await namen('?lang=ja'), englisch);
     // Nichts davon ist eine App-Sprache - und nichts davon erreicht den Service.
-    for (const boese of ['?lang=xx', '?lang=..%2Fde', '?lang=de%26countryIsoCode%3DFR', '?lang=de&lang=fr', '?lang=']) {
+    for (const boese of ['?lang=xx', '?lang=..%2Fde', '?lang=de%26countryIsoCode%3DFR', '?lang=']) {
       assert.deepEqual(await namen(boese), englisch, `${boese} faellt auf Englisch`);
     }
+    // Doppelt gegeben ist `lang` kein Text mehr (#2810, Gruppe 11b): das
+    // Dokument liest den Parameter einmal, validateRequest() antwortet 400,
+    // bevor etwas den Service erreicht. Vorher fiel es auf Englisch.
+    const doppelt = await raw('GET', '/holidays/subdivisions/DE?lang=de&lang=fr');
+    assert.equal(doppelt.status, 400);
+    assert.equal(doppelt.body.reason, 'validation');
+    assert.deepEqual(doppelt.body.fields.map((f) => f.path), ['query/lang']);
     assert.ok(urls.length > 0 && urls.every((url) => url.endsWith('/Subdivisions?countryIsoCode=DE')),
       `lang geht nicht an die Fremd-API: ${[...new Set(urls)].join(', ')}`);
   } finally {

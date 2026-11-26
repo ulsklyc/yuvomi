@@ -83,14 +83,13 @@ test('cleanupExpired deletes only stale rows', () => {
 
 // --- Routes (forgot/reset) ------------------------------------------------
 import express from 'express';
-import bcrypt from 'bcrypt';
+import { createAuthApp } from './auth-app.js';
+import { verifyPassword } from '../server/utils/password.js';
 
 function makeAuthApp(db, { baseUrl = 'https://oikos.test', sendMail = null } = {}) {
   // Lazy import so the route module reads our injected services.
-  return import('../server/auth.js').then(({ buildResetRoutes }) => {
+  return import('../server/auth.js').then(async ({ buildResetRoutes }) => {
     const sent = [];
-    const app = express();
-    app.use(express.json());
     const router = express.Router();
     const pending = [];
     buildResetRoutes(router, {
@@ -103,7 +102,7 @@ function makeAuthApp(db, { baseUrl = 'https://oikos.test', sendMail = null } = {
       // `drain` wartet darauf, damit die Tests danach zaehlen koennen.
       defer: (fn) => { pending.push(new Promise((r) => setImmediate(() => Promise.resolve(fn()).finally(r)))); },
     });
-    app.use('/auth', router);
+    const app = await createAuthApp({ routers: [router] });
     app.locals.drain = () => Promise.all(pending.splice(0));
     return { app, sent };
   });
@@ -114,7 +113,7 @@ async function callJson(app, method, path, body) {
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const { port } = server.address();
-  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/v1${path}`, {
     method, headers: { 'content-type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -167,8 +166,6 @@ test('forgot-password runs the rate limiter on every request (counts 200 respons
   seedContactsAndEmail(db);
   let calls = 0;
   const { buildResetRoutes } = await import('../server/auth.js');
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   buildResetRoutes(router, {
     database: db,
@@ -177,7 +174,7 @@ test('forgot-password runs the rate limiter on every request (counts 200 respons
     baseUrl: 'https://oikos.test',
     limiter: (_req, _res, next) => { calls += 1; next(); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   // Two known-user requests both return 200 — the limiter must still count both.
   await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
   await callJson(app, 'POST', '/auth/forgot-password', { identifier: 'alice' });
@@ -275,7 +272,7 @@ test('forgot-password antwortet, bevor der Versand fertig ist, und in jedem Fall
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 1500);
     try {
-      const res = await fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+      const res = await fetch(`http://127.0.0.1:${server.address().port}/api/v1/auth/forgot-password`, {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ identifier }), signal: ctrl.signal,
       });
@@ -338,7 +335,7 @@ test('forgot-password: zwei schnelle Anfragen fuer dasselbe Konto - die zuletzt 
   const { createServer } = await import('node:http');
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/api/v1/auth/forgot-password`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ identifier: 'alice' }),
   }).then((r) => r.text());
@@ -389,7 +386,7 @@ test('forgot-password: drei schnelle Anfragen ergeben hoechstens zwei Versande, 
   const { createServer } = await import('node:http');
   const server = createServer(app);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/auth/forgot-password`, {
+  const ask = () => fetch(`http://127.0.0.1:${server.address().port}/api/v1/auth/forgot-password`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ identifier: 'alice' }),
   }).then((r) => r.text());
@@ -447,7 +444,7 @@ test('reset-password updates the hash and consumes the token', async () => {
   const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
   assert.equal(status, 200);
   const hash = db.prepare('SELECT password_hash FROM users WHERE id = 1').get().password_hash;
-  assert.equal(await bcrypt.compare('brandnewpw', hash), true);
+  assert.deepEqual(await verifyPassword('brandnewpw', hash), { valid: true, needsRehash: false });
   assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 0);
 });
 
@@ -507,14 +504,20 @@ test('reset-password/check antwortet fuer unbekannt, abgelaufen, eingeloest und 
     answers.push({ status, json });
   };
   await ask({ token: 'f'.repeat(64) });                        // unbekannt
-  await ask({});                                                // fehlend
-  await ask({ token: 42 });                                     // kein Text
   db.prepare('UPDATE password_resets SET expires_at = 1').run();
   await ask({ token });                                         // abgelaufen
   db.prepare('UPDATE password_resets SET expires_at = ?').run(Date.now() + 3_600_000);
   assert.equal((await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' })).status, 200);
   await ask({ token });                                         // eingeloest
   for (const a of answers) assert.deepEqual(a, { status: 200, json: { data: { valid: false } } });
+  // Fehlend und kein Text weist seit #2810 (Gruppe 12a) das Dokument ab, vor jedem
+  // Token: 400 mit dem Feld, fuer jeden Aufrufer gleich.
+  for (const [body, rule] of [[{}, 'required'], [{ token: 42 }, 'type']]) {
+    const { status, json } = await callJson(app, 'POST', '/auth/reset-password/check', body);
+    assert.equal(status, 400, JSON.stringify(body));
+    assert.equal(json.reason, 'validation');
+    assert.deepEqual(json.fields, [{ path: 'body/token', rule }]);
+  }
 });
 
 test('reset-password/check: ein Konto, das keinen Reset mehr annimmt, gilt als toter Link - der Token bleibt', async () => {
@@ -539,8 +542,6 @@ test('reset-password/check zaehlt im selben Limiter wie das Einloesen', async ()
   seedContactsAndEmail(db);
   const seen = [];
   const { buildResetRoutes } = await import('../server/auth.js');
-  const app = express();
-  app.use(express.json());
   const router = express.Router();
   buildResetRoutes(router, {
     database: db,
@@ -549,7 +550,7 @@ test('reset-password/check zaehlt im selben Limiter wie das Einloesen', async ()
     baseUrl: 'https://oikos.test',
     limiter: (req, _res, next) => { seen.push(req.path); next(); },
   });
-  app.use('/auth', router);
+  const app = await createAuthApp({ routers: [router] });
   await callJson(app, 'POST', '/auth/reset-password/check', { token: 'x' });
   await callJson(app, 'POST', '/auth/reset-password', { token: 'x', password: 'longenough' });
   assert.deepEqual(seen, ['/reset-password/check', '/reset-password']);
@@ -565,4 +566,143 @@ test('reset-password/check: der echte Router haengt die Pruefung an den Reset-Li
   assert.match(src, /targetRouter\.post\('\/reset-password', limiter,/);
   assert.match(src, /limiter = passwordResetLimiter,\n\s*defer = /);
   assert.match(src, /^buildResetRoutes\(router\);$/m);
+});
+
+// --- Einloesen genau einmal (#2938) ---------------------------------------
+// Zwischen Pruefen des Tokens und Schreiben des Passworts liegt das Hashen,
+// ein await: ein zweiter Antrag mit demselben Token lief dort dazwischen und
+// setzte sein Passwort ebenfalls. `crypto.argon2` wird beim Aufruf vom
+// Modulobjekt gelesen (server/utils/password.js); hier haelt der Test jede
+// Berechnung an, bis er sie selbst freigibt - ohne Uhr als Taktgeber.
+
+/**
+ * Haelt jeden Aufruf von `crypto.argon2` an. `started(n)` loest auf, sobald n
+ * Aufrufe warten; `release(i)` rechnet den i-ten zu Ende.
+ */
+function holdArgon2() {
+  const original = crypto.argon2;
+  /** @type {any[][]} */
+  const held = [];
+  /** @type {{ n: number, resolve: () => void }[]} */
+  let waiters = [];
+  crypto.argon2 = /** @type {any} */ (function holdCall(/** @type {any[]} */ ...args) {
+    held.push(args);
+    const due = waiters.filter((w) => held.length >= w.n);
+    waiters = waiters.filter((w) => held.length < w.n);
+    for (const w of due) w.resolve();
+  });
+  return {
+    /** @param {number} n */
+    started: (n) => (held.length >= n ? Promise.resolve()
+      : new Promise((resolve) => { waiters.push({ n, resolve: () => resolve(undefined) }); })),
+    /** @param {number} i */
+    release: (i) => /** @type {any} */ (original)(...held[i]),
+    restore: () => { crypto.argon2 = original; },
+  };
+}
+
+/** @param {DatabaseSync} db */
+const passwordHashOf = (db) => /** @type {{ password_hash: string }} */ (
+  db.prepare('SELECT password_hash FROM users WHERE id = 1').get()).password_hash;
+/** @param {DatabaseSync} db */
+const resetRows = (db) => /** @type {{ c: number }} */ (
+  db.prepare('SELECT COUNT(*) c FROM password_resets').get()).c;
+
+/** @param {import('express').Express} app */
+async function listen(app) {
+  const { createServer } = await import('node:http');
+  const server = createServer(app);
+  await new Promise((r) => server.listen(0, '127.0.0.1', () => r(undefined)));
+  const { port } = /** @type {import('node:net').AddressInfo} */ (server.address());
+  /** @param {string} path @param {object} body */
+  const post = (path, body) => fetch(`http://127.0.0.1:${port}/api/v1${path}`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  }).then(async (res) => ({ status: res.status, json: await res.json() }));
+  return { post, close: () => server.close() };
+}
+
+test('reset-password: zwei Antraege mit demselben Token, die sich im Hashen ueberlappen - nur der erste setzt sein Passwort (#2938)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, token } = await issuedToken(db);
+  const before = passwordHashOf(db);
+  const server = await listen(app);
+  const hold = holdArgon2();
+  try {
+    const a = server.post('/auth/reset-password', { token, password: 'password-of-a' });
+    await hold.started(1);
+    const b = server.post('/auth/reset-password', { token, password: 'password-of-b' });
+    await hold.started(2);
+    // Beide haben den Token geprueft und hashen. A schreibt zuerst, dann B.
+    hold.release(0);
+    const answerA = await a;
+    hold.release(1);
+    const answerB = await b;
+    assert.deepEqual(answerA, { status: 200, json: { data: { ok: true } } });
+    // B bekommt dieselbe Antwort wie fuer einen ungueltigen Token.
+    assert.deepEqual(answerB, { status: 400, json: { error: 'Invalid or expired token.', code: 400 } });
+  } finally {
+    hold.restore();
+    server.close();
+  }
+  const hash = passwordHashOf(db);
+  assert.notEqual(hash, before);
+  assert.equal((await verifyPassword('password-of-a', hash)).valid, true, 'das Passwort von A gilt');
+  assert.equal((await verifyPassword('password-of-b', hash)).valid, false, 'B hat nichts geschrieben');
+  assert.equal(resetRows(db), 0);
+});
+
+test('reset-password: wird das Konto waehrend des Hashens deaktiviert, schreibt das Einloesen nichts (#2938)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  const { app, token } = await issuedToken(db);
+  const before = passwordHashOf(db);
+  const server = await listen(app);
+  const hold = holdArgon2();
+  try {
+    const a = server.post('/auth/reset-password', { token, password: 'password-of-a' });
+    await hold.started(1);
+    db.prepare("UPDATE users SET deactivated_at = '2026-01-01T00:00:00Z' WHERE id = 1").run();
+    hold.release(0);
+    assert.deepEqual(await a, { status: 400, json: { error: 'Invalid or expired token.', code: 400 } });
+  } finally {
+    hold.restore();
+    server.close();
+  }
+  assert.equal(passwordHashOf(db), before);
+  // Wie beim Ablehnen vor dem Hashen ist der Token danach verbraucht.
+  assert.equal(resetRows(db), 0);
+});
+
+test('reset-password: laeuft der Token waehrend des Hashens ab, schreibt das Einloesen nichts (#2938)', async () => {
+  const db = makeDb();
+  seedContactsAndEmail(db);
+  // Die Uhr des Reset-Service steht in der Hand des Tests (Naht `now`).
+  let clock = 1_000_000;
+  const resetService = createPasswordResetService(/** @type {any} */ ({ db, now: () => clock }));
+  const { token, expiresAt } = resetService.createToken(1);
+  const { buildResetRoutes } = await import('../server/auth.js');
+  const router = express.Router();
+  buildResetRoutes(router, /** @type {any} */ ({
+    database: db,
+    emailService: { isConfigured: () => true, sendMail: async () => {} },
+    resetService,
+    baseUrl: 'https://oikos.test',
+    limiter: (/** @type {any} */ _req, /** @type {any} */ _res, /** @type {() => void} */ next) => next(),
+  }));
+  const app = await createAuthApp({ routers: [router] });
+  const before = passwordHashOf(db);
+  const server = await listen(app);
+  const hold = holdArgon2();
+  try {
+    const a = server.post('/auth/reset-password', { token, password: 'password-of-a' });
+    await hold.started(1);
+    clock = expiresAt; // abgelaufen: expires_at <= now
+    hold.release(0);
+    assert.deepEqual(await a, { status: 400, json: { error: 'Invalid or expired token.', code: 400 } });
+  } finally {
+    hold.restore();
+    server.close();
+  }
+  assert.equal(passwordHashOf(db), before);
 });

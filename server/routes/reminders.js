@@ -7,7 +7,8 @@
 import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
-import * as v from '../middleware/validate.js';
+import { withTx } from '../db/tx.ts';
+import * as v from '../api/formats.ts';
 import { validateRequest } from '../api/validate-request.ts';
 import { syncAllBirthdayReminders } from '../services/birthdays.js';
 import { fanOutEventReminders, eventAuthorId } from '../services/event-reminder-fanout.js';
@@ -22,6 +23,7 @@ import { ORIGIN_MODULE, withoutSwitchedOffModules } from '../services/reminder-o
 import { withoutGoneEvents } from '../services/reminder-deleted-occurrence.js';
 import { remindAtCompareKey, remindAtUtcSql } from '../utils/reminder-schedule.js';
 import { moveNoticeFields } from '../services/shopping-move-notices.js';
+import { sqlInList } from '../utils/sql-in-list.ts';
 
 const log    = createLogger('Reminders');
 const router = express.Router();
@@ -246,6 +248,7 @@ function callerReminders(req, {
   // für den ganzen Router nach `calendar` und deckt die anderen fünf nicht.
   const origins = readableOrigins(req).filter((type) => !types || types.has(type));
   if (!origins.length) return [];
+  const originList = sqlInList(origins);
 
   const found = db.get().prepare(`
     SELECT
@@ -297,7 +300,7 @@ function callerReminders(req, {
     WHERE r.created_by  = ?
       AND r.dismissed   = 0
       AND ${window.sql}
-      AND r.entity_type IN (${origins.map(() => '?').join(', ')})
+      AND r.entity_type IN (${originList.sql})
       -- Der Titel wird nur fuer eine Zeile aufgeloest, die der Aufrufer
       -- sieht (authorize/rows/reminders.ts). Das Modulrecht darueber sagt
       -- nichts ueber die einzelne Aufgabe, und die Sichtbarkeit aendert sich
@@ -335,7 +338,7 @@ function callerReminders(req, {
       )
       ${openTasksOnly ? OPEN_TASK_REMINDER_SQL : ''}
     ORDER BY ${orderBy}
-  `).all(userId, ...window.params, ...origins);
+  `).all(userId, ...window.params, originList.param);
 
   // Die dritte Achse neben Token-Scopes und Mitgliedsrechten: ein Modul, das
   // der Haushalt abgeschaltet hat, gibt es hier nicht - auch nicht als
@@ -654,7 +657,7 @@ router.put('/', validateRequest(), (req, res) => {
   // und eine gelesene, vergangene Erinnerung meldete sich nach jedem
   // Speichern derselben Menge erneut. Geerbte Zeilen (`assigned_from`)
   // weichen wie bisher der eigenen Menge.
-  const replace = db.get().transaction((values) => {
+  const replace = (values) => withTx(db.get(), () => {
     const existing = db.get().prepare(`
       SELECT id, remind_at, assigned_from FROM reminders
       WHERE entity_type = ? AND entity_id = ? AND created_by = ?
