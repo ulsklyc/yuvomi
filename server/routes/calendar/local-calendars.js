@@ -6,6 +6,7 @@ import { isAdminRequest, requireAdmin } from '../../middleware/require-admin.js'
 import { mayWriteModule, readerVisibleWhere, rowReader } from '../../authorize/index.ts';
 import {
   clearCalendarFeedToken,
+  defaultCalendarId,
   ensureDefaultCalendar,
   localCalendarById,
   localCalendarIdSql,
@@ -14,13 +15,18 @@ import {
   restoreInheritedImportColors,
   serializeCalendar,
   validateCalendarColor,
+  validateCalendarId,
   validateCalendarName,
 } from '../../services/local-calendars.js';
 import { uploadsLocalEvents } from '../../services/apple-calendar.js';
 import { calendarSources } from '../../services/calendar-selection.js';
+import { queueEventDeletion, flushOutbound } from '../../services/calendar-outbound.js';
+import { createLogger } from '../../logger.js';
+import { sqlInList } from '../../utils/sql-in-list.ts';
 import { feedUrl, getUserId } from './helpers.js';
 
 const router = express.Router();
+const log = createLogger('Calendar');
 
 // #1909: die Faelle, die ein Nutzer in der Kalender-Verwaltung erreicht, tragen
 // einen `reason`; die App sagt dazu ihren Satz (utils/friendly-error.js,
@@ -184,6 +190,22 @@ router.put('/calendars/:id', requireCalendarWrite, validateRequest(), (req, res)
   res.json({ data: serializeCalendar(req, localCalendarById(database, id), feedUrl, { includeFeedToken: isAdminRequest(req) }) });
 });
 
+/**
+ * DELETE /calendars/:id
+ * Body (optional): { mode?: 'move' | 'delete', target_calendar_id?: number }
+ *
+ * `mode: 'delete'` removes every event the calendar owns along with it.
+ * Anything else (including no body, for existing callers) moves them - to
+ * `target_calendar_id`, or to the default calendar when that is omitted.
+ *
+ * Moving never pushes outward: `local_calendar_id` is not in MIRRORED_FIELDS
+ * (server/services/calendar-outbound.js), by design - a local reshuffle is
+ * not a change to what a synced event looks like anywhere else. An event here
+ * can in any case never carry an active sync target (DB triggers enforce
+ * local and synced calendars as mutually exclusive), so `queueEventDeletion`
+ * below is the same defensive no-op the single-event route relies on, not
+ * dead code added for this change alone.
+ */
 router.delete('/calendars/:id', requireCalendarWrite, validateRequest(), (req, res) => {
   const id = pathId(req);
   const database = db.get();
@@ -197,11 +219,60 @@ router.delete('/calendars/:id', requireCalendarWrite, validateRequest(), (req, r
   if (row.feed_token && !isAdminRequest(req)) {
     return res.status(403).json({ error: 'Admin access required.', code: 403, reason: 'calendar_feed_admin_only' });
   }
+  const deleteEvents = req.body?.mode === 'delete';
+  let targetId = null;
+  if (!deleteEvents) {
+    const vTarget = validateCalendarId(database, req.body?.target_calendar_id);
+    if (vTarget.error) return sendValidationErrors(res, [vTarget]);
+    targetId = vTarget.value ?? defaultCalendarId(database);
+    if (targetId === id) {
+      return res.status(400).json({
+        error: 'Choose a different calendar to move the events to.', code: 400,
+        reason: 'calendar_move_target_same',
+      });
+    }
+  }
+
+  // Dieselbe Zugehoerigkeit, die die Zeile in der Liste zaehlt
+  // (loadCalendars/event_count): kein Sync-Ziel, kein Geburtstag, keine
+  // Haushaltshilfe - sonst zaehlte und zoege diese Route etwas, das gar
+  // nicht diesem Kalender gehoert.
+  /** @type {{ id: number }[]} */
+  const events = database.prepare(`
+    SELECT * FROM calendar_events e WHERE ${localCalendarIdSql('e')} = ?
+  `).all(id);
+
+  let queued = false;
   withTx(database, () => {
+    if (deleteEvents) {
+      if (events.length) {
+        for (const event of events) queued = queueEventDeletion(event, database) || queued;
+        const idList = sqlInList(events.map((e) => e.id));
+        database.prepare(`DELETE FROM reminders WHERE entity_type = 'event' AND entity_id IN (${idList.sql})`).run(idList.param);
+        database.prepare(`DELETE FROM calendar_events WHERE id IN (${idList.sql})`).run(idList.param);
+      }
+    } else if (events.length) {
+      // NULL statt der Kennung des Standardkalenders: dieselbe Zeile, die
+      // der Lesepfad ohnehin als Standard aufloest (localCalendarIdSql),
+      // und bestehende Aufrufer ohne target_calendar_id sehen die exakt
+      // gleiche Spalte wie vor dieser Aenderung.
+      const value = targetId === defaultCalendarId(database) ? null : targetId;
+      const idList = sqlInList(events.map((e) => e.id));
+      database.prepare(`UPDATE calendar_events SET local_calendar_id = ? WHERE id IN (${idList.sql})`).run(value, idList.param);
+    }
     database.prepare('DELETE FROM local_calendars WHERE id = ?').run(id);
     restoreInheritedImportColors(database);
   });
   res.status(204).end();
+
+  // Bewusst nach der Antwort, wie bei der Einzelloeschung (crud.js):
+  // der Provider-Aufruf darf das lokale Loeschen nicht verzoegern. In der
+  // Praxis bleibt `queued` fuer Termine dieses Kalenders immer false (siehe
+  // Kommentar oben), der Pfad bleibt aber derselbe wie dort.
+  if (queued) {
+    flushOutbound()
+      .catch((err) => log.warn('Loeschung vorgemerkt, Sofortversuch fehlgeschlagen:', err.message));
+  }
 });
 
 router.post('/calendars/:id/feed/regenerate', requireAdmin, validateRequest(), (req, res) => {

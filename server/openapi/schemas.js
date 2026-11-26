@@ -523,6 +523,13 @@ export const schemas = {
             sort_order: { type: 'integer', minimum: 0 },
           },
         },
+        LocalCalendarDeleteInput: {
+          type: 'object',
+          properties: {
+            mode: { type: 'string', enum: ['move', 'delete'], description: 'Omit or `move` to reassign the calendar\'s events; `delete` removes them with the calendar.' },
+            target_calendar_id: { type: 'integer', description: '`move` only. Omit for the default calendar.' },
+          },
+        },
         IcsSubscriptionCreateInput: {
           type: 'object',
           description: 'A new ICS subscription. Name, address and colour are required; name and address are the route\'s checks, each with its own answer: an empty or too long name carries `calendar_subscription_name_invalid`, an address that does not parse `calendar_ics_url_invalid`, another scheme `calendar_ics_url_scheme`.',
