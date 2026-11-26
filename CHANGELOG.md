@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.96.0] - 2026-11-26
+
+### Foundation
+- **Each migration is its own file, and a new installation starts from a schema baseline.** The
+  284 database migrations lived in one `server/db.js` of almost 14,000 lines. Each is now its
+  own file under `server/migrations/`, and a test holds every one of them byte for byte to what
+  existing installations have already applied. A new database is created from one generated
+  baseline instead of replaying all migrations; a test checks on both SQLite drivers that the
+  baseline plus any later migration gives the same schema and the same rows as replaying them
+  from the first. `server/db.js` is down to about 1,200 lines; the migration runner, backup,
+  restore and the baseline live under `server/db/`.
+- **Every database transaction runs through one function.** Transactions were opened in about
+  25 places, each in its own way. They now all go through `withTx` in `server/db/tx.ts`, which
+  only accepts synchronous work, and a lint rule refuses a transaction opened any other way.
+  Where the server waits for something before it saves (a file upload, a feed, a connection
+  test, a password hash), it now reads again what it checked, and the rights of whoever sent
+  the request, in the same step as the write; the corrections this brought to light are listed
+  under "Fixed".
+- **One migration, so the way back is the backup.** Unlike the earlier foundation releases,
+  this one brings a migration (284, search index, see "Fixed"). Once 2.96.0 has opened a
+  database, 2.95.0 refuses to start on it, as described in the installation guide ("Going
+  back"): going back means the previous image with the backup taken before the update. Before
+  the tag, a database from 2.95.0 was updated by this build, a backup taken on 2.95.0 before the
+  update was restored on 2.95.0 afterwards, and this build started on a new database created
+  from the baseline and again on it after a restart.
+
 ### Changed
 - **A new installation creates its database in one step.** The first start used to run every
   migration since the first release one after another (284 of them, each with its own line in the
