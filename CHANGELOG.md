@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Shopping: price estimation and cost calculator** (part 2 of #1003). Open items without a
+  typed price show an estimate based on the last purchase of an item with the same name. One
+  quiet line at the end of the list shows what is still to buy, what is in the cart and the
+  total, updates as items are ticked off or priced, and stays hidden while no item has a price.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation
