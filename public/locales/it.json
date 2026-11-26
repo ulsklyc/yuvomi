@@ -3162,6 +3162,7 @@
         "notificationChannelDelete": "Elimina canale",
         "notificationChannelDeleted": "Canale eliminato.",
         "notificationChannelError": "Impossibile aggiornare il canale di notifica.",
+        "notificationChannelErrorPrivateNetwork": "L’URL del canale punta a una rete privata o locale. Per consentirlo, imposta NOTIFICATION_ALLOW_PRIVATE_NETWORK=true sul server.",
         "notificationChannelSecretKeep": "Lascia vuoto per mantenere il segreto",
         "notificationChannelEmpty": "Nessun canale della famiglia ancora configurato.",
         "notificationChannelAdminOnlyHint": "Solo gli amministratori possono gestire i canali della famiglia.",

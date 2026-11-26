@@ -45,12 +45,25 @@ function toJson(value) {
  * is not marked and goes out as a fixed 500.
  */
 export class ChannelInputError extends Error {
-  constructor(message) {
+  /**
+   * @param {string} message
+   * @param {string} [reason] - the case the page translates, where it has one (#2837)
+   */
+  constructor(message, reason) {
     super(message);
     this.name = 'ChannelInputError';
     this.code = 'notification_channel_invalid';
+    if (reason) this.reason = reason;
   }
 }
+
+/**
+ * The refusal of a channel URL in a private or local network. Saving says it
+ * for what is decided without DNS; a channel test says it for a name that only
+ * the lookup finds there (#2837). It names the switch: the answer to the admin
+ * is the one place an admin learns it.
+ */
+export const PRIVATE_NETWORK_MESSAGE = `Notification channel URL must not point to a private or local network address (set ${ENV_ALLOW_PRIVATE_NETWORK}=true to allow it).`;
 
 // `keepPath`: Gotify und ntfy bekommen eine BASIS, an die der Provider seinen
 // eigenen Pfad haengt - da ist ein abschliessender Slash Rauschen und wird
@@ -76,7 +89,7 @@ function normalizeBaseUrl(value, { keepPath = false } = {}) {
   // guardedFetch beim Senden, je Verbindung (GHSA-f4w5-ggcc-7m5c).
   const host = normalizeHostname(url.hostname);
   if (!isPrivateNetworkAllowed() && (isBlockedHostname(host) || (isIP(host) && isBlockedAddress(host)))) {
-    throw new ChannelInputError(`Notification channel URL must not point to a private or local network address (set ${ENV_ALLOW_PRIVATE_NETWORK}=true to allow it).`);
+    throw new ChannelInputError(PRIVATE_NETWORK_MESSAGE, 'notifications_private_network');
   }
   if (keepPath) return url.toString();
   url.pathname = url.pathname.replace(/\/+$/, '');

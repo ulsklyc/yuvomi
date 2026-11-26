@@ -3180,6 +3180,7 @@
         "notificationChannelDelete": "حذف کانال",
         "notificationChannelDeleted": "کانال حذف شد.",
         "notificationChannelError": "کانال اعلان به‌روزرسانی نشد.",
+        "notificationChannelErrorPrivateNetwork": "آدرس کانال به یک شبکه خصوصی یا محلی اشاره می‌کند. برای اجازه دادن، NOTIFICATION_ALLOW_PRIVATE_NETWORK=true را روی سرور تنظیم کنید.",
         "notificationChannelSecretKeep": "برای حفظ راز خالی بگذارید",
         "notificationChannelEmpty": "هنوز کانال خانواری تنظیم نشده است.",
         "notificationChannelAdminOnlyHint": "فقط مدیران می‌توانند کانال‌های خانوار را مدیریت کنند.",

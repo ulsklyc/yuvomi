@@ -3162,6 +3162,7 @@
         "notificationChannelDelete": "Xóa kênh",
         "notificationChannelDeleted": "Đã xóa kênh.",
         "notificationChannelError": "Không thể cập nhật kênh thông báo.",
+        "notificationChannelErrorPrivateNetwork": "URL của kênh trỏ đến một mạng riêng hoặc mạng cục bộ. Để cho phép, hãy đặt NOTIFICATION_ALLOW_PRIVATE_NETWORK=true trên máy chủ.",
         "notificationChannelSecretKeep": "Để trống để giữ nguyên bí mật",
         "notificationChannelEmpty": "Chưa cấu hình kênh gia đình nào.",
         "notificationChannelAdminOnlyHint": "Chỉ quản trị viên mới có thể quản lý kênh gia đình.",

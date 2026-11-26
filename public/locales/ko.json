@@ -3180,6 +3180,7 @@
         "notificationChannelDelete": "채널 삭제",
         "notificationChannelDeleted": "채널이 삭제되었습니다.",
         "notificationChannelError": "알림 채널을 업데이트하지 못했습니다.",
+        "notificationChannelErrorPrivateNetwork": "채널 URL이 사설 또는 로컬 네트워크를 가리킵니다. 허용하려면 서버에서 NOTIFICATION_ALLOW_PRIVATE_NETWORK=true을(를) 설정하세요.",
         "notificationChannelSecretKeep": "시크릿을 유지하려면 비워 두세요",
         "notificationChannelEmpty": "아직 설정된 가구 채널이 없습니다.",
         "notificationChannelAdminOnlyHint": "관리자만 가구 채널을 관리할 수 있습니다.",

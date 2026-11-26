@@ -3472,6 +3472,7 @@
         "notificationChannelDelete": "حذف القناة",
         "notificationChannelDeleted": "تم حذف القناة.",
         "notificationChannelError": "تعذر تحديث قناة الإشعارات.",
+        "notificationChannelErrorPrivateNetwork": "يشير رابط القناة إلى شبكة خاصة أو محلية. للسماح بذلك، اضبط NOTIFICATION_ALLOW_PRIVATE_NETWORK=true على الخادم.",
         "notificationChannelSecretKeep": "اتركه فارغًا للاحتفاظ بالسر",
         "notificationChannelEmpty": "لم يتم إعداد أي قنوات منزلية بعد.",
         "notificationChannelAdminOnlyHint": "يمكن للمشرفين فقط إدارة قنوات المنزل.",

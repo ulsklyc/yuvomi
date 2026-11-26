@@ -2897,10 +2897,13 @@ webhook URL is the complete endpoint and keeps a trailing slash if one was enter
 subscriptions and the recipe mirrors - the address actually connected to is checked, on every redirect
 hop. Before that the three providers called the bare global `fetch()` on the configured URL. Saving a
 channel refuses a private or local hostname or IP literal (`server/services/notification-channels.js`),
-naming the switch in the message. `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` lifts the guard for a
-Gotify/ntfy server in the same Docker network or LAN; the default is off, like the ICS feeds' switch,
-and it is a deployment switch rather than an app setting because the line between app admin and host
-operator runs exactly here.
+naming the switch in the message. A host name that resolves into a private network passes the save
+(that check needs no DNS) and is refused by the channel test with the same sentence; both answer 400
+with `reason: notifications_private_network`, so the settings page names the switch in the admin's
+language (#2837, the test answered 500 `Internal server error.` before).
+`NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` lifts the guard for a Gotify/ntfy server in the same Docker
+network or LAN; the default is off, like the ICS feeds' switch, and it is a deployment switch rather
+than an app setting because the line between app admin and host operator runs exactly here.
 
 **Email channel (#944).** Unlike the other three, an email channel carries no endpoint and no
 credentials of its own - only `toAddress`. The SMTP access is app-wide (Settings → Email, or

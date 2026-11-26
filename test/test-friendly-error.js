@@ -264,6 +264,9 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // Rezeptdienste in den Kuechen-Einstellungen (#1909); die echte Antwort
     // misst test:recipe-provider-routes.
     '../server/routes/recipe-providers.js',
+    // Benachrichtigungskanaele: ein Ziel im privaten Netz beim Speichern und
+    // beim Testversand (#2837); die echte Antwort misst test:notifications.
+    '../server/routes/notifications.js',
     // Der Fall eines gescheiterten Abgleichs (#1909, Migration 255); gespeichert
     // und ausgeliefert misst ihn test:recipe-provider-routes, je Klasse
     // test:recipe-provider-adapter am echten Server.

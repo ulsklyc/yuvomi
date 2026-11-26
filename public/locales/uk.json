@@ -3368,6 +3368,7 @@
         "notificationChannelDelete": "Видалити канал",
         "notificationChannelDeleted": "Канал видалено.",
         "notificationChannelError": "Не вдалося оновити канал сповіщень.",
+        "notificationChannelErrorPrivateNetwork": "URL каналу вказує на приватну або локальну мережу. Щоб дозволити це, задайте на сервері NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
         "notificationChannelSecretKeep": "Залиште порожнім, щоб зберегти секрет",
         "notificationChannelEmpty": "Канали домогосподарства ще не налаштовано.",
         "notificationChannelAdminOnlyHint": "Керувати каналами домогосподарства можуть лише адміністратори.",

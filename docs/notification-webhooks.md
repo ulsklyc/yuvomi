@@ -32,7 +32,8 @@ deployment environment (see the
 [installation guide](installation.md#calendar-subscriptions--ics-feeds-optional)).
 Delivery checks the address again for every connection, redirects included, so
 a host name that resolves into a private network is refused at send time as
-well.
+well. **Send test** on the settings page says so with a message that names
+the switch.
 
 ## Request format
 

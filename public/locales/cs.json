@@ -3268,6 +3268,7 @@
         "notificationChannelDelete": "Smazat kanál",
         "notificationChannelDeleted": "Kanál smazán.",
         "notificationChannelError": "Kanál oznámení se nepodařilo aktualizovat.",
+        "notificationChannelErrorPrivateNetwork": "URL kanálu odkazuje do soukromé nebo místní sítě. Pokud to chcete povolit, nastavte na serveru NOTIFICATION_ALLOW_PRIVATE_NETWORK=true.",
         "notificationChannelSecretKeep": "Nechte prázdné pro zachování tajného údaje",
         "notificationChannelEmpty": "Zatím nejsou nastaveny žádné kanály domácnosti.",
         "notificationChannelAdminOnlyHint": "Kanály domácnosti mohou spravovat pouze správci.",

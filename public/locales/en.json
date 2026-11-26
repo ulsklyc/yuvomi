@@ -3199,6 +3199,7 @@
         "notificationChannelDelete": "Delete channel",
         "notificationChannelDeleted": "Channel deleted.",
         "notificationChannelError": "Notification channel could not be updated.",
+        "notificationChannelErrorPrivateNetwork": "The channel URL points to a private or local network. To allow this, set NOTIFICATION_ALLOW_PRIVATE_NETWORK=true on the server.",
         "notificationChannelSecretKeep": "Leave empty to keep the secret",
         "notificationChannelEmpty": "No household channels configured yet.",
         "notificationChannelAdminOnlyHint": "Only admins can manage household channels.",

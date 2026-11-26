@@ -3162,6 +3162,7 @@
         "notificationChannelDelete": "Ta bort kanal",
         "notificationChannelDeleted": "Kanal borttagen.",
         "notificationChannelError": "Aviseringskanalen kunde inte uppdateras.",
+        "notificationChannelErrorPrivateNetwork": "Kanalens URL pekar på ett privat eller lokalt nätverk. För att tillåta det, ange NOTIFICATION_ALLOW_PRIVATE_NETWORK=true på servern.",
         "notificationChannelSecretKeep": "Lämna tomt för att behålla hemligheten",
         "notificationChannelEmpty": "Inga hushållskanaler har konfigurerats ännu.",
         "notificationChannelAdminOnlyHint": "Endast administratörer kan hantera hushållskanaler.",
