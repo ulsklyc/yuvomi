@@ -301,6 +301,12 @@ export const ROWS = [
   })),
   { form: 'inline', file: 'server/routes/preferences.js', key: 'POST /holidays/sync', method: 'POST',
     path: '/api/v1/preferences/holidays/sync', body: {}, expect: ADMIN_REQUIRED },
+  // The shopping webhook URL is a credential (#2502): its own route, admin-only
+  // in both directions, outside /preferences.
+  { form: 'inline', file: 'server/routes/shopping.js', key: 'GET /webhook', method: 'GET',
+    path: '/api/v1/shopping/webhook', expect: ADMIN_REQUIRED },
+  { form: 'inline', file: 'server/routes/shopping.js', key: 'PUT /webhook', method: 'PUT',
+    path: '/api/v1/shopping/webhook', body: { url: 'https://example.com/hook' }, expect: ADMIN_REQUIRED },
   // A done task whose payment visit is paid: reopening it is for an admin.
   { form: 'inline', file: 'server/routes/tasks.js', key: 'PUT /:id', method: 'PUT',
     path: (s) => `/api/v1/tasks/${s.ids.settledTask}`, body: { status: 'open' }, expect: ADMIN_REQUIRED },

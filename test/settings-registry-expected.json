@@ -87,6 +87,7 @@
       "holiday_public_color": "#FF3B30",
       "holiday_school_color": "#34C759",
       "holiday_last_sync": null,
+      "shopping_webhook_configured": false,
       "screensaver_enabled": false
      }
     }
@@ -177,6 +178,7 @@
       "holiday_public_color": "#FF3B30",
       "holiday_school_color": "#34C759",
       "holiday_last_sync": null,
+      "shopping_webhook_configured": false,
       "screensaver_enabled": false
      }
     }
@@ -369,6 +371,7 @@
       "holiday_public_color": "#112233",
       "holiday_school_color": "#445566",
       "holiday_last_sync": "2035-01-02T03:04:05Z",
+      "shopping_webhook_configured": false,
       "screensaver_enabled": true
      }
     }
@@ -523,6 +526,7 @@
       "holiday_public_color": "#112233",
       "holiday_school_color": "#445566",
       "holiday_last_sync": "2035-01-02T03:04:05Z",
+      "shopping_webhook_configured": false,
       "screensaver_enabled": true
      }
     }
@@ -678,6 +682,7 @@
       "holiday_public_color": "red",
       "holiday_school_color": "",
       "holiday_last_sync": "",
+      "shopping_webhook_configured": false,
       "screensaver_enabled": false
      }
     }
@@ -763,6 +768,7 @@
       "holiday_public_color": "red",
       "holiday_school_color": "",
       "holiday_last_sync": "",
+      "shopping_webhook_configured": false,
       "screensaver_enabled": false
      }
     }
@@ -904,6 +910,7 @@
       "holiday_public_color": "#FF3B30",
       "holiday_school_color": "#34C759",
       "holiday_last_sync": null,
+      "shopping_webhook_configured": false,
       "screensaver_enabled": false
      }
     }
@@ -1010,6 +1017,7 @@
       "holiday_public_color": "#FF3B30",
       "holiday_school_color": "#34C759",
       "holiday_last_sync": null,
+      "shopping_webhook_configured": false,
       "screensaver_enabled": false
      }
     }
@@ -1142,7 +1150,8 @@
    "holiday_show_school": false,
    "holiday_public_color": "#FF3B30",
    "holiday_school_color": "#34C759",
-   "holiday_last_sync": null
+   "holiday_last_sync": null,
+   "shopping_webhook_configured": false
   },
   "member": {
    "visible_meal_types": [
@@ -1218,7 +1227,8 @@
    "holiday_show_school": false,
    "holiday_public_color": "#FF3B30",
    "holiday_school_color": "#34C759",
-   "holiday_last_sync": null
+   "holiday_last_sync": null,
+   "shopping_webhook_configured": false
   }
  },
  "put": {
