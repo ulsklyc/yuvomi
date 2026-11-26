@@ -452,15 +452,15 @@ test('reset-password updates the hash and consumes the token', async () => {
   assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 0);
 });
 
-test('a failure consuming the reset token rolls back the new password and passkey revocation', async () => {
+test('a failure saving the reset password rolls back token redemption and passkey revocation', async () => {
   const db = makeDb();
   const options = { db, now: Date.now };
   const reset = createPasswordResetService(options);
   const token = reset.createToken(1).token;
   db.prepare(`INSERT INTO user_passkeys (user_id, credential_id, public_key, name)
     VALUES (1, 'fixture-credential', X'00', 'Fixture key')`).run();
-  db.exec(`CREATE TRIGGER reject_token_delete BEFORE DELETE ON password_resets
-    BEGIN SELECT RAISE(ABORT, 'Token deletion failed'); END;`);
+  db.exec(`CREATE TRIGGER reject_reset_password BEFORE UPDATE OF password_hash ON users
+    BEGIN SELECT RAISE(ABORT, 'Password update failed'); END;`);
   const { app } = await makeAuthApp(db);
   const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'new-password' });
   assert.equal(status, 500);

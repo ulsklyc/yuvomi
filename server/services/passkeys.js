@@ -5,6 +5,7 @@ import {
   generateRegistrationOptions, verifyRegistrationResponse,
   generateAuthenticationOptions, verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
+import { withTx } from '../db/tx.ts';
 
 /** @typedef {ReturnType<typeof import('../db.js').get>} Database */
 /** @typedef {{ id: number, username: string, display_name: string }} PasskeyUser */
@@ -70,11 +71,11 @@ export function remove(database, userId, id) {
  */
 export function revokeAll(database, userId) {
   // Rotating the opaque handle also invalidates registration already verifying.
-  database.transaction(() => {
+  withTx(database, () => {
     database.prepare('DELETE FROM user_passkeys WHERE user_id = ?').run(userId);
     database.prepare('DELETE FROM user_passkey_handles WHERE user_id = ?').run(userId);
     database.prepare('DELETE FROM passkey_challenges WHERE user_id = ?').run(userId);
-  })();
+  });
 }
 
 /** @param {Database} database
@@ -85,7 +86,7 @@ export function revokeAll(database, userId) {
  * @param {string} [clientId]
  */
 function remember(database, sessionId, operation, challenge, userId = null, clientId = sessionId) {
-  database.transaction(() => {
+  withTx(database, () => {
     database.prepare('DELETE FROM passkey_challenges WHERE expires_at <= ?').run(Date.now());
     database.prepare('DELETE FROM passkey_challenges WHERE session_hash = ? AND operation = ?').run(sessionHash(sessionId), operation);
     if (userId === null) {
@@ -98,7 +99,7 @@ function remember(database, sessionId, operation, challenge, userId = null, clie
     }
     database.prepare('INSERT INTO passkey_challenges (challenge, session_hash, operation, user_id, expires_at, client_hash) VALUES (?, ?, ?, ?, ?, ?)')
       .run(challenge, sessionHash(sessionId), operation, userId, Date.now() + WINDOW_MS, sessionHash(clientId));
-  })();
+  });
 }
 
 // DELETE RETURNING consumes before any asynchronous verification: concurrent
@@ -167,12 +168,12 @@ export async function finishRegistration(database, userId, sessionId, response, 
   if (!result.verified || !result.registrationInfo) throw fail();
   const { credential } = result.registrationInfo;
   const transports = (response.response.transports ?? []).filter(t => ['ble', 'cable', 'hybrid', 'internal', 'nfc', 'smart-card', 'usb'].includes(t));
-  database.transaction(() => {
+  withTx(database, () => {
     if (!isAllowed() || database.prepare('SELECT user_handle FROM user_passkey_handles WHERE user_id = ?').get(userId)?.user_handle !== userHandle
         || list(database, userId).length >= MAX_PASSKEYS) throw fail();
     database.prepare('INSERT INTO user_passkeys (user_id, credential_id, public_key, counter, transports, name) VALUES (?, ?, ?, ?, ?, ?)')
       .run(userId, credential.id, Buffer.from(credential.publicKey), credential.counter, JSON.stringify(transports), name.trim());
-  })();
+  });
 }
 
 /** @param {Database} database

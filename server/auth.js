@@ -4644,12 +4644,16 @@ router.patch('/me/password', requireAuth, csrfMiddleware, validateRequest(), asy
   // aenderte sich das Passwort waehrend der awaits (zweite Aenderung, Reset,
   // Admin), ist das bewiesene "aktuelle" Passwort keins mehr - nichts wird
   // geschrieben, keine Sitzung endet, die Antwort ist die eines falschen.
-  const { changes } = db.get()
-    .prepare('UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?')
-    .run(hash, req.authUserId, user.password_hash);
-  if (changes === 0) return wrongPassword();
-
-  invalidateUserSessions(req.authUserId, req.sessionID, db.get(), true);
+  const database = db.get();
+  const written = withTx(database, () => {
+    const { changes } = database
+      .prepare('UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?')
+      .run(hash, req.authUserId, user.password_hash);
+    if (changes === 0) return false;
+    invalidateUserSessions(req.authUserId, req.sessionID, database, true);
+    return true;
+  });
+  if (!written) return wrongPassword();
 
   res.json({ ok: true });
 });
