@@ -9,6 +9,7 @@
  *          adds the verdict from the account as it is now (`requestAsOfNow`).
  *
  * The answer on refusal is the one the gate gives at entry:
+ *   - account no longer active: the 401 of requireAuth (sendNotAuthenticated);
  *   - module gate: `module_access_denied` / `module_read_only`
  *     (sendModuleGateRefusal, also used by server/index.js);
  *   - admin gate: refuseAdmin() from ./require-admin.js.
@@ -24,7 +25,7 @@ import {
   moduleAccessVerdict,
   requestAsOfNow,
 } from '../authorize/index.ts';
-import { isAdminRequest, refuseAdmin } from './require-admin.js';
+import { isAdminRequest, refuseAdmin, sendNotAuthenticated } from './require-admin.js';
 
 /**
  * The module gate's refusal for a verdict, or null when it lets through.
@@ -73,14 +74,17 @@ export class RefusedNowError extends Error {
 export function gateRefusalNow(database, req, { admin = false } = {}) {
   if (admin && !isAdminRequest(req)) return (res) => refuseAdmin(req, res);
   const now = requestAsOfNow(database, req);
-  if (admin && !(now && isAdminRequest(now))) return (res) => refuseAdmin(req, res);
+  // Das Konto ist nicht mehr aktiv (deaktiviert oder geloescht): die 401, die
+  // requireAuth am Eingang jetzt gaebe - die App meldet ab, kein 403.
+  if (!now) return (res) => sendNotAuthenticated(res);
+  if (admin && !isAdminRequest(now)) return (res) => refuseAdmin(req, res);
   if (req.authMethod === 'display') return null;
   const path = `${req.baseUrl || ''}${req.path || ''}`.replace(/^\/api\/v1(?=\/|$)/, '');
   const { moduleKey, access } = sessionModuleAccessRequirement(path, req.method);
   const atEntry = moduleAccessVerdict(req.sessionModuleAccess, moduleKey, access);
   const verdict = atEntry === MODULE_ACCESS_DENIED || atEntry === MODULE_ACCESS_READ_ONLY
     ? atEntry
-    : (now ? moduleAccessVerdict(now.sessionModuleAccess, moduleKey, access) : MODULE_ACCESS_DENIED);
+    : moduleAccessVerdict(now.sessionModuleAccess, moduleKey, access);
   if (verdict === MODULE_ACCESS_DENIED || verdict === MODULE_ACCESS_READ_ONLY) {
     return (res) => sendModuleGateRefusal(res, verdict);
   }

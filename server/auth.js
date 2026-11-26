@@ -62,7 +62,8 @@ import {
   applyChildStartPermissions, INVITE_PRESET_DEFAULT,
   userForRequest,
 } from './authorize/index.ts';
-import { isAdminRequest, refuseAdmin, requireAdmin, stillAdmin } from './middleware/require-admin.js';
+import { isAdminRequest, requireAdmin, sendNotAuthenticated } from './middleware/require-admin.js';
+import { gateRefusalNow } from './middleware/gate-now.js';
 import { resolveRequestModuleAccess } from './authorize/index.ts';
 import { actorForAccount, authorize } from './authorize/index.ts';
 import { EMAIL_IN_USE_MESSAGE, emailsTakenByOtherAccounts, storedAccountEmails } from './services/contact-identity.js';
@@ -1199,7 +1200,7 @@ function requireAuth(req, res, next) {
     // holen. Der Request selbst bleibt abgewiesen; erst der naechste kommt ohne
     // das tote Cookie und wird normal behandelt.
     res.clearCookie(DISPLAY_COOKIE, displayCookieIdentity());
-    return res.status(401).json({ error: 'Not authenticated.', code: 401 });
+    return sendNotAuthenticated(res);
   }
 
   // EINE SITZUNG EINES EHEMALIGEN GILT NICHT, AUCH WENN SIE NOCH DASTEHT (#1381).
@@ -1229,7 +1230,7 @@ function requireAuth(req, res, next) {
     ? db.get().prepare(`SELECT u.role FROM users u WHERE u.id = ? AND ${activeAccountSql('u')}`).get(req.session.userId)
     : null;
   if (req.session && req.session.userId && !sessionAccount) {
-    return res.status(401).json({ error: 'Not authenticated.', code: 401 });
+    return sendNotAuthenticated(res);
   }
 
   if (sessionAccount) {
@@ -1242,7 +1243,7 @@ function requireAuth(req, res, next) {
     applyRoleModuleAccess(req);
     return next();
   }
-  res.status(401).json({ error: 'Not authenticated.', code: 401 });
+  sendNotAuthenticated(res);
 }
 
 /**
@@ -3932,8 +3933,9 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest
 
     // Das Recht gilt am Schreiben, nicht am Eingang (#2947): wer waehrend des
     // Hashens die Administratorrolle verlor, legt kein Konto mehr an.
-    const result = withTx(db.get(), () => {
-      if (!stillAdmin(db.get(), req)) return null;
+    const outcome = withTx(db.get(), () => {
+      const refusedNow = gateRefusalNow(db.get(), req, { admin: true });
+      if (refusedNow) return { refusedNow, created: null };
       const created = db.get()
         .prepare(`
           INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
@@ -3954,9 +3956,10 @@ router.post('/users', requireAuth, requireAdmin, csrfMiddleware, validateRequest
         avatarData: normalizedAvatarData ?? null,
         actorUserId: req.authUserId,
       });
-      return created;
+      return { refusedNow: null, created };
     });
-    if (!result) return refuseAdmin(req, res);
+    if (outcome.refusedNow) return outcome.refusedNow(res);
+    const result = /** @type {NonNullable<typeof outcome.created>} */ (outcome.created);
 
     const createdUser = adminUserRow(result.lastInsertRowid);
 

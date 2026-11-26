@@ -19,7 +19,7 @@
  * requireAdmin unchanged - existing imports stay valid.
  */
 
-import { actorFromRequest, authorize, requestAsOfNow } from '../authorize/index.ts';
+import { actorFromRequest, authorize } from '../authorize/index.ts';
 
 /**
  * The admin verdict of a request. Call it only after requireAuth: the actor is
@@ -60,21 +60,14 @@ export function refuseAdmin(req, res) {
 }
 
 /**
- * Is the request's account an admin NOW (#2947)? For a write that follows an
- * await (a password hash): requireAdmin answered for the role the request
- * arrived with. Both must hold, the verdict at entry and the one from the
- * account as it is now - re-reading only narrows. Asked in the same
- * synchronous step as the write; on `false`
- * the route sends refuseAdmin(), the answer requireAdmin would have given.
- * The connection is handed in: this module loads no database.
- * @param {any} database
- * @param {object} req
- * @returns {boolean}
+ * THE 401 of requireAuth (server/auth.js): no valid sign-in, or an account
+ * that is no longer active. Also the answer when the account was deactivated
+ * while a request waited for an await and is asked again at the write (#2947,
+ * server/middleware/gate-now.js) - the app signs out on it.
+ * @param {{ status(code: number): { json(body: unknown): unknown } }} res
  */
-export function stillAdmin(database, req) {
-  if (!manageVerdict(req).allowed) return false;
-  const now = requestAsOfNow(database, req);
-  return now !== null && manageVerdict(now).allowed;
+export function sendNotAuthenticated(res) {
+  return res.status(401).json({ error: 'Not authenticated.', code: 401 });
 }
 
 /**

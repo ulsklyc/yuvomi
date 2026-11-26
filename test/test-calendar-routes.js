@@ -3019,6 +3019,37 @@ test('PUT /:id - documents read taken during the upload of a replacement: the at
   assert.deepEqual(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id), before, 'der Termin bleibt, wie er war');
 });
 
+// DAS KONTO WIRD WAEHREND DES UPLOADS DEAKTIVIERT (#2947): die 401, die
+// requireAuth am Eingang jetzt gaebe - die App meldet ab -, nichts geschrieben,
+// Upload entfernt.
+for (const [label, request] of /** @type {const} */ ([
+  ['POST /', () => ({ method: 'POST', route: '/', body: { title: 'GONE-2947-POST', start_datetime: '2059-09-01T09:00' } })],
+  ['PUT /:id', () => {
+    const id = insertEvent({ title: 'GONE-2947-PUT', start_datetime: '2059-09-02T09:00', created_by: MARIA.id });
+    return { method: 'PUT', route: `/${id}`, body: { description: 'mit Anhang' } };
+  }],
+])) {
+  test(`${label} - the account deactivated during the upload gets the 401 of requireAuth, nothing written (#2947)`, async () => {
+    const { method, route, body } = request();
+    const key = `drive-2947-gone-${label.replace(/\W+/g, '-')}`;
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs(method, route, { actor: MARIA, body: { ...body, ...uploadBody(key) } }),
+        async () => { db.prepare("UPDATE users SET deactivated_at = '2059-01-01T00:00:00Z' WHERE id = ?").run(MARIA.id); });
+    } finally {
+      db.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(MARIA.id);
+    }
+    assert.deepEqual([answer.status, answer.body], [401, { error: 'Not authenticated.', code: 401 }]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'kein neuer Termin');
+    if (method === 'PUT') {
+      assert.equal(db.prepare('SELECT description FROM calendar_events WHERE id = ?').get(Number(route.slice(1))).description, null);
+    }
+  });
+}
+
 test('POST / - a CalDAV target switched off during the upload is refused like without it (#2956)', async () => {
   caldavTargetAccount7();
   const target = { target_caldav_account_id: 7, target_caldav_calendar_url: 'https://dav.test/cal/' };

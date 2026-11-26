@@ -447,3 +447,17 @@ test('Konto anlegen: ein waehrend des Verbindungstests zurueckgestufter Admin be
     restore();
   }
 });
+
+test('Kalender aktualisieren: ein waehrend der Abfrage deaktiviertes Konto bekommt die 401 von requireAuth, nichts gespeichert (#2947)', async () => {
+  reset();
+  fakeDav.addCollection('family', { name: 'Familie' });
+  duringFirstRequest(() => db.prepare("UPDATE users SET deactivated_at = '2059-01-01T00:00:00Z' WHERE id = ?").run(userId));
+  try {
+    const res = await api('GET', `/calendar/caldav/accounts/${accountId}/calendars?refresh=true`);
+    assert.deepEqual([res.status, res.body], [401, { error: 'Not authenticated.', code: 401 }]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_calendar_selection WHERE account_id = ?').get(accountId).n, 0);
+  } finally {
+    fakeDav.allowAll();
+    db.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(userId);
+  }
+});

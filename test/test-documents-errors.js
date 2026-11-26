@@ -286,6 +286,30 @@ test('Server: das Schreibrecht an Dokumenten faellt WAEHREND des Hochladens weg 
   assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
 });
 
+test('Server: das eigene Konto wird WAEHREND des Hochladens deaktiviert - die 401 von requireAuth, kein Dokument, keine Datei (#2947)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const files = () => readdirSync(storageRoot, { recursive: true }).filter((name) => String(name).endsWith('.pdf'));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  const before = files().length;
+  /** @type {any} */
+  let answer;
+  _setStageUploadForTest(async (/** @type {any} */ args) => {
+    const staged = await stageDocumentUpload(args);
+    db.prepare("UPDATE users SET deactivated_at = '2059-01-01T00:00:00Z' WHERE id = ?").run(admin);
+    return staged;
+  });
+  try {
+    answer = await call('POST', '', upload({ name: 'Weg 2947' }));
+  } finally {
+    _setStageUploadForTest(null);
+    delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    db.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(admin);
+  }
+  assert.deepEqual([answer.status, answer.body], [401, { error: 'Not authenticated.', code: 401 }]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE name = 'Weg 2947'").get().n, 0, 'kein Dokument');
+  assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
+});
+
 test('Server: ein Name, den es unter den Geschwistern schon gibt - anlegen, umbenennen und verschieben nennen den Fall', async () => {
   const parent = await folder('Eltern');
   await folder('Doppelt', parent);
