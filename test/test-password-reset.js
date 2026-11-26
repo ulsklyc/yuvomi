@@ -6,16 +6,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { createRequire } from 'node:module';
-// Recovery uses the production driver's transaction API.
-const Database = createRequire(import.meta.url)('better-sqlite3-multiple-ciphers');
+import { DatabaseSync } from 'node:sqlite';
 import { createPasswordResetService } from '../server/services/password-reset.js';
 import passkeysMigration from '../server/migrations/0285.ts';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
 function makeDb() {
-  const db = new Database(':memory:');
+  const db = new DatabaseSync(':memory:');
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
     CREATE TABLE users (deactivated_at TEXT, id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
@@ -464,7 +462,7 @@ test('a failure saving the reset password rolls back token redemption and passke
   const { app } = await makeAuthApp(db);
   const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'new-password' });
   assert.equal(status, 500);
-  assert.equal(db.prepare('SELECT password_hash FROM users WHERE id = 1').get().password_hash, 'x');
+  assert.equal(passwordHashOf(db), 'x');
   assert.ok(db.prepare('SELECT 1 FROM user_passkeys WHERE user_id = 1').get());
   assert.equal(reset.verifyToken(token), 1);
 });
@@ -485,7 +483,7 @@ test('reset-password beendet jede Sitzung des Kontos, auch eine abgelaufene Zeil
   const token = sent[0].html.match(/token=([a-f0-9]+)/)[1];
   const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
   assert.equal(status, 200);
-  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map((/** @type {{sid:string}} */ r) => r.sid);
+  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map(row => row.sid);
   assert.deepEqual(left, ['bob-1', 'broken']);
 });
 
