@@ -1273,7 +1273,8 @@
         "localCalendarEdit": "Editar calendário",
         "localCalendarNew": "Novo calendário",
         "manageSubscriptionsLink": "Assinaturas e sincronização",
-        "cancelled": "Cancelado"
+        "cancelled": "Cancelado",
+        "errorSeriesChanged": "A série acabou de ser alterada em outro lugar. Salve novamente."
     },
     "noteCategories": {
         "categories": "Categorias",
@@ -3610,7 +3611,8 @@
         "remoteErrorAuthFailed": "O servidor recusou o login. Verifique o nome de usuário e a senha.",
         "remoteErrorStatus": "O servidor respondeu com o status {{status}}.",
         "remoteErrorUnreachable": "Não foi possível acessar o servidor. Verifique o endereço e se o servidor está em execução.",
-        "remoteErrorFailed": "A solicitação ao servidor falhou."
+        "remoteErrorFailed": "A solicitação ao servidor falhou.",
+        "caldavErrorAccountChanged": "A conta acabou de ser alterada em outro lugar. Salve novamente."
     },
     "login": {
         "tagline": "Bem-vindo de volta. Sua casa em um só lugar.",

@@ -135,6 +135,9 @@ test('errorSentence: ein bekannter Fall bekommt seinen Satz, an jedem Status', a
   }
   // Der Fall aus dem Issue, ausgeschrieben.
   assert.equal(errorSentence(answer(400, 'Unknown list.', 'shopping_list_not_found')), 'shopping.errorListGone');
+  // Gleichzeitiges Bearbeiten (#2956, #2947): ein Satz der App, nicht der allgemeine.
+  assert.equal(errorSentence(answer(409, SERVER_TEXT, 'calendar_series_changed'), 'calendar.saveError'), 'calendar.errorSeriesChanged');
+  assert.equal(errorSentence(answer(409, SERVER_TEXT, 'caldav_account_changed'), 'settings.connectionFailed'), 'settings.caldavErrorAccountChanged');
   assert.equal(errorSentence(answer(409, 'Category already exists.', 'category_exists')), 'category.errorExists');
 });
 
@@ -309,6 +312,10 @@ test('jeder Fall hat seinen Satz in jeder Sprache, und der Server nennt ihn', ()
     // step (b) the address checks of the recipe providers stand only there.
     // The real answer, with `fields`, measures test:recipe-provider-routes.
     + `\n${read('../server/openapi/paths/recipeproviders.js').replace(/'x-reason': (?:\{ [a-zA-Z]+: )?'([a-z_]+)'/g, "reason: '$1'")}`
+    // A CalendarOccurrenceError carries its reason as `code`, and
+    // sendCalendarOccurrenceError sends it as `reason` (#2956); the real
+    // answer measures test:calendar-routes.
+    + `\n${read('../server/routes/calendar/crud.js').replace(/code: '(calendar_series_changed)'/g, "reason: '$1'")}`
     // Since group 4 step (b) the bounds and the time of a waste reminder
     // setting are refused by the schema only; the real answer, with `fields`,
     // measures test:waste-schedule-answers.

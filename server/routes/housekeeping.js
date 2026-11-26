@@ -874,18 +874,21 @@ async function createWorkerUser({ username, displayName, avatarColor, avatarData
   const password = crypto.randomBytes(24).toString('base64url');
   const hash = await hashPassword(password);
   // Das Recht gilt am Schreiben, nicht am Eingang (#2947): wer waehrend des
-  // Hashens die Administratorrolle verlor, legt kein Konto mehr an.
-  if (!stillAllowed()) return null;
-  const result = db.get().prepare(`
-    INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
-    VALUES (?, ?, ?, ?, ?, 'member', 'other')
-  `).run(finalUsername, displayName, hash, avatarColor || NEW_WORKER_COLOR, avatarData ?? null);
-  syncFamilyMemberArtifacts(db.get(), result.lastInsertRowid, {
-    displayName,
-    avatarData: avatarData ?? null,
-    actorUserId,
+  // Hashens die Administratorrolle verlor, legt kein Konto mehr an. Pruefung
+  // und Anlegen in einer Transaktion, wie in server/auth.js.
+  return withTx(db.get(), () => {
+    if (!stillAllowed()) return null;
+    const result = db.get().prepare(`
+      INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
+      VALUES (?, ?, ?, ?, ?, 'member', 'other')
+    `).run(finalUsername, displayName, hash, avatarColor || NEW_WORKER_COLOR, avatarData ?? null);
+    syncFamilyMemberArtifacts(db.get(), result.lastInsertRowid, {
+      displayName,
+      avatarData: avatarData ?? null,
+      actorUserId,
+    });
+    return result.lastInsertRowid;
   });
-  return result.lastInsertRowid;
 }
 
 function defaultShoppingCategory() {

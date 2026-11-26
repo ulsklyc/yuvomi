@@ -1273,7 +1273,8 @@
         "localCalendarEdit": "Naptár szerkesztése",
         "localCalendarNew": "Új naptár",
         "manageSubscriptionsLink": "Feliratkozások és szinkronizálás",
-        "cancelled": "Lemondva"
+        "cancelled": "Lemondva",
+        "errorSeriesChanged": "A sorozatot épp máshol módosították. Mentse újra."
     },
     "noteCategories": {
         "categories": "Kategóriák",
@@ -3610,7 +3611,8 @@
         "remoteErrorAuthFailed": "A szerver elutasította a bejelentkezést. Ellenőrizd a felhasználónevet és a jelszót.",
         "remoteErrorStatus": "A szerver {{status}} állapottal válaszolt.",
         "remoteErrorUnreachable": "A szerver nem érhető el. Ellenőrizd a címet, és hogy fut-e a szerver.",
-        "remoteErrorFailed": "A szerverhez intézett kérés sikertelen."
+        "remoteErrorFailed": "A szerverhez intézett kérés sikertelen.",
+        "caldavErrorAccountChanged": "A fiókot épp máshol módosították. Mentse újra."
     },
     "login": {
         "tagline": "Üdv újra! Az otthon ügyei egy helyen.",

@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start falls back to the migrations and says so in the log.
 
 ### Fixed
+- **A save that collides with a change made at the same moment now says so.** When a series or
+  a CalDAV account is changed elsewhere while it is being saved, the app now shows "changed
+  elsewhere, please save again" instead of a general error.
 - **Changes made while the app waits for a server or an upload are no longer lost or
   overruled.** Several actions check something, wait for a server or a file upload, and only then
   save; a change made in that moment was not seen. A document shared with someone, or about

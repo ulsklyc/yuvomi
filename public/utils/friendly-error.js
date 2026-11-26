@@ -407,6 +407,9 @@ export const CASE_MESSAGES = new Map([
   // dieser Satz ist derselbe wie dort.
   ['calendar_series_no_occurrence', 'calendar.errorSeriesNoOccurrence'],
   ['calendar_series_ends_before_start', 'calendar.recurrenceEndBeforeStart'],
+  // Die Serie aenderte sich in jeder Runde, waehrend die Kopien eines Anhangs
+  // hochgeladen wurden (#2956): nichts ist gespeichert, nochmal speichern hilft.
+  ['calendar_series_changed', 'calendar.errorSeriesChanged'],
   // Personen einer Sync-Quelle oder eines Imports (#1897, #1221, #1940): die
   // Auswahl bietet nur Mitglieder an, beide Saetze erreicht nur ein veralteter
   // Stand (Person entfernt, Konto geloescht). Die Einkaufsliste nennt, warum
@@ -459,6 +462,9 @@ export const CASE_MESSAGES = new Map([
   // doppeltes Konto sagt denselben Satz wie bei CardDAV.
   ['caldav_account_exists', 'settings.cardavErrorDuplicate'],
   ['caldav_no_calendars', 'settings.caldavErrorNoCalendars'],
+  // Das Konto aenderte sich in jedem Verbindungstest beim Speichern neuer
+  // Zugangsdaten (#2947): nichts ist gespeichert, nochmal speichern hilft.
+  ['caldav_account_changed', 'settings.caldavErrorAccountChanged'],
   ['apple_no_calendars', 'settings.caldavErrorNoCalendars'],
   ['apple_url_invalid', 'settings.icsErrorUrlScheme'],
   // Abo anlegen und einmaliger Import: der Abruf eines Feeds scheitert an

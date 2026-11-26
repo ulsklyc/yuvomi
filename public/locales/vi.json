@@ -1273,7 +1273,8 @@
         "localCalendarEdit": "Sửa lịch",
         "localCalendarNew": "Lịch mới",
         "manageSubscriptionsLink": "Đăng ký và đồng bộ",
-        "cancelled": "Đã hủy"
+        "cancelled": "Đã hủy",
+        "errorSeriesChanged": "Chuỗi sự kiện vừa được thay đổi ở nơi khác. Vui lòng lưu lại."
     },
     "noteCategories": {
         "categories": "Danh mục",
@@ -3610,7 +3611,8 @@
         "remoteErrorAuthFailed": "Máy chủ đã từ chối đăng nhập. Hãy kiểm tra tên người dùng và mật khẩu.",
         "remoteErrorStatus": "Máy chủ đã trả lời với trạng thái {{status}}.",
         "remoteErrorUnreachable": "Không thể kết nối tới máy chủ. Hãy kiểm tra địa chỉ và máy chủ có đang chạy không.",
-        "remoteErrorFailed": "Yêu cầu tới máy chủ đã thất bại."
+        "remoteErrorFailed": "Yêu cầu tới máy chủ đã thất bại.",
+        "caldavErrorAccountChanged": "Tài khoản vừa được thay đổi ở nơi khác. Vui lòng lưu lại."
     },
     "login": {
         "tagline": "Chào mừng bạn trở lại. Ngôi nhà của bạn ở cùng một nơi.",

@@ -1520,7 +1520,8 @@
         "localCalendarEdit": "تعديل التقويم",
         "localCalendarNew": "تقويم جديد",
         "manageSubscriptionsLink": "الاشتراكات والمزامنة",
-        "cancelled": "أُلغي"
+        "cancelled": "أُلغي",
+        "errorSeriesChanged": "تغيّرت السلسلة للتو في مكان آخر. يُرجى الحفظ مرة أخرى."
     },
     "noteCategories": {
         "categories": "الفئات",
@@ -3950,7 +3951,8 @@
         "remoteErrorAuthFailed": "رفض الخادم تسجيل الدخول. تحقق من اسم المستخدم وكلمة المرور.",
         "remoteErrorStatus": "أجاب الخادم بالحالة {{status}}.",
         "remoteErrorUnreachable": "تعذر الوصول إلى الخادم. تحقق من العنوان ومن أن الخادم يعمل.",
-        "remoteErrorFailed": "فشل الطلب إلى الخادم."
+        "remoteErrorFailed": "فشل الطلب إلى الخادم.",
+        "caldavErrorAccountChanged": "تغيّر الحساب للتو في مكان آخر. يُرجى الحفظ مرة أخرى."
     },
     "login": {
         "tagline": "مرحبًا بعودتك. منزلك في مكان واحد.",

@@ -1273,7 +1273,8 @@
         "localCalendarEdit": "Redigera kalender",
         "localCalendarNew": "Ny kalender",
         "manageSubscriptionsLink": "Prenumerationer och synkronisering",
-        "cancelled": "Inställt"
+        "cancelled": "Inställt",
+        "errorSeriesChanged": "Serien ändrades nyss någon annanstans. Spara igen."
     },
     "noteCategories": {
         "categories": "Kategorier",
@@ -3610,7 +3611,8 @@
         "remoteErrorAuthFailed": "Servern avvisade inloggningen. Kontrollera användarnamn och lösenord.",
         "remoteErrorStatus": "Servern svarade med status {{status}}.",
         "remoteErrorUnreachable": "Servern kan inte nås. Kontrollera adressen och att servern är igång.",
-        "remoteErrorFailed": "Begäran till servern misslyckades."
+        "remoteErrorFailed": "Begäran till servern misslyckades.",
+        "caldavErrorAccountChanged": "Kontot ändrades nyss någon annanstans. Spara igen."
     },
     "login": {
         "tagline": "Välkommen tillbaka. Ditt hem samlat på ett ställe.",
