@@ -7034,13 +7034,12 @@ test('Critique 2026-10-16: Kurzzeile einzeilig bis aufgeklappt, Startsaldo beim 
 // Die Pruefung brach beim ersten Fehler ab, Titel vor Betrag, obwohl der
 // Betrag oben steht. entryFormErrors liefert jetzt ALLE Fehler; die Reihenfolge
 // im Bild stellt reportFieldErrors her (test:modal-utils).
-test('entryFormErrors: ein leerer Dialog meldet Titel, Betrag, Kategorie und Datum zugleich', () => {
+test('entryFormErrors: ein leerer Dialog meldet Betrag, Kategorie und Datum zugleich (Titel ist optional, #2403)', () => {
   const fields = Object.fromEntries(['bm-title', 'bm-amount', 'bm-category', 'bm-subcategory', 'bm-date']
     .map((id) => [`#${id}`, { id, value: '' }]));
   const panel = { querySelector: (sel) => fields[sel] ?? null };
   const ids = (list) => list.filter(Boolean).map(([el, msg]) => [el.id, msg]);
   assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', category: '', subcategory: '', date: '' })), [
-    ['bm-title', 'common.titleRequired'],
     ['bm-amount', 'common.amountNotPositive'],
     ['bm-category', 'budget.categoryRequired'],
     ['bm-date', 'calendar.invalidDate'],
@@ -7052,7 +7051,7 @@ test('entryFormErrors: ein leerer Dialog meldet Titel, Betrag, Kategorie und Dat
   const valid = { category: 'Lebensmittel', subcategory: '', date: '2026-10-16' };
   try {
     fields['#bm-amount'].value = '1,005';
-    assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', ...valid })).map(([id]) => id), ['bm-title', 'bm-amount']);
+    assert.deepEqual(ids(budgetUi.entryFormErrors(panel, { title: '', ...valid })).map(([id]) => id), ['bm-amount']);
     // Critique R23 P1: "1.200" ist unter de gruppiert - benannt abgewiesen,
     // nie still 1,20 gespeichert.
     fields['#bm-amount'].value = '1.200';
