@@ -1901,7 +1901,7 @@ test('module-specific settings leaves only reference their owned preferences and
     },
     '../public/settings/pages/modules-options.js': {
       endpoints: ['/preferences'],
-      preferences: ['budget_mode', 'health_cycle_enabled', 'housekeeping_payment_tasks', 'tasks_subtasks_expanded', 'schedule_hidden_templates'],
+      preferences: ['budget_mode', 'health_cycle_enabled', 'housekeeping_payment_tasks', 'tasks_subtasks_expanded', 'tasks_show_creator', 'schedule_hidden_templates'],
     },
   };
 
@@ -2023,7 +2023,7 @@ test('module-specific settings leaves preserve their required controls and behav
   // diesen Schaltern (Aufgaben kam später dazu) und einem einzigen
   // /preferences-Request statt einem pro Schalter.
   const options = read('../public/settings/pages/modules-options.js');
-  for (const id of ['budget-mode-personal', 'health-cycle-enabled', 'housekeeping-payment-tasks', 'tasks-subtasks-expanded']) {
+  for (const id of ['budget-mode-personal', 'health-cycle-enabled', 'housekeeping-payment-tasks', 'tasks-subtasks-expanded', 'tasks-show-creator']) {
     assert.match(options, controlIdPattern(id));
   }
   // Die drei Schichtplan-Vorlagen-Kontrollkaestchen teilen sich EINE
@@ -2038,7 +2038,7 @@ test('module-specific settings leaves preserve their required controls and behav
   // Fundstellen im QUELLTEXT, nicht Aufrufe zur Laufzeit: die drei
   // Schichtplan-Vorlagen teilen sich die eine `.map(...)`-Aufrufstelle oben.
   // Seit R17 (E9) ueber die Schalterzeile der Gruppe (`settingSwitchRowHtml`).
-  assert.equal([...options.matchAll(/settingSwitchRowHtml\(\{/g)].length, 5);
+  assert.equal([...options.matchAll(/settingSwitchRowHtml\(\{/g)].length, 6);
   assert.equal([...options.matchAll(/\btoggleRowHtml\(/g)].length, 0, 'kein Schalter ausserhalb einer gruppierten Zeile');
   assert.equal([...options.matchAll(/<(?:input|select|textarea)\b/g)].length, 0);
   assert.equal([...options.matchAll(/getPreferences\(\)/g)].length, 1);

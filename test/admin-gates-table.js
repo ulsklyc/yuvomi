@@ -290,6 +290,7 @@ export const ROWS = [
     ['health_cycle_enabled', 'x'],
     ['rewards_require_approval', 'x'],
     ['tasks_subtasks_expanded', 'x'],
+    ['tasks_show_creator', 'x'],
     ['tasks_default_points', 'x'],
     ['tasks_late_decay_enabled', 'x'],
     ['countdown_grace_days', 'x'],

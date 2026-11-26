@@ -42,6 +42,13 @@ const TOGGLES = [
     payload: (checked) => ({ tasks_subtasks_expanded: checked }),
     savedKey: 'settings.tasksSubtasksExpandedSaved',
   },
+  {
+    id: 'tasks-show-creator',
+    key: 'tasks_show_creator',
+    read: (preferences) => Boolean(preferences.tasks_show_creator),
+    payload: (checked) => ({ tasks_show_creator: checked }),
+    savedKey: 'settings.tasksShowCreatorSaved',
+  },
 ];
 
 // Nicht Teil von TOGGLES: das sind DREI Kontrollkästchen ueber EINEM
@@ -126,13 +133,21 @@ function partHtml(part, preferences, checked) {
       });
     case 'tasks':
       return groupHtml({
-        rows: settingSwitchRowHtml({
-          label: t('settings.tasksSubtasksExpandedLabel'),
-          checked: checked.get('tasks-subtasks-expanded'),
-          attrs: { id: 'tasks-subtasks-expanded', 'aria-describedby': 'tasks-subtasks-expanded-hint' },
-        }),
+        rows: [
+          settingSwitchRowHtml({
+            label: t('settings.tasksSubtasksExpandedLabel'),
+            checked: checked.get('tasks-subtasks-expanded'),
+            attrs: { id: 'tasks-subtasks-expanded', 'aria-describedby': 'tasks-subtasks-expanded-hint' },
+          }),
+          settingSwitchRowHtml({
+            label: t('settings.tasksShowCreatorLabel'),
+            checked: checked.get('tasks-show-creator'),
+            attrs: { id: 'tasks-show-creator', 'aria-describedby': 'tasks-show-creator-hint' },
+          }),
+        ].join(''),
         footer: `
-      <p class="form-hint settings-group__footer" id="tasks-subtasks-expanded-hint">${t('settings.tasksSubtasksExpandedHint')}</p>`,
+      <p class="form-hint settings-group__footer" id="tasks-subtasks-expanded-hint">${t('settings.tasksSubtasksExpandedHint')}</p>
+      <p class="form-hint settings-group__footer" id="tasks-show-creator-hint">${t('settings.tasksShowCreatorHint')}</p>`,
       });
     case 'schedule':
       return groupHtml({

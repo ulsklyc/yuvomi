@@ -536,9 +536,12 @@ function loadSubtasks(taskId, reader) {
   // Mit den Tags käme deren Freitext dazu.
   const rows = db.get().prepare(`
     SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-      ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
+      ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL},
+      cu.display_name AS created_by_name, cu.avatar_color AS created_by_color,
+      ${personAvatarUrlSql('cu')} AS created_by_avatar
     FROM tasks t
     LEFT JOIN users u ON t.assigned_to = u.id
+    LEFT JOIN users cu ON t.created_by = cu.id
     WHERE t.parent_task_id = ?
       AND ${taskVisibleWhere(reader, 't')}
     ORDER BY t.created_at ASC
@@ -1055,6 +1058,9 @@ router.get('/', validateRequest(), (req, res) => {
       u.avatar_color AS assigned_color,
       ${personAvatarUrlSql('u')} AS assigned_avatar,
       ${ASSIGNED_USERS_SQL},
+      cu.display_name AS created_by_name,
+      cu.avatar_color AS created_by_color,
+      ${personAvatarUrlSql('cu')} AS created_by_avatar,
       -- Unteraufgaben tragen eine EIGENE Sichtbarkeit, und diese Liste hing nie
       -- an ihr: unter einer geteilten Elternaufgabe lief eine private
       -- Unteraufgabe samt Titel mit, und Zähler wie Fortschrittsbalken zählten
@@ -1071,6 +1077,7 @@ router.get('/', validateRequest(), (req, res) => {
                ORDER BY s.created_at ASC) s) AS subtasks
     FROM tasks t
     LEFT JOIN users u ON t.assigned_to = u.id
+    LEFT JOIN users cu ON t.created_by = cu.id
     WHERE ${taskScopeWhere('t', { includeFuture: !!include_future })}
   `;
   const params = [];
@@ -1185,9 +1192,12 @@ router.get('/:id', validateRequest(), (req, res) => {
   const reader = taskReader(req);
   const task = db.get().prepare(`
     SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-      ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
+      ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL},
+      cu.display_name AS created_by_name, cu.avatar_color AS created_by_color,
+      ${personAvatarUrlSql('cu')} AS created_by_avatar
     FROM tasks t
     LEFT JOIN users u ON t.assigned_to = u.id
+    LEFT JOIN users cu ON t.created_by = cu.id
     WHERE t.id = ? AND t.parent_task_id IS NULL
       AND ${taskVisibleWhere(reader, 't')}
   `).get(pathId(req), { me: reader.userId });
@@ -1373,8 +1383,11 @@ router.post('/', validateRequest(), (req, res) => {
 
   const task = db.get().prepare(`
     SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-      ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
+      ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL},
+      cu.display_name AS created_by_name, cu.avatar_color AS created_by_color,
+      ${personAvatarUrlSql('cu')} AS created_by_avatar
     FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id
+    LEFT JOIN users cu ON t.created_by = cu.id
     WHERE t.id = ?
   `).get(taskId);
 
@@ -1634,8 +1647,11 @@ router.put('/:id', validateRequest(), (req, res) => {
     // nicht über Lesearbeit gehalten wird.
     updated = db.get().prepare(`
       SELECT t.*, u.display_name AS assigned_name, u.avatar_color AS assigned_color,
-        ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL}
+        ${personAvatarUrlSql('u')} AS assigned_avatar, ${ASSIGNED_USERS_SQL},
+        cu.display_name AS created_by_name, cu.avatar_color AS created_by_color,
+        ${personAvatarUrlSql('cu')} AS created_by_avatar
       FROM tasks t LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN users cu ON t.created_by = cu.id
       WHERE t.id = ?
     `).get(pathId(req));
     attachTags([updated]);
