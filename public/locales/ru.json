@@ -1437,7 +1437,8 @@
         "localCalendarEdit": "Редактировать календарь",
         "localCalendarNew": "Новый календарь",
         "manageSubscriptionsLink": "Подписки и синхронизация",
-        "cancelled": "Отменено"
+        "cancelled": "Отменено",
+        "errorSeriesChanged": "Серию только что изменили в другом месте. Сохраните ещё раз."
     },
     "noteCategories": {
         "categories": "Категории",
@@ -3836,7 +3837,8 @@
         "remoteErrorAuthFailed": "Сервер отклонил вход. Проверьте имя пользователя и пароль.",
         "remoteErrorStatus": "Сервер ответил со статусом {{status}}.",
         "remoteErrorUnreachable": "Сервер недоступен. Проверьте адрес и работает ли сервер.",
-        "remoteErrorFailed": "Запрос к серверу не удался."
+        "remoteErrorFailed": "Запрос к серверу не удался.",
+        "caldavErrorAccountChanged": "Учётную запись только что изменили в другом месте. Сохраните ещё раз."
     },
     "login": {
         "tagline": "С возвращением. Ваш дом - в одном месте.",

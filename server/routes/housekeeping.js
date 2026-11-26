@@ -13,6 +13,7 @@ import { normalizeAvatarData, syncFamilyMemberArtifacts } from '../auth.js';
 import { birthDateInput, validateYearUnknown } from '../services/birthdays.js';
 import { collectErrors, color, date, datetime, num, str, id as validateId, MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require-admin.js';
+import { assertGatesNow, RefusedNowError } from '../middleware/gate-now.js';
 import { validateRequest } from '../api/validate-request.ts';
 import { sqlInList } from '../utils/sql-in-list.ts';
 import { MAX_WORKER_NAME, MAX_WORKER_USERNAME } from '../services/housekeeping-fields.js';
@@ -865,20 +866,30 @@ const MASKED_RECEIPTS = Object.freeze({
   }),
 });
 
-async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId }) {
+/**
+ * @param {{ username: string | null | undefined, displayName: string | null, avatarColor: string, avatarData: any,
+ *   actorUserId: number, assertStillAllowed: () => void }} worker
+ */
+async function createWorkerUser({ username, displayName, avatarColor, avatarData, actorUserId, assertStillAllowed }) {
   const finalUsername = username || `housekeeper_${Date.now()}`;
   const password = crypto.randomBytes(24).toString('base64url');
   const hash = await hashPassword(password);
-  const result = db.get().prepare(`
-    INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
-    VALUES (?, ?, ?, ?, ?, 'member', 'other')
-  `).run(finalUsername, displayName, hash, avatarColor || NEW_WORKER_COLOR, avatarData ?? null);
-  syncFamilyMemberArtifacts(db.get(), result.lastInsertRowid, {
-    displayName,
-    avatarData: avatarData ?? null,
-    actorUserId,
+  // Das Recht gilt am Schreiben, nicht am Eingang (#2947): wer waehrend des
+  // Hashens die Administratorrolle verlor, legt kein Konto mehr an. Pruefung
+  // und Anlegen in einer Transaktion, wie in server/auth.js.
+  return withTx(db.get(), () => {
+    assertStillAllowed();
+    const result = db.get().prepare(`
+      INSERT INTO users (username, display_name, password_hash, avatar_color, avatar_data, role, family_role)
+      VALUES (?, ?, ?, ?, ?, 'member', 'other')
+    `).run(finalUsername, displayName, hash, avatarColor || NEW_WORKER_COLOR, avatarData ?? null);
+    syncFamilyMemberArtifacts(db.get(), result.lastInsertRowid, {
+      displayName,
+      avatarData: avatarData ?? null,
+      actorUserId,
+    });
+    return result.lastInsertRowid;
   });
-  return result.lastInsertRowid;
 }
 
 function defaultShoppingCategory() {
@@ -988,6 +999,7 @@ router.post('/worker', requireAdmin, validateRequest(), async (req, res) => {
       avatarColor,
       avatarData,
       actorUserId: actorId,
+      assertStillAllowed: () => assertGatesNow(db.get(), req, { admin: true }),
     });
 
     withTx(db.get(), () => {
@@ -1027,6 +1039,8 @@ router.post('/worker', requireAdmin, validateRequest(), async (req, res) => {
     const saved = existing ? loadWorkerById(existing.id) : loadWorkers().find((worker) => worker.user_id === targetUserId);
     res.status(existing ? 200 : 201).json({ data: publicWorker(saved, localDayContext(), receiptAccess(req)) });
   } catch (err) {
+    // Admin- oder Modulrecht waehrend des Hashens verloren (#2947): die Absage des Gates.
+    if (err instanceof RefusedNowError) return err.respond(res);
     if (err.message?.includes('UNIQUE constraint')) {
       return res.status(409).json({ error: 'Username is already taken.', code: 409, reason: 'housekeeping_username_taken' });
     }

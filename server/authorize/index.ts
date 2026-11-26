@@ -4,7 +4,7 @@
  *          only, never from the files behind it.
  */
 
-export { actorForAccount, actorForUser, actorFromRequest, householdAudience, resolveRequestModuleAccess } from './actor.ts';
+export { actorForAccount, actorForUser, actorFromRequest, householdAudience, requestAsOfNow, resolveRequestModuleAccess } from './actor.ts';
 export type { Actor } from './types.ts';
 export type { Database } from './catalog.ts';
 export {

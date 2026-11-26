@@ -76,6 +76,36 @@ test('POST /worker: Nicht-Admin -> 403', async () => {
   assert.equal(r.status, 403);
 });
 
+test('POST /worker: ein Admin, der waehrend des Passwort-Hashens die Rolle verliert, legt kein Konto an und bekommt die Admin-Absage (#2947)', async () => {
+  // Das Konto der Haushaltshilfe bekommt ein Zufallspasswort; dessen Hash ist
+  // ein await. Der Test laesst die Berechnung laufen und stuft den Admin in dem
+  // Moment zurueck, in dem sie beginnt.
+  const crypto = await import('node:crypto');
+  const original = crypto.default.argon2;
+  let demoted = false;
+  crypto.default.argon2 = /** @type {any} */ (/** @this {any} */ function demoteDuring(/** @type {any[]} */ ...args) {
+    if (!demoted) {
+      demoted = true;
+      db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(ADMIN);
+    }
+    return /** @type {any} */ (original).apply(this, args);
+  });
+  const usersBefore = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  /** @type {any} */
+  let answer;
+  try {
+    answer = await call('POST', '/worker', { as: ADM, body: { display_name: 'Rollenprobe 2947', daily_rate: 10 } });
+  } finally {
+    crypto.default.argon2 = original;
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(ADMIN);
+  }
+  const direct = await call('POST', '/worker', { as: MEM, body: { display_name: 'Rollenprobe 2947', daily_rate: 10 } });
+  assert.ok(demoted, 'der Hash lief');
+  assert.equal(direct.status, 403);
+  assert.deepEqual([answer.status, answer.body], [403, direct.body], 'die Absage von requireAdmin');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n, usersBefore, 'kein Konto');
+});
+
 test('GET /workers: can_manage folgt derselben Grenze wie POST /worker (#1976-Nebenbefund)', async () => {
   // Die Seite blendet "Profil anlegen" und den Stift an diesem Feld aus. Das
   // Schreib-Gate fuer Modulrecht und Token-Scope haengt in server/index.js und

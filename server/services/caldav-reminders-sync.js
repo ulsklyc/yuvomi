@@ -26,6 +26,7 @@ import { runSerialized } from '../utils/sync-lock.js';
 import { calendarDisplayName } from '../utils/calendar-meta.js';
 import { readAllDefaultAssignees, readDefaultAssignees, writeDefaultAssignees } from './default-assignees.js';
 import { REMINDER_LIST_TARGETS } from './calendar-fields.js';
+import { accountGoneError, sameConnection } from '../utils/caldav-account-check.js';
 
 /** Standard-Personen fuer eine Liste, die nicht auf Aufgaben zeigt (#1221): die Route antwortet 400. */
 export class ReminderListAssigneeError extends Error {}
@@ -133,7 +134,12 @@ const createClient = createCalDAVClient;
 // Reminder-List Discovery & Selection
 // --------------------------------------------------------
 
-async function getReminderLists(accountId, { refresh = false, createClient: makeClient } = {}) {
+/**
+ * @param {number} accountId
+ * @param {{ refresh?: boolean, createClient?: any, assertStillAllowed?: () => void }} [options]
+ *   `assertStillAllowed` (#2947): the route's gates, asked in the write after the query.
+ */
+async function getReminderLists(accountId, { refresh = false, createClient: makeClient, assertStillAllowed = () => {} } = {}) {
   const account = getAccountById(accountId);
   if (!account) {
     throw new Error(`Account ${accountId} not found.`);
@@ -145,66 +151,89 @@ async function getReminderLists(accountId, { refresh = false, createClient: make
   // sucht der erste Aufruf selbst. Der Zeitstempel (v125) merkt sich, dass die
   // Suche lief, auch wenn sie nichts fand - sonst befragte ein Server ohne
   // VTODO-Sammlungen bei jedem Seitenaufruf erneut das Netz.
-  if (!refresh && account.reminders_discovered_at) {
-    const rows = db.get().prepare(`
-      SELECT id, list_url, list_name, target_module, enabled, writable
-      FROM caldav_reminder_selection
-      WHERE account_id = ?
-      ORDER BY list_name
-    `).all(accountId);
-    const sets = readAllDefaultAssignees(db.get(), 'reminderList');
-
-    return rows.map(r => ({
-      listUrl:      r.list_url,
-      listName:     r.list_name,
-      targetModule: r.target_module,
-      enabled:      r.enabled === 1,
-      // Standard-Personen neuer Aufgaben aus dieser Liste (#1221).
-      defaultAssigneeUserIds: sets.get(Number(r.id)) ?? [],
-      // Nimmt die Liste neue Einträge an (#1840)? null: der Server sagt es
-      // nicht. Dazu, was auf den Upload hierher wartet.
-      writable:       writableFromColumn(r.writable),
-      waitingUploads: todoOutbound.countWaitingTodoUploads(accountId, r.list_url),
-    }));
-  }
+  if (!refresh && account.reminders_discovered_at) return storedReminderLists(accountId);
 
   // Refresh from server, preserving existing enabled/target_module settings
   const client    = await (makeClient || createClient)(account);
   const calendars = await client.fetchCalendars();
   const lists     = calendars.filter(isReminderCollection);
 
-  const result = [];
-  for (const cal of lists) {
-    const name     = calendarDisplayName(cal.displayName, 'Reminders');
-    const existing = db.get().prepare(
-      'SELECT id, target_module, enabled FROM caldav_reminder_selection WHERE account_id = ? AND list_url = ?'
-    ).get(accountId, cal.url);
+  // NACH DEM AWAIT NOCH EINMAL (#2947): waehrend der Abfrage kann das Konto
+  // geloescht oder auf einen anderen Server umgestellt worden sein. Geloescht:
+  // dieselbe 404 wie vor der Abfrage. Umgestellt: die Listen stammen vom alten
+  // Server und werden nicht gespeichert; es bleibt, was gespeichert ist.
+  const database = db.get();
+  const result = withTx(database, () => {
+    // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947).
+    assertStillAllowed();
+    const current = getAccountById(accountId);
+    if (!current) throw accountGoneError(accountId);
+    if (!sameConnection(current, account)) {
+      log.info(`Account ${accountId} changed during discovery - the reminder lists of the old server are not stored.`);
+      return null;
+    }
+    const stored = [];
+    for (const cal of lists) {
+      const name     = calendarDisplayName(cal.displayName, 'Reminders');
+      const existing = database.prepare(
+        'SELECT id, target_module, enabled FROM caldav_reminder_selection WHERE account_id = ? AND list_url = ?'
+      ).get(accountId, cal.url);
 
-    const targetModule = existing ? existing.target_module : 'tasks';
-    const enabled      = existing ? existing.enabled : 0;
+      const targetModule = existing ? existing.target_module : 'tasks';
+      const enabled      = existing ? existing.enabled : 0;
 
-    db.get().prepare(`
-      INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled, writable)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(account_id, list_url) DO UPDATE SET list_name = excluded.list_name,
-                                                     writable  = excluded.writable
-    `).run(accountId, cal.url, name, targetModule, enabled, writableColumn(cal));
+      database.prepare(`
+        INSERT INTO caldav_reminder_selection (account_id, list_url, list_name, target_module, enabled, writable)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(account_id, list_url) DO UPDATE SET list_name = excluded.list_name,
+                                                       writable  = excluded.writable
+      `).run(accountId, cal.url, name, targetModule, enabled, writableColumn(cal));
 
-    result.push({
-      listUrl: cal.url, listName: name, targetModule, enabled: enabled === 1,
-      defaultAssigneeUserIds: existing ? readDefaultAssignees(db.get(), 'reminderList', existing.id) : [],
-      writable: writableFromColumn(writableColumn(cal)),
-    });
-  }
+      stored.push({
+        listUrl: cal.url, listName: name, targetModule, enabled: enabled === 1,
+        defaultAssigneeUserIds: existing ? readDefaultAssignees(database, 'reminderList', existing.id) : [],
+        writable: writableFromColumn(writableColumn(cal)),
+      });
+    }
 
-  db.get().prepare(`
-    UPDATE caldav_accounts
-       SET reminders_discovered_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-     WHERE id = ?
-  `).run(accountId);
+    database.prepare(`
+      UPDATE caldav_accounts
+         SET reminders_discovered_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+       WHERE id = ?
+    `).run(accountId);
+    return stored;
+  });
+  if (!result) return storedReminderLists(accountId);
 
   log.info(`Discovered ${result.length} reminder list(s) for account ${accountId}.`);
   return result;
+}
+
+/**
+ * Die gespeicherten Listen eines Kontos, ohne den Server zu fragen.
+ * @param {number} accountId
+ */
+function storedReminderLists(accountId) {
+  const rows = db.get().prepare(`
+    SELECT id, list_url, list_name, target_module, enabled, writable
+    FROM caldav_reminder_selection
+    WHERE account_id = ?
+    ORDER BY list_name
+  `).all(accountId);
+  const sets = readAllDefaultAssignees(db.get(), 'reminderList');
+
+  return rows.map(r => ({
+    listUrl:      r.list_url,
+    listName:     r.list_name,
+    targetModule: r.target_module,
+    enabled:      r.enabled === 1,
+    // Standard-Personen neuer Aufgaben aus dieser Liste (#1221).
+    defaultAssigneeUserIds: sets.get(Number(r.id)) ?? [],
+    // Nimmt die Liste neue Einträge an (#1840)? null: der Server sagt es
+    // nicht. Dazu, was auf den Upload hierher wartet.
+    writable:       writableFromColumn(r.writable),
+    waitingUploads: todoOutbound.countWaitingTodoUploads(accountId, r.list_url),
+  }));
 }
 
 /**

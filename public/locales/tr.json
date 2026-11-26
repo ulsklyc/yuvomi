@@ -1273,7 +1273,8 @@
         "localCalendarEdit": "Takvimi düzenle",
         "localCalendarNew": "Yeni takvim",
         "manageSubscriptionsLink": "Abonelikler ve eşitleme",
-        "cancelled": "İptal edildi"
+        "cancelled": "İptal edildi",
+        "errorSeriesChanged": "Seri az önce başka bir yerde değiştirildi. Lütfen yeniden kaydedin."
     },
     "noteCategories": {
         "categories": "Kategoriler",
@@ -3610,7 +3611,8 @@
         "remoteErrorAuthFailed": "Sunucu oturum açmayı reddetti. Kullanıcı adını ve parolayı kontrol edin.",
         "remoteErrorStatus": "Sunucu {{status}} durumuyla yanıt verdi.",
         "remoteErrorUnreachable": "Sunucuya ulaşılamıyor. Adresi ve sunucunun çalışıp çalışmadığını kontrol edin.",
-        "remoteErrorFailed": "Sunucuya yapılan istek başarısız oldu."
+        "remoteErrorFailed": "Sunucuya yapılan istek başarısız oldu.",
+        "caldavErrorAccountChanged": "Hesap az önce başka bir yerde değiştirildi. Lütfen yeniden kaydedin."
     },
     "login": {
         "tagline": "Tekrar hoş geldin. Evin tek bir yerde.",

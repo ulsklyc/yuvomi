@@ -24,6 +24,7 @@ import * as outbound from './calendar-outbound.js';
 import { dropUploadAttemptsOf } from './caldav-upload-attempts.js';
 import { processPendingDeletions, processPendingUpdates, flushAccount, ObjectIndex } from './caldav-outbound.js';
 import { detachAccountRows } from './caldav-todo-outbound.js';
+import { accountGoneError, sameConnection } from '../utils/caldav-account-check.js';
 import { runSerialized } from '../utils/sync-lock.js';
 import { toICSDatetime, escapeICSText } from '../utils/ics-format.js';
 import { eventDateTimeFields, rruleForDtstart } from '../utils/ics-datetime.js';
@@ -440,7 +441,15 @@ async function testConnection(caldavUrl, username, password, { createClient } = 
 // Account Management
 // --------------------------------------------------------
 
-async function addAccount(name, caldavUrl, username, password, { createClient } = {}) {
+/**
+ * @param {string} name
+ * @param {string} caldavUrl
+ * @param {string} username
+ * @param {string} password
+ * @param {{ createClient?: any, assertStillAllowed?: () => void }} [options]
+ *   `assertStillAllowed` (#2947): the route's gates, asked after the connection test.
+ */
+async function addAccount(name, caldavUrl, username, password, { createClient, assertStillAllowed = () => {} } = {}) {
   // Validate inputs
   if (!name || !caldavUrl || !username || !password) {
     throw new Error('All fields required: name, caldavUrl, username, password');
@@ -449,6 +458,9 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
   // Test connection first (createClient injizierbar wie bei getCalendars/
   // updateAccount - ohne sie ginge dieser Pfad im Test ans echte Netz).
   const { calendars } = await testConnection(caldavUrl, username, password, { createClient });
+  // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947); ab hier
+  // kein await mehr bis zum Anlegen.
+  assertStillAllowed();
 
   // Check for duplicate
   const existing = db.get().prepare(
@@ -530,6 +542,9 @@ function listAccounts() {
   }));
 }
 
+/** Wie oft `updateAccount` gegen eine geaenderte Zeile neu entscheidet, bevor es aufgibt (#2947). */
+const CALDAV_UPDATE_ROUNDS = 3;
+
 /**
  * Zugangsdaten eines Kontos aendern; ein leeres Feld laesst den gespeicherten
  * Wert stehen.
@@ -542,58 +557,58 @@ function listAccounts() {
  * Adresse mit dem gespeicherten Passwort - ein PUT mit fremder Adresse schickte
  * die Zugangsdaten des Haushalts sofort per Basic Auth dorthin. Ein anderer Pfad
  * auf demselben Server bleibt ohne Passwort moeglich.
+ * @param {any} accountId
+ * @param {{ name?: string, caldavUrl?: string, username?: string, password?: string,
+ *   createClient?: any, assertStillAllowed?: () => void }} fields
+ *   `assertStillAllowed` (#2947): the route's gates, asked in the write after the test.
  */
-async function updateAccount(accountId, { name, caldavUrl, username, password, createClient }) {
-  const account = getAccountById(accountId);
+async function updateAccount(accountId, { name, caldavUrl, username, password, createClient, assertStillAllowed = () => {} }) {
+  let account = getAccountById(accountId);
   if (!account) {
     throw new Error(`Account ${accountId} not found.`);
   }
 
-  if (!password
-      && ((caldavUrl && !sameCredentialOrigin(caldavUrl, account.caldav_url))
-        || (username && username !== account.username))) {
-    const err = new Error('A new server or username needs the password again.');
-    err.code = 'password_required';
-    throw err;
-  }
+  /** @type {any[] | null} */
+  let calendars = null;
+  // NACH DEM AWAIT NOCH EINMAL (#2947): "Passwort noetig", "anderer Server"
+  // und der Verbindungstest beruhen auf der gelesenen Zeile. Hat ein anderes
+  // Aendern sie waehrend des Tests umgestellt, faellt alles noch einmal gegen
+  // die Zeile von jetzt - sonst ginge ein Passwort, das fuer den anderen
+  // Server gespeichert wurde, mit dieser Adresse an den alten. Eine Runde mehr
+  // gibt es nur, wenn dazwischen wirklich ein anderes Schreiben lag - und
+  // hoechstens CALDAV_UPDATE_ROUNDS: aendert sich das Konto in jedem Test,
+  // ist es ein Konflikt (409 `caldav_account_changed`), nichts ist gespeichert.
+  for (let round = 1; ; round += 1) {
+    if (!password
+        && ((caldavUrl && !sameCredentialOrigin(caldavUrl, account.caldav_url))
+          || (username && username !== account.username))) {
+      const err = new Error('A new server or username needs the password again.');
+      err.code = 'password_required';
+      throw err;
+    }
 
-  // If credentials changed, test connection
-  const credentialsChanged =
-    (caldavUrl && caldavUrl !== account.caldav_url) ||
-    (username && username !== account.username) ||
-    (password && password !== account.password);
+    // If credentials changed, test connection
+    const credentialsChanged =
+      (caldavUrl && caldavUrl !== account.caldav_url) ||
+      (username && username !== account.username) ||
+      (password && password !== account.password);
+    if (!credentialsChanged) break;
 
-  if (credentialsChanged) {
     const testUrl = caldavUrl || account.caldav_url;
     const testUser = username || account.username;
     const testPwd = password || account.password;
+    ({ calendars } = await testConnection(testUrl, testUser, testPwd, { createClient }));
 
-    const { calendars } = await testConnection(testUrl, testUser, testPwd, { createClient });
-
-    // If credentials changed, refresh calendar list
-    if (calendars) {
-      // Wie in getCalendars({ refresh: true }): neue Zugangsdaten heißen neue
-      // Kalenderliste, nicht neue Auswahl. Ein geändertes Passwort darf einen
-      // abgewählten Kalender nicht wieder in den Sync holen (#732).
-      const previous = new Map(
-        db.get().prepare('SELECT calendar_url, enabled FROM caldav_calendar_selection WHERE account_id = ?')
-          .all(accountId).map((row) => [row.calendar_url, row.enabled === 1])
-      );
-
-      // Delete old selections
-      db.get().prepare('DELETE FROM caldav_calendar_selection WHERE account_id = ?').run(accountId);
-
-      // Insert new selections
-      for (const cal of eventCalendars(calendars)) {
-        const calColor = normalizeCalColor(cal.calendarColor) || '#4A90E2';
-        const calName = calendarDisplayName(cal.displayName, 'Unnamed Calendar');
-
-        db.get().prepare(`
-          INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled, writable)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(accountId, cal.url, calName, calColor, (previous.get(cal.url) ?? false) ? 1 : 0, writableColumn(cal));
-      }
+    const current = getAccountById(accountId);
+    if (!current) throw accountGoneError(accountId);
+    if (sameConnection(current, account)) break;
+    if (round >= CALDAV_UPDATE_ROUNDS) {
+      const err = /** @type {Error & { code?: string }} */ (new Error('The account changed while its connection was tested.'));
+      err.code = 'caldav_account_changed';
+      throw err;
     }
+    account = current;
+    calendars = null;
   }
 
   // Update account
@@ -619,6 +634,33 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
     || (username && username !== account.username);
 
   withTx(db.get(), () => {
+    // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947).
+    assertStillAllowed();
+    // If credentials changed, refresh calendar list
+    if (calendars) {
+      // Wie in getCalendars({ refresh: true }): neue Zugangsdaten heißen neue
+      // Kalenderliste, nicht neue Auswahl. Ein geändertes Passwort darf einen
+      // abgewählten Kalender nicht wieder in den Sync holen (#732).
+      const previous = new Map(
+        db.get().prepare('SELECT calendar_url, enabled FROM caldav_calendar_selection WHERE account_id = ?')
+          .all(accountId).map((row) => [row.calendar_url, row.enabled === 1])
+      );
+
+      // Delete old selections
+      db.get().prepare('DELETE FROM caldav_calendar_selection WHERE account_id = ?').run(accountId);
+
+      // Insert new selections
+      for (const cal of eventCalendars(calendars)) {
+        const calColor = normalizeCalColor(cal.calendarColor) || '#4A90E2';
+        const calName = calendarDisplayName(cal.displayName, 'Unnamed Calendar');
+
+        db.get().prepare(`
+          INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled, writable)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(accountId, cal.url, calName, calColor, (previous.get(cal.url) ?? false) ? 1 : 0, writableColumn(cal));
+      }
+    }
+
     db.get().prepare(`
       UPDATE caldav_accounts SET ${updates.join(', ')} WHERE id = ?
     `).run(...values);
@@ -727,91 +769,120 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
 // Calendar Selection
 // --------------------------------------------------------
 
-async function getCalendars(accountId, { refresh = false, createClient } = {}) {
+/**
+ * @param {number} accountId
+ * @param {{ refresh?: boolean, createClient?: any, assertStillAllowed?: () => void }} [options]
+ *   `assertStillAllowed` (#2947): the route's gates, asked in the write after the query.
+ */
+async function getCalendars(accountId, { refresh = false, createClient, assertStillAllowed = () => {} } = {}) {
   const account = getAccountById(accountId);
   if (!account) {
     throw new Error(`Account ${accountId} not found.`);
   }
 
-  if (!refresh) {
-    // Return from DB
-    const calendars = db.get().prepare(`
-      SELECT calendar_url, calendar_name, calendar_color, enabled, writable
-      FROM caldav_calendar_selection
-      WHERE account_id = ?
-      ORDER BY calendar_name
-    `).all(accountId);
-
-    // Standard-Personen je Kalender (#459, #1897) aus der geteilten
-    // external_calendars-Tabelle und ihrer Join-Tabelle.
-    const sets = readAllDefaultAssignees(db.get(), 'calendar');
-    const assigneeMap = new Map(
-      db.get().prepare(`SELECT id, external_id FROM external_calendars WHERE source = 'caldav'`)
-        .all().map((r) => [r.external_id, sets.get(Number(r.id)) ?? []])
-    );
-
-    return calendars.map(cal => ({
-      calendarUrl: cal.calendar_url,
-      calendarName: cal.calendar_name,
-      calendarColor: cal.calendar_color,
-      enabled: cal.enabled === 1,
-      // Nimmt der Kalender neue Termine an (#1840)? null: der Server sagt es
-      // nicht. Dazu, wie viele Termine auf ihren Upload hierher warten - bei
-      // einem nur lesbaren Kalender sind das die, die nie ankommen.
-      writable: writableFromColumn(cal.writable),
-      waitingUploads: countWaitingUploads(accountId, cal.calendar_url),
-      ...assigneeFields(assigneeMap.get(cal.calendar_url) ?? []),
-      synced: assigneeMap.has(cal.calendar_url),
-      // Die Zahl reist mit der Liste, damit die Rückfrage beim Abwählen sie
-      // sofort nennen kann (#732). Ein eigener Endpunkt dafür wäre ein zweiter
-      // Roundtrip genau in dem Moment, in dem der Nutzer auf eine Antwort wartet.
-      eventCount: countMirroredEvents(db.get(), [cal.calendar_url], { accountId }),
-    }));
-  }
+  if (!refresh) return storedCalendars(accountId);
 
   // Refresh from server
   const { calendars } = await testConnection(
     account.caldav_url, account.username, account.password, { createClient }
   );
 
-  // DIE ABWAHL ÜBERLEBT DIE AKTUALISIERUNG: „Kalender aktualisieren" holt die
-  // Liste vom Server, es ist keine Zurücksetzung. Vorher lief hier ein DELETE
-  // mit anschließendem INSERT auf enabled=1, und jeder bewusst abgewählte
-  // Kalender kam ungefragt zurück in den Sync - beim nächsten Lauf mitsamt
-  // seinen Terminen (#732). Deshalb den Stand je calendar_url vorher sichern
-  // und nur für NEUE Kalender die Vorgabe „an" setzen.
-  const previous = new Map(
-    db.get().prepare('SELECT calendar_url, enabled FROM caldav_calendar_selection WHERE account_id = ?')
-      .all(accountId).map((row) => [row.calendar_url, row.enabled === 1])
-  );
+  // NACH DEM AWAIT NOCH EINMAL (#2947): waehrend der Abfrage kann das Konto
+  // geloescht oder auf einen anderen Server umgestellt worden sein. Geloescht:
+  // dieselbe 404 wie vor der Abfrage. Umgestellt: die Liste stammt vom alten
+  // Server und wird nicht gespeichert; es bleibt, was gespeichert ist.
+  const database = db.get();
+  const result = withTx(database, () => {
+    // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947).
+    assertStillAllowed();
+    const current = getAccountById(accountId);
+    if (!current) throw accountGoneError(accountId);
+    if (!sameConnection(current, account)) {
+      log.info(`Account ${accountId} changed during the refresh - the calendars of the old server are not stored.`);
+      return null;
+    }
 
-  db.get().prepare('DELETE FROM caldav_calendar_selection WHERE account_id = ?').run(accountId);
+    // DIE ABWAHL ÜBERLEBT DIE AKTUALISIERUNG: „Kalender aktualisieren" holt die
+    // Liste vom Server, es ist keine Zurücksetzung. Vorher lief hier ein DELETE
+    // mit anschließendem INSERT auf enabled=1, und jeder bewusst abgewählte
+    // Kalender kam ungefragt zurück in den Sync - beim nächsten Lauf mitsamt
+    // seinen Terminen (#732). Deshalb den Stand je calendar_url vorher sichern
+    // und nur für NEUE Kalender die Vorgabe „an" setzen.
+    const previous = new Map(
+      database.prepare('SELECT calendar_url, enabled FROM caldav_calendar_selection WHERE account_id = ?')
+        .all(accountId).map((row) => [row.calendar_url, row.enabled === 1])
+    );
 
-  const result = [];
-  for (const cal of eventCalendars(calendars)) {
-    const calColor = normalizeCalColor(cal.calendarColor) || '#4A90E2';
-    const calName = calendarDisplayName(cal.displayName, 'Unnamed Calendar');
-    // Bekannter Kalender behaelt seinen Stand, ein neu gemeldeter kommt
-    // abgewaehlt - dieselbe Opt-in-Regel wie beim Anlegen des Kontos (#732).
-    const enabled = previous.get(cal.url) ?? false;
+    database.prepare('DELETE FROM caldav_calendar_selection WHERE account_id = ?').run(accountId);
 
-    db.get().prepare(`
-      INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled, writable)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(accountId, cal.url, calName, calColor, enabled ? 1 : 0, writableColumn(cal));
+    const stored = [];
+    for (const cal of eventCalendars(calendars)) {
+      const calColor = normalizeCalColor(cal.calendarColor) || '#4A90E2';
+      const calName = calendarDisplayName(cal.displayName, 'Unnamed Calendar');
+      // Bekannter Kalender behaelt seinen Stand, ein neu gemeldeter kommt
+      // abgewaehlt - dieselbe Opt-in-Regel wie beim Anlegen des Kontos (#732).
+      const enabled = previous.get(cal.url) ?? false;
 
-    result.push({
-      calendarUrl: cal.url,
-      calendarName: calName,
-      calendarColor: calColor,
-      enabled,
-      writable: writableFromColumn(writableColumn(cal)),
-    });
-  }
+      database.prepare(`
+        INSERT INTO caldav_calendar_selection (account_id, calendar_url, calendar_name, calendar_color, enabled, writable)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(accountId, cal.url, calName, calColor, enabled ? 1 : 0, writableColumn(cal));
+
+      stored.push({
+        calendarUrl: cal.url,
+        calendarName: calName,
+        calendarColor: calColor,
+        enabled,
+        writable: writableFromColumn(writableColumn(cal)),
+      });
+    }
+    return stored;
+  });
+  if (!result) return storedCalendars(accountId);
 
   log.info(`Refreshed calendars for account ${accountId}.`);
 
   return result;
+}
+
+/**
+ * Die gespeicherte Kalenderauswahl eines Kontos, ohne den Server zu fragen.
+ * @param {number} accountId
+ */
+function storedCalendars(accountId) {
+  // Return from DB
+  const calendars = db.get().prepare(`
+    SELECT calendar_url, calendar_name, calendar_color, enabled, writable
+    FROM caldav_calendar_selection
+    WHERE account_id = ?
+    ORDER BY calendar_name
+  `).all(accountId);
+
+  // Standard-Personen je Kalender (#459, #1897) aus der geteilten
+  // external_calendars-Tabelle und ihrer Join-Tabelle.
+  const sets = readAllDefaultAssignees(db.get(), 'calendar');
+  const assigneeMap = new Map(
+    db.get().prepare(`SELECT id, external_id FROM external_calendars WHERE source = 'caldav'`)
+      .all().map((r) => [r.external_id, sets.get(Number(r.id)) ?? []])
+  );
+
+  return calendars.map(cal => ({
+    calendarUrl: cal.calendar_url,
+    calendarName: cal.calendar_name,
+    calendarColor: cal.calendar_color,
+    enabled: cal.enabled === 1,
+    // Nimmt der Kalender neue Termine an (#1840)? null: der Server sagt es
+    // nicht. Dazu, wie viele Termine auf ihren Upload hierher warten - bei
+    // einem nur lesbaren Kalender sind das die, die nie ankommen.
+    writable: writableFromColumn(cal.writable),
+    waitingUploads: countWaitingUploads(accountId, cal.calendar_url),
+    ...assigneeFields(assigneeMap.get(cal.calendar_url) ?? []),
+    synced: assigneeMap.has(cal.calendar_url),
+    // Die Zahl reist mit der Liste, damit die Rückfrage beim Abwählen sie
+    // sofort nennen kann (#732). Ein eigener Endpunkt dafür wäre ein zweiter
+    // Roundtrip genau in dem Moment, in dem der Nutzer auf eine Antwort wartet.
+    eventCount: countMirroredEvents(db.get(), [cal.calendar_url], { accountId }),
+  }));
 }
 
 /**

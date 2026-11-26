@@ -34,6 +34,7 @@ import { documentViewer } from '../../services/document-links.js';
 import {
   mayChangeRecord,
   mayWriteModule,
+  requestAsOfNow,
   sendNotOwner,
   normalizeVisibility,
   ATTACHMENT_NARROW_ONLY,
@@ -64,12 +65,13 @@ import {
   followInboundStartChange,
 } from '../../services/calendar-occurrence-overrides.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
+import { gateRefusalNow } from '../../middleware/gate-now.js';
 import {
   ASSIGNED_USERS_SQL,
   getUserId,
   eventIcon,
   parseAttachment,
-  refuseUploadWithoutDocumentsWrite, storedAttachmentLocked,
+  refuseUploadWithoutDocumentsWrite, sendAttachmentUploadRefused, storedAttachmentLocked,
   ATTACHMENT_CHANGE_REFUSAL,
   caldavTarget,
   caldavTargetOffered,
@@ -144,24 +146,44 @@ function sendSeriesWithoutOccurrence(res) {
  * sonst saehe die ganze Familie den Anhang eines Termins fuer Zugewiesene.
  */
 function attachmentRights(req) {
-  const actor = {
-    actorId: getUserId(req),
-    isAdmin: isAdminRequest(req),
-    documentsWritable: mayWriteModule(req, 'documents'),
+  // DAS RECHT GILT AM SCHREIBEN, NICHT AM EINGANG (#2947). Jede Frage liest
+  // Rolle und Modulrechte des Kontos neu (`requestAsOfNow`) - gestellt wird sie
+  // im synchronen Teil des Schreibens, nach dem Upload und nach den Kopien. Wer
+  // waehrenddessen Admin- oder Dokumente-Recht verlor, gleicht kein fremdes
+  // Dokument mehr ab, kopiert keins und legt keinen Anhang mehr an. Das Recht
+  // vom Eingang bleibt Bedingung: neu gelesen wird nur enger, nie weiter.
+  const atEntry = { isAdmin: isAdminRequest(req), documentsWritable: mayWriteModule(req, 'documents') };
+  const actorNow = () => {
+    const now = requestAsOfNow(db.get(), req);
+    return {
+      actorId: getUserId(req),
+      isAdmin: atEntry.isAdmin && Boolean(now) && isAdminRequest(now),
+      documentsWritable: atEntry.documentsWritable && Boolean(now) && mayWriteModule(now, 'documents'),
+    };
   };
-  const mayManage = documentWidenPredicate(db.get(), actor);
   const createdHere = new Set();
   return {
     // Voll abgleichen: nur wer das Dokument auch verwalten darf; ein hier neu
     // angelegtes nur verengen; alles andere bleibt unangetastet.
-    mayWidenAttachment: (documentId) => {
-      if (mayManage(documentId)) return true;
+    mayWidenAttachment: (/** @type {any} */ documentId) => {
+      if (documentWidenPredicate(db.get(), actorNow())(documentId)) return true;
       return createdHere.has(Number(documentId)) ? ATTACHMENT_NARROW_ONLY : false;
     },
     // Kopieren: wer es sieht und Dokumente schreiben darf.
-    mayCloneAttachment: documentClonePredicate(db.get(), actor),
-    createAttachmentDocument: (...args) => {
-      const documentId = createAttachmentDocument(...args);
+    mayCloneAttachment: (/** @type {any} */ documentId) => documentClonePredicate(db.get(), actorNow())(documentId),
+    createAttachmentDocument: (
+      /** @type {any} */ database, /** @type {any} */ attachment, /** @type {any} */ staged,
+      /** @type {any} */ body, /** @type {number} */ ownerId,
+    ) => {
+      // Ein hochgeladener Anhang braucht das Dokumente-Schreibrecht, das
+      // `refuseUploadWithoutDocumentsWrite` am Eingang fragte: dieselbe Absage.
+      // Dieselbe Bedingung wie in createAttachmentDocument(): nur wo ein
+      // Dokument entstuende.
+      const createsDocument = Boolean(attachment?.buffer && staged);
+      if (createsDocument && !actorNow().documentsWritable) {
+        throw new RefusedAfterUploadError((r) => sendAttachmentUploadRefused(r));
+      }
+      const documentId = createAttachmentDocument(database, attachment, staged, body, ownerId);
       if (documentId) createdHere.add(Number(documentId));
       return documentId;
     },
@@ -178,7 +200,7 @@ class ClonePlanChangedError extends Error {}
 /** Wie oft der Plan neu gemacht wird, bevor die Anfrage aufgibt. */
 const CLONE_PLAN_ROUNDS = 3;
 
-async function runWithAttachmentClonePlan(database, stagedClones, operation, { mayClone = () => false } = {}) {
+async function runWithAttachmentClonePlan(database, stagedClones, operation, { mayClone = /** @type {(documentId: any) => boolean} */ (() => false) } = {}) {
   let requests;
   try {
     return operation({});
@@ -428,7 +450,7 @@ class AttachmentLockedError extends Error {}
 
 function assertAttachmentStillChangeable(req, database, storedDocumentId, { replacementRequested, removalRequested }) {
   if (!(replacementRequested || removalRequested)) return;
-  if (storedAttachmentLocked(req, database, storedDocumentId)) throw new AttachmentLockedError();
+  if (attachmentLockedNow(req, database, storedDocumentId)) throw new AttachmentLockedError();
 }
 
 /** Anhang inzwischen gesperrt: gestagte Uploads wegraeumen, dann dieselbe 403 wie die fruehe Pruefung. */
@@ -785,6 +807,12 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
       if (strangersNow.length) return res.status(400).json({ error: nonMemberMessage(strangersNow), code: 400 });
       return sendValidationErrors(res, checksNow);
     }
+    // Das Modul-Gate gilt am Schreiben (#2947): dieselbe Absage wie am Eingang.
+    const gateNow = gateRefusalNow(db.get(), req);
+    if (gateNow) {
+      if (stagedUpload) await cleanupStagedUpload(stagedUpload);
+      return gateNow(res);
+    }
     const rights = attachmentRights(req);
     const eventId = withTx(db.get(), () => {
       const documentId = rights.createAttachmentDocument(
@@ -882,6 +910,10 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
       log.error('POST / storage error:', err);
       return sendStorageError(res, err, 'Calendar attachment storage upload failed.');
     }
+    // Das Dokumente-Recht ging waehrend des Uploads verloren (#2947).
+    if (err instanceof RefusedAfterUploadError) {
+      return sendRefusalAfterUpload(res, err.respond, [stagedUpload].filter(Boolean));
+    }
     // Ein unerwarteter Fehler geht an den zentralen Handler (#2810) - aber
     // erst, wenn der bereitgestellte Anhang wieder weg ist.
     if (stagedUpload) {
@@ -939,6 +971,46 @@ function refuseForeignEvent(req, res, event) {
   if (mayChangeRecord(db.get(), req, 'calendar_edit_others', ownsEvent(event, req))) return false;
   sendNotOwner(res);
   return true;
+}
+
+/**
+ * DAS RECHT GILT AM SCHREIBEN (#2947). Darf die Anfrage den Termin aendern -
+ * mit dem Recht vom Eingang UND mit Rolle und Rechten des Kontos von jetzt
+ * (`requestAsOfNow`)? Gefragt nach dem letzten await (Upload, Kopien), im
+ * selben synchronen Schritt wie das Schreiben; neu gelesen wird nur enger.
+ * @param {any} req
+ * @param {any} event
+ */
+function mayEditEventNow(req, event) {
+  if (!mayChangeRecord(db.get(), req, 'calendar_edit_others', ownsEvent(event, req))) return false;
+  const now = requestAsOfNow(db.get(), req);
+  return Boolean(now) && mayChangeRecord(db.get(), now, 'calendar_edit_others', ownsEvent(event, now));
+}
+
+/**
+ * Der gespeicherte Anhang ist fuer die Anfrage gesperrt - am Eingang ODER jetzt
+ * (#2947): das Dokumente-Leserecht gilt am Schreiben wie das Bearbeitungsrecht.
+ * @param {any} req
+ * @param {any} database
+ * @param {number | null | undefined} storedDocumentId
+ */
+function attachmentLockedNow(req, database, storedDocumentId) {
+  if (storedAttachmentLocked(req, database, storedDocumentId)) return true;
+  const now = requestAsOfNow(database, req);
+  return !now || storedAttachmentLocked(now, database, storedDocumentId);
+}
+
+/**
+ * Modul-Gate und Bearbeitungsrecht am Schreiben (#2947): faellt eines weg,
+ * dieselbe Absage wie am Eingang, als RefusedAfterUploadError - der catch der
+ * Route raeumt Upload und Kopien weg.
+ * @param {any} req
+ * @param {any} event
+ */
+function assertCalendarRightsNow(req, event) {
+  const gate = gateRefusalNow(db.get(), req);
+  if (gate) throw new RefusedAfterUploadError(gate);
+  if (!mayEditEventNow(req, event)) throw new RefusedAfterUploadError((r) => sendNotOwner(r));
 }
 
 const CALENDAR_OCCURRENCE_ERRORS = {
@@ -1016,6 +1088,9 @@ function seriesAfterUpload(seriesId, req) {
       code: 'calendar_series_not_found',
     });
   }
+  // Ebenso Modul-Gate und Bearbeitungsrecht (#2947): die Route fragte sie am
+  // Eingang, vor dem Upload.
+  assertCalendarRightsNow(req, current);
   return current;
 }
 
@@ -1094,7 +1169,11 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     const refuse = (respond) => ({ refuse: respond });
     const evaluate = (/** @type {any} */ row) => {
       if (!row) return refuse((r) => sendEventGone(r));
-      if (!mayChangeRecord(db.get(), req, 'calendar_edit_others', ownsEvent(row, req))) {
+      // Modul-Gate und Bearbeitungsrecht, wie sie JETZT stehen (#2947): beim
+      // zweiten Lauf nach dem Upload sonst noch der Stand vom Eingang.
+      const gate = gateRefusalNow(db.get(), req);
+      if (gate) return refuse(gate);
+      if (!mayEditEventNow(req, row)) {
         return refuse((r) => sendNotOwner(r));
       }
       // Ein verknuepftes Vorkommen hat seinen eigenen Weg; die Absage (404, 403
@@ -1281,7 +1360,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
         }));
       }
       if ((replacementRequested || removalRequested)
-          && storedAttachmentLocked(req, db.get(), row.attachment_document_id)) {
+          && attachmentLockedNow(req, db.get(), row.attachment_document_id)) {
         return refuse((r) => r.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' }));
       }
 
@@ -1870,6 +1949,10 @@ router.put('/:seriesId/occurrences/:recurrenceId', refuseUploadWithoutDocumentsW
     }
     if (err instanceof NonMemberAssignmentError) return sendNonMemberAssignment(res, err, [stagedUpload].filter(Boolean));
     if (err instanceof AttachmentLockedError) return sendAttachmentLocked(res, [stagedUpload].filter(Boolean));
+    // Das Dokumente-Recht ging waehrend des Uploads verloren (#2947).
+    if (err instanceof RefusedAfterUploadError) {
+      return sendRefusalAfterUpload(res, err.respond, [stagedUpload].filter(Boolean));
+    }
     // Ein unerwarteter Fehler geht an den zentralen Handler (#2810) - aber
     // erst, wenn der bereitgestellte Anhang wieder weg ist.
     if (stagedUpload) {

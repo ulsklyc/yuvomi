@@ -8,6 +8,7 @@ import { createLogger } from '../logger.js';
 import express from 'express';
 import * as db from '../db.js';
 import * as CardDAVSync from '../services/cardav-sync.js';
+import { assertGatesNow, RefusedNowError } from '../middleware/gate-now.js';
 import { str, secret, collectErrors, MAX_TITLE } from '../api/formats.ts';
 import { requireAdmin } from '../middleware/require-admin.js';
 import { remoteFailure } from '../utils/http.js';
@@ -127,11 +128,14 @@ router.post('/accounts', validateRequest(), async (req, res) => {
       vName.value,
       vUrl.value,
       vUsername.value,
-      vPassword.value
+      vPassword.value,
+      { assertStillAllowed: () => assertGatesNow(db.get(), req, { admin: true }) },
     );
 
     res.status(201).json({ data: result });
   } catch (err) {
+    // Admin- oder Modulrecht waehrend des Verbindungstests verloren (#2947).
+    if (err instanceof RefusedNowError) return err.respond(res);
     log.error('Error adding CardDAV account:', err);
     if (failIfConnection(res, err)) return;
     fail(res, 500, 'internal', 'Internal error');
@@ -282,7 +286,9 @@ router.post('/accounts/:id/addressbooks/refresh', validateRequest(), async (req,
     const account = db.get().prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(id);
     if (!account) return fail(res, 404, 'account_not_found', 'Account not found');
 
-    await CardDAVSync.discoverAddressbooks(id);
+    await CardDAVSync.discoverAddressbooks(id, {
+      assertStillAllowed: () => assertGatesNow(db.get(), req, { admin: true }),
+    });
 
     const addressbooks = db.get().prepare(`
       SELECT id, addressbook_url as url, addressbook_name as name, enabled,
@@ -294,6 +300,10 @@ router.post('/accounts/:id/addressbooks/refresh', validateRequest(), async (req,
 
     res.json({ data: addressbooks });
   } catch (err) {
+    // Waehrend der Abfrage geloescht (#2947): dieselbe 404 wie davor.
+    if (err instanceof CardDAVSync.CardDAVAccountGoneError) return fail(res, 404, 'account_not_found', 'Account not found');
+    // Admin- oder Modulrecht waehrend der Abfrage verloren (#2947): die Absage des Gates.
+    if (err instanceof RefusedNowError) return err.respond(res);
     log.error('Error refreshing addressbooks:', err);
     fail(res, 500, 'internal', 'Internal error');
   }

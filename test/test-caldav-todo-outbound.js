@@ -1173,6 +1173,26 @@ test('Der Sofortversuch laedt neue Aufgaben hoch', async () => {
   assert.strictEqual(reloadTask(task.id).external_source, 'caldav');
 });
 
+test('Der Sofortversuch laedt nicht in eine Liste, die waehrend des Listenabrufs abgewaehlt wurde (#2947)', async () => {
+  // Die Auswahl wird vor dem Abruf der Collections gelesen, einem await; dort
+  // wird die Liste abgewaehlt. Danach gilt, was vor dem Lauf gegolten haette.
+  const accountId = reset();
+  enableList(accountId);
+  const task = insertLocalTask(/** @type {any} */ ({ accountId }));
+  const client = fakeClient();
+  const listed = client.fetchCalendars;
+  client.fetchCalendars = async () => {
+    db.prepare('UPDATE caldav_reminder_selection SET enabled = 0 WHERE account_id = ?').run(accountId);
+    return listed();
+  };
+
+  const result = /** @type {any} */ (await flushOutbound({ createClient: async () => client }));
+
+  assert.strictEqual(result.created, 0);
+  assert.strictEqual(client.calls.created.length, 0, 'kein Upload in die abgewaehlte Liste');
+  assert.strictEqual(reloadTask(task.id).external_source, 'local');
+});
+
 test('Der Sync-Lauf laedt hoch, ohne dass der Prune die frische Aufgabe gleich wieder entfernt', async () => {
   // Die Reihenfolge ist der Punkt: der Prune raeumt lokale Spiegel weg, die der
   // Server nicht mehr fuehrt. Liefe der Upload VOR ihm, saehe er eine Aufgabe,
@@ -1234,7 +1254,7 @@ test('pendingShoppingCreations findet nur lokale Artikel der zugeordneten Liste'
   const accountId = reset();
   const listId    = insertShoppingList();
   const other     = insertShoppingList('Baumarkt');
-  enableList(accountId, 'shopping', listId);
+  enableList(accountId, 'shopping', /** @type {any} */ (listId));
 
   const local = insertLocalItem(listId);
   insertLocalItem(other, 'Schrauben');
@@ -1328,6 +1348,45 @@ test('Der Sofortversuch laedt neue Einkaufsartikel hoch', async () => {
 
   assert.strictEqual(result.created, 1);
   assert.strictEqual(reloadItem(item.id).external_source, 'caldav');
+});
+
+test('Der Sofortversuch laedt keinen Einkaufsartikel in eine Liste, die waehrend des Listenabrufs abgewaehlt wurde (#2947)', async () => {
+  const accountId = reset();
+  const listId    = insertShoppingList();
+  enableList(accountId, 'shopping', /** @type {any} */ (listId));
+  const item   = insertLocalItem(listId);
+  const client = fakeClient();
+  const listed = client.fetchCalendars;
+  client.fetchCalendars = async () => {
+    db.prepare('UPDATE caldav_reminder_selection SET enabled = 0 WHERE account_id = ?').run(accountId);
+    return listed();
+  };
+
+  const result = /** @type {any} */ (await flushOutbound({ createClient: async () => client }));
+
+  assert.strictEqual(result.created, 0);
+  assert.strictEqual(client.calls.created.length, 0, 'kein Upload in die abgewaehlte Liste');
+  assert.strictEqual(reloadItem(item.id).external_source, 'local');
+});
+
+test('Der Sofortversuch laedt keinen Einkaufsartikel hoch, dessen Liste waehrend des Listenabrufs eine andere Zuordnung bekam (#2947)', async () => {
+  const accountId = reset();
+  const listId    = insertShoppingList();
+  const other     = insertShoppingList('Baumarkt');
+  enableList(accountId, 'shopping', /** @type {any} */ (listId));
+  const item   = insertLocalItem(listId);
+  const client = fakeClient();
+  const listed = client.fetchCalendars;
+  client.fetchCalendars = async () => {
+    db.prepare('UPDATE caldav_reminder_selection SET target_list_id = ? WHERE account_id = ?').run(other, accountId);
+    return listed();
+  };
+
+  const result = /** @type {any} */ (await flushOutbound({ createClient: async () => client }));
+
+  assert.strictEqual(result.created, 0);
+  assert.strictEqual(client.calls.created.length, 0, 'die Server-Liste gehoert jetzt einer anderen Liste');
+  assert.strictEqual(reloadItem(item.id).external_source, 'local');
 });
 
 test('Eine Liste, die auf Aufgaben zeigt, nimmt keine Einkaufsartikel an', async () => {

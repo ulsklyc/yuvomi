@@ -1273,7 +1273,8 @@
         "localCalendarEdit": "Modifier le calendrier",
         "localCalendarNew": "Nouveau calendrier",
         "manageSubscriptionsLink": "Abonnements et synchronisation",
-        "cancelled": "Annulé"
+        "cancelled": "Annulé",
+        "errorSeriesChanged": "La série vient d’être modifiée ailleurs. Veuillez enregistrer à nouveau."
     },
     "noteCategories": {
         "categories": "Catégories",
@@ -3610,7 +3611,8 @@
         "remoteErrorAuthFailed": "Le serveur a refusé la connexion. Vérifiez le nom d’utilisateur et le mot de passe.",
         "remoteErrorStatus": "Le serveur a répondu avec le statut {{status}}.",
         "remoteErrorUnreachable": "Le serveur est injoignable. Vérifiez l’adresse et que le serveur est en marche.",
-        "remoteErrorFailed": "La requête vers le serveur a échoué."
+        "remoteErrorFailed": "La requête vers le serveur a échoué.",
+        "caldavErrorAccountChanged": "Le compte vient d’être modifié ailleurs. Veuillez enregistrer à nouveau."
     },
     "login": {
         "tagline": "Bon retour. Votre foyer, au même endroit.",

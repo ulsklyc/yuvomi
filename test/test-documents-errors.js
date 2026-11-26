@@ -180,6 +180,136 @@ test('Server: der Zielordner verschwindet WAEHREND des Hochladens - 400 mit dem 
   }
 });
 
+test('Server: eine freigegebene Person faellt WAEHREND des Hochladens aus dem Haushalt - dieselbe 400 wie vorher, kein Dokument, keine Datei (#2947)', async () => {
+  // Die Freigabeliste wird vor dem Ablegen der Datei geprueft, einem await;
+  // dort wird die Person entfernt. Eine Spur (ein Termin) haelt ihr Konto als
+  // deaktivierte Zeile, so dass nur die Mitgliedschaft wegfaellt.
+  const { readdirSync } = await import('node:fs');
+  const { removeUser } = await import('../server/services/user-removal.js');
+  // Die Tabelle legt sonst der Session-Store an; removeUser() beendet dort Sitzungen.
+  db.exec('CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired_at INTEGER NOT NULL)');
+  const member = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('bea-2947', 'Bea', '$2b$12$x', 'member')`).run().lastInsertRowid;
+  db.prepare(`INSERT INTO calendar_events (title, start_datetime, created_by)
+    VALUES ('Spur 2947', '2059-01-01T09:00', ?)`).run(member);
+  const body = upload({ name: 'Scan 2947', visibility: 'restricted', allowed_member_ids: [member] });
+  const files = () => readdirSync(storageRoot, { recursive: true }).filter((name) => String(name).endsWith('.pdf'));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  const before = files().length;
+  /** @type {any} */
+  let answer;
+  _setStageUploadForTest(async (/** @type {any} */ args) => {
+    const staged = await stageDocumentUpload(args);
+    assert.equal(removeUser(db, member).outcome, 'deactivated');
+    return staged;
+  });
+  try {
+    answer = await call('POST', '', body);
+  } finally {
+    _setStageUploadForTest(null);
+  }
+  /** @type {any} */
+  let direct;
+  try {
+    direct = await call('POST', '', body);
+  } finally {
+    delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  }
+  assert.equal(direct.status, 400, JSON.stringify(direct.body));
+  assert.deepEqual([answer.status, answer.body], [400, direct.body], 'dieselbe Absage wie ohne Hochladen dazwischen');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE name = 'Scan 2947'").get().n, 0, 'kein Dokument');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_document_access WHERE user_id = ?').get(member).n, 0, 'keine Freigabe');
+  assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
+});
+
+test('Server: die Person, um die es geht, faellt WAEHREND des Hochladens aus dem Haushalt - dieselbe 400 wie vorher, kein Dokument, keine Datei (#2947)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const { removeUser } = await import('../server/services/user-removal.js');
+  db.exec('CREATE TABLE IF NOT EXISTS sessions (sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expired_at INTEGER NOT NULL)');
+  const member = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+    VALUES ('cem-2947', 'Cem', '$2b$12$x', 'member')`).run().lastInsertRowid;
+  db.prepare(`INSERT INTO calendar_events (title, start_datetime, created_by)
+    VALUES ('Spur 2947 Person', '2059-01-01T09:00', ?)`).run(member);
+  const body = upload({ name: 'Ausweis 2947', subject_user_id: member });
+  const files = () => readdirSync(storageRoot, { recursive: true }).filter((name) => String(name).endsWith('.pdf'));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  const before = files().length;
+  /** @type {any} */
+  let answer;
+  _setStageUploadForTest(async (/** @type {any} */ args) => {
+    const staged = await stageDocumentUpload(args);
+    assert.equal(removeUser(db, member).outcome, 'deactivated');
+    return staged;
+  });
+  try {
+    answer = await call('POST', '', body);
+  } finally {
+    _setStageUploadForTest(null);
+  }
+  /** @type {any} */
+  let direct;
+  try {
+    direct = await call('POST', '', body);
+  } finally {
+    delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+  }
+  assert.equal(direct.status, 400, JSON.stringify(direct.body));
+  assert.deepEqual([answer.status, answer.body], [400, direct.body], 'dieselbe Absage wie ohne Hochladen dazwischen');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE name = 'Ausweis 2947'").get().n, 0, 'kein Dokument');
+  assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
+});
+
+test('Server: das Schreibrecht an Dokumenten faellt WAEHREND des Hochladens weg - die Absage des Modul-Gates, kein Dokument, keine Datei (#2947)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const files = () => readdirSync(storageRoot, { recursive: true }).filter((name) => String(name).endsWith('.pdf'));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  const before = files().length;
+  /** @type {any} */
+  let answer;
+  _setStageUploadForTest(async (/** @type {any} */ args) => {
+    const staged = await stageDocumentUpload(args);
+    db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(admin);
+    db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+      VALUES ('user', ?, 'module', 'documents', 'read')`).run(String(admin));
+    return staged;
+  });
+  try {
+    answer = await call('POST', '', upload({ name: 'Gate 2947' }));
+  } finally {
+    _setStageUploadForTest(null);
+    delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(admin);
+    db.prepare("DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?").run(String(admin));
+  }
+  assert.deepEqual([answer.status, answer.body], [403, { error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' }]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE name = 'Gate 2947'").get().n, 0, 'kein Dokument');
+  assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
+});
+
+test('Server: das eigene Konto wird WAEHREND des Hochladens deaktiviert - die 401 von requireAuth, kein Dokument, keine Datei (#2947)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const files = () => readdirSync(storageRoot, { recursive: true }).filter((name) => String(name).endsWith('.pdf'));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  const before = files().length;
+  /** @type {any} */
+  let answer;
+  _setStageUploadForTest(async (/** @type {any} */ args) => {
+    const staged = await stageDocumentUpload(args);
+    db.prepare("UPDATE users SET deactivated_at = '2059-01-01T00:00:00Z' WHERE id = ?").run(admin);
+    return staged;
+  });
+  try {
+    answer = await call('POST', '', upload({ name: 'Weg 2947' }));
+  } finally {
+    _setStageUploadForTest(null);
+    delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    db.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(admin);
+  }
+  assert.deepEqual([answer.status, answer.body], [401, { error: 'Not authenticated.', code: 401 }]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE name = 'Weg 2947'").get().n, 0, 'kein Dokument');
+  assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
+});
+
 test('Server: ein Name, den es unter den Geschwistern schon gibt - anlegen, umbenennen und verschieben nennen den Fall', async () => {
   const parent = await folder('Eltern');
   await folder('Doppelt', parent);

@@ -1455,7 +1455,8 @@
         "localCalendarEdit": "Edytuj kalendarz",
         "localCalendarNew": "Nowy kalendarz",
         "manageSubscriptionsLink": "Subskrypcje i synchronizacja",
-        "cancelled": "Odwołane"
+        "cancelled": "Odwołane",
+        "errorSeriesChanged": "Seria została właśnie zmieniona w innym miejscu. Zapisz ponownie."
     },
     "noteCategories": {
         "categories": "Kategorie",
@@ -3854,7 +3855,8 @@
         "remoteErrorAuthFailed": "Serwer odrzucił logowanie. Sprawdź nazwę użytkownika i hasło.",
         "remoteErrorStatus": "Serwer odpowiedział statusem {{status}}.",
         "remoteErrorUnreachable": "Serwer jest nieosiągalny. Sprawdź adres i czy serwer działa.",
-        "remoteErrorFailed": "Żądanie do serwera nie powiodło się."
+        "remoteErrorFailed": "Żądanie do serwera nie powiodło się.",
+        "caldavErrorAccountChanged": "Konto zostało właśnie zmienione w innym miejscu. Zapisz ponownie."
     },
     "login": {
         "tagline": "Witaj ponownie. Twój dom w jednym miejscu.",

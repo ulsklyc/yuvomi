@@ -1750,7 +1750,18 @@ describe('Multi-Value Validators', () => {
 // CardDAV API Routes
 // ========================================
 
+/**
+ * Die Anfrage eines angemeldeten Admins (Nutzer 1 des API-Schemas), wie
+ * requireAuth und requireAdmin sie hinterlassen: "Adressbuecher aktualisieren"
+ * fragt das Admin-Recht nach der Abfrage beim Server noch einmal (#2947).
+ */
+const ADMIN_SESSION = Object.freeze({
+  authUserId: 1, authRole: 'admin', authMethod: 'session', sessionModuleAccess: null,
+  method: 'POST', baseUrl: '/api/v1/contacts/cardav', path: '/accounts/1/addressbooks/refresh',
+});
+
 describe('CardDAV API Routes', () => {
+  /** @type {any} */
   let apiTestDb;
 
   before(async () => {
@@ -1769,8 +1780,16 @@ describe('CardDAV API Routes', () => {
         username TEXT NOT NULL,
         display_name TEXT,
         avatar_color TEXT,
-        avatar_data  TEXT
+        avatar_data  TEXT,
+        -- Seit #2947 fragt "Adressbuecher aktualisieren" nach der Abfrage beim
+        -- Server, ob das Konto noch Admin ist (requestAsOfNow): Rolle, Status
+        -- und die zwei Tabellen, an denen der Akteur seine Art abliest.
+        role TEXT NOT NULL DEFAULT 'admin',
+        family_role TEXT,
+        deactivated_at TEXT
       );
+      CREATE TABLE split_expense_guest_users (user_id INTEGER);
+      CREATE TABLE display_accounts (user_id INTEGER);
 
       CREATE TABLE contacts (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1903,6 +1922,7 @@ describe('CardDAV API Routes', () => {
       const cardavRouter = await import('../server/routes/cardav.js');
 
       const req = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {
@@ -1965,6 +1985,7 @@ describe('CardDAV API Routes', () => {
 
       // First create an account to delete
       const createReq = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {
@@ -2076,6 +2097,7 @@ describe('CardDAV API Routes', () => {
 
       // Create account first
       const createReq = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {
@@ -2158,6 +2180,7 @@ describe('CardDAV API Routes', () => {
 
       // Create account first
       const createReq = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {
@@ -2182,6 +2205,7 @@ describe('CardDAV API Routes', () => {
 
       // Refresh addressbooks
       const req = {
+        ...ADMIN_SESSION,
         params: { id: String(accountId) },
         query: {},
         body: {}
@@ -2202,6 +2226,132 @@ describe('CardDAV API Routes', () => {
       assert.strictEqual(res.statusCode, 200);
       assert.ok(Array.isArray(res.data.data));
     });
+
+  });
+
+  // Die Abfrage beim Server, waehrenddessen geaendert (#2947): eigener Block,
+  // die Handler-Anfragen tragen eine Admin-Sitzung (ADMIN_SESSION).
+  describe('Abfrage beim Server, waehrenddessen geaendert (#2947)', () => {
+    // Die Abfrage beim Server ist ein await; der Test haelt sie an, aendert das
+    // Konto und gibt sie dann frei (#2947).
+    /**
+     * @param {number|bigint} accountId
+     * @param {() => void} during
+     */
+    async function refreshWhileHeld(accountId, during) {
+      const cardavRouter = await import('../server/routes/cardav.js');
+      const cardavSync = await import('../server/services/cardav-sync.js');
+      /** @type {() => void} */
+      let release = () => {};
+      const gate = new Promise((resolve) => { release = () => resolve(undefined); });
+      /** @type {() => void} */
+      let asked = () => {};
+      const started = new Promise((resolve) => { asked = () => resolve(undefined); });
+      cardavSync._mockTestConnection(async () => {
+        asked();
+        await gate;
+        return { ok: true, addressbooks: [{ url: 'https://old.example/carddav/held', displayName: 'Alt' }] };
+      });
+      /** @type {any} */
+      const res = {
+        statusCode: 200,
+        status(/** @type {number} */ code) { this.statusCode = code; return this; },
+        json(/** @type {unknown} */ data) { this.data = data; return this; },
+      };
+      const refreshHandler = /** @type {any} */ (cardavRouter.default).stack.find(
+        (/** @type {any} */ layer) => layer.route?.path === '/accounts/:id/addressbooks/refresh' && layer.route.methods.post
+      )?.route?.stack.at(-1)?.handle;
+      try {
+        const pending = refreshHandler({ ...ADMIN_SESSION, params: { id: String(accountId) }, query: {}, body: {} }, res);
+        await started;
+        during();
+        release();
+        await pending;
+      } finally {
+        cardavSync._mockTestConnection(async () => ({
+          ok: true,
+          addressbooks: [
+            { url: 'https://example.com/carddav/addressbook1', displayName: 'Contacts' },
+            { url: 'https://example.com/carddav/addressbook2', displayName: 'Work' }
+          ]
+        }));
+      }
+      return res;
+    }
+
+    it('POST /accounts/:id/addressbooks/refresh - an account deleted during the query answers 404 as before it (#2947)', async () => {
+      const accountId = apiTestDb.prepare(`
+        INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES ('Weg', 'https://old.example/carddav/', 'gone-2947', 'p')
+      `).run().lastInsertRowid;
+      const res = await refreshWhileHeld(accountId, () => {
+        apiTestDb.prepare('DELETE FROM carddav_accounts WHERE id = ?').run(accountId);
+      });
+      assert.deepEqual([res.statusCode, res.data], [404, { error: 'Account not found', errorCode: 'account_not_found', code: 404 }]);
+    });
+
+    it('POST /accounts - an admin demoted during the connection test gets the admin refusal, no account (#2947)', async () => {
+      const cardavRouter = await import('../server/routes/cardav.js');
+      const cardavSync = await import('../server/services/cardav-sync.js');
+      const before = apiTestDb.prepare('SELECT COUNT(*) AS n FROM carddav_accounts').get().n;
+      cardavSync._mockTestConnection(async () => {
+        apiTestDb.prepare("UPDATE users SET role = 'member' WHERE id = 1").run();
+        return { ok: true, addressbooks: [{ url: 'https://example.com/carddav/new', displayName: 'Neu' }] };
+      });
+      /** @type {any} */
+      const res = {
+        statusCode: 200,
+        status(/** @type {number} */ code) { this.statusCode = code; return this; },
+        json(/** @type {unknown} */ data) { this.data = data; return this; },
+      };
+      const postAccountHandler = /** @type {any} */ (cardavRouter.default).stack.find(
+        (/** @type {any} */ layer) => layer.route?.path === '/accounts' && layer.route.methods.post
+      )?.route?.stack.at(-1)?.handle;
+      try {
+        await postAccountHandler({
+          ...ADMIN_SESSION, path: '/accounts', params: {}, query: {},
+          body: { name: 'Neu 2947', cardavUrl: 'https://example.com/carddav-2947', username: 'neu-2947', password: 'p' },
+        }, res);
+      } finally {
+        apiTestDb.prepare("UPDATE users SET role = 'admin' WHERE id = 1").run();
+        cardavSync._mockTestConnection(async () => ({
+          ok: true,
+          addressbooks: [
+            { url: 'https://example.com/carddav/addressbook1', displayName: 'Contacts' },
+            { url: 'https://example.com/carddav/addressbook2', displayName: 'Work' }
+          ]
+        }));
+      }
+      assert.deepEqual([res.statusCode, res.data], [403, { error: 'Admin access required.', code: 403, reason: 'admin_required' }]);
+      assert.strictEqual(apiTestDb.prepare('SELECT COUNT(*) AS n FROM carddav_accounts').get().n, before, 'kein Konto');
+    });
+
+    it('POST /accounts/:id/addressbooks/refresh - an admin demoted during the query gets the admin refusal, nothing stored (#2947)', async () => {
+      const accountId = apiTestDb.prepare(`
+        INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES ('Rolle', 'https://old.example/carddav/', 'role-2947', 'p')
+      `).run().lastInsertRowid;
+      try {
+        const res = await refreshWhileHeld(accountId, () => {
+          apiTestDb.prepare("UPDATE users SET role = 'member' WHERE id = 1").run();
+        });
+        assert.deepEqual([res.statusCode, res.data], [403, { error: 'Admin access required.', code: 403, reason: 'admin_required' }]);
+        assert.strictEqual(apiTestDb.prepare('SELECT COUNT(*) AS n FROM carddav_addressbook_selection WHERE account_id = ?').get(accountId).n, 0);
+      } finally {
+        apiTestDb.prepare("UPDATE users SET role = 'admin' WHERE id = 1").run();
+      }
+    });
+
+    it('POST /accounts/:id/addressbooks/refresh - an account moved to another server during the query keeps no address book of the old one (#2947)', async () => {
+      const accountId = apiTestDb.prepare(`
+        INSERT INTO carddav_accounts (name, carddav_url, username, password) VALUES ('Umzug', 'https://old.example/carddav/', 'moved-2947', 'p')
+      `).run().lastInsertRowid;
+      const res = await refreshWhileHeld(accountId, () => {
+        apiTestDb.prepare("UPDATE carddav_accounts SET carddav_url = 'https://new.example/carddav/' WHERE id = ?").run(accountId);
+      });
+      assert.strictEqual(res.statusCode, 200);
+      assert.deepEqual(res.data.data, []);
+      assert.strictEqual(apiTestDb.prepare('SELECT COUNT(*) AS n FROM carddav_addressbook_selection WHERE account_id = ?').get(accountId).n, 0,
+        'kein Adressbuch des alten Servers am umgestellten Konto');
+    });
   });
 
   describe('Addressbook Management', () => {
@@ -2210,6 +2360,7 @@ describe('CardDAV API Routes', () => {
 
       // First create an account (which creates addressbooks)
       const createReq = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {
@@ -2313,6 +2464,7 @@ describe('CardDAV API Routes', () => {
 
       // Create account (which creates addressbooks)
       const createReq = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {
@@ -2807,6 +2959,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       // First create a contact with multi-value fields
       const createReq = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {
@@ -2894,6 +3047,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       // Create a contact first
       const createReq = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {
@@ -2943,6 +3097,7 @@ describe('Contacts API - Multi-Value Fields', () => {
 
       // Create contact with multi-value fields
       const createReq = {
+        ...ADMIN_SESSION, path: '/accounts',
         params: {},
         query: {},
         body: {

@@ -708,7 +708,7 @@ const CASE_REASONS = {
     get: `${OUTLOOK_NOT_CONFIGURED}, ${OUTLOOK_ACCOUNT_GONE}, ${OUTLOOK_REAUTH}; ${REMOTE_FAILURE}`,
   },
   '/api/v1/calendar/caldav/accounts/{id}': {
-    put: `${CALDAV_ACCOUNT_GONE}; ${REMOTE_FAILURE}`,
+    put: `${CALDAV_ACCOUNT_GONE}, \`caldav_account_changed\` (409, the account changed during each of three connection tests; nothing is saved, the request may be sent again); ${REMOTE_FAILURE}`,
     delete: CALDAV_ACCOUNT_GONE,
   },
   '/api/v1/calendar/caldav/accounts/{id}/calendars': {

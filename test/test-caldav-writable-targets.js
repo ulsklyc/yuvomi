@@ -63,6 +63,7 @@ async function api(method, path, body) {
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
+/** @type {number} */
 let accountId;
 
 function reset() {
@@ -295,4 +296,168 @@ test('iCloud: ohne beschreibbaren Terminkalender bleibt der Termin lokal', async
 
   assert.equal(puts().length, 0);
   assert.equal(event(id).external_source, 'local');
+});
+
+// ── Das Konto aendert sich, waehrend der Server gefragt wird (#2947) ───────
+// Der Server fuehrt die Aenderung bei der ersten Anfrage aus, die ihn
+// erreicht - also waehrend die Route auf ihn wartet - und antwortet dann
+// normal. Gemessen wird an den Zeilen und an der Antwort.
+
+/** Der Fake-Server mit seinen Methoden (startFakeDavServer gibt `object` an). */
+const fakeDav = /** @type {any} */ (dav);
+
+/** @param {() => void} change */
+function duringFirstRequest(change) {
+  let done = false;
+  fakeDav.refuse({ when: () => { if (!done) { done = true; change(); } return false; } });
+}
+
+const goneRow = () => db.prepare('DELETE FROM caldav_accounts WHERE id = ?').run(accountId);
+const movedRow = () => db.prepare("UPDATE caldav_accounts SET caldav_url = 'https://elsewhere.example/', password = 'secret-x' WHERE id = ?")
+  .run(accountId);
+
+for (const [label, path, table] of [
+  ['Kalender aktualisieren', 'calendars', 'caldav_calendar_selection'],
+  ['Erinnerungslisten aktualisieren', 'reminder-lists', 'caldav_reminder_selection'],
+]) {
+  test(`${label}: ein waehrenddessen geloeschtes Konto antwortet wie ein unbekanntes (#2947)`, async () => {
+    reset();
+    fakeDav.addCollection('family', { name: 'Familie' });
+    fakeDav.addCollection('todo', { name: 'Aufgaben', components: ['VTODO'] });
+    const unknown = await api('GET', `/calendar/caldav/accounts/999999/${path}?refresh=true`);
+    duringFirstRequest(goneRow);
+    try {
+      const res = await api('GET', `/calendar/caldav/accounts/${accountId}/${path}?refresh=true`);
+      assert.equal(unknown.status, 404);
+      assert.deepEqual([res.status, res.body], [404, unknown.body]);
+    } finally {
+      fakeDav.allowAll();
+    }
+  });
+
+  test(`${label}: ein waehrenddessen umgestelltes Konto bekommt nichts vom alten Server (#2947)`, async () => {
+    reset();
+    fakeDav.addCollection('family', { name: 'Familie' });
+    fakeDav.addCollection('todo', { name: 'Aufgaben', components: ['VTODO'] });
+    duringFirstRequest(movedRow);
+    try {
+      const res = await api('GET', `/calendar/caldav/accounts/${accountId}/${path}?refresh=true`);
+      assert.deepEqual([res.status, res.body?.data], [200, []]);
+      assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE account_id = ?`).get(accountId).n, 0,
+        'keine Sammlung des alten Servers am umgestellten Konto');
+    } finally {
+      fakeDav.allowAll();
+    }
+  });
+}
+
+test('Zugangsdaten aendern: ein waehrenddessen geloeschtes Konto antwortet wie ein unbekanntes (#2947)', async () => {
+  reset();
+  fakeDav.addCollection('family', { name: 'Familie' });
+  const unknown = await api('PUT', '/calendar/caldav/accounts/999999', { password: 'neu' });
+  duringFirstRequest(goneRow);
+  try {
+    const res = await api('PUT', `/calendar/caldav/accounts/${accountId}`, { password: 'neu' });
+    assert.equal(unknown.status, 404);
+    assert.deepEqual([res.status, res.body], [404, unknown.body]);
+  } finally {
+    fakeDav.allowAll();
+  }
+});
+
+test('Zugangsdaten aendern: aendert sich das Konto in jedem Verbindungstest, gibt es nach drei Runden 409 und speichert nichts (#2947)', async () => {
+  reset();
+  fakeDav.addCollection('family', { name: 'Familie' });
+  // Jede Anfrage beim Server stellt das gespeicherte Passwort um: jede Runde
+  // findet nach ihrem Test eine andere Zeile vor.
+  let writes = 0;
+  fakeDav.refuse({ when: () => {
+    writes += 1;
+    db.prepare('UPDATE caldav_accounts SET password = ? WHERE id = ?').run(`fremd-${writes}`, accountId);
+    return false;
+  } });
+  try {
+    const res = await api('PUT', `/calendar/caldav/accounts/${accountId}`, { password: 'neu' });
+    assert.deepEqual([res.status, res.body?.reason], [409, 'caldav_account_changed'], JSON.stringify(res.body));
+    const row = db.prepare('SELECT caldav_url, password FROM caldav_accounts WHERE id = ?').get(accountId);
+    assert.deepEqual({ ...row }, { caldav_url: fakeDav.url, password: `fremd-${writes}` }, 'nur die fremden Schreibzugriffe');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_calendar_selection WHERE account_id = ?').get(accountId).n, 0);
+  } finally {
+    fakeDav.allowAll();
+  }
+});
+
+test('Zugangsdaten aendern: zieht das Konto waehrenddessen um, entscheidet die neue Zeile - das Passwort des neuen Servers geht nicht an den alten (#2947)', async () => {
+  reset();
+  fakeDav.addCollection('family', { name: 'Familie' });
+  // Dieselbe Adresse ohne Schraegstrich: derselbe Server, also ohne Passwort
+  // erlaubt, aber eine Aenderung, die den Verbindungstest ausloest.
+  const sameServer = fakeDav.url.replace(/\/$/, '');
+  duringFirstRequest(movedRow);
+  try {
+    const res = await api('PUT', `/calendar/caldav/accounts/${accountId}`, { caldavUrl: sameServer });
+    assert.deepEqual([res.status, res.body?.errorCode], [400, 'password_required'], JSON.stringify(res.body));
+    const row = db.prepare('SELECT caldav_url, password FROM caldav_accounts WHERE id = ?').get(accountId);
+    assert.deepEqual({ ...row }, { caldav_url: 'https://elsewhere.example/', password: 'secret-x' });
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_calendar_selection WHERE account_id = ?').get(accountId).n, 0);
+  } finally {
+    fakeDav.allowAll();
+  }
+});
+
+// Das Admin-Recht gilt am Schreiben (#2947): verliert der Admin waehrend der
+// Abfrage beim Server seine Rolle, die Absage von requireAdmin, nichts gespeichert.
+const ADMIN_REQUIRED = { error: 'Admin access required.', code: 403, reason: 'admin_required' };
+const demote = () => db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(userId);
+const restore = () => db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(userId);
+
+for (const [label, method, path, body, table] of /** @type {const} */ ([
+  ['Kalender aktualisieren', 'GET', 'calendars?refresh=true', undefined, 'caldav_calendar_selection'],
+  ['Erinnerungslisten aktualisieren', 'GET', 'reminder-lists?refresh=true', undefined, 'caldav_reminder_selection'],
+  ['Zugangsdaten aendern', 'PUT', '', { password: 'neu' }, 'caldav_calendar_selection'],
+])) {
+  test(`${label}: ein waehrenddessen zurueckgestufter Admin bekommt die Admin-Absage, nichts gespeichert (#2947)`, async () => {
+    reset();
+    fakeDav.addCollection('family', { name: 'Familie' });
+    fakeDav.addCollection('todo', { name: 'Aufgaben', components: ['VTODO'] });
+    duringFirstRequest(demote);
+    try {
+      const res = await api(method, `/calendar/caldav/accounts/${accountId}${path ? `/${path}` : ''}`, body);
+      assert.deepEqual([res.status, res.body], [403, ADMIN_REQUIRED]);
+      assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE account_id = ?`).get(accountId).n, 0);
+      assert.equal(db.prepare('SELECT password FROM caldav_accounts WHERE id = ?').get(accountId).password, 'p');
+    } finally {
+      fakeDav.allowAll();
+      restore();
+    }
+  });
+}
+
+test('Konto anlegen: ein waehrend des Verbindungstests zurueckgestufter Admin bekommt die Admin-Absage, kein Konto (#2947)', async () => {
+  reset();
+  fakeDav.addCollection('family', { name: 'Familie' });
+  const before = db.prepare('SELECT COUNT(*) AS n FROM caldav_accounts').get().n;
+  duringFirstRequest(demote);
+  try {
+    const res = await api('POST', '/calendar/caldav/accounts', { name: 'Neu', caldavUrl: fakeDav.url, username: 'neu-2947', password: 'p' });
+    assert.deepEqual([res.status, res.body], [403, ADMIN_REQUIRED]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_accounts').get().n, before, 'kein Konto');
+  } finally {
+    fakeDav.allowAll();
+    restore();
+  }
+});
+
+test('Kalender aktualisieren: ein waehrend der Abfrage deaktiviertes Konto bekommt die 401 von requireAuth, nichts gespeichert (#2947)', async () => {
+  reset();
+  fakeDav.addCollection('family', { name: 'Familie' });
+  duringFirstRequest(() => db.prepare("UPDATE users SET deactivated_at = '2059-01-01T00:00:00Z' WHERE id = ?").run(userId));
+  try {
+    const res = await api('GET', `/calendar/caldav/accounts/${accountId}/calendars?refresh=true`);
+    assert.deepEqual([res.status, res.body], [401, { error: 'Not authenticated.', code: 401 }]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_calendar_selection WHERE account_id = ?').get(accountId).n, 0);
+  } finally {
+    fakeDav.allowAll();
+    db.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(userId);
+  }
 });

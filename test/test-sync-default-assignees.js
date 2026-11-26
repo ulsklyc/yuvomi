@@ -68,7 +68,9 @@ const CAL_TOGETHER = 'https://dav.example/together/';
 const CAL_BEN = 'https://dav.example/ben/';
 const UID = 'dentist@example.org';
 
-/** @type {number} */ let OWNER; /** @type {number} */ let ANNA; /** @type {number} */ let BEN;
+/** @type {number} */ let OWNER;
+/** @type {number} */ let ANNA;
+/** @type {number} */ let BEN;
 /** @type {number} */ let CHRIS; /** @type {number} */ let STAFF;
 
 function addUser(username, color = '#123456') {
@@ -457,6 +459,85 @@ describe('Routen', () => {
     assert.equal(ok.body.data.assigned, 0);
     const id = db.prepare("SELECT id FROM calendar_events WHERE external_calendar_id = 'route-1'").get().id;
     assert.deepEqual(assignmentsOf(id), sorted([ANNA, BEN]));
+  });
+
+  // Die Route prueft Kalender und Personen vor dem Laden des Feeds, einem
+  // await (#2947). Der Feed-Server haelt seine Antwort, bis `during` gelaufen
+  // ist; danach antwortet er mit `icsText`.
+  /**
+   * @param {Record<string, unknown>} body ohne `url`
+   * @param {string} icsText
+   * @param {() => void} during
+   */
+  async function importWhileFeedHeld(body, icsText, during) {
+    const http = await import('node:http');
+    /** @type {(res: import('node:http').ServerResponse) => void} */
+    let arrived = () => {};
+    const requested = new Promise((resolve) => { arrived = resolve; });
+    const feed = http.createServer((_req, res) => arrived(res));
+    await new Promise((resolve) => feed.listen(0, '127.0.0.1', () => resolve(undefined)));
+    const before = process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK;
+    process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK = 'true';
+    try {
+      const pending = call('POST', '/import', { ...body, url: `http://127.0.0.1:${/** @type {any} */ (feed.address()).port}/cal.ics` });
+      const res = /** @type {import('node:http').ServerResponse} */ (await requested);
+      during();
+      res.writeHead(200, { 'Content-Type': 'text/calendar' });
+      res.end(icsText);
+      return await pending;
+    } finally {
+      if (before === undefined) delete process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK;
+      else process.env.ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK = before;
+      await new Promise((resolve) => feed.close(() => resolve(undefined)));
+    }
+  }
+
+  const feedOf = (/** @type {string} */ uid) => ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', `UID:${uid}`, 'SUMMARY:R',
+    'DTSTART:20260601T090000Z', 'DTEND:20260601T100000Z', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+
+  it('POST /import from a URL: a person who leaves the household while the feed loads is refused as before it (#2947)', async () => {
+    // Eine Spur (ein eigener Termin) laesst Annas Konto als deaktivierte Zeile stehen.
+    const icsText = feedOf('route-2947');
+    db.prepare("INSERT INTO calendar_events (title, start_datetime, created_by) VALUES ('Spur', '2059-01-01T09:00', ?)").run(ANNA);
+    const answer = await importWhileFeedHeld({ assignee_user_ids: [ANNA, BEN] }, icsText, () => {
+      assert.equal(removeUser(db, ANNA).outcome, 'deactivated');
+    });
+    const direct = await call('POST', '/import', { ics: icsText, assignee_user_ids: [ANNA, BEN] });
+    assert.equal(direct.status, 400, JSON.stringify(direct.body));
+    assert.equal(direct.body.reason, 'calendar_assignee_not_member');
+    assert.deepEqual([answer.status, answer.body], [400, direct.body], 'dieselbe Absage wie ohne Laden dazwischen');
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM calendar_events WHERE external_calendar_id = 'route-2947'").get().c, 0, 'kein Termin');
+  });
+
+  it('POST /import from a URL: a calendar deleted while the feed loads is refused as before it, not with a 500 (#2947)', async () => {
+    const icsText = feedOf('route-2947-cal');
+    const target = Number(db.prepare("INSERT INTO local_calendars (name, color, sort_order) VALUES ('Weg 2947', '#111111', 98) RETURNING id").get().id);
+    const answer = await importWhileFeedHeld({ local_calendar_id: target }, icsText, () => {
+      db.prepare('DELETE FROM local_calendars WHERE id = ?').run(target);
+    });
+    const direct = await call('POST', '/import', { ics: icsText, local_calendar_id: target });
+    assert.equal(direct.status, 400, JSON.stringify(direct.body));
+    assert.equal(direct.body.reason, 'calendar_selected_calendar_not_found');
+    assert.deepEqual([answer.status, answer.body], [400, direct.body], 'dieselbe Absage wie ohne Laden dazwischen');
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM calendar_events WHERE external_calendar_id = 'route-2947-cal'").get().c, 0, 'kein Termin');
+  });
+
+  it('POST /import from a URL: calendar write taken while the feed loads is the module gate refusal, no event (#2947)', async () => {
+    const icsText = feedOf('route-2947-gate');
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await importWhileFeedHeld({}, icsText, () => {
+        db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(OWNER);
+        db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+          VALUES ('user', ?, 'module', 'calendar', 'read')`).run(String(OWNER));
+      });
+    } finally {
+      db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(OWNER);
+      db.prepare("DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?").run(String(OWNER));
+    }
+    assert.deepEqual([answer.status, answer.body], [403, { error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' }]);
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM calendar_events WHERE external_calendar_id = 'route-2947-gate'").get().c, 0, 'kein Termin');
   });
 
   it('subscriptions: a gone subscription names calendar_subscription_not_found (#1909)', async () => {

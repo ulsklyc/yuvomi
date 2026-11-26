@@ -2791,6 +2791,265 @@ test('PUT .../following - a person who stops being a member during the upload is
   assert.equal(db.prepare('SELECT recurrence_rule AS r FROM calendar_events WHERE id = ?').get(seriesId).r, 'FREQ=DAILY');
 });
 
+// DAS DOKUMENTE-RECHT GILT AM SCHREIBEN (#2947). Am Eingang fragt
+// `refuseUploadWithoutDocumentsWrite`; waehrend des Uploads (await) nimmt der
+// Test Maria das Schreibrecht an Dokumenten in der Datenbank (`access_permissions`).
+// Danach entsteht kein Anhang und kein Termin bzw. keine Aenderung, der Upload
+// wird entfernt, und die Antwort ist die Absage des Eingangs.
+/** `call` mit den Optionen dieser Faelle (Rumpf, Akteur mit Modulrechten). */
+const callAs = /** @type {(method: string, route: string, options: any) => Promise<any>} */ (call);
+const UPLOAD_REFUSED = { error: 'Attaching a file needs write access to documents.', code: 403, reason: 'ATTACHMENT_UPLOAD_REFUSED' };
+const revokeDocumentsWrite = () => db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+  VALUES ('user', ?, 'module', 'documents', 'read')`).run(String(MARIA.id));
+const restoreDocumentsWrite = () => db.prepare(`DELETE FROM access_permissions
+  WHERE subject_type = 'user' AND subject_id = ? AND resource_type = 'module' AND resource_key = 'documents'`).run(String(MARIA.id));
+
+for (const [label, request] of /** @type {const} */ ([
+  ['POST /', () => ({ method: 'POST', route: '/', body: { title: 'RIGHT-2947-POST', start_datetime: '2059-05-01T09:00' } })],
+  ['PUT /:id', () => {
+    const id = insertEvent({ title: 'RIGHT-2947-PUT', start_datetime: '2059-05-02T09:00', created_by: MARIA.id });
+    return { method: 'PUT', route: `/${id}`, body: { description: 'mit Anhang' } };
+  }],
+  ['PUT occurrence', () => {
+    const id = insertEvent({ title: 'RIGHT-2947-OCC', start_datetime: '2059-05-03T09:00', created_by: MARIA.id, recurrence_rule: 'FREQ=DAILY' });
+    return { method: 'PUT', route: `/${id}/occurrences/2059-05-04`, body: { title: 'Ausnahme' } };
+  }],
+  ['PUT following', () => {
+    const id = insertEvent({ title: 'RIGHT-2947-FOL', start_datetime: '2059-05-05T09:00', created_by: MARIA.id, recurrence_rule: 'FREQ=DAILY' });
+    return { method: 'PUT', route: `/${id}/occurrences/2059-05-07/following`, body: { title: 'Nachfolger' } };
+  }],
+])) {
+  test(`${label} - documents write taken during the upload: the entry refusal, no attachment, upload removed (#2947)`, async () => {
+    const { method, route, body } = request();
+    const key = `drive-2947-${label.replace(/\W+/g, '-')}`;
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    const titleRow = route === '/' ? null : db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(Number(route.split('/')[1]));
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs(method, route, /** @type {any} */ ({ actor: MARIA, body: { ...body, ...uploadBody(key) } })),
+        async () => { revokeDocumentsWrite(); });
+    } finally {
+      restoreDocumentsWrite();
+    }
+    const direct = await callAs(method, route, /** @type {any} */ ({
+      actor: { ...MARIA, moduleAccess: { documents: 'read' } }, body: { ...body, ...uploadBody(key) },
+    }));
+    assert.deepEqual([direct.status, direct.body], [403, UPLOAD_REFUSED], 'die Absage am Eingang');
+    assert.deepEqual([answer.status, answer.body], [403, UPLOAD_REFUSED], 'dieselbe Absage nach dem Upload');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'kein neuer Termin');
+    if (titleRow) {
+      assert.deepEqual(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(titleRow.id), titleRow, 'der Termin bleibt, wie er war');
+    }
+  });
+}
+
+test('PUT following - documents write taken while the attachment copy uploads: no copy, the copy is removed (#2947)', async () => {
+  // Der Split kopiert den Anhang der Serie fuer den Nachfolger (Upload der
+  // Kopie, await). Waehrenddessen verliert Maria das Dokumente-Schreibrecht:
+  // die Kopie gilt dann als verweigert, wie mit `documents: none` am Eingang.
+  const dataUrl = `data:text/plain;base64,${Buffer.from('kopie').toString('base64')}`;
+  const series = await callAs('POST', '/', { actor: MARIA, body: {
+    title: 'RIGHT-2947-CLONE', start_datetime: '2059-06-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    attachment_data: dataUrl, attachment_name: 'k.txt',
+  } });
+  assert.equal(series.status, 201, JSON.stringify(series.body));
+  const documentsBefore = db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n;
+  /** @type {any} */
+  let split;
+  try {
+    split = await duringUpload('drive-2947-clone',
+      () => callAs('PUT', `/${series.body.data.id}/occurrences/2059-06-03/following`, { actor: MARIA, body: { title: 'Nachfolger' } }),
+      async () => { revokeDocumentsWrite(); });
+  } finally {
+    restoreDocumentsWrite();
+  }
+  assert.equal(split.status, 201, JSON.stringify(split.body));
+  assert.equal(split.body.data.attachment_document_id, null, 'der Nachfolger hat keinen Anhang');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM family_documents').get().n, documentsBefore, 'keine Dokumentkopie');
+});
+
+test('PUT /:id - an admin demoted while a detach copy uploads no longer aligns a foreign document (#2947)', async () => {
+  // Abgleichen darf nur, wer das Dokument verwaltet - die Besitzerin oder ein
+  // Admin. Das Abloesen einer Ausnahme kopiert den Anhang (await); waehrend
+  // dessen verliert der Admin die Rolle. Danach bleibt das Dokument, wie die
+  // Besitzerin es gesetzt hat (Tom behaelt seine Freigabe).
+  const dataUrl = `data:text/plain;base64,${Buffer.from('abgleich').toString('base64')}`;
+  const access = (/** @type {number} */ id) => db.prepare('SELECT user_id FROM family_document_access WHERE document_id = ? ORDER BY user_id')
+    .all(id).map((/** @type {any} */ r) => r.user_id);
+  const series = await callAs('POST', '/', { actor: MARIA, body: {
+    title: 'RIGHT-2947-WIDEN', start_datetime: '2059-07-01T09:00:00', recurrence_rule: 'FREQ=DAILY;COUNT=5',
+    visibility: 'assignees', assigned_to: [MARIA.id, ADMIN.id], attachment_data: dataUrl, attachment_name: 'w.txt',
+  } });
+  assert.equal(series.status, 201, JSON.stringify(series.body));
+  const seriesId = series.body.data.id;
+  const docId = series.body.data.attachment_document_id;
+  db.prepare('INSERT INTO family_document_access (document_id, user_id) VALUES (?, ?)').run(docId, TOM.id);
+  const owned = access(docId);
+  assert.ok(owned.includes(TOM.id));
+  const override = await callAs('PUT', `/${seriesId}/occurrences/2059-07-03`, { actor: MARIA, body: { title: 'Ausnahme' } });
+  assert.equal(override.status, 200, JSON.stringify(override.body));
+  // Der Admin nimmt sich aus den Zugewiesenen: ein Verwalter gliche die
+  // Freigaben des Dokuments darauf ab.
+  const rule = { recurrence_rule: 'FREQ=WEEKLY;COUNT=3', visibility: 'assignees', assigned_to: [MARIA.id] };
+  const conflict = await callAs('PUT', `/${seriesId}`, { actor: ADMIN, body: rule });
+  assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
+  /** @type {any} */
+  let detached;
+  try {
+    await withHeldDriveUpload('drive-2947-widen', async ({ started, release }) => {
+      const pending = callAs('PUT', `/${seriesId}`, {
+        actor: ADMIN, body: { ...rule, confirmed_orphan_count: conflict.body.orphaned_override_count },
+      });
+      await started;
+      db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(ADMIN.id);
+      release();
+      detached = await pending;
+    });
+  } finally {
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(ADMIN.id);
+  }
+  assert.equal(detached.status, 200, JSON.stringify(detached.body));
+  assert.deepEqual(access(docId), owned, 'kein Abgleich ohne Verwaltungsrecht: Tom behaelt die Freigabe');
+});
+
+// DAS BEARBEITUNGSRECHT UND DAS MODUL-GATE GELTEN AM SCHREIBEN (#2947). Am
+// Eingang fragt die Route `calendar_edit_others` (bzw. die Admin-Rolle) und das
+// Modul-Gate; waehrend des Uploads nimmt der Test das Recht in der Datenbank.
+// Danach dieselbe 403 wie am Eingang, nichts geschrieben, Upload entfernt.
+const NOT_OWNER = { error: 'You can only change entries you created.', code: 403, reason: 'not_owner' };
+const MODULE_READ_ONLY = { error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' };
+/** @param {number} userId @param {string} type @param {string} key @param {string} access */
+const grant = (userId, type, key, access) => db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+  VALUES ('user', ?, ?, ?, ?)`).run(String(userId), type, key, access);
+/** @param {number} userId */
+const ungrant = (userId) => db.prepare("DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?").run(String(userId));
+
+test('PUT /:id - an admin demoted during the upload, without calendar_edit_others, gets not_owner (#2947)', async () => {
+  const id = insertEvent({ title: 'EDIT-2947-PUT', start_datetime: '2059-08-01T09:00', created_by: MARIA.id });
+  const before = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  /** @type {any} */
+  let answer;
+  try {
+    answer = await duringUpload('drive-2947-edit-put',
+      () => callAs('PUT', `/${id}`, { actor: ADMIN, body: { description: 'vom Admin', ...uploadBody('drive-2947-edit-put') } }),
+      async () => {
+        db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(ADMIN.id);
+        grant(ADMIN.id, 'capability', 'calendar_edit_others', 'none');
+      });
+  } finally {
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(ADMIN.id);
+    ungrant(ADMIN.id);
+  }
+  assert.deepEqual([answer.status, answer.body], [403, NOT_OWNER]);
+  assert.deepEqual(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id), before, 'der Termin bleibt, wie er war');
+});
+
+for (const [label, request] of /** @type {const} */ ([
+  ['PUT occurrence', (/** @type {number} */ id) => ({ route: `/${id}/occurrences/2059-08-04`, body: { title: 'Ausnahme' } })],
+  ['PUT following', (/** @type {number} */ id) => ({ route: `/${id}/occurrences/2059-08-05/following`, body: { title: 'Nachfolger' } })],
+])) {
+  test(`${label} - calendar_edit_others taken during the upload: not_owner, nothing written, upload removed (#2947)`, async () => {
+    const id = insertEvent({ title: `EDIT-2947-${label}`, start_datetime: '2059-08-03T09:00', created_by: ADMIN.id, recurrence_rule: 'FREQ=DAILY' });
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    const { route, body } = request(id);
+    const key = `drive-2947-edit-${label.replace(/\W+/g, '-')}`;
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs('PUT', route, { actor: MARIA, body: { ...body, ...uploadBody(key) } }),
+        async () => { grant(MARIA.id, 'capability', 'calendar_edit_others', 'none'); });
+    } finally {
+      ungrant(MARIA.id);
+    }
+    assert.deepEqual([answer.status, answer.body], [403, NOT_OWNER]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'keine Ausnahme, keine Folgeserie');
+  });
+}
+
+for (const [label, request] of /** @type {const} */ ([
+  ['POST /', () => ({ method: 'POST', route: '/', body: { title: 'GATE-2947-POST', start_datetime: '2059-08-10T09:00' } })],
+  ['PUT /:id', () => {
+    const id = insertEvent({ title: 'GATE-2947-PUT', start_datetime: '2059-08-11T09:00', created_by: MARIA.id });
+    return { method: 'PUT', route: `/${id}`, body: { description: 'mit Anhang' } };
+  }],
+])) {
+  test(`${label} - calendar write taken during the upload: the module gate refusal, nothing written (#2947)`, async () => {
+    const { method, route, body } = request();
+    const key = `drive-2947-gate-${label.replace(/\W+/g, '-')}`;
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs(method, route, { actor: MARIA, body: { ...body, ...uploadBody(key) } }),
+        async () => { grant(MARIA.id, 'module', 'calendar', 'read'); });
+    } finally {
+      ungrant(MARIA.id);
+    }
+    assert.deepEqual([answer.status, answer.body], [403, MODULE_READ_ONLY]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'kein neuer Termin');
+    if (method === 'PUT') {
+      assert.equal(db.prepare('SELECT description FROM calendar_events WHERE id = ?').get(Number(route.slice(1))).description, null);
+    }
+  });
+}
+
+test('PUT /:id - documents read taken during the upload of a replacement: the attachment refusal, nothing written (#2947)', async () => {
+  // Ersetzen verlangt, dass man den gespeicherten Anhang sieht (Dokumente
+  // lesen, #1358). Waehrend des Uploads verliert Maria das Modul ganz.
+  const created = await callAs('POST', '/', { actor: MARIA, body: {
+    title: 'LOCK-2947', start_datetime: '2059-08-20T09:00', ...uploadBody('lock-2947-old'),
+  } });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const id = created.body.data.id;
+  const before = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id);
+  /** @type {any} */
+  let answer;
+  try {
+    answer = await duringUpload('drive-2947-lock',
+      () => callAs('PUT', `/${id}`, { actor: MARIA, body: { ...uploadBody('drive-2947-lock') } }),
+      async () => { grant(MARIA.id, 'module', 'documents', 'none'); });
+  } finally {
+    ungrant(MARIA.id);
+  }
+  assert.deepEqual([answer.status, answer.body?.reason], [403, 'ATTACHMENT_CHANGE_REFUSED'], JSON.stringify(answer.body));
+  assert.deepEqual(db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id), before, 'der Termin bleibt, wie er war');
+});
+
+// DAS KONTO WIRD WAEHREND DES UPLOADS DEAKTIVIERT (#2947): die 401, die
+// requireAuth am Eingang jetzt gaebe - die App meldet ab -, nichts geschrieben,
+// Upload entfernt.
+for (const [label, request] of /** @type {const} */ ([
+  ['POST /', () => ({ method: 'POST', route: '/', body: { title: 'GONE-2947-POST', start_datetime: '2059-09-01T09:00' } })],
+  ['PUT /:id', () => {
+    const id = insertEvent({ title: 'GONE-2947-PUT', start_datetime: '2059-09-02T09:00', created_by: MARIA.id });
+    return { method: 'PUT', route: `/${id}`, body: { description: 'mit Anhang' } };
+  }],
+])) {
+  test(`${label} - the account deactivated during the upload gets the 401 of requireAuth, nothing written (#2947)`, async () => {
+    const { method, route, body } = request();
+    const key = `drive-2947-gone-${label.replace(/\W+/g, '-')}`;
+    const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n;
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await duringUpload(key,
+        () => callAs(method, route, { actor: MARIA, body: { ...body, ...uploadBody(key) } }),
+        async () => { db.prepare("UPDATE users SET deactivated_at = '2059-01-01T00:00:00Z' WHERE id = ?").run(MARIA.id); });
+    } finally {
+      db.prepare('UPDATE users SET deactivated_at = NULL WHERE id = ?').run(MARIA.id);
+    }
+    assert.deepEqual([answer.status, answer.body], [401, { error: 'Not authenticated.', code: 401 }]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM calendar_events').get().n, eventsBefore, 'kein neuer Termin');
+    if (method === 'PUT') {
+      assert.equal(db.prepare('SELECT description FROM calendar_events WHERE id = ?').get(Number(route.slice(1))).description, null);
+    }
+  });
+}
+
 test('POST / - a CalDAV target switched off during the upload is refused like without it (#2956)', async () => {
   caldavTargetAccount7();
   const target = { target_caldav_account_id: 7, target_caldav_calendar_url: 'https://dav.test/cal/' };

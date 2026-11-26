@@ -37,6 +37,7 @@
  */
 
 import { createLogger } from '../logger.js';
+import { activeAccountSql } from '../services/account-state.js';
 import { resolvePermissions } from './catalog.ts';
 import { managesHousehold } from './manage.ts';
 import { buildSessionModuleAccess, userForRequest } from './modules.ts';
@@ -198,6 +199,30 @@ function kindOf(req: AuthenticatedRequest, userId: number | null): { kind: Actor
   if (guest !== 'no') return { kind: 'guest', unresolved };
   if (display !== 'no') return { kind: 'display', unresolved };
   return { kind: req.authMethod === 'api_token' ? 'token' : 'session', unresolved };
+}
+
+/**
+ * The request as its account stands NOW (#2947), for a write after an await.
+ *
+ * requireAuth reads the role and the module rights once, when the request
+ * arrives, and the actor is remembered per request. A check made then and a
+ * write after an await (a password hash, an upload) would decide on that
+ * snapshot: an admin demoted meanwhile, or a member whose module right was
+ * taken, would still write. This re-reads the role from `users` and resolves
+ * the module rights again, on a copy of the request - the original keeps its
+ * actor. Devices and wall displays stay members, as in requireAuth. `null`
+ * when the account is no longer active: it has no rights left.
+ */
+export function requestAsOfNow<T extends AuthenticatedRequest>(database: Database, req: T): T | null {
+  const row = database
+    .prepare(`SELECT u.role FROM users u WHERE u.id = ? AND ${activeAccountSql('u')}`)
+    .get(req.authUserId) as { role: string } | undefined;
+  if (!row) return null;
+  const fixedMember = req.authMethod === 'display' || (req.authDeviceId ?? null) != null;
+  const now = Object.assign(Object.create(Object.getPrototypeOf(req)), req) as T;
+  now.authRole = fixedMember ? 'member' : row.role;
+  now.sessionModuleAccess = resolveRequestModuleAccess(database, now);
+  return now;
 }
 
 /**
