@@ -480,7 +480,7 @@ async function testConnection(cardavUrl, username, password) {
  * @param {string} password - Password
  * @returns {Promise<Object>} { accountId, addressbooks }
  */
-async function addAccount(name, cardavUrl, username, password) {
+async function addAccount(name, cardavUrl, username, password, { assertStillAllowed = () => {} } = {}) {
   try {
     // Validate inputs
     if (!name || !cardavUrl || !username || !password) {
@@ -489,6 +489,9 @@ async function addAccount(name, cardavUrl, username, password) {
 
     // Test connection first
     const { addressbooks } = await testConnection(cardavUrl, username, password);
+    // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947); ab hier
+    // kein await mehr bis zum Anlegen.
+    assertStillAllowed();
 
     // Check for duplicate
     const existing = db.get().prepare(
@@ -692,7 +695,7 @@ function storedAddressbooks(database, accountId) {
  * @param {number} accountId - Account ID
  * @returns {Promise<Array<Object>>} Array of addressbook objects
  */
-async function discoverAddressbooks(accountId) {
+async function discoverAddressbooks(accountId, { assertStillAllowed = () => {} } = {}) {
   try {
     const database = db.get();
     const account = database.prepare('SELECT * FROM carddav_accounts WHERE id = ?').get(accountId);
@@ -708,6 +711,8 @@ async function discoverAddressbooks(accountId) {
     // fehlers. Umgestellt: die Liste stammt vom alten Server und wird nicht
     // gespeichert; es bleibt, was fuer das Konto schon gespeichert ist.
     const result = withTx(database, () => {
+      // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947).
+      assertStillAllowed();
       const current = database.prepare('SELECT carddav_url, username, password FROM carddav_accounts WHERE id = ?').get(accountId);
       if (!current) throw new CardDAVAccountGoneError(accountId);
       if (current.carddav_url !== account.carddav_url || current.username !== account.username

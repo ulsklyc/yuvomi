@@ -12,6 +12,7 @@ import { requireAdmin } from '../../auth.js';
 import { secret } from '../../api/formats.ts';
 import { refuseWhileRestoring } from '../../middleware/restore-gate.js';
 import * as db from '../../db.js';
+import { assertGatesNow, RefusedNowError } from '../../middleware/gate-now.js';
 import { readDefaultAssignees, validateAssigneeIds } from '../../services/default-assignees.js';
 import { remoteFailure } from '../../utils/http.js';
 
@@ -96,9 +97,12 @@ router.post('/caldav/accounts', requireAdmin, validateRequest(), async (req, res
     const vPassword = secret(password, 'Password');
     if (vPassword.error) return res.status(400).json({ error: vPassword.error, code: 400 });
 
-    const result = await caldavSync.addAccount(name, caldavUrl, username, password);
+    const result = await caldavSync.addAccount(name, caldavUrl, username, password, {
+      assertStillAllowed: () => assertGatesNow(db.get(), req, { admin: true }),
+    });
     res.json({ data: result });
   } catch (err) {
+    if (err instanceof RefusedNowError) return err.respond(res);
     // Die zwei Faelle, die die App selbst kennt (#1909). Alles andere ist eine
     // Absage des fremden Servers: die Seite zeigt dem Admin ihre Klasse.
     if (err.code === 'caldav_account_exists') {
@@ -125,7 +129,10 @@ router.put('/caldav/accounts/:id', requireAdmin, validateRequest(), async (req, 
     if (vPassword.error) return res.status(400).json({ error: vPassword.error, code: 400 });
     if (refuseUnknownAccount(res, accountId)) return;
 
-    const result = await caldavSync.updateAccount(accountId, { name, caldavUrl, username, password });
+    const result = await caldavSync.updateAccount(accountId, {
+      name, caldavUrl, username, password,
+      assertStillAllowed: () => assertGatesNow(db.get(), req, { admin: true }),
+    });
     res.json({ data: result });
   } catch (err) {
     // Neuer Server oder Benutzer ohne neues Passwort - keine Stoerung, sondern
@@ -134,6 +141,7 @@ router.put('/caldav/accounts/:id', requireAdmin, validateRequest(), async (req, 
       return res.status(400).json({ error: err.message, errorCode: 'password_required', code: 400 });
     }
     if (refuseGoneAccount(res, err)) return;
+    if (err instanceof RefusedNowError) return err.respond(res);
     // Das Konto aenderte sich in jedem Verbindungstest (#2947): ein Konflikt,
     // nichts ist gespeichert, die Anfrage darf wiederholt werden.
     if (/** @type {any} */ (err).code === 'caldav_account_changed') {
@@ -167,10 +175,13 @@ router.get('/caldav/accounts/:id/calendars', requireAdmin, refuseWhileRestoring,
     const refresh = req.query.refresh === 'true';
     if (refuseUnknownAccount(res, accountId)) return;
 
-    const calendars = await caldavSync.getCalendars(accountId, { refresh });
+    const calendars = await caldavSync.getCalendars(accountId, {
+      refresh, assertStillAllowed: () => assertGatesNow(db.get(), req, { admin: true }),
+    });
     res.json({ data: calendars });
   } catch (err) {
     if (refuseGoneAccount(res, err)) return;
+    if (err instanceof RefusedNowError) return err.respond(res);
     sendCaldavFailure(res, err, 'CalDAV calendars fetch failed:');
   }
 });
@@ -229,10 +240,13 @@ router.get('/caldav/accounts/:id/reminder-lists', requireAdmin, refuseWhileResto
     const refresh = req.query.refresh === 'true';
     if (refuseUnknownAccount(res, accountId)) return;
 
-    const lists = await caldavReminders.getReminderLists(accountId, { refresh });
+    const lists = await caldavReminders.getReminderLists(accountId, {
+      refresh, assertStillAllowed: () => assertGatesNow(db.get(), req, { admin: true }),
+    });
     res.json({ data: lists });
   } catch (err) {
     if (refuseGoneAccount(res, err)) return;
+    if (err instanceof RefusedNowError) return err.respond(res);
     sendCaldavFailure(res, err, 'CalDAV reminder lists fetch failed:');
   }
 });

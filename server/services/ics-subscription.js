@@ -470,7 +470,7 @@ class ImportRefusedAfterFeed extends TypeError {
  *   `assigned`: schon vorhandene Termine, die dabei eine Person dazubekamen
  *   (sie zaehlen auch in `skipped`).
  */
-async function importToLocal(userId, { ics, url, color, localCalendarId = null, assigneeIds = [] } = {}) {
+async function importToLocal(userId, { ics, url, color, localCalendarId = null, assigneeIds = [], assertStillAllowed = () => {} } = {}) {
   let rawEvents;
   if (typeof ics === 'string' && ics.trim()) {
     rawEvents = parseICS(ics);
@@ -480,6 +480,8 @@ async function importToLocal(userId, { ics, url, color, localCalendarId = null, 
   } else {
     throw new Error('Either an ICS file or a URL is required.');
   }
+  // Die Gates der Route (Modulrecht) gelten nach dem Laden des Feeds (#2947).
+  assertStillAllowed();
   const database = db.get();
   const calendarCheck = validateCalendarId(database, localCalendarId);
   // Der Kalender wurde waehrend des Ladens geloescht (#2947): dieselbe 400 wie

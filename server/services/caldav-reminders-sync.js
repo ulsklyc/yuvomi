@@ -134,7 +134,12 @@ const createClient = createCalDAVClient;
 // Reminder-List Discovery & Selection
 // --------------------------------------------------------
 
-async function getReminderLists(accountId, { refresh = false, createClient: makeClient } = {}) {
+/**
+ * @param {number} accountId
+ * @param {{ refresh?: boolean, createClient?: any, assertStillAllowed?: () => void }} [options]
+ *   `assertStillAllowed` (#2947): the route's gates, asked in the write after the query.
+ */
+async function getReminderLists(accountId, { refresh = false, createClient: makeClient, assertStillAllowed = () => {} } = {}) {
   const account = getAccountById(accountId);
   if (!account) {
     throw new Error(`Account ${accountId} not found.`);
@@ -159,6 +164,8 @@ async function getReminderLists(accountId, { refresh = false, createClient: make
   // Server und werden nicht gespeichert; es bleibt, was gespeichert ist.
   const database = db.get();
   const result = withTx(database, () => {
+    // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947).
+    assertStillAllowed();
     const current = getAccountById(accountId);
     if (!current) throw accountGoneError(accountId);
     if (!sameConnection(current, account)) {

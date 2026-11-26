@@ -259,6 +259,33 @@ test('Server: die Person, um die es geht, faellt WAEHREND des Hochladens aus dem
   assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
 });
 
+test('Server: das Schreibrecht an Dokumenten faellt WAEHREND des Hochladens weg - die Absage des Modul-Gates, kein Dokument, keine Datei (#2947)', async () => {
+  const { readdirSync } = await import('node:fs');
+  const files = () => readdirSync(storageRoot, { recursive: true }).filter((name) => String(name).endsWith('.pdf'));
+  process.env.DOCUMENT_STORAGE_LOCAL_ENABLED = 'true';
+  const before = files().length;
+  /** @type {any} */
+  let answer;
+  _setStageUploadForTest(async (/** @type {any} */ args) => {
+    const staged = await stageDocumentUpload(args);
+    db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(admin);
+    db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+      VALUES ('user', ?, 'module', 'documents', 'read')`).run(String(admin));
+    return staged;
+  });
+  try {
+    answer = await call('POST', '', upload({ name: 'Gate 2947' }));
+  } finally {
+    _setStageUploadForTest(null);
+    delete process.env.DOCUMENT_STORAGE_LOCAL_ENABLED;
+    db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(admin);
+    db.prepare("DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?").run(String(admin));
+  }
+  assert.deepEqual([answer.status, answer.body], [403, { error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' }]);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM family_documents WHERE name = 'Gate 2947'").get().n, 0, 'kein Dokument');
+  assert.equal(files().length, before, 'die schon abgelegte Datei bleibt nicht liegen');
+});
+
 test('Server: ein Name, den es unter den Geschwistern schon gibt - anlegen, umbenennen und verschieben nennen den Fall', async () => {
   const parent = await folder('Eltern');
   await folder('Doppelt', parent);

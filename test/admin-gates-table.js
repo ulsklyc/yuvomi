@@ -343,8 +343,6 @@ export const EXCEPTIONS = [
   // first); only an admin demoted during the hash does.
   { form: 'inline', file: 'server/auth.js', key: 'POST /users',
     reason: 'requireAdmin asked again after the password hash, stillAdmin() (test:password-hash, #2947)' },
-  { form: 'inline', file: 'server/routes/housekeeping.js', key: 'POST /worker',
-    reason: 'requireAdmin asked again after the password hash, stillAdmin() (test:housekeeping-routes, #2947)' },
 ];
 
 /**

@@ -38,7 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   demoted while a new member's or housekeeper's password is being prepared gets "admin access
   required" and no account is created, and whoever loses write access to documents while an
   event attachment uploads gets the refusal for attachments, with no attachment, copy or change
-  to the document's sharing left behind.
+  to the document's sharing left behind. The same holds for the right to change other people's
+  events, for read or write access to a module (calendar, documents) and for the administrator
+  role behind the CalDAV and CardDAV settings: whoever loses one of them while an attachment, a
+  document, a calendar feed or a connection test is on its way gets the same refusal as before
+  it, and nothing is saved.
 - **Saving a series with an attachment no longer fails when the series changes at the same
   moment.** When a change to a recurring event left single changed dates on their own, each of
   them first got its own copy of the attachment, and only then was the series saved. If the

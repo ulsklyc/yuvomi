@@ -441,7 +441,15 @@ async function testConnection(caldavUrl, username, password, { createClient } = 
 // Account Management
 // --------------------------------------------------------
 
-async function addAccount(name, caldavUrl, username, password, { createClient } = {}) {
+/**
+ * @param {string} name
+ * @param {string} caldavUrl
+ * @param {string} username
+ * @param {string} password
+ * @param {{ createClient?: any, assertStillAllowed?: () => void }} [options]
+ *   `assertStillAllowed` (#2947): the route's gates, asked after the connection test.
+ */
+async function addAccount(name, caldavUrl, username, password, { createClient, assertStillAllowed = () => {} } = {}) {
   // Validate inputs
   if (!name || !caldavUrl || !username || !password) {
     throw new Error('All fields required: name, caldavUrl, username, password');
@@ -450,6 +458,9 @@ async function addAccount(name, caldavUrl, username, password, { createClient } 
   // Test connection first (createClient injizierbar wie bei getCalendars/
   // updateAccount - ohne sie ginge dieser Pfad im Test ans echte Netz).
   const { calendars } = await testConnection(caldavUrl, username, password, { createClient });
+  // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947); ab hier
+  // kein await mehr bis zum Anlegen.
+  assertStillAllowed();
 
   // Check for duplicate
   const existing = db.get().prepare(
@@ -531,6 +542,9 @@ function listAccounts() {
   }));
 }
 
+/** Wie oft `updateAccount` gegen eine geaenderte Zeile neu entscheidet, bevor es aufgibt (#2947). */
+const CALDAV_UPDATE_ROUNDS = 3;
+
 /**
  * Zugangsdaten eines Kontos aendern; ein leeres Feld laesst den gespeicherten
  * Wert stehen.
@@ -543,11 +557,12 @@ function listAccounts() {
  * Adresse mit dem gespeicherten Passwort - ein PUT mit fremder Adresse schickte
  * die Zugangsdaten des Haushalts sofort per Basic Auth dorthin. Ein anderer Pfad
  * auf demselben Server bleibt ohne Passwort moeglich.
+ * @param {any} accountId
+ * @param {{ name?: string, caldavUrl?: string, username?: string, password?: string,
+ *   createClient?: any, assertStillAllowed?: () => void }} fields
+ *   `assertStillAllowed` (#2947): the route's gates, asked in the write after the test.
  */
-/** Wie oft `updateAccount` gegen eine geaenderte Zeile neu entscheidet, bevor es aufgibt (#2947). */
-const CALDAV_UPDATE_ROUNDS = 3;
-
-async function updateAccount(accountId, { name, caldavUrl, username, password, createClient }) {
+async function updateAccount(accountId, { name, caldavUrl, username, password, createClient, assertStillAllowed = () => {} }) {
   let account = getAccountById(accountId);
   if (!account) {
     throw new Error(`Account ${accountId} not found.`);
@@ -619,6 +634,8 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
     || (username && username !== account.username);
 
   withTx(db.get(), () => {
+    // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947).
+    assertStillAllowed();
     // If credentials changed, refresh calendar list
     if (calendars) {
       // Wie in getCalendars({ refresh: true }): neue Zugangsdaten heißen neue
@@ -752,7 +769,12 @@ function deleteAccount(accountId, { deleteEvents = false } = {}) {
 // Calendar Selection
 // --------------------------------------------------------
 
-async function getCalendars(accountId, { refresh = false, createClient } = {}) {
+/**
+ * @param {number} accountId
+ * @param {{ refresh?: boolean, createClient?: any, assertStillAllowed?: () => void }} [options]
+ *   `assertStillAllowed` (#2947): the route's gates, asked in the write after the query.
+ */
+async function getCalendars(accountId, { refresh = false, createClient, assertStillAllowed = () => {} } = {}) {
   const account = getAccountById(accountId);
   if (!account) {
     throw new Error(`Account ${accountId} not found.`);
@@ -771,6 +793,8 @@ async function getCalendars(accountId, { refresh = false, createClient } = {}) {
   // Server und wird nicht gespeichert; es bleibt, was gespeichert ist.
   const database = db.get();
   const result = withTx(database, () => {
+    // Die Gates der Route (Admin, Modul) gelten am Schreiben (#2947).
+    assertStillAllowed();
     const current = getAccountById(accountId);
     if (!current) throw accountGoneError(accountId);
     if (!sameConnection(current, account)) {

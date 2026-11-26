@@ -8,6 +8,7 @@ import express from 'express';
 import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
 import { withTx } from '../db/tx.ts';
+import { assertGatesNow, RefusedNowError } from '../middleware/gate-now.js';
 import { createLogger } from '../logger.js';
 import { str, date as validateDate, num, collectErrors, MAX_TEXT, MAX_TITLE } from '../api/formats.ts';
 import { isAdminRequest, requireAdmin } from '../middleware/require-admin.js';
@@ -1380,6 +1381,9 @@ router.post('/', validateRequest(), async (req, res) => {
       // Ablegens, und dort kann ein anderes Loeschen den Ordner nehmen (Review
       // zu #1994). Erst hier ist das Ergebnis bis zum INSERT verbindlich.
       if (selectedFolderMissing(selectedFolderId)) throw new SelectedFolderGoneError();
+      // Das Modul-Gate gilt am Schreiben (#2947): wer waehrend des Ablegens das
+      // Schreibrecht an Dokumenten verlor, bekommt die Absage des Gates.
+      assertGatesNow(database, req);
       // Ebenso das Ziel der Ablage (#2946): wurden die Speicher-Einstellungen
       // waehrend des Ablegens geaendert, stuende die Zeile hinter einer
       // Verbindung, die nicht mehr gilt. 409, die Datei raeumt der catch weg.
@@ -1457,6 +1461,7 @@ router.post('/', validateRequest(), async (req, res) => {
     }
     if (folderGone) return selectedFolderGone(res);
     if (err instanceof AccessStrangersError) return res.status(400).json({ error: nonMemberMessage(err.strangers), code: 400 });
+    if (err instanceof RefusedNowError) return err.respond(res);
     // A storage refusal after staging (#2946: the settings changed meanwhile),
     // answered once the staged file is gone.
     if (err instanceof StorageError) return sendStorageError(res, err, 'Document storage upload failed.');

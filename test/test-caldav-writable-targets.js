@@ -404,3 +404,46 @@ test('Zugangsdaten aendern: zieht das Konto waehrenddessen um, entscheidet die n
     fakeDav.allowAll();
   }
 });
+
+// Das Admin-Recht gilt am Schreiben (#2947): verliert der Admin waehrend der
+// Abfrage beim Server seine Rolle, die Absage von requireAdmin, nichts gespeichert.
+const ADMIN_REQUIRED = { error: 'Admin access required.', code: 403, reason: 'admin_required' };
+const demote = () => db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(userId);
+const restore = () => db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(userId);
+
+for (const [label, method, path, body, table] of /** @type {const} */ ([
+  ['Kalender aktualisieren', 'GET', 'calendars?refresh=true', undefined, 'caldav_calendar_selection'],
+  ['Erinnerungslisten aktualisieren', 'GET', 'reminder-lists?refresh=true', undefined, 'caldav_reminder_selection'],
+  ['Zugangsdaten aendern', 'PUT', '', { password: 'neu' }, 'caldav_calendar_selection'],
+])) {
+  test(`${label}: ein waehrenddessen zurueckgestufter Admin bekommt die Admin-Absage, nichts gespeichert (#2947)`, async () => {
+    reset();
+    fakeDav.addCollection('family', { name: 'Familie' });
+    fakeDav.addCollection('todo', { name: 'Aufgaben', components: ['VTODO'] });
+    duringFirstRequest(demote);
+    try {
+      const res = await api(method, `/calendar/caldav/accounts/${accountId}${path ? `/${path}` : ''}`, body);
+      assert.deepEqual([res.status, res.body], [403, ADMIN_REQUIRED]);
+      assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE account_id = ?`).get(accountId).n, 0);
+      assert.equal(db.prepare('SELECT password FROM caldav_accounts WHERE id = ?').get(accountId).password, 'p');
+    } finally {
+      fakeDav.allowAll();
+      restore();
+    }
+  });
+}
+
+test('Konto anlegen: ein waehrend des Verbindungstests zurueckgestufter Admin bekommt die Admin-Absage, kein Konto (#2947)', async () => {
+  reset();
+  fakeDav.addCollection('family', { name: 'Familie' });
+  const before = db.prepare('SELECT COUNT(*) AS n FROM caldav_accounts').get().n;
+  duringFirstRequest(demote);
+  try {
+    const res = await api('POST', '/calendar/caldav/accounts', { name: 'Neu', caldavUrl: fakeDav.url, username: 'neu-2947', password: 'p' });
+    assert.deepEqual([res.status, res.body], [403, ADMIN_REQUIRED]);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_accounts').get().n, before, 'kein Konto');
+  } finally {
+    fakeDav.allowAll();
+    restore();
+  }
+});

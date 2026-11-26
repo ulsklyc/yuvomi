@@ -522,6 +522,24 @@ describe('Routen', () => {
     assert.equal(db.prepare("SELECT COUNT(*) AS c FROM calendar_events WHERE external_calendar_id = 'route-2947-cal'").get().c, 0, 'kein Termin');
   });
 
+  it('POST /import from a URL: calendar write taken while the feed loads is the module gate refusal, no event (#2947)', async () => {
+    const icsText = feedOf('route-2947-gate');
+    /** @type {any} */
+    let answer;
+    try {
+      answer = await importWhileFeedHeld({}, icsText, () => {
+        db.prepare("UPDATE users SET role = 'member' WHERE id = ?").run(OWNER);
+        db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+          VALUES ('user', ?, 'module', 'calendar', 'read')`).run(String(OWNER));
+      });
+    } finally {
+      db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(OWNER);
+      db.prepare("DELETE FROM access_permissions WHERE subject_type = 'user' AND subject_id = ?").run(String(OWNER));
+    }
+    assert.deepEqual([answer.status, answer.body], [403, { error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' }]);
+    assert.equal(db.prepare("SELECT COUNT(*) AS c FROM calendar_events WHERE external_calendar_id = 'route-2947-gate'").get().c, 0, 'kein Termin');
+  });
+
   it('subscriptions: a gone subscription names calendar_subscription_not_found (#1909)', async () => {
     for (const [method, path, body] of [
       ['PATCH', '/subscriptions/999999', { name: 'x' }],

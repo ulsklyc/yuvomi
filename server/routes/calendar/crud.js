@@ -65,6 +65,7 @@ import {
   followInboundStartChange,
 } from '../../services/calendar-occurrence-overrides.js';
 import { isAdminRequest } from '../../middleware/require-admin.js';
+import { gateRefusalNow } from '../../middleware/gate-now.js';
 import {
   ASSIGNED_USERS_SQL,
   getUserId,
@@ -449,7 +450,7 @@ class AttachmentLockedError extends Error {}
 
 function assertAttachmentStillChangeable(req, database, storedDocumentId, { replacementRequested, removalRequested }) {
   if (!(replacementRequested || removalRequested)) return;
-  if (storedAttachmentLocked(req, database, storedDocumentId)) throw new AttachmentLockedError();
+  if (attachmentLockedNow(req, database, storedDocumentId)) throw new AttachmentLockedError();
 }
 
 /** Anhang inzwischen gesperrt: gestagte Uploads wegraeumen, dann dieselbe 403 wie die fruehe Pruefung. */
@@ -806,6 +807,12 @@ router.post('/', refuseUploadWithoutDocumentsWrite, validateRequest(), async (re
       if (strangersNow.length) return res.status(400).json({ error: nonMemberMessage(strangersNow), code: 400 });
       return sendValidationErrors(res, checksNow);
     }
+    // Das Modul-Gate gilt am Schreiben (#2947): dieselbe Absage wie am Eingang.
+    const gateNow = gateRefusalNow(db.get(), req);
+    if (gateNow) {
+      if (stagedUpload) await cleanupStagedUpload(stagedUpload);
+      return gateNow(res);
+    }
     const rights = attachmentRights(req);
     const eventId = withTx(db.get(), () => {
       const documentId = rights.createAttachmentDocument(
@@ -966,6 +973,46 @@ function refuseForeignEvent(req, res, event) {
   return true;
 }
 
+/**
+ * DAS RECHT GILT AM SCHREIBEN (#2947). Darf die Anfrage den Termin aendern -
+ * mit dem Recht vom Eingang UND mit Rolle und Rechten des Kontos von jetzt
+ * (`requestAsOfNow`)? Gefragt nach dem letzten await (Upload, Kopien), im
+ * selben synchronen Schritt wie das Schreiben; neu gelesen wird nur enger.
+ * @param {any} req
+ * @param {any} event
+ */
+function mayEditEventNow(req, event) {
+  if (!mayChangeRecord(db.get(), req, 'calendar_edit_others', ownsEvent(event, req))) return false;
+  const now = requestAsOfNow(db.get(), req);
+  return Boolean(now) && mayChangeRecord(db.get(), now, 'calendar_edit_others', ownsEvent(event, now));
+}
+
+/**
+ * Der gespeicherte Anhang ist fuer die Anfrage gesperrt - am Eingang ODER jetzt
+ * (#2947): das Dokumente-Leserecht gilt am Schreiben wie das Bearbeitungsrecht.
+ * @param {any} req
+ * @param {any} database
+ * @param {number | null | undefined} storedDocumentId
+ */
+function attachmentLockedNow(req, database, storedDocumentId) {
+  if (storedAttachmentLocked(req, database, storedDocumentId)) return true;
+  const now = requestAsOfNow(database, req);
+  return !now || storedAttachmentLocked(now, database, storedDocumentId);
+}
+
+/**
+ * Modul-Gate und Bearbeitungsrecht am Schreiben (#2947): faellt eines weg,
+ * dieselbe Absage wie am Eingang, als RefusedAfterUploadError - der catch der
+ * Route raeumt Upload und Kopien weg.
+ * @param {any} req
+ * @param {any} event
+ */
+function assertCalendarRightsNow(req, event) {
+  const gate = gateRefusalNow(db.get(), req);
+  if (gate) throw new RefusedAfterUploadError(gate);
+  if (!mayEditEventNow(req, event)) throw new RefusedAfterUploadError((r) => sendNotOwner(r));
+}
+
 const CALENDAR_OCCURRENCE_ERRORS = {
   calendar_series_not_found: 'Calendar series not found.',
   not_authorized: 'Not authorized to change this calendar series.',
@@ -1041,6 +1088,9 @@ function seriesAfterUpload(seriesId, req) {
       code: 'calendar_series_not_found',
     });
   }
+  // Ebenso Modul-Gate und Bearbeitungsrecht (#2947): die Route fragte sie am
+  // Eingang, vor dem Upload.
+  assertCalendarRightsNow(req, current);
   return current;
 }
 
@@ -1119,7 +1169,11 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
     const refuse = (respond) => ({ refuse: respond });
     const evaluate = (/** @type {any} */ row) => {
       if (!row) return refuse((r) => sendEventGone(r));
-      if (!mayChangeRecord(db.get(), req, 'calendar_edit_others', ownsEvent(row, req))) {
+      // Modul-Gate und Bearbeitungsrecht, wie sie JETZT stehen (#2947): beim
+      // zweiten Lauf nach dem Upload sonst noch der Stand vom Eingang.
+      const gate = gateRefusalNow(db.get(), req);
+      if (gate) return refuse(gate);
+      if (!mayEditEventNow(req, row)) {
         return refuse((r) => sendNotOwner(r));
       }
       // Ein verknuepftes Vorkommen hat seinen eigenen Weg; die Absage (404, 403
@@ -1306,7 +1360,7 @@ router.put('/:id', refuseUploadWithoutDocumentsWrite, validateRequest(), async (
         }));
       }
       if ((replacementRequested || removalRequested)
-          && storedAttachmentLocked(req, db.get(), row.attachment_document_id)) {
+          && attachmentLockedNow(req, db.get(), row.attachment_document_id)) {
         return refuse((r) => r.status(403).json({ error: ATTACHMENT_CHANGE_REFUSAL, code: 403, reason: 'ATTACHMENT_CHANGE_REFUSED' }));
       }
 

@@ -110,7 +110,8 @@ import scheduleFeedRouter from './routes/schedule-feed.js';
 import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
 import { sessionModuleAccessRequirement, tokenAccessRequirement, tokenAllows } from './scopes.js';
-import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './authorize/index.ts';
+import { moduleAccessVerdict } from './authorize/index.ts';
+import { sendModuleGateRefusal } from './middleware/gate-now.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
 import { createStaticAssets } from './utils/static-assets.js';
@@ -693,12 +694,9 @@ app.use('/api/v1', (req, res, next) => {
   // `reason` ist der maschinenlesbare Grund (#1607): der Satz in `error` ist
   // englisch und stand so in jeder Oberflaechensprache im Toast. Die App
   // uebersetzt ueber den Grund (public/api.js), API-Nutzer behalten den Satz.
-  if (verdict === MODULE_ACCESS_DENIED) {
-    return res.status(403).json({ error: 'You do not have access to this module.', code: 403, reason: 'module_access_denied' });
-  }
-  if (verdict === MODULE_ACCESS_READ_ONLY) {
-    return res.status(403).json({ error: 'You have read-only access to this module.', code: 403, reason: 'module_read_only' });
-  }
+  // Die Absage selbst steht in server/middleware/gate-now.js: dieselbe gibt
+  // eine Route, die nach einem await vor dem Schreiben noch einmal fragt (#2947).
+  if (sendModuleGateRefusal(res, verdict)) return;
   return next();
 });
 app.use('/api/v1', csrfMiddleware);

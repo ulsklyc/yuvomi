@@ -6,6 +6,7 @@ import { createLogger } from '../../logger.js';
 import express from 'express';
 import { validateRequest } from '../../api/validate-request.ts';
 import * as db from '../../db.js';
+import { assertGatesNow, RefusedNowError } from '../../middleware/gate-now.js';
 import * as icsSubscription from '../../services/ics-subscription.js';
 import { color } from '../../api/formats.ts';
 import { ICS_COLOR_RE, getUserId } from './helpers.js';
@@ -227,11 +228,13 @@ router.post('/import', validateRequest(), async (req, res) => {
     const result = await icsSubscription.importToLocal(userId, {
       ics, url, color: vColorValue, localCalendarId: vLocalCalendar.value,
       assigneeIds: assignees.present ? assignees.ids : [],
+      assertStillAllowed: () => assertGatesNow(db.get(), req),
     });
     res.status(201).json({ data: result });
   } catch (err) {
     // Kalender oder Personen kamen waehrend des Ladens abhanden (#2947): die
     // Absage, die sie vor dem Laden bekommen haetten.
+    if (err instanceof RefusedNowError) return err.respond(res);
     if (err instanceof icsSubscription.ImportRefusedAfterFeed) {
       return res.status(400).json({ error: err.answer.error, code: 400, ...(err.answer.reason ? { reason: err.answer.reason } : {}) });
     }
