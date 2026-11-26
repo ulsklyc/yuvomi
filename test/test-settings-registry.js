@@ -252,6 +252,9 @@ function personalValid(label, variant) {
     ]),
     [`hidden_modules:user:${label}`]: variant === 1 ? '["notes","budget"]' : '["notes"]',
     [`module_order:user:${label}`]: variant === 1 ? '["dashboard","tasks"]' : '["tasks","dashboard"]',
+    [`module_colors:user:${label}`]: variant === 1
+      ? '{"dashboard":{"light":"#112233","dark":"#445566"}}'
+      : '{"tasks":{"light":"#223344","dark":"#556677"}}',
     [`mobile_nav_order:user:${label}`]: '["tasks","kitchen","notes"]',
     [`calendar_default_reminders:user:${label}`]: '[60,15]',
     [`calendar_default_assign_me:user:${label}`]: '1',
@@ -277,6 +280,7 @@ function personalInvalid(label) {
     [`dashboard_widgets_phone:user:${label}`]: '{broken',
     [`hidden_modules:user:${label}`]: '["dashboard","settings","notes"]',
     [`module_order:user:${label}`]: 'null',
+    [`module_colors:user:${label}`]: '{"tasks":"bad","notes":{"light":"#112233","dark":"#445566"}}',
     [`mobile_nav_order:user:${label}`]: '[1,2,"bogus"]',
     [`calendar_default_reminders:user:${label}`]: '[7,"60",60]',
     [`calendar_default_assign_me:user:${label}`]: 'true',
@@ -438,7 +442,7 @@ const PERSONAL_KEYS = Object.keys(personalValid('x', 0)).map((key) => key.replac
 
 test('the valid and the invalid GET seed set every storage key of the route', () => {
   assert.equal(HOUSEHOLD_KEYS.length, 41);
-  assert.equal(PERSONAL_KEYS.length, 19);
+  assert.equal(PERSONAL_KEYS.length, 20);
   for (const state of ['valid', 'invalid']) {
     const keys = Object.keys(GET_STATES[state].seed);
     assert.deepEqual(HOUSEHOLD_KEYS.filter((key) => !keys.includes(key)), [], `${state}: household`);
@@ -571,6 +575,8 @@ const PUT_CASES = [
   { name: 'hidden_modules not an array', body: { hidden_modules: 'budget' } },
   { name: 'module_order valid', body: { module_order: ['tasks', 'dashboard', 'bogus', 'tasks', 'third-party-foo-bar'] } },
   { name: 'module_order not an array', body: { module_order: 'tasks' } },
+  { name: 'module_colors valid', body: { module_colors: { tasks: { light: '#112233', dark: '#445566' }, bogus: { light: '#112233', dark: '#445566' } } } },
+  { name: 'module_colors not an object', body: { module_colors: 'tasks' } },
   { name: 'mobile_nav_order valid', body: { mobile_nav_order: ['meals', 'recipes', 'tasks', 'calendar', 'notes'] } },
   { name: 'mobile_nav_order not an array', body: { mobile_nav_order: 'tasks' } },
 
@@ -1054,8 +1060,8 @@ const SINGLE_FIELD_CASES = Object.groupBy(
 
 const catalogByField = () => new Map(settingsCatalog().map((entry) => [entry.field, entry]));
 
-test('registry: the measured fields are what this suite expects (52 PUT fields, the route views)', () => {
-  assert.equal(PUT_FIELDS.length, 52, PUT_FIELDS.join(', '));
+test('registry: the measured fields are what this suite expects (53 PUT fields, the route views)', () => {
+  assert.equal(PUT_FIELDS.length, 53, PUT_FIELDS.join(', '));
   for (const field of PUT_FIELDS) assert.ok(SINGLE_FIELD_CASES[field]?.length, `a single-field case for ${field}`);
   for (const view of ROUTE_VIEWS) assert.ok(GET_FIELDS.includes(view), view);
 });
