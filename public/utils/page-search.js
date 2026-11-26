@@ -24,6 +24,7 @@
  */
 import { esc } from '/utils/html.js';
 
+/** @param {{id?: string, label?: string, placeholder?: string, value?: string, clearLabel?: string, className?: string}} opts */
 export function renderPageSearch({ id, label, placeholder, value = '', clearLabel = '', className = '' } = {}) {
   const ph = placeholder ?? label ?? '';
   const lbl = label ?? placeholder ?? '';

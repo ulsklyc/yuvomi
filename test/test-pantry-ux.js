@@ -17,11 +17,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 global.HTMLElement = class HTMLElement {};
+global.Element = global.HTMLElement;
+/** @type {any} Runtime hooks used by the browser loader. */
+const testGlobals = globalThis;
 global.customElements = { define() {}, get() { return undefined; } };
 
 /** Generischer Knoten: genug fuer `rowEl`, das die Zeile wirklich neu baut.
  *  Attribute und eingesetztes HTML werden mitgeschrieben, damit die Produktzeile
  *  (#1448) an `aria-expanded`, `aria-controls` und ihrem Winkel pruefbar ist. */
+/** @returns {any} Test nodes deliberately implement a small, mutable DOM surface. */
 function makeNode() {
   const attrs = new Map();
   const node = {
@@ -29,22 +33,24 @@ function makeNode() {
     className: '', textContent: '', type: '', hidden: false, disabled: false,
     isConnected: true,
     classList: { add() {}, remove() {}, toggle() {} },
-    setAttribute(name, value) { attrs.set(name, String(value)); },
-    removeAttribute(name) { attrs.delete(name); },
-    getAttribute(name) { return attrs.has(name) ? attrs.get(name) : null; },
-    appendChild(child) { node.children.push(child); return child; },
+    setAttribute(/** @type {string} */ name, /** @type {unknown} */ value) { attrs.set(name, String(value)); },
+    removeAttribute(/** @type {string} */ name) { attrs.delete(name); },
+    getAttribute(/** @type {string} */ name) { return attrs.has(name) ? attrs.get(name) : null; },
+    appendChild(/** @type {any} */ child) { node.children.push(child); return child; },
+    /** @param {...any} kids */
     append(...kids) { node.children.push(...kids); },
+    /** @param {...any} kids */
     prepend(...kids) { node.children.unshift(...kids); },
     replaceChildren() { node.children = []; },
     replaceWith() {},
-    insertAdjacentHTML(_where, html) { node.html += html; },
+    insertAdjacentHTML(/** @type {string} */ _where, /** @type {string} */ html) { node.html += html; },
     addEventListener() {},
     querySelector() { return null; },
     querySelectorAll() { return []; },
     closest() { return null; },
     focus() {},
   };
-  return node;
+  return Object.setPrototypeOf(node, HTMLElement.prototype);
 }
 
 global.window = { matchMedia: () => ({ matches: false }), addEventListener() {}, yuvomi: {} };
@@ -53,6 +59,7 @@ global.window = { matchMedia: () => ({ matches: false }), addEventListener() {},
 global.location = { pathname: '/pantry' };
 global.document = {
   createElement: () => makeNode(),
+  createTextNode: (text) => /** @type {Text} */ (/** @type {unknown} */ ({ textContent: text })),
   getElementById: () => null,
   querySelector: () => null,
   addEventListener() {},
@@ -60,7 +67,7 @@ global.document = {
   activeElement: null,
 };
 
-const { __test } = await import('../public/pages/pantry.js');
+const { __test, render: renderPantry } = await import('../public/pages/pantry.js');
 
 /** Zeile mit genau den zwei Stellen, die `refreshRowQuantity` wirklich anfasst. */
 function makeRow(step = 1) {
@@ -94,6 +101,7 @@ function resetPantry() {
   __test.state.locations = [];
   __test.state.categories = [];
   __test.state.filter = 'all';
+  __test.state.locationId = null;
   __test.state.query = '';
   __test.setContainerForTest(null);
   __test.setQuantityDebounceMsForTest(null);
@@ -102,6 +110,36 @@ function resetPantry() {
 
 /** Wartet, bis der entprellte PATCH gefeuert und abgearbeitet ist. */
 const settled = () => new Promise((resolve) => setTimeout(resolve, 25));
+
+test('entering the pantry starts at All after a previous filtered visit and honors explicit dashboard links', async () => {
+  resetPantry();
+  const location = testGlobals.window.location;
+  testGlobals.window.location = { search: '' };
+  testGlobals.__apiStub = {
+    get: async () => ({ data: [], products: [], locations: [], categories: [] }),
+  };
+  try {
+    __test.state.filter = 'low';
+    __test.state.locationId = 1;
+    __test.state.query = 'milk';
+    await renderPantry(makeNode());
+    assert.equal(__test.state.filter, 'all');
+    assert.equal(__test.state.locationId, null);
+    assert.equal(__test.state.query, '');
+
+    for (const filter of ['low', 'soon', 'expired']) {
+      testGlobals.window.location.search = `?filter=${filter}`;
+      await renderPantry(makeNode());
+      assert.equal(__test.state.filter, filter);
+    }
+    testGlobals.window.location.search = '';
+    await renderPantry(makeNode());
+    assert.equal(__test.state.filter, 'all', 'returning through the pantry tab clears the last status');
+  } finally {
+    testGlobals.window.location = location;
+    delete testGlobals.__apiStub;
+  }
+});
 
 test('ein Schritt ueberlebt eine Auffrischung mitten im Entprell-Fenster', async () => {
   resetPantry();
@@ -441,7 +479,7 @@ test('renderList() laesst die Chipreihe als erstes Kind des Ports stehen', () =>
   const chipRow = makeNode();
   const list = makeNode();
   list.querySelector = (sel) => (sel === ':scope > #pantry-filters' ? chipRow : null);
-  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  list.replaceChildren = /** @param {...any} kids */ (...kids) => { list.children = [...kids]; };
   list.children = [chipRow, makeNode(), makeNode()];
   __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null) });
 
@@ -471,7 +509,7 @@ test('R24 E2: der Vorrat hat keine Seitenspalte mehr - weder Markup noch Regel',
   const css = readFileSync(new URL('../public/styles/pantry.css', import.meta.url), 'utf8');
   const rules = [...eachRule(css)];
   assert.ok(!rules.some((r) => /pantry-watch/.test(r.selector)), 'keine Regel fuer ein Nebenpanel');
-  assert.ok(!rules.some((r) => r.at.some?.((at) => /pantry-surface/.test(at)) || /pantry-surface/.test(String(r.at))),
+  assert.ok(!rules.some((r) => r.selector === '.pantry-body' && /grid-template-columns/.test(r.body)),
     'keine Container-Abfrage, die Liste und Spalte nebeneinander stellt');
   const src = readFileSync(new URL('../public/pages/pantry.js', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /pantry-watch|renderWatch|onWatchClick/, 'kein Panel im Code');
@@ -532,6 +570,7 @@ test('der Bearbeiten-Dialog zeigt die Menge eines noch entprellten Schritts', ()
     open.onSave(panel);
     return fields;
   };
+  /** @type {any[]} */
   const opened = [];
   globalThis.__openModal = (opts) => { opened.push(opts); };
   try {
@@ -937,6 +976,24 @@ test('#1448: alle Chargen an EINEM Ort heissen nach ihrem MHD, an verschiedenen 
   assert.equal(__test.rowOptions(milk.batches[0]).byDate, false);
 });
 
+test('pantry best-before dates omit the dangling dot when the current year is hidden', () => {
+  groupedPantry();
+  const formatDayMonth = testGlobals.__formatDayMonth;
+  testGlobals.__formatDayMonth = () => '08.11.';
+  try {
+    const passata = __test.productSections(__test.state.items)[2].products[0];
+    const rows = byClass(__test.productEl(passata), 'pantry-batches')[0].children;
+    assert.equal(textOf(byClass(rows[0], 'list-row__name')[0]), 'Passata: pantry.bestBefore{"date":"08.11"}');
+    assert.equal(textOf(byClass(rows[1], 'list-row__name')[0]), 'Passata: pantry.bestBefore{"date":"2027-08-15"}');
+    const milk = __test.productSections(__test.state.items)[0].products[1];
+    const milkRows = byClass(__test.productEl(milk), 'pantry-batches')[0].children;
+    assert.match(textOf(byClass(milkRows[0], 'pantry-row__date')[0]), /"date":"08\.11"/);
+  } finally {
+    if (formatDayMonth) testGlobals.__formatDayMonth = formatDayMonth;
+    else delete testGlobals.__formatDayMonth;
+  }
+});
+
 test('#1448: aufklappen schaltet aria-expanded und die Region; der Zustand gilt fuer den Besuch', async () => {
   groupedPantry();
   const milk = __test.productSections(__test.state.items)[0].products[1];
@@ -1042,11 +1099,12 @@ test('#1448: renderList zeichnet ohne Filter Produkte in Kategorie-Abschnitten, 
   groupedPantry();
   const list = makeNode();
   list.querySelector = () => null;
-  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  list.replaceChildren = /** @param {...any} kids */ (...kids) => { list.children = [...kids]; };
   __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null), querySelectorAll: () => [] });
   __test.renderList();
   const sections = list.children.filter((c) => hasClass(c, 'pantry-group'));
-  assert.equal(sections.length, 3, 'drei Kategorien');
+  assert.equal(sections.length, 2, 'only categories with batches occupy the stock grid');
+  assert.equal(byClass(list, 'pantry-saved-products')[0].open, false);
   const title = byClass(sections[0], 'list-group__title')[0];
   assert.equal(textOf(byClass(title, 'list-group__count')[0]), '2', 'die Zahl zaehlt Produkte, nicht Chargen');
   assert.equal(byClass(sections[0], 'pantry-product__toggle').length, 1, 'Milch als Produktzeile');
@@ -1065,7 +1123,9 @@ test('#1448: renderList zeichnet ohne Filter Produkte in Kategorie-Abschnitten, 
   __test.state.filter = 'all';
   __test.state.items = [];
   __test.renderList();
+  assert.equal(byClass(list, 'pantry-group').length, 0, 'no category cards without batches');
   assert.equal(byClass(list, 'pantry-product--empty').length, 4, 'alle vier als Leer, kein Leerzustand');
+  assert.equal(byClass(list, 'pantry-saved-products')[0].open, true, 'restock actions are visible when all stock is gone');
 });
 
 test('#1448: die zugeklappte Produktzeile zeigt das dringendste MHD ihrer Chargen und den Bestand des Produkts', async () => {
@@ -1145,6 +1205,7 @@ test('#1448: im Rueckgaengig-Fenster zaehlt die Produktzeile die geloeschte Char
     __test.pendingDeletes.add(expired.id);
     __test.refreshProductTotals(expired, { speak: false });
     assert.match(textOf(total), /"quantity":"2 /, 'nur noch die 2 l im Dachboden');
+    assert.ok(!textOf(where).startsWith(' · '), 'the separator stays in its own node');
     assert.match(textOf(where), /pantry\.productBatches\{"count":1\}.*Dachboden/, 'eine Charge an einem Ort');
     assert.deepEqual(byClass(slot, 'pantry-badge').map(textOf), ['pantry.badgeLow'],
       'das Abgelaufen-Badge geht mit der Charge; 2 l gegen 4 bleiben knapp');
@@ -1178,7 +1239,7 @@ const { setPermissions, clearPermissions } = await import('../public/permissions
 function pageStub({ stage = null, extra = {} } = {}) {
   const list = makeNode();
   list.querySelector = () => null;
-  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  list.replaceChildren = /** @param {...any} kids */ (...kids) => { list.children = [...kids]; };
   const live = makeNode();
   const container = {
     list,
@@ -1196,6 +1257,32 @@ function pageStub({ stage = null, extra = {} } = {}) {
 }
 
 const productNames = () => __test.productSections(__test.state.items).flatMap((s) => s.products.map((p) => p.name));
+
+test('the last batch hides its category during the undo window and undo restores it', async () => {
+  groupedPantry();
+  __test.state.items = __test.state.items.filter((item) => item.id === 5);
+  const [butter] = __test.state.items;
+  const page = pageStub({ extra: { '.pantry-row[data-id="5"]': makeNode() } });
+  page.list.querySelector = (/** @type {string} */ selector) => selector === '.pantry-saved-products' ? byClass(page.list, 'pantry-saved-products')[0] ?? null : null;
+  /** @type {any} */
+  let pending;
+  testGlobals.__undoStub = (/** @type {any} */ opts) => { pending = opts; };
+  try {
+    __test.renderList();
+    assert.equal(byClass(page.list, 'pantry-group').length, 1);
+    assert.equal(byClass(page.list, 'pantry-saved-products')[0].open, false);
+    await __test.removeItem(butter);
+    assert.equal(byClass(page.list, 'pantry-group').length, 0);
+    assert.equal(byClass(page.list, 'pantry-saved-products')[0].open, true, 'the last deletion reveals restock actions');
+    __test.renderList();
+    assert.equal(byClass(page.list, 'pantry-group').length, 0);
+    pending.restore();
+    assert.equal(byClass(page.list, 'pantry-group').length, 1);
+  } finally {
+    __test.pendingDeletes.clear();
+    delete testGlobals.__undoStub;
+  }
+});
 
 test('#2085: the product without batches lies on a swipe stage and has a more button with "Delete"', async () => {
   groupedPantry();
@@ -1353,13 +1440,14 @@ test('#2085: a step on a batch under an open product updates the product total a
   }
 });
 
-test('#2085: one chip per place that holds a batch, in the order of the places, single-select with the status chips', () => {
+test('location chips keep their order and zero counts as filters change', () => {
   groupedPantry();
   __test.state.locations = [...LOCS, { id: 4, name: 'Keller', icon: 'warehouse' }];
   const chips = __test.placeChips(__test.state.items);
   assert.deepEqual(chips.map((c) => [c.id, c.label, c.count]), [
     ['place:1', 'Garage', 2], ['place:2', 'Dachboden', 1], ['place:3', 'Speisekammer', 2],
-  ], 'Keller holds nothing and gets no chip; the rest in the order of the places');
+    ['place:4', 'pantry.locCellar', 0], ['place:none', 'pantry.unlocated', 0],
+  ], 'every location stays reachable, including unassigned batches');
   assert.equal(chips[0].icon, 'map-pin', 'a place without an icon gets the pin');
 
   // The bar: the same filter-chip markup as the status chips, aria-pressed on each, one pressed.
@@ -1367,37 +1455,173 @@ test('#2085: one chip per place that holds a batch, in the order of the places, 
   bar.contains = () => false;
   bar.querySelector = () => null;
   __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-filters' ? bar : null), querySelectorAll: () => [] });
-  __test.state.filter = 'place:3';
-  const { wasReset } = __test.renderFilters();
-  assert.equal(wasReset, false);
+  __test.state.locationId = 3;
+  __test.renderFilters();
   assert.equal(bar.hidden, false);
-  const buttons = bar.html.match(/<button[^>]*>/g);
+  const buttons = bar.html.match(/<button[^>]*>/g).filter((/** @type {string} */ button) => /data-filter=/.test(button));
   const pressed = buttons.filter((b) => /aria-pressed="true"/.test(b));
-  assert.equal(pressed.length, 1, 'single-select: one chip pressed');
-  assert.match(pressed[0], /class="filter-chip filter-chip--sm filter-chip--active"\s+data-filter="place:3"/);
-  assert.ok(buttons.some((b) => /data-filter="expired" aria-pressed="false"/.test(b)), 'the status chips stay, unpressed');
+  assert.equal(pressed.length, 0, 'location selection leaves status chips clear');
+  assert.match(bar.html, /pantry-location-filter__label">Speisekammer<\/span>/);
+  assert.ok(buttons.some((b) => /data-filter="expired"/.test(b)), 'zero-count statuses stay in position');
   assert.ok(buttons.every((b) => /class="filter-chip filter-chip--sm/.test(b)), 'every chip is a filter-chip');
   assert.deepEqual(buttons.map((b) => b.match(/data-filter="([^"]+)"/)[1]),
-    ['all', 'expired', 'low', 'place:1', 'place:2', 'place:3'], 'status chips first, then the places');
-  assert.match(bar.html, /<span>Speisekammer<\/span>\s*<span class="filter-chip__count">2<\/span>/);
+    ['all', 'expired', 'soon', 'low'], 'stable status chips with locations in a compact selector');
+  assert.match(bar.html, /data-location-filter aria-haspopup="dialog"/);
+  assert.doesNotMatch(bar.html, /<select/);
 
-  // A place that loses its last batch drops its chip and the filter falls back to All.
-  __test.state.filter = 'place:2';
+  // The selected place survives losing its last batch.
+  __test.state.locationId = 2;
   __test.state.items = __test.state.items.filter((i) => i.id !== 1);
-  assert.equal(__test.renderFilters().wasReset, true);
-  assert.equal(__test.state.filter, 'all');
+  bar.html = '';
+  __test.renderFilters();
+  assert.equal(__test.state.locationId, 2);
+  assert.match(bar.html, /pantry-location-filter__label">Dachboden<\/span>/);
+  __test.selectFilter('all');
 
   // A household with a single place still sees its one place chip, as asked on #2085.
   __test.state.items = __test.state.items.filter((i) => i.location_id === 1);
-  assert.deepEqual(__test.placeChips(__test.state.items).map((c) => [c.id, c.count]), [['place:1', 2]]);
-  // Counter-check: a batch without a place gives no chip.
+  assert.deepEqual(__test.placeChips(__test.state.items).map((c) => [c.id, c.count]), [['place:1', 2], ['place:2', 0], ['place:3', 0], ['place:4', 0], ['place:none', 0]]);
+  // Batches without a location have their own chip.
   __test.state.items = [batch(9, 12, { name: 'Butter' })];
-  assert.deepEqual(__test.placeChips(__test.state.items), []);
+  const unlocated = __test.placeChips(__test.state.items).find((chip) => chip.id === 'place:none');
+  assert.ok(unlocated);
+  assert.equal(unlocated.count, 1);
+});
+
+test('combined chips stay selected across deletion, undo and commit', async () => {
+  groupedPantry();
+  const bar = makeNode();
+  bar.contains = () => false;
+  bar.replaceChildren = () => { bar.html = ''; };
+  const page = pageStub({ extra: { '#pantry-filters': bar } });
+  const expired = __test.state.items.find((item) => item.id === 2);
+  /** @type {any} */
+  let pending;
+  testGlobals.__undoStub = (/** @type {any} */ opts) => { pending = opts; };
+  testGlobals.__apiStub = { delete: async () => {} };
+  try {
+    __test.selectFilter('expired');
+    __test.selectFilter('place:1');
+    await __test.removeItem(expired);
+    assert.match(bar.html, /data-filter="expired" aria-pressed="true"[^<]*>[\s\S]*?filter-chip__count">0</);
+    assert.match(bar.html, /pantry-location-filter__label">Garage<\/span>/);
+    assert.equal(byClass(page.list, 'pantry-row').length, 0);
+    assert.equal(textOf(byClass(page.list, 'empty-state__cta')[0]), 'pantry.showAll');
+    pending.restore();
+    assert.deepEqual(byClass(page.list, 'pantry-row').map((row) => row.dataset.id), ['2']);
+    await __test.removeItem(expired);
+    await pending.commit({ keepalive: false });
+    assert.equal(__test.state.filter, 'expired');
+    assert.equal(__test.state.locationId, 1);
+    assert.equal(byClass(page.list, 'empty-state').length, 1);
+    __test.selectFilter('expired');
+    assert.deepEqual(__test.visibleItems().map((row) => row.id), [5]);
+    __test.selectFilter('place:all');
+    assert.equal(__test.visibleItems().length, 4);
+  } finally {
+    __test.pendingDeletes.clear();
+    delete testGlobals.__undoStub;
+    delete testGlobals.__apiStub;
+  }
+});
+
+test('the shared location filter panel changes locations while preserving the status filter', () => {
+  groupedPantry();
+  __test.state.locations.push(...Array.from({ length: 10 }, (_, index) => ({ id: 20 + index, name: `Location ${index}` })));
+  __test.state.filter = 'expired';
+  const page = pageStub();
+  const panel = makeNode();
+  const choices = ['all', '1', '2', 'none'].map((value) => {
+    const chip = makeNode();
+    chip.dataset.value = value;
+    return chip;
+  });
+  panel.querySelectorAll = () => choices;
+  /** @type {(event: any) => void} */
+  let onClick = () => {};
+  panel.addEventListener = (/** @type {string} */ type, /** @type {(event: any) => void} */ listener) => { if (type === 'click') onClick = listener; };
+  const querySelector = document.querySelector;
+  const openModal = testGlobals.__openModal;
+  /** @type {any} */
+  let options;
+  document.querySelector = () => panel;
+  testGlobals.__openModal = (/** @type {any} */ opts) => { options = opts; };
+  try {
+    __test.openLocationFilter();
+    assert.equal(options.title, 'pantry.locations');
+    assert.match(options.content, /pantry-location-search/);
+    assert.match(options.content, /pantry\.unlocated \(0\)/);
+    assert.match(options.content, /Location 9 \(0\)/);
+    assert.doesNotMatch(options.content, /<select/);
+    const target = makeNode();
+    target.closest = () => choices[1];
+    onClick({ target });
+    assert.equal(__test.state.locationId, 1);
+    assert.equal(__test.state.filter, 'expired');
+    assert.equal(choices[1].getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(byClass(page.list, 'pantry-row').map((row) => row.dataset.id), ['2']);
+    target.closest = () => choices[3];
+    onClick({ target });
+    assert.equal(__test.state.locationId, 'none');
+    assert.equal(byClass(page.list, 'pantry-row').length, 0);
+    target.closest = () => choices[0];
+    onClick({ target });
+    assert.equal(__test.state.locationId, null);
+    assert.equal(__test.state.filter, 'expired');
+  } finally {
+    document.querySelector = querySelector;
+    testGlobals.__openModal = openModal;
+  }
+});
+
+test('low stock at a location uses the household total and shows only batches stored there', () => {
+  groupedPantry();
+  __test.selectFilter('place:2');
+  __test.selectFilter('low');
+  assert.deepEqual(__test.lowProducts().map((product) => product.name), ['Milch']);
+  assert.equal(__test.filterCounts().low, 1);
+  const page = pageStub();
+  __test.renderList();
+  assert.deepEqual(byClass(page.list, 'pantry-row').map((row) => row.dataset.id), ['1']);
+  assert.match(textOf(byClass(page.list, 'pantry-product__total')[0]), /"quantity":"3 /);
+  __test.state.products[0].min_quantity = 2;
+  assert.equal(__test.filterCounts().low, 0);
+  assert.deepEqual(__test.lowProducts(), []);
+});
+
+test('unassigned batches combine with status and search and survive undo', async () => {
+  groupedPantry();
+  __test.state.items[1].location_id = null;
+  __test.state.items[1].location_name = null;
+  __test.selectFilter('place:none');
+  __test.selectFilter('expired');
+  assert.deepEqual(__test.visibleItems().map((item) => item.id), [2]);
+  __test.state.query = 'passata';
+  assert.deepEqual(__test.visibleItems(), []);
+  __test.state.query = '';
+  const page = pageStub();
+  /** @type {any} */
+  let pending;
+  testGlobals.__undoStub = (/** @type {any} */ opts) => { pending = opts; };
+  try {
+    await __test.removeItem(__test.state.items[1]);
+    assert.equal(__test.state.locationId, 'none');
+    const empty = byClass(page.list, 'empty-state')[0];
+    assert.match(empty.html, /pantry.filterEmptyExpired/);
+    assert.match(empty.html, /pantry.unlocated/);
+    pending.restore();
+    assert.deepEqual(__test.visibleItems().map((item) => item.id), [2]);
+    __test.selectFilter('all');
+    assert.equal(__test.state.locationId, null);
+  } finally {
+    __test.pendingDeletes.clear();
+    delete testGlobals.__undoStub;
+  }
 });
 
 test('#2085: a place chip lists the batches there, flat, by name, with the product total; the search narrows it', () => {
   groupedPantry();
-  __test.state.filter = 'place:1';
+  __test.state.locationId = 1;
   assert.deepEqual(__test.visibleItems().map((i) => i.id), [2, 5], 'Garage: one milk batch and the butter');
   assert.deepEqual(__test.flatItems(__test.visibleItems()).map((i) => i.id), [5, 2], 'by name: Butter before Milch');
 
@@ -1420,11 +1644,13 @@ test('#2085: a place chip lists the batches there, flat, by name, with the produ
   assert.deepEqual(__test.visibleItems().map((i) => i.id), [], 'passata is in the Speisekammer, not here');
   __test.state.query = '';
 
-  // Counter-check: the status chips are untouched by the place logic.
-  __test.state.filter = 'expired';
+  // The status chip narrows the current place; All clears both.
+  __test.selectFilter('expired');
   assert.deepEqual(__test.visibleItems().map((i) => i.id), [2]);
-  __test.state.filter = 'all';
+  __test.selectFilter('all');
   assert.equal(__test.visibleItems().length, 5);
+  __test.renderList();
+  assert.equal(page.live.textContent, '', 'All clears the old filtered result announcement');
 });
 
 test('#2085: renderList keeps the scroll position of the chip row, so the active place chip stays in view', () => {
@@ -1434,9 +1660,9 @@ test('#2085: renderList keeps the scroll position of the chip row, so the active
   const list = makeNode();
   list.querySelector = (sel) => (sel === ':scope > #pantry-filters' ? chipRow : null);
   // As in a browser: taking the row out and putting it back resets its scroll.
-  list.replaceChildren = (...kids) => { list.children = [...kids]; if (kids.includes(chipRow)) chipRow.scrollLeft = 0; };
+  list.replaceChildren = /** @param {...any} kids */ (...kids) => { list.children = [...kids]; if (kids.includes(chipRow)) chipRow.scrollLeft = 0; };
   __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null), querySelectorAll: () => [] });
-  __test.state.filter = 'place:2';
+  __test.state.locationId = 2;
   __test.renderList();
   assert.equal(list.children[0], chipRow);
   assert.equal(chipRow.scrollLeft, 558, 'where renderFilters() scrolled the active chip to');
@@ -1546,7 +1772,7 @@ test('#1448/3: der Chip "Fast leer" listet PRODUKTE, die Pille schickt je Produk
 
   const list = makeNode();
   list.querySelector = () => null;
-  list.replaceChildren = (...kids) => { list.children = [...kids]; };
+  list.replaceChildren = /** @param {...any} kids */ (...kids) => { list.children = [...kids]; };
   __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null), querySelectorAll: () => [] });
   __test.state.filter = 'low';
   const pills = [];
@@ -1582,8 +1808,10 @@ test('#1448/3: der Dialog zeigt das Minimum des Produkts und schickt es nur, wen
       return fields[sel];
     },
   };
+  /** @type {any[]} */
   const opened = [];
   globalThis.__openModal = (opts) => { opened.push(opts); };
+  /** @type {Array<{path: string, body: any}>} */
   const sent = [];
   globalThis.__apiStub = {
     put: async (path, body) => { sent.push({ path, body }); return { data: __test.state.items[1] }; },
@@ -1611,12 +1839,35 @@ test('#1448/3: der Dialog zeigt das Minimum des Produkts und schickt es nur, wen
 
     // Neu angelegt: das leere Feld schickt nichts, eine Zahl setzt es.
     __test.openItemModal('create');
+    /** @type {Record<string, any>} */
     const createFields = {};
     const createPanel = { querySelector: (sel) => { createFields[sel] ??= { value: '', dataset: {}, addEventListener() {} }; return createFields[sel]; } };
     opened.at(-1).onSave(createPanel);
     createFields['#pantry-name'].value = 'Milch';
     await __test.saveItem(createPanel, 'create', null);
-    assert.equal('min_quantity' in sent.at(-1).body, false, 'eine neue Charge ueberschreibt das Minimum ihres Produkts nicht');
+    assert.equal('min_quantity' in (sent.at(-1)?.body ?? {}), false, 'eine neue Charge ueberschreibt das Minimum ihres Produkts nicht');
+
+    const tooth = __test.state.products.find((p) => p.id === 13);
+    assert.ok(tooth);
+    const entry = __test.productSections(__test.state.items).flatMap((group) => group.products).find((p) => p.id === tooth.id);
+    const [restock] = byClass(__test.emptyProductEl(entry), 'pantry-restock');
+    __test.onListClick({ target: { closest: () => restock } });
+    const dialog = opened.at(-1);
+    assert.equal(dialog.title, 'pantry.restock');
+    assert.equal(dialog.initialFocus, '#pantry-quantity');
+    dialog.onSave(createPanel);
+    assert.equal(createFields['#pantry-name'].value, tooth.name);
+    assert.equal(createFields['#pantry-unit'].value, tooth.unit);
+    assert.equal(createFields['#pantry-category'].value, tooth.category);
+    assert.equal(createFields['#pantry-min'].value, '3');
+    createFields['#pantry-quantity'].value = '2';
+    await __test.saveItem(createPanel, 'create', tooth);
+    const restocked = sent.at(-1);
+    assert.ok(restocked);
+    assert.equal(restocked.path, '/pantry');
+    assert.equal(restocked.body.quantity, 2);
+    assert.equal(restocked.body.expires_on, null);
+    assert.equal('min_quantity' in restocked.body, false);
   } finally {
     global.window.yuvomi = yuvomi;
     delete globalThis.__apiStub;
@@ -1665,9 +1916,9 @@ test('#2118: a flat list builds the product stock once per render, not once per 
     const items = Array.from({ length: n }, (_, i) => batch(200 + i, 100 + i, { name: `P${i}`, location_id: 1, location_name: 'Garage' }));
     const list = makeNode();
     list.querySelector = () => null;
-    list.replaceChildren = (...kids) => { list.children = [...kids]; };
+    list.replaceChildren = /** @param {...any} kids */ (...kids) => { list.children = [...kids]; };
     __test.setContainerForTest({ querySelector: (sel) => (sel === '#pantry-list' ? list : null), querySelectorAll: () => [] });
-    __test.state.filter = 'place:1';
+    __test.state.locationId = 1;
     let calls = 0;
     __test.state.items = new Proxy(items, {
       get(target, key, receiver) {

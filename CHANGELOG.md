@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from the baseline and again on it after a restart.
 
 ### Changed
+- **The pantry has a wider overview with combined status and storage-location filters.**
+  Products stay grouped by category, with two columns where space allows. Status chips keep
+  their positions and counts, and storage locations can be searched in a filter panel that
+  opens as a sheet on phones. A fresh visit starts at All, and deleting the last match keeps
+  its filter selected with an empty-result message and Undo. Empty categories disappear,
+  while saved products stay available under Out of stock with a prefilled Restock action.
+  Short best-before dates omit the trailing dot, and landscape filters use less space.
 - **A new installation creates its database in one step.** The first start used to run every
   migration since the first release one after another (284 of them, each with its own line in the
   log); it now applies one schema baseline with the same result and logs
