@@ -456,9 +456,19 @@ test('die Schreibsperre ist beim naechsten Versuch frei: die Baseline wird einge
   const dir = tempDir('yuvomi-baseline-');
   const { database, waiting, holder, attempts } = contended(path.join(dir, 'busy.db'), 1);
   const replayed = CIPHER.replayFromZero();
+  // Die Sperre faellt nur beim ALLERERSTEN BEGIN (busyFor=1): ein Versuch dort,
+  // einer danach, macht 2 - plus einen weiteren, erfolgreichen Versuch je
+  // Migration, die ueber die Baseline hinaus noch anliegt. Ohne das waere
+  // dieser Test an jeder PR rot, die eine Migration anfuegt, bevor baseline.json
+  // neu erzeugt ist (die Baseline bleibt sonst hinter MIGRATIONS zurueck).
+  const pendingBeyondBaseline = MIGRATIONS.filter((m) => m.version > shipped.version).length;
   try {
     assert.deepEqual(migrate(database, MIGRATIONS, () => shipped), { baseline: shipped.version });
-    assert.equal(attempts(), 2, 'ein Versuch an der Sperre, einer danach');
+    assert.equal(
+      attempts(),
+      2 + pendingBeyondBaseline,
+      'ein Versuch an der Sperre, einer danach, dann ein Versuch je ausstehender Migration'
+    );
     assert.deepEqual(log.error, []);
     assert.equal(log.warn.length, 1);
     assert.match(log.warn[0], /Schreibsperre \(SQLITE_BUSY\w*\), Versuch 2 von/);
