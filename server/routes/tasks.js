@@ -41,7 +41,9 @@ import { isAdminRequest, refuseAdmin, requireAdmin } from '../middleware/require
 import { householdMemberSql, isHouseholdMember, memberOrderSql, memberPositionSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { displayActingPerson, isDisplayRequest } from '../services/display-acting.js';
 import { pushService } from '../services/push.js';
-import { todayKey } from '../utils/timezone.js';
+import {
+  daysBetweenDateKeys, hasExplicitZone, householdTimeZone, localToUTCPrecise, shiftDateKey, todayKey, utcToWall,
+} from '../utils/timezone.js';
 import { runExternalJob } from '../utils/restore-state.js';
 import {
   allTags, applyTagChanges, loadTags, loadTagsFor, normalizeTags,
@@ -1939,6 +1941,42 @@ function shiftedStartDate(startDate, dueDate, nextDue) {
 }
 
 /**
+ * Die Erinnerungen einer Serie wandern mit der Folgeinstanz. `remind_at` ist
+ * ein absoluter Zeitpunkt (naiv-UTC); ohne das Mitnehmen stand die naechste
+ * Instanz ohne Erinnerung da, und "15 Minuten vorher" musste nach jedem
+ * Abhaken neu gesetzt werden. Verschoben wird die Wanduhr in der
+ * Haushaltszone um genau so viele Tage, wie die Faelligkeit springt: der
+ * Abstand zur Faelligkeit bleibt derselbe, auch ueber eine Zeitumstellung.
+ * Geerbte Zeilen (`assigned_from`) bleiben ihrem eigenen Pfad ueberlassen.
+ * @param {number|bigint} fromId  die erledigte Instanz
+ * @param {number|bigint} toId    die Folgeinstanz
+ * @param {string} fromDue        YYYY-MM-DD
+ * @param {string} toDue          YYYY-MM-DD
+ */
+function carryTaskReminders(fromId, toId, fromDue, toDue) {
+  const days = daysBetweenDateKeys(fromDue, toDue);
+  if (days === null) return;
+  const rows = db.get().prepare(`
+    SELECT remind_at, created_by FROM reminders
+     WHERE entity_type = 'task' AND entity_id = ? AND assigned_from IS NULL
+     ORDER BY id
+  `).all(fromId);
+  if (!rows.length) return;
+  const tz = householdTimeZone(db.get());
+  const insert = db.get().prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('task', ?, ?, ?)
+  `);
+  for (const row of rows) {
+    const stored = String(row.remind_at);
+    const wall = utcToWall(hasExplicitZone(stored) ? stored : `${stored}Z`, tz);
+    if (!wall) continue;
+    const at = localToUTCPrecise(`${shiftDateKey(wall.date, days)}T${wall.time}`, tz);
+    insert.run(toId, at.slice(0, 19), row.created_by);
+  }
+}
+
+/**
  * Schreibt die Serie weiter: nächste Instanz anlegen, wenn eine wiederkehrende
  * Aufgabe erledigt wurde. Erwartet die bereits auf 'done' gesetzte Zeile.
  *
@@ -2057,6 +2095,7 @@ function spawnRecurrenceFollowup(task) {
         .run(rotation.userId, rotation.position, newTask.lastInsertRowid);
     }
     setTags(db.get(), newTask.lastInsertRowid, existingTags);
+    if (task.due_date) carryTaskReminders(task.id, newTask.lastInsertRowid, task.due_date, nextDate);
     // Eine fremde Serie (#2506): die Folgeinstanz uebernimmt den Master, die
     // erledigte Zeile geht als eigene Kopie hinauf.
     handedOver = handOverForeignSeries(task, Number(newTask.lastInsertRowid));
