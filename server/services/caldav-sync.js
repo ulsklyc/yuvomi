@@ -544,6 +544,9 @@ function listAccounts() {
  * die Zugangsdaten des Haushalts sofort per Basic Auth dorthin. Ein anderer Pfad
  * auf demselben Server bleibt ohne Passwort moeglich.
  */
+/** Wie oft `updateAccount` gegen eine geaenderte Zeile neu entscheidet, bevor es aufgibt (#2947). */
+const CALDAV_UPDATE_ROUNDS = 3;
+
 async function updateAccount(accountId, { name, caldavUrl, username, password, createClient }) {
   let account = getAccountById(accountId);
   if (!account) {
@@ -557,8 +560,10 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
   // Aendern sie waehrend des Tests umgestellt, faellt alles noch einmal gegen
   // die Zeile von jetzt - sonst ginge ein Passwort, das fuer den anderen
   // Server gespeichert wurde, mit dieser Adresse an den alten. Eine Runde mehr
-  // gibt es nur, wenn dazwischen wirklich ein anderes Schreiben lag.
-  for (;;) {
+  // gibt es nur, wenn dazwischen wirklich ein anderes Schreiben lag - und
+  // hoechstens CALDAV_UPDATE_ROUNDS: aendert sich das Konto in jedem Test,
+  // ist es ein Konflikt (409 `caldav_account_changed`), nichts ist gespeichert.
+  for (let round = 1; ; round += 1) {
     if (!password
         && ((caldavUrl && !sameCredentialOrigin(caldavUrl, account.caldav_url))
           || (username && username !== account.username))) {
@@ -582,6 +587,11 @@ async function updateAccount(accountId, { name, caldavUrl, username, password, c
     const current = getAccountById(accountId);
     if (!current) throw accountGoneError(accountId);
     if (sameConnection(current, account)) break;
+    if (round >= CALDAV_UPDATE_ROUNDS) {
+      const err = /** @type {Error & { code?: string }} */ (new Error('The account changed while its connection was tested.'));
+      err.code = 'caldav_account_changed';
+      throw err;
+    }
     account = current;
     calendars = null;
   }

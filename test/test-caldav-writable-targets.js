@@ -365,6 +365,28 @@ test('Zugangsdaten aendern: ein waehrenddessen geloeschtes Konto antwortet wie e
   }
 });
 
+test('Zugangsdaten aendern: aendert sich das Konto in jedem Verbindungstest, gibt es nach drei Runden 409 und speichert nichts (#2947)', async () => {
+  reset();
+  fakeDav.addCollection('family', { name: 'Familie' });
+  // Jede Anfrage beim Server stellt das gespeicherte Passwort um: jede Runde
+  // findet nach ihrem Test eine andere Zeile vor.
+  let writes = 0;
+  fakeDav.refuse({ when: () => {
+    writes += 1;
+    db.prepare('UPDATE caldav_accounts SET password = ? WHERE id = ?').run(`fremd-${writes}`, accountId);
+    return false;
+  } });
+  try {
+    const res = await api('PUT', `/calendar/caldav/accounts/${accountId}`, { password: 'neu' });
+    assert.deepEqual([res.status, res.body?.reason], [409, 'caldav_account_changed'], JSON.stringify(res.body));
+    const row = db.prepare('SELECT caldav_url, password FROM caldav_accounts WHERE id = ?').get(accountId);
+    assert.deepEqual({ ...row }, { caldav_url: fakeDav.url, password: `fremd-${writes}` }, 'nur die fremden Schreibzugriffe');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM caldav_calendar_selection WHERE account_id = ?').get(accountId).n, 0);
+  } finally {
+    fakeDav.allowAll();
+  }
+});
+
 test('Zugangsdaten aendern: zieht das Konto waehrenddessen um, entscheidet die neue Zeile - das Passwort des neuen Servers geht nicht an den alten (#2947)', async () => {
   reset();
   fakeDav.addCollection('family', { name: 'Familie' });

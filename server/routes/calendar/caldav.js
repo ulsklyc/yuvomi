@@ -134,6 +134,15 @@ router.put('/caldav/accounts/:id', requireAdmin, validateRequest(), async (req, 
       return res.status(400).json({ error: err.message, errorCode: 'password_required', code: 400 });
     }
     if (refuseGoneAccount(res, err)) return;
+    // Das Konto aenderte sich in jedem Verbindungstest (#2947): ein Konflikt,
+    // nichts ist gespeichert, die Anfrage darf wiederholt werden.
+    if (/** @type {any} */ (err).code === 'caldav_account_changed') {
+      return res.status(409).json({
+        error: 'The account changed while its connection was tested. Nothing was saved; send the request again.',
+        code: 409,
+        reason: 'caldav_account_changed',
+      });
+    }
     sendCaldavFailure(res, err, 'CalDAV account update failed:');
   }
 });

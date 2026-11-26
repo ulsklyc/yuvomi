@@ -170,13 +170,19 @@ function attachmentRights(req) {
     },
     // Kopieren: wer es sieht und Dokumente schreiben darf.
     mayCloneAttachment: (/** @type {any} */ documentId) => documentClonePredicate(db.get(), actorNow())(documentId),
-    createAttachmentDocument: (...args) => {
+    createAttachmentDocument: (
+      /** @type {any} */ database, /** @type {any} */ attachment, /** @type {any} */ staged,
+      /** @type {any} */ body, /** @type {number} */ ownerId,
+    ) => {
       // Ein hochgeladener Anhang braucht das Dokumente-Schreibrecht, das
       // `refuseUploadWithoutDocumentsWrite` am Eingang fragte: dieselbe Absage.
-      if (args[2] && !actorNow().documentsWritable) {
+      // Dieselbe Bedingung wie in createAttachmentDocument(): nur wo ein
+      // Dokument entstuende.
+      const createsDocument = Boolean(attachment?.buffer && staged);
+      if (createsDocument && !actorNow().documentsWritable) {
         throw new RefusedAfterUploadError((r) => sendAttachmentUploadRefused(r));
       }
-      const documentId = createAttachmentDocument(...args);
+      const documentId = createAttachmentDocument(database, attachment, staged, body, ownerId);
       if (documentId) createdHere.add(Number(documentId));
       return documentId;
     },

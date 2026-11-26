@@ -27,7 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleted meanwhile now answers "not found" instead of an error, and an account moved to another
   server meanwhile keeps nothing from the old one. Changing the server or user of a CalDAV
   account checks again against the account as it is after the connection test, so a password
-  saved for another server in the meantime is never sent to the old one. A task or shopping item
+  saved for another server in the meantime is never sent to the old one; if the account changes
+  during each of three connection tests, the change stops with a conflict (`409`, reason
+  `caldav_account_changed`), nothing is saved, and it can be sent again. A task or shopping item
   is no longer uploaded to a reminder list that was switched off while the list was fetched.
   Rights now count at the moment of saving, not only when the request arrived: an administrator
   demoted while a new member's or housekeeper's password is being prepared gets "admin access
