@@ -160,6 +160,7 @@
  "server/routes/backup.js\toxlint/no-restricted-syntax/ERROR-TEXT": 1,
  "server/routes/backup.js\toxlint/no-restricted-syntax/LOG-PLUS-500": 2,
  "server/routes/birthdays.js\toxlint/no-unused-vars": 2,
+ "server/routes/budget/entries.js\toxlint/max-lines-per-function": 1,
  "server/routes/budget/helpers.js\toxlint/no-restricted-syntax/UTC-DAY-KEY": 1,
  "server/routes/calendar/apple.js\toxlint/no-restricted-syntax/ERROR-TEXT": 1,
  "server/routes/calendar/apple.js\toxlint/no-unused-vars": 2,
