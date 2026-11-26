@@ -107,17 +107,31 @@ function contactAvatar(c) {
   // sagte, in welcher Schublade jemand liegt, nicht wer es ist. Wie in Apples
   // Kontakten traegt jede Scheibe die Initialen, ruhig auf neutraler Flaeche;
   // die Kategorie steht als Filter darueber und im Detail.
-  if (!c.family_user_id) {
-    return `<span class="contact-item__icon contact-item__icon--initials" aria-hidden="true">${esc(initials(c.name, '?'))}</span>`;
+  // Prioritaet: 1. Haushaltsmitglied-Avatar, 2. Eigenes Foto, 3. Initialen.
+  if (c.family_user_id) {
+    const color = c.family_avatar_color || AVATAR_FALLBACK_COLOR;
+    const name  = c.family_display_name || c.name;
+    const inner = c.family_avatar_data
+      ? `<img src="${esc(c.family_avatar_data)}" alt="" loading="lazy">`
+      : esc(initials(name, '?'));
+    return `<span class="contact-item__icon contact-item__icon--member"
+      style="background-color:${esc(color)};color:${getReadableTextColor(color)}"
+      aria-hidden="true">${inner}</span>`;
   }
-  const color = c.family_avatar_color || AVATAR_FALLBACK_COLOR;
-  const name  = c.family_display_name || c.name;
-  const inner = c.family_avatar_data
-    ? `<img src="${esc(c.family_avatar_data)}" alt="" loading="lazy">`
-    : esc(initials(name, '?'));
-  return `<span class="contact-item__icon contact-item__icon--member"
-    style="background-color:${esc(color)};color:${getReadableTextColor(color)}"
-    aria-hidden="true">${inner}</span>`;
+  // Kein Haushaltsmitglied: eigenes Foto, falls vorhanden.
+  //
+  // IMMER UEBER DIE ADRESSE, NIE AUS DER SPALTE. Hier stand `c.photo` der
+  // Detailansicht direkt im `src`, und das traf genau die Bestandsdaten: ein
+  // vor #2128 synchronisiertes Foto liegt als nackte Base64-Zeichen in der
+  // Spalte, und die sind als `src` kein Bild. Ueber die Adresse entscheidet der
+  // Server, der beide Formen kennt (decodeStoredPhoto) - und die Antwort traegt
+  // keine Megabyte Base64 mehr durch JSON und DOM. `has_photo` sagt nur, OB es
+  // eins gibt; beide Antworten fuehren das Feld.
+  if (c.has_photo) {
+    return `<span class="contact-item__icon contact-item__icon--photo"
+      aria-hidden="true"><img src="/api/v1/contacts/${c.id}/photo" alt="" loading="lazy"></span>`;
+  }
+  return `<span class="contact-item__icon contact-item__icon--initials" aria-hidden="true">${esc(initials(c.name, '?'))}</span>`;
 }
 
 // --------------------------------------------------------
