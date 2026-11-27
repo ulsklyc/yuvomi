@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender, captureModalContext, dialogInitialFocus } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, whenModalClosed, wireBlurValidation, validateAll, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender, captureModalContext, dialogInitialFocus, reportFieldError } from '/components/modal.js';
 import { whenHistorySettled } from '/utils/overlay-history.js';
 import { beginRowFill, drawRowIcons, flushRowFill } from '/utils/row-fill.js';
 import { stagger, vibrate, scheduleUndoableDelete, offerUndo, acknowledgeCheck, collapseOut, expandIn, wireScrollFade, isImeComposing, drawIconsInSightOrder } from '/utils/ux.js';
@@ -3135,8 +3135,25 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   let remindAt = null;
   if (wantsReminder) {
     if (!dueDate) { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
-    const offsetPreset = form.querySelector('#reminder-offset')?.value || 'offset_none';
-    if (offsetPreset === 'offset_none') { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
+    const offsetField = form.querySelector('#reminder-offset');
+    const offsetPreset = offsetField?.value || 'offset_none';
+    // ES FEHLT DER VORLAUF, NICHT DAS DATUM (#2705, Frage 5). Schalter an,
+    // Auswahl auf „Keine": die Meldung nannte hier bis jetzt das
+    // Faelligkeitsdatum, das in diesem Fall gesetzt ist. Sie nennt jetzt, was
+    // fehlt, und steht an der Auswahl, die es aufloest (reportFieldError:
+    // Text darunter, Fokus und Scroll dorthin) - unten im Dialog laege sie
+    // unter der Falz.
+    if (offsetPreset === 'offset_none') {
+      if (offsetField) {
+        const btn = /** @type {HTMLButtonElement} */ (submitBtn);
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+        reportFieldError(offsetField, t('tasks.reminderNeedsOffset'));
+      } else {
+        resetSubmit(t('tasks.reminderNeedsOffset'));
+      }
+      return;
+    }
     remindAt = reminderRemindAtFromForm(form, { dueDate, dueTime: body.due_time });
     if (!remindAt) { resetSubmit(t('common.invalidInput')); return; }
   }
