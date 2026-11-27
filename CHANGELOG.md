@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Family members can share their own availability** (#1591). Tap your row on the family
+  tile to set a status - available, busy, do not disturb or away - with an optional note and
+  an expiry (1 hour, 4 hours, until midnight, until tomorrow 8am, or 1 week). Everyone in the
+  household sees the status and note on your row instead of your next appointment or shift
+  while it is active; it clears itself once it expires, no manual reset needed. Only your own
+  status is editable from your own row. New endpoints: `GET/PUT/DELETE /api/v1/availability`.
+
+### Changed
+- **The availability routes check every request against the published API description.** This
+  is about your own API clients; the app sends nothing that is refused now. Under
+  `/api/v1/availability`, `PUT` with a `state` outside `available`/`busy`/`do_not_disturb`/`away`,
+  a `note` longer than 200 characters or not text, or an `expires_at` missing or not an
+  ISO-8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`) still answers 400, now with `reason: validation`
+  and `fields` instead of its own sentence. `expires_at` being in the future and within 30 days is
+  still checked by the route itself and keeps its own sentence (`"expires_at must be in the
+  future."`, `"expires_at must be within 30 days from now."`), since that depends on when the
+  request is made, not on its shape.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation

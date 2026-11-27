@@ -65,6 +65,7 @@ export {
   householdVisibleWhere,
   modulesOutsideHouseholdAudience,
   openDisplayWallModules,
+  wallFamilyStatuses,
   wallMeals,
   wallPantryExpiring,
 } from './rows/household.ts';

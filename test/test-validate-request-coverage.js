@@ -48,7 +48,9 @@
  *          (server/routes/birthday-feed.js) and the six ICS feeds, moved out
  *          of server/index.js into server/routes/ics-feeds.js, carry it too;
  *          NOT_MIGRATED is empty and stays as a ratchet for a route file that
- *          a later PR adds without the check. Two more checks keep a route
+ *          a later PR adds without the check - server/routes/availability.js
+ *          (#1591) goes straight to MIGRATED on that ratchet. Two more checks
+ *          keep a route
  *          from hiding where the stack walk above does not look:
  *            - every `Router()` under server/ stands in a file the guard reads
  *              (server/routes/**, EXTRA_FILES) or on ROUTER_OUTSIDE with a
@@ -161,7 +163,7 @@ const MIGRATED = [
   'server/routes/tasks.js',
   'server/routes/preferences.js', 'server/routes/push.js',
   'server/auth.js',
-  'server/routes/birthday-feed.js', 'server/routes/ics-feeds.js',
+  'server/routes/birthday-feed.js', 'server/routes/ics-feeds.js', 'server/routes/availability.js',
 ];
 
 /** @param {string} dir @returns {string[]} */

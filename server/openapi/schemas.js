@@ -3411,6 +3411,7 @@ export const schemas = {
             users: { type: 'array', items: { $ref: '#/components/schemas/DashboardUser' } },
             upcomingEvents: { type: 'array', items: { $ref: '#/components/schemas/CalendarEvent' } },
             familyEvents: { type: 'array', items: { $ref: '#/components/schemas/CalendarEvent' } },
+            familyStatuses: { type: 'array', items: { $ref: '#/components/schemas/AvailabilityStatus' } },
             weekEvents: { type: 'array', items: { $ref: '#/components/schemas/DashboardWeekEvent' } },
             birthdays: { type: 'array', maxItems: 8, items: { $ref: '#/components/schemas/DashboardBirthday' } },
             birthdayCount: { type: 'integer', description: 'Persons, whereas `birthdayTotal` counts occasions.' },
@@ -3444,7 +3445,7 @@ export const schemas = {
               description: 'Null when the read failed, which is not the same as nothing expiring.',
             },
           },
-          required: ['users', 'upcomingEvents', 'familyEvents', 'weekEvents', 'birthdays', 'birthdayCount', 'birthdayTotal',
+          required: ['users', 'upcomingEvents', 'familyEvents', 'familyStatuses', 'weekEvents', 'birthdays', 'birthdayCount', 'birthdayTotal',
             'birthdaySoonCount', 'urgentTasks', 'openTaskCount', 'overdueTaskCount', 'memberTodayTasks', 'tasksDoneToday',
             'wallTasks', 'todayMeals', 'pinnedNotes', 'pinnedNotesCount', 'notesTotal', 'shoppingLists', 'shoppingOpenCount',
             'shoppingOpenLists', 'countdowns', 'countdownTotal', 'quicklinks', 'splitBalance', 'rewards', 'nutrition',
@@ -4270,4 +4271,24 @@ export const schemas = {
         },
         // Die Anfrage-Schemata der Abfuhr (#2810) stehen in waste-inputs.js.
         ...wasteInputSchemas(),
+        AvailabilityStatus: {
+          type: 'object',
+          required: ['user_id', 'state', 'expires_at', 'updated_at'],
+          properties: {
+            user_id: { type: 'integer' },
+            state: { type: 'string', enum: ['available', 'busy', 'do_not_disturb', 'away'] },
+            note: { type: ['string', 'null'], maxLength: 200 },
+            expires_at: { type: 'string', format: 'date-time', description: 'ISO-8601 UTC timestamp' },
+            updated_at: { type: 'string', format: 'date-time', description: 'ISO-8601 UTC timestamp' },
+          },
+        },
+        AvailabilityInput: {
+          type: 'object',
+          required: ['state', 'expires_at'],
+          properties: {
+            state: { type: 'string', enum: ['available', 'busy', 'do_not_disturb', 'away'] },
+            note: { type: ['string', 'null'], maxLength: 200 },
+            expires_at: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$', description: 'ISO-8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ), must be in the future' },
+          },
+        },
 };
