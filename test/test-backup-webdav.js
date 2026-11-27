@@ -438,6 +438,100 @@ describe('WebDAV Backup — service module', async () => {
     });
   });
 
+  // Nextcloud antwortet mit dem Pfad auf dem Server, die Basis-URL hat aber
+  // selbst einen Pfad (`/remote.php/dav/files/<user>/`). joinUrl() setzte ihn
+  // doppelt davor, jedes DELETE ging mit 404 ins Leere - und 404 galt als
+  // "Rotated remote backup", Lauf fuer Lauf fuer dieselben Dateien.
+  describe('rotation on a Nextcloud server with a base path', async () => {
+    const base = '/remote.php/dav/files/alice%40example.com/';
+    const dir  = `${base}Yuvomi%20Backup/`;
+    const names = [
+      'yuvomi-backup-2099-05-01T00-00-00-000Z.db', // DELETE → 403
+      'yuvomi-backup-2099-05-02T00-00-00-000Z.db', // DELETE → 404
+      'yuvomi-backup-2099-05-03T00-00-00-000Z.db', // DELETE → 204
+      'yuvomi-backup-2099-05-04T00-00-00-000Z.db',
+      'yuvomi-backup-2099-05-05T00-00-00-000Z.db',
+    ];
+    /** @type {Record<string, number>} */
+    const deleteStatus = { [names[0]]: 403, [names[1]]: 404, [names[2]]: 204 };
+    /** @type {string[]} */
+    const deleted = [];
+    /** @param {string} href @param {string} type */
+    const entry = (href, type) => `
+      <d:response>
+        <d:href>${href}</d:href>
+        <d:propstat>
+          <d:prop><d:resourcetype>${type}</d:resourcetype></d:prop>
+          <d:status>HTTP/1.1 200 OK</d:status>
+        </d:propstat>
+      </d:response>`;
+
+    before(() => {
+      /** @type {any} */ (mockHost).active = {
+        /** @param {http.IncomingMessage} req @param {http.ServerResponse} res */
+        handle(req, res) {
+          const url = req.url ?? '';
+          if (req.method === 'PROPFIND' && decodeURIComponent(url) === decodeURIComponent(dir)) {
+            res.writeHead(207, { 'Content-Type': 'application/xml; charset=utf-8' });
+            res.end(`<?xml version="1.0"?><d:multistatus xmlns:d="DAV:">${
+              entry(dir, '<d:collection/>')}${names.map((n) => entry(`${dir}${n}`, '')).join('')
+            }</d:multistatus>`);
+            return;
+          }
+          if (req.method === 'DELETE') {
+            deleted.push(decodeURIComponent(url));
+            res.writeHead(deleteStatus[path.basename(url)] ?? 404);
+            res.end();
+            return;
+          }
+          res.writeHead(405);
+          res.end();
+        },
+      };
+    });
+    after(() => { mockHost.active = null; });
+
+    it('should DELETE the listed file paths and log only real deletions as rotated', async () => {
+      /** @type {{ level: string, msg: string }[]} */
+      const logged = [];
+      const originals = { info: console.info, warn: console.warn, error: console.error };
+      for (const level of /** @type {('info'|'warn'|'error')[]} */ (Object.keys(originals))) {
+        console[level] = (/** @type {unknown[]} */ ...args) => { logged.push({ level, msg: args.slice(1).join(' ') }); };
+      }
+      // Dasselbe Modul wie `webdav` (Modul-Cache), aber mit Typen.
+      const { rotateRemoteBackups } = await import('../server/services/backup-webdav.js');
+      try {
+        await rotateRemoteBackups({
+          url:        `http://127.0.0.1:${mockHost.port}/remote.php/dav/files/alice@example.com/`,
+          username:   'alice@example.com',
+          password:   'testpass',
+          remotePath: 'Yuvomi Backup/',
+          keep:       2,
+        });
+      } finally {
+        Object.assign(console, originals);
+      }
+
+      assert.deepStrictEqual(
+        deleted.sort(),
+        names.slice(0, 3).map((n) => `/remote.php/dav/files/alice@example.com/Yuvomi Backup/${n}`),
+        'DELETE must target the href from PROPFIND, not the base path plus the href'
+      );
+      const rotated = logged
+        .filter((l) => l.msg.startsWith('Rotated remote backup:'))
+        .map((l) => l.msg);
+      assert.deepStrictEqual(rotated, [`Rotated remote backup: ${names[2]}`], 'only a 2xx counts as rotated');
+      assert.ok(
+        logged.some((l) => l.level === 'warn' && l.msg.includes(names[1])),
+        'a 404 is logged as a warning'
+      );
+      assert.ok(
+        logged.some((l) => l.level === 'error' && l.msg.includes(names[0]) && l.msg.includes('403')),
+        'a 403 is logged as a failure'
+      );
+    });
+  });
+
   describe('triggerUpload()', async () => {
     const mockCtx = useMock();
 

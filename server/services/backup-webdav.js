@@ -251,6 +251,22 @@ function hrefToPath(href) {
 }
 
 /**
+ * Die URL einer Datei aus der PROPFIND-Antwort. Ihr Pfad ist der Pfad auf dem
+ * Server, nicht relativ zur Basis-URL: Nextcloud antwortet mit
+ * `/remote.php/dav/files/<user>/YuvomiBackup/x.db`, und joinUrl() an eine Basis
+ * `https://host/remote.php/dav/files/<user>/` ergaebe den Pfad doppelt - ein
+ * DELETE, das mit 404 ins Leere ging. Aufgeloest wird darum wie im RFC gegen
+ * die URL der Anfrage, die das href geliefert hat.
+ * @param {any} cfg  Konfiguration wie aus getConfig()
+ * @param {string} remotePath  Pfad aus dem href, dekodiert
+ */
+function remoteFileUrl(cfg, remotePath) {
+  const encoded = remotePath.split('/').map(encodeURIComponent).join('/');
+  // getConfig() schliesst remotePath immer mit `/` ab: die Basis ist der Ordner.
+  return new URL(encoded, joinUrl(cfg.url, cfg.remotePath)).href;
+}
+
+/**
  * Sortierschluessel: der Zeitpunkt aus dem Dateinamen, sonst `getlastmodified`,
  * sonst null. Bewusst KEIN Ersatzwert "jetzt" - ein erfundenes Datum ist
  * schlimmer als ein fehlendes, weil es die Sortierung still in eine Gleichheit
@@ -424,10 +440,12 @@ export async function rotateRemoteBackups(existingCfg, opts = {}) {
 
     for (const f of candidates) {
       try {
-        const delUrl = joinUrl(cfg.url, f.remotePath);
+        const delUrl = remoteFileUrl(cfg, f.remotePath);
         const res    = await davFetch('DELETE', delUrl, { username: cfg.username, password: cfg.password });
-        if (res.ok || res.status === 404) {
+        if (res.ok) {
           log.info(`Rotated remote backup: ${f.filename}`);
+        } else if (res.status === 404) {
+          log.warn(`Remote backup already gone: ${f.filename}`);
         } else {
           log.error(`Failed to delete remote backup ${f.filename}: ${res.status}`);
         }
