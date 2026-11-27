@@ -1056,6 +1056,11 @@ GlassWorm through malicious updates to extensions that had already been accepted
   the topic hint under "Preparing a module for installation".
 - No index file in the repository, no list of modules in the app, and no built-in source in
   Settings -> Modules -> Add custom module: the admin pastes an address they chose.
+- What makes the admin's own review easier instead (#2064): Details in Active modules show
+  the commit that was installed, linked to it on GitHub, and after a replace from the same
+  repository a link to GitHub's compare view from the commit last approved to the new one. That
+  shows the commit; it does not bind the approval to it, so it is not the second condition
+  below.
 
 ### What would reopen it
 

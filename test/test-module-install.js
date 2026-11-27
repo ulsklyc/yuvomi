@@ -1636,6 +1636,146 @@ test('POST /install/github: Commit nur aus einer SHA im ZIP-Kommentar (klein ges
   }
 });
 
+// #2064: der Commit, der WIRKLICH installiert ist, und nach einem Ersetzen der
+// alte daneben - fuer GitHubs Vergleich `alt...neu`, bevor der Admin wieder
+// freigibt. Nur aus demselben Repository und nur bei zwei verschiedenen
+// Commits; ein ZIP auf einer der beiden Seiten, ein anderes Repository oder ein
+// Datensatz ohne Commit ergibt keinen. Der alte Commit steht in der NEUEN
+// Datei, denn der alte Ordner geht mit dem Tausch.
+test('#2064: Ersetzen aus demselben Repository merkt sich den alten Commit, sonst keinen', async () => {
+  const shaA = 'a1'.repeat(20);
+  const shaB = 'b2'.repeat(20);
+  let comment = '';
+  github.__setGithubRequestForTests(async (/** @type {string} */ url) => (/^https:\/\/api\.github\.com\/repos\/o\/(cmp|other)\/zipball\/main$/i.test(url)
+    ? fakeResponse(200, /** @type {any} */ ({ body: makeZip(moduleFiles('cmp-mod'), { comment }) }))
+    : fakeResponse(404)));
+  const fromGithub = async (/** @type {string} */ repo, /** @type {string} */ commentNow) => {
+    comment = commentNow;
+    const r = await call('POST', '/install/github', /** @type {any} */ ({ json: { url: repo, ref: 'main', overwrite: true } }));
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    return r.body.data.install;
+  };
+  const record = () => recordOf('cmp-mod');
+  try {
+    // Neu: der Commit, kein alter.
+    let installed = await fromGithub('o/cmp', shaA);
+    assert.equal(installed.commit, shaA);
+    assert.equal('previousCommit' in installed, false, 'eine neue Installation ersetzt nichts');
+    assert.equal(record().commit, shaA, 'der Commit steht zur Installationszeit in der Datei');
+    assert.equal('previousCommit' in record(), false);
+
+    // Derselbe Ort, ein anderer Commit: der alte steht daneben, auch nach der Freigabe.
+    installed = await fromGithub('o/cmp', shaB);
+    assert.equal(installed.commit, shaB);
+    assert.equal(installed.previousCommit, shaA, 'der Commit vor dem Ersetzen');
+    assert.equal(record().previousCommit, shaA);
+    assert.equal(installed.approved, false, 'das Ersetzen nimmt die Freigabe trotzdem zurueck (DECISIONS.md, 12)');
+    await modulesSvc.setModuleEnabled('cmp-mod', true);
+    assert.equal(record().previousCommit, shaA, 'die Freigabe schreibt die Datei um und laesst den alten Commit stehen');
+    assert.equal(/** @type {any} */ (await adminListed('cmp-mod'))?.install?.previousCommit, shaA, 'und die Admin-Liste nennt ihn');
+
+    // Derselbe Commit noch einmal, NACH der Freigabe von B: nichts zu vergleichen,
+    // und der alte Wert wandert nicht mit (vor der Freigabe bliebe A...B, siehe
+    // den Test zur Basis des Vergleichs).
+    installed = await fromGithub('o/cmp', shaB);
+    assert.equal(installed.commit, shaB);
+    assert.equal('previousCommit' in installed, false, 'derselbe Commit ist kein Vergleich');
+    assert.equal('previousCommit' in record(), false);
+
+    // GitHub unterscheidet Gross und Klein in owner/repo nicht.
+    installed = await fromGithub('O/Cmp', shaA);
+    assert.equal(installed.url, 'https://github.com/O/Cmp');
+    assert.equal(installed.previousCommit, shaB, 'O/Cmp ist o/cmp');
+
+    // Ein anderes Repository: ein Vergleich ueber zwei Repositories zeigt nichts Pruefbares.
+    installed = await fromGithub('o/other', shaB);
+    assert.equal(installed.commit, shaB);
+    assert.equal('previousCommit' in installed, false, 'anderes Repository, kein alter Commit');
+
+    // Das Archiv nennt keinen Commit: keiner, auch kein Vergleich.
+    installed = await fromGithub('o/other', 'release v2');
+    assert.equal(installed.commit, null);
+    assert.equal('previousCommit' in installed, false);
+    assert.equal('commit' in record(), false, 'ohne SHA kein Feld in der Datei');
+
+    // Ein ZIP auf einer der beiden Seiten: kein Commit, kein Vergleich.
+    await fromGithub('o/cmp', shaA);
+    const zip = await postZip(makeZip(moduleFiles('cmp-mod'), { comment: shaB }), '?overwrite=1');
+    assert.equal(zip.status, 201, JSON.stringify(zip.body));
+    assert.equal(zip.body.data.install.source, 'zip');
+    assert.equal(zip.body.data.install.commit, null, 'ein ZIP-Upload nennt keinen Commit, auch wenn sein Kommentar einer ist');
+    assert.equal('previousCommit' in zip.body.data.install, false);
+    assert.deepEqual(['commit', 'previousCommit'].filter((k) => k in record()), [], 'nichts davon in der Datei');
+    installed = await fromGithub('o/cmp', shaB);
+    assert.equal(installed.commit, shaB);
+    assert.equal('previousCommit' in installed, false, 'ueber einem ZIP gibt es keinen alten Commit');
+  } finally {
+    github.__setGithubRequestForTests(null);
+    fs.rmSync(path.join(MODULES_DIR, 'cmp-mod'), { recursive: true, force: true });
+  }
+});
+
+// Review zu #2064: der Vergleich beginnt bei dem Commit, den der Admin zuletzt
+// freigegeben hat. Ersetzt jemand eine noch nicht freigegebene Fassung, bleibt
+// deren Basis stehen: A freigegeben, dann B, dann C vor jeder Freigabe ist
+// A...C - B hat niemand angesehen. Erst nach einer Freigabe ist die freigegebene
+// Fassung die neue Basis.
+test('#2064: vor der Freigabe bleibt die Basis des Vergleichs die zuletzt freigegebene Fassung', async () => {
+  const [shaA, shaB, shaC] = ['a3', 'b4', 'c5'].map((p) => p.repeat(20));
+  let comment = '';
+  github.__setGithubRequestForTests(async (/** @type {string} */ url) => (url.endsWith('/repos/o/base/zipball/main')
+    ? fakeResponse(200, /** @type {any} */ ({ body: makeZip(moduleFiles('base-mod'), { comment }) }))
+    : fakeResponse(404)));
+  const replace = async (/** @type {string} */ sha) => {
+    comment = sha;
+    const r = await call('POST', '/install/github', /** @type {any} */ ({ json: { url: 'o/base', ref: 'main', overwrite: true } }));
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(r.body.data.install.commit, sha);
+    assert.equal(r.body.data.install.previousCommit, recordOf('base-mod').previousCommit, 'Antwort und Datei sagen dasselbe');
+    return r.body.data.install.previousCommit;
+  };
+  try {
+    assert.equal(await replace(shaA), undefined, 'neu: nichts zu vergleichen');
+    await modulesSvc.setModuleEnabled('base-mod', true);
+
+    assert.equal(await replace(shaB), shaA, 'A freigegeben, B ersetzt: A...B');
+    assert.equal(await replace(shaB), shaA, 'B noch einmal vor der Freigabe: weiter A...B, nicht nichts');
+    assert.equal(await replace(shaC), shaA, 'C vor der Freigabe von B: A...C, denn B hat niemand angesehen');
+    assert.equal(await replace(shaA), undefined, 'zurueck auf A vor der Freigabe: nichts zu vergleichen');
+
+    await replace(shaB);
+    await modulesSvc.setModuleEnabled('base-mod', true);
+    assert.equal(await replace(shaC), shaB, 'nach der Freigabe von B ist B die Basis: B...C');
+  } finally {
+    github.__setGithubRequestForTests(null);
+    fs.rmSync(path.join(MODULES_DIR, 'base-mod'), { recursive: true, force: true });
+  }
+});
+
+// Die Route reicht nur einen geprueften Commit weiter; installFilesUnlocked
+// prueft ihn trotzdem selbst, denn aus dem Wert baut die Seite Links.
+test('#2064: ein Commit, der keiner ist, kommt nie in die Datei, und ein ZIP traegt keinen', async () => {
+  const zip = makeZip(moduleFiles('sha-guard-mod'));
+  const sha = 'C0FFEE'.repeat(6) + 'C0FF';
+  try {
+    /** @type {Array<[object, string|undefined]>} */
+    const cases = [
+      [{ source: 'github', meta: { url: 'https://github.com/o/r', commit: sha } }, sha.toLowerCase()],
+      [{ source: 'github', meta: { url: 'https://github.com/o/r', commit: '../../evil' } }, undefined],
+      [{ source: 'github', meta: { url: 'https://github.com/o/r', commit: `${sha.slice(0, 39)}/` } }, undefined],
+      [{ source: 'github', meta: { url: 'https://github.com/o/r', commit: 12 } }, undefined],
+      [{ source: 'zip', meta: { commit: sha } }, undefined],
+    ];
+    for (const [opts, expected] of cases) {
+      const r = /** @type {any} */ (await install.installFromZip(zip, { ...opts, overwrite: true }));
+      assert.equal(r.module.install.commit, expected ?? null, JSON.stringify(opts));
+      assert.equal(recordOf('sha-guard-mod').commit, expected, JSON.stringify(opts));
+    }
+  } finally {
+    fs.rmSync(path.join(MODULES_DIR, 'sha-guard-mod'), { recursive: true, force: true });
+  }
+});
+
 // Die Route prueft die url, bevor sie die Installationssperre nimmt. Der Satz
 // ist derselbe wie der des Parsers dahinter; was die Pruefung an der Route
 // ausmacht, zeigt sich, waehrend eine andere Installation laeuft: ohne URL

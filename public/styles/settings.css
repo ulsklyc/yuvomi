@@ -3527,6 +3527,43 @@
   -webkit-hyphenate-limit-after: 4;
 }
 
+/* Der installierte Commit (#2064): kurzer Commit als Link, daneben der
+   Kopier-Knopf. Rechtsbuendig wie jeder Wert der Liste; wird es eng, rutscht
+   der Knopf unter den Link statt ueber den Rand. */
+.settings-module-commit {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Ein voller Commit (nach gescheitertem Kopieren steht er markiert da) hat
+   keine Trennstelle: er bricht an jeder Stelle statt ueber den Rand. */
+.settings-module-commit code {
+  overflow-wrap: anywhere;
+}
+
+/* EIN WEG IST ALS WEG ZU SEHEN (R22, D13), wie im Hinweis oben: reset.css
+   nimmt Links Farbe und Unterstrich, und der Commit und "Aenderungen auf
+   GitHub ansehen" standen sonst in Textfarbe zwischen den Werten der Liste.
+   Akzenttinte, der Unterstrich unter dem Zeiger und am Tastaturfokus. */
+.settings-module-row__details .settings-info-value a:not([class*='btn']) {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+  text-underline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .settings-module-row__details .settings-info-value a:not([class*='btn']):hover {
+    text-decoration: underline;
+  }
+}
+
+.settings-module-row__details .settings-info-value a:not([class*='btn']):focus-visible {
+  text-decoration: underline;
+}
+
 @media (max-width: 639px) {
   .settings-module-row--fixed.settings-module-row--menu {
     grid-template-columns: var(--target-base) minmax(0, 1fr) auto auto;
