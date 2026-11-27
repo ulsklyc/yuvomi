@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Notifications show the Yuvomi mark in the Android status bar, not a white square.** Android
+  keeps only the shape of a notification's badge and paints it in one colour, and the badge was the
+  coloured app icon, so the status bar showed its tile as a plain white square. The badge is now
+  its own picture, `badge-96.png`: the three circles of the mark, white on transparent. The
+  notification itself keeps the coloured icon.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation

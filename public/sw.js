@@ -971,7 +971,9 @@ self.addEventListener('push', (event) => {
   const options = {
     body: payload.body || '',
     icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    // Nur der Alphakanal zaehlt: Android faerbt das Badge einfarbig. Das App-Icon
+    // (bunte Kachel) wird dort zum weissen Quadrat, darum das Zeichen allein.
+    badge: '/icons/badge-96.png',
     tag: payload.tag || 'yuvomi-push',
     // `/` UND NICHT `/reminders`: diese Route hat es nie gegeben (Critique
     // 2026-08-10). Der Router kannte sie nicht und fiel still auf die
