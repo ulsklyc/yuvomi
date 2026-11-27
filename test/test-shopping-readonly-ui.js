@@ -787,6 +787,55 @@ test('Vorrat bei `read`: die Liste oeffnet die Leseansicht, nie den Editor', asy
   }
 });
 
+test('Vorrat bei `read`: kein "Menge entnehmen" (#1891) - weder im Dialog noch als Weg darum herum', async () => {
+  const g = /** @type {any} */ (globalThis);
+  const vorrat = /** @type {any} */ (pantry);
+  const panel = () => {
+    /** @type {Record<string, any>} */
+    const felder = {};
+    return {
+      querySelector: (/** @type {string} */ sel) => { felder[sel] ??= { value: '30', dataset: {}, addEventListener() {} }; return felder[sel]; },
+      querySelectorAll: () => [],
+    };
+  };
+  const zuvor = { open: g.__openModal, close: g.__closeModal };
+  /** @type {any[]} */
+  const dialoge = [];
+  /** @type {string[]} */
+  const geschlossen = [];
+  g.__openModal = (/** @type {any} */ opts) => { dialoge.push(opts); };
+  g.__closeModal = () => { geschlossen.push('close'); return true; };
+  try {
+    vorratZustand([reichlich()]);
+    // Die Leseansicht hat keinen Knopf, also kein Entnehmen.
+    await withAccess(NUR_VORRAT_LESEN, () => pantry.onListClick(listenKlick('details', 7)));
+    assert.match(dialoge[0].content, /data-view="read"/);
+    assert.doesNotMatch(dialoge[0].content, /pantry-take/);
+    dialoge.length = 0;
+    // Die zweiten Linien: kein Dialog, kein Schliessen, kein POST.
+    for (const [name, weg] of Object.entries({
+      switchToTake: () => vorrat.switchToTake(vorrat.state.items[0]),
+      openTakeModal: () => vorrat.openTakeModal(vorrat.state.items[0]),
+      submitTake: () => vorrat.submitTake(panel(), vorrat.state.items[0]),
+    })) {
+      const gesendet = await withAccess(NUR_VORRAT_LESEN, () => aufrufe(weg));
+      assert.deepEqual(gesendet, [], `${name}: nichts gesendet`);
+      assert.deepEqual(dialoge, [], `${name}: kein Dialog`);
+    }
+    assert.deepEqual(geschlossen, [], 'auch kein Schliessen eines Dialogs');
+    // Gegenfall: mit Schreibrecht traegt der Editor den Knopf, und das Entnehmen geht raus.
+    await withAccess(VORRAT_VOLL, () => pantry.onListClick(listenKlick('edit', 7)));
+    assert.match(dialoge[0].content, /id="pantry-take"/);
+    const gesendet = await withAccess(VORRAT_VOLL, () => aufrufe(() => vorrat.submitTake(panel(), vorrat.state.items[0]),
+      { 'POST /pantry/7/take': { data: { ...reichlich(), quantity: 0 }, taken: 3 } }));
+    assert.deepEqual(gesendet, ['POST /pantry/7/take']);
+  } finally {
+    g.__openModal = zuvor.open;
+    g.__closeModal = zuvor.close;
+    vorratZustand([]);
+  }
+});
+
 test('Vorrat bei `read`: die Leseansicht zeigt alles, was der Editor zeigt', async () => {
   const html = await withAccess(NUR_VORRAT_LESEN, () => pantry.itemReadHtml(reichlich()));
   for (const label of ['quantityLabel', 'locationLabel', 'categoryLabel', 'expiresLabel', 'minQuantityLabel', 'notesLabel']) {

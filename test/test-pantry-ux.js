@@ -1685,3 +1685,473 @@ test('#2118: a flat list builds the product stock once per render, not once per 
   };
   assert.equal(filterCalls(8), filterCalls(2), 'eight rows cost what two cost: one pass per render');
 });
+
+// --------------------------------------------------------
+// #1891: take an amount from a batch, in the item dialog
+// --------------------------------------------------------
+
+/** The stubs read globals; untyped on purpose, like the API answers they stand for. */
+const G = /** @type {any} */ (globalThis);
+/** The page's test handle, untyped: its state holds plain API rows. */
+const P = /** @type {any} */ (__test);
+
+/**
+ * A dialog panel whose fields are plain objects; listeners are kept per selector and event.
+ * @param {Record<string, string>} [values]
+ */
+function takePanel(values = {}) {
+  /** @type {Record<string, any>} */
+  const fields = {};
+  /** @type {Record<string, any>} */
+  const on = {};
+  const panel = {
+    /** @param {string} sel */
+    querySelector: (sel) => {
+      fields[sel] ??= {
+        value: values[sel] ?? '', dataset: {}, hidden: false, disabled: false, textContent: '',
+        /** @param {string} type @param {Function} fn */
+        addEventListener(type, fn) { on[`${sel} ${type}`] = fn; },
+      };
+      return fields[sel];
+    },
+    querySelectorAll: () => [],
+  };
+  return { panel, fields, on };
+}
+
+/** The open product "Milch" (2 l Dachboden + 1 l Garage) on a stub page with its live region. */
+function takeStage() {
+  groupedPantry();
+  const milk = /** @type {any} */ (__test.productSections(__test.state.items)[0].products[1]);
+  __test.expandedProducts.add(milk.key);
+  const el = __test.productEl(milk);
+  const head = el.children[0];
+  const total = byClass(head, 'pantry-product__total')[0];
+  const live = makeNode();
+  const { row, quantityEl } = makeRow(0.5);
+  const totalSelector = `.pantry-product[data-product-key="${milk.key}"] > .pantry-product__row .pantry-product__total`;
+  __test.setContainerForTest({
+    /** @param {string} sel */
+    querySelector: (sel) => {
+      if (sel === '#pantry-live') return live;
+      if (sel === '.pantry-row[data-id="1"]') return row;
+      return null;
+    },
+    /** @param {string} sel */
+    querySelectorAll: (sel) => (sel === totalSelector ? [total] : []),
+  });
+  return { milk, total, live, quantityEl };
+}
+
+/** @param {number} id */
+const itemOf = (id) => P.state.items.find((/** @type {any} */ i) => i.id === id);
+
+test('#1891: the item dialog has "Take an amount" under quantity and unit for a batch with stock, not for an empty one or a new item', () => {
+  resetPantry();
+  /** @type {any[]} */
+  const opened = [];
+  G.__openModal = (/** @type {any} */ opts) => { opened.push(opts); };
+  try {
+    P.state.items = [rice(2), rice(0, { id: 6 })];
+    P.openItemModal('edit', P.state.items[0]);
+    const html = opened[0].content;
+    assert.match(html, /<button type="button" class="btn btn--secondary btn--sm pantry-form__take" id="pantry-take">/);
+    assert.match(html, /pantry\.takeAmount/);
+    assert.ok(html.indexOf('id="pantry-take"') > html.indexOf('id="pantry-unit"'), 'under quantity and unit');
+    assert.ok(html.indexOf('id="pantry-take"') < html.indexOf('id="pantry-location"'), 'before the place');
+    P.openItemModal('edit', P.state.items[1]);
+    assert.doesNotMatch(opened[1].content, /pantry-take/, 'nothing to take from an empty batch');
+    P.openItemModal('create');
+    assert.doesNotMatch(opened[2].content, /pantry-take/, 'a new item has nothing yet');
+    // A step still in its debounce window counts: 0 shown, no take.
+    P.intents.set(5, { quantity: 0, seq: 1, timer: null, flush: () => {} });
+    P.openItemModal('edit', P.state.items[0]);
+    assert.doesNotMatch(opened[3].content, /pantry-take/);
+  } finally {
+    delete G.__openModal;
+    resetPantry();
+  }
+});
+
+test('#1891: "Take an amount" closes the item dialog (asking about changes), waits for its focus, then opens the take dialog', async () => {
+  resetPantry();
+  P.state.items = [rice(250, { name: 'Butter', unit: 'g' })];
+  /** @type {string[]} */
+  const steps = [];
+  /** @type {any[]} */
+  const opened = [];
+  G.__openModal = (/** @type {any} */ opts) => { steps.push('open'); opened.push(opts); };
+  let answer = false;
+  G.__closeModal = (/** @type {any} */ opts) => { steps.push(`close${opts?.force ? ' force' : ''}`); return answer; };
+  G.__whenModalClosed = async () => { steps.push('closed'); };
+  try {
+    P.openItemModal('edit', P.state.items[0]);
+    const { panel, on } = takePanel();
+    opened[0].onSave(panel);
+    steps.length = 0;
+    // Discarding the changes declined: the item dialog stays, nothing else opens.
+    await on['#pantry-take click']();
+    await settled();
+    assert.deepEqual(steps, ['close'], 'closed without force, so the dirty guard asks');
+    answer = true;
+    steps.length = 0;
+    await on['#pantry-take click']();
+    await settled();
+    assert.deepEqual(steps, ['close', 'closed', 'open'], 'the take dialog opens once the item dialog is gone');
+    const take = opened.at(-1);
+    assert.equal(take.title, 'pantry.takeTitle{"name":"Butter"}');
+    assert.match(take.content, /<form id="pantry-take-form" novalidate>/);
+    assert.match(take.content, /id="pantry-take-amount"/);
+    assert.match(take.content, /type="text"/, 'text, not type="number": the browser would decide the separator');
+    assert.doesNotMatch(take.content, /type="number"/);
+    assert.match(take.content, /inputmode="decimal"/);
+    assert.match(take.content, /autocomplete="off"/);
+    assert.match(take.content, / required/);
+    assert.match(take.content, /aria-label="pantry\.takeLabel"/, 'the field is named like its row');
+    assert.match(take.content, /aria-describedby="pantry-take-stock pantry-take-more pantry-take-amount-suffix"/,
+      'the stock, the warning and the unit describe the field');
+    assert.match(take.content, /<label class="form-row__label" for="pantry-take-amount">pantry\.takeLabel<\/label>/);
+    assert.match(take.content, /id="pantry-take-stock">pantry\.takeInStock\{&quot;quantity&quot;:&quot;250 /, 'what is there, in the unit of the batch');
+    assert.match(take.content, /id="pantry-take-amount-suffix">/);
+    assert.match(take.content, /role="status" hidden><\/p>/, 'the warning is a status line, hidden until needed');
+    assert.match(take.content, /type="submit" class="btn btn--primary" id="pantry-take-submit">pantry\.takeSubmit</);
+    assert.match(take.content, /class="btn btn--secondary" data-action="close-modal">common\.cancel</);
+  } finally {
+    delete G.__openModal;
+    delete G.__closeModal;
+    delete G.__whenModalClosed;
+    resetPantry();
+  }
+});
+
+test('#1891: taking 0.5 l sends the amount, the row and the product total follow, the live region says it, the toast undoes it', async () => {
+  const { total, live, quantityEl } = takeStage();
+  /** @type {any[]} */
+  const sent = [];
+  /** @type {any[]} */
+  const toasts = [];
+  G.__apiStub = {
+    post: async (/** @type {string} */ path, /** @type {any} */ body) => {
+      sent.push([path, body]);
+      const dachboden = itemOf(1);
+      if (path.endsWith('/take')) return { data: { ...dachboden, quantity: dachboden.quantity - body.amount }, taken: body.amount };
+      return { data: { ...dachboden, quantity: dachboden.quantity + body.amount } };
+    },
+  };
+  /** @type {any[]} */
+  const closed = [];
+  G.__closeModal = (/** @type {any} */ opts) => { closed.push(opts); return true; };
+  G.__modalContextId = () => 'take-dialog';
+  G.window.yuvomi = {
+    showToast: (/** @type {string} */ msg, /** @type {string} */ type, /** @type {number} */ _duration, /** @type {any} */ action, /** @type {any} */ opts) => {
+      toasts.push({ msg, type, action, opts });
+      return true;
+    },
+    feedbackScope: () => 7,
+  };
+  try {
+    /** @type {any[]} */
+    const opened = [];
+    G.__openModal = (/** @type {any} */ opts) => { opened.push(opts); };
+    P.openTakeModal(itemOf(1));
+    const { panel, fields, on } = takePanel({ '#pantry-take-amount': '0.5' });
+    opened[0].onSave(panel);
+    await on['#pantry-take-form submit']({ preventDefault() {} });
+    await settled();
+
+    assert.deepEqual(sent, [['/pantry/1/take', { amount: 0.5 }]], 'the amount, not the new quantity');
+    assert.equal(closed[0]?.force, true);
+    assert.equal(closed[0]?.context, 'take-dialog', 'only the dialog the request came from');
+    assert.equal(itemOf(1).quantity, 1.5);
+    assert.match(quantityEl.textContent, /1[.,]5/, 'the row shows what the server answered');
+    assert.match(textOf(total), /"quantity":"2[.,]5 /, 'the product row says the new total');
+    assert.match(live.textContent, /^Milch: .*1[.,]5 .*, pantry\.productTotal\{"quantity":"2[.,]5 /,
+      'the live region says it like a step');
+    assert.equal(fields['#pantry-take-submit'].disabled, true, 'no second take from the same dialog');
+
+    const toast = toasts.at(-1);
+    assert.match(toast.msg, /^pantry\.taken\{"name":"Milch","quantity":"0[.,]5 /);
+    assert.equal(typeof toast.action, 'function', 'the toast carries undo');
+    assert.equal(toast.opts.scope, 7, 'no receipt in the next module');
+    await toast.action();
+    assert.deepEqual(sent.at(-1), ['/pantry/1/take/undo', { amount: 0.5 }], 'undo puts back what was taken');
+    assert.equal(itemOf(1).quantity, 2);
+    assert.match(textOf(total), /"quantity":"3 /);
+  } finally {
+    delete G.__openModal;
+    delete G.__closeModal;
+    delete G.__modalContextId;
+    G.window.yuvomi = {};
+    __test.expandedProducts.clear();
+    resetPantry();
+  }
+});
+
+test('#1891: more than is in stock is said before the tap, and after it the toast says the batch is used up', async () => {
+  takeStage();
+  /** @type {any[]} */
+  const toasts = [];
+  /** @type {any[]} */
+  const sent = [];
+  G.__apiStub = {
+    post: async (/** @type {string} */ path, /** @type {any} */ body) => {
+      sent.push([path, body]);
+      return path.endsWith('/take')
+        ? { data: { ...itemOf(1), quantity: 0 }, taken: 2 }
+        : { data: { ...itemOf(1), quantity: 2 } };
+    },
+  };
+  G.__closeModal = () => true;
+  G.window.yuvomi = {
+    showToast: (/** @type {string} */ msg, /** @type {string} */ _type, /** @type {number} */ _duration, /** @type {any} */ action) => {
+      toasts.push({ msg, action });
+      return true;
+    },
+  };
+  try {
+    /** @type {any[]} */
+    const opened = [];
+    G.__openModal = (/** @type {any} */ opts) => { opened.push(opts); };
+    P.openTakeModal(itemOf(1));
+    const { panel, fields, on } = takePanel();
+    opened[0].onSave(panel);
+    const more = fields['#pantry-take-more'];
+    fields['#pantry-take-amount'].value = '1';
+    on['#pantry-take-amount input']();
+    assert.equal(more.hidden, true, '1 of 2 l: nothing to say');
+    fields['#pantry-take-amount'].value = '5';
+    on['#pantry-take-amount input']();
+    assert.equal(more.hidden, false);
+    assert.equal(more.textContent, 'pantry.takeMoreThanStock', 'a warning, the button stays');
+    assert.equal(panel.querySelector('#pantry-take-submit').disabled, false);
+    assert.match(fields['#pantry-take-amount-suffix'].textContent, /pantry\.units\.l/, 'the unit follows the number');
+
+    await on['#pantry-take-form submit']({ preventDefault() {} });
+    await settled();
+    assert.match(toasts.at(-1).msg, /^pantry\.takenAll\{"name":"Milch","quantity":"2 /, 'used up, with what was really taken');
+    assert.equal(itemOf(1).quantity, 0);
+    await toasts.at(-1).action();
+    assert.deepEqual(sent.at(-1), ['/pantry/1/take/undo', { amount: 2 }], 'undo puts back the 2 l that were there, not the 5 asked');
+  } finally {
+    delete G.__openModal;
+    delete G.__closeModal;
+    G.window.yuvomi = {};
+    __test.expandedProducts.clear();
+    resetPantry();
+  }
+});
+
+test('#1891: an amount the field refuses is said at the field and nothing is sent; a failed take keeps the dialog', async () => {
+  takeStage();
+  /** @type {string[]} */
+  const sent = [];
+  /** @type {any[]} */
+  const reported = [];
+  /** @type {any[]} */
+  const toasts = [];
+  G.__apiStub = {
+    post: async (/** @type {string} */ path) => { sent.push(path); throw Object.assign(new Error('boom'), { status: 500, data: {} }); },
+  };
+  G.__reportFieldError = (/** @type {any} */ el, /** @type {string} */ msg) => reported.push([el, msg]);
+  G.__closeModal = () => true;
+  G.window.yuvomi = { showToast: (/** @type {string} */ msg, /** @type {string} */ type) => { toasts.push([msg, type]); return true; } };
+  try {
+    /** @type {any[]} */
+    const opened = [];
+    G.__openModal = (/** @type {any} */ opts) => { opened.push(opts); };
+    P.openTakeModal(itemOf(1));
+    const { panel, fields } = takePanel();
+    opened[0].onSave(panel);
+    // The markup rules (min, max, required, number) through constraintErrors,
+    // also for a value that reads as a number.
+    fields['#pantry-take-amount'].value = '30';
+    G.__constraintErrors = () => [[fields['#pantry-take-amount'], 'common.fieldMax']];
+    await P.submitTake(panel, itemOf(1));
+    delete G.__constraintErrors;
+    // Nothing the browser checks, but rounded to nothing: still the field.
+    fields['#pantry-take-amount'].value = '';
+    await P.submitTake(panel, itemOf(1));
+    // Not a number in the household's writing, grouped, 0 after rounding, above the cap.
+    for (const text of ['abc', '1.000', '0,001', '2000000']) {
+      fields['#pantry-take-amount'].value = text;
+      await P.submitTake(panel, itemOf(1));
+    }
+    assert.equal(sent.length, 0, 'nothing sent');
+    assert.deepEqual(reported.map(([el, msg]) => [el === fields['#pantry-take-amount'], msg.split('{')[0]]),
+      [[true, 'common.fieldMax'], [true, 'common.required'], [true, 'common.fieldNumber'], [true, 'common.fieldNumber'],
+        [true, 'common.fieldMin'], [true, 'common.fieldMax']]);
+
+    fields['#pantry-take-amount'].value = '0.5';
+    await P.submitTake(panel, itemOf(1));
+    assert.deepEqual(sent, ['/pantry/1/take']);
+    assert.equal(toasts.at(-1)[1], 'danger');
+    assert.equal(fields['#pantry-take-submit'].disabled, false, 'the dialog can try again');
+    assert.equal(itemOf(1).quantity, 2, 'the row keeps what the server has');
+  } finally {
+    delete G.__openModal;
+    delete G.__closeModal;
+    delete G.__reportFieldError;
+    delete G.__constraintErrors;
+    G.window.yuvomi = {};
+    __test.expandedProducts.clear();
+    resetPantry();
+  }
+});
+
+test('#1891: the amount is read in the writing of the household, not of the browser: "0,5" in a German household is 0.5', async () => {
+  takeStage();
+  /** @type {any[]} */
+  const sent = [];
+  G.__apiStub = {
+    post: async (/** @type {string} */ _path, /** @type {any} */ body) => {
+      sent.push(body.amount);
+      return { data: { ...itemOf(1), quantity: 1 }, taken: body.amount };
+    },
+  };
+  G.__closeModal = () => true;
+  G.window.yuvomi = { showToast: () => true };
+  const before = G.__formatLocale;
+  try {
+    /** @type {any[]} */
+    const opened = [];
+    G.__openModal = (/** @type {any} */ opts) => { opened.push(opts); };
+    for (const [region, text, expected] of /** @type {Array<[string, string, number]>} */ ([
+      ['de', '0,5', 0.5], ['de', '0.5', 0.5], ['en-US', '0.5', 0.5], ['en-US', '0,5', 0.5], ['de', '1,25', 1.25],
+    ])) {
+      G.__formatLocale = region;
+      P.openTakeModal(itemOf(1));
+      const { panel, on } = takePanel({ '#pantry-take-amount': text });
+      opened.at(-1).onSave(panel);
+      await on['#pantry-take-form submit']({ preventDefault() {} });
+      await settled();
+      assert.equal(sent.at(-1), expected, `${region} "${text}"`);
+    }
+    // A grouped thousand is refused, never read as 1: "1,000" under en-US.
+    G.__formatLocale = 'en-US';
+    /** @type {string[]} */
+    const reported = [];
+    G.__reportFieldError = (/** @type {any} */ _el, /** @type {string} */ msg) => reported.push(msg);
+    P.openTakeModal(itemOf(1));
+    const { panel } = takePanel({ '#pantry-take-amount': '1,000' });
+    opened.at(-1).onSave(panel);
+    const count = sent.length;
+    await P.submitTake(panel, itemOf(1));
+    assert.equal(sent.length, count, 'nothing sent');
+    assert.equal(reported[0], 'common.fieldNumber');
+  } finally {
+    G.__formatLocale = before;
+    delete G.__openModal;
+    delete G.__closeModal;
+    delete G.__reportFieldError;
+    G.window.yuvomi = {};
+    __test.expandedProducts.clear();
+    resetPantry();
+  }
+});
+
+test('#1891: one Idempotency-Key per dialog - kept when the answer never came, new after a clear refusal or for another amount', async () => {
+  takeStage();
+  /** @type {Array<{ amount: number, key: string }>} */
+  const sent = [];
+  /** @type {Array<() => any>} */
+  const answers = [];
+  G.__apiStub = {
+    post: async (/** @type {string} */ _path, /** @type {any} */ body, /** @type {any} */ opts) => {
+      sent.push({ amount: body.amount, key: opts?.headers?.['Idempotency-Key'] });
+      return answers.shift()?.();
+    },
+  };
+  G.__closeModal = () => true;
+  G.window.yuvomi = { showToast: () => true };
+  const fail = (/** @type {number} */ status, /** @type {any} */ data = {}) => () => { throw Object.assign(new Error('x'), { status, data }); };
+  try {
+    /** @type {any[]} */
+    const opened = [];
+    G.__openModal = (/** @type {any} */ opts) => { opened.push(opts); };
+    P.openTakeModal(itemOf(1));
+    const { panel, on } = takePanel({ '#pantry-take-amount': '0.5' });
+    opened[0].onSave(panel);
+    const submit = async () => { await on['#pantry-take-form submit']({ preventDefault() {} }); await settled(); };
+    answers.push(fail(0), fail(503), fail(409, { reason: 'idempotency_in_progress' }), fail(400), () => ({ data: { ...itemOf(1), quantity: 1.5 }, taken: 0.5 }));
+    await submit();
+    const first = sent[0].key;
+    assert.match(first, /^[0-9a-f]{32}$/, 'a key goes with the first take');
+    await submit();
+    await submit();
+    await submit();
+    assert.deepEqual(sent.map((s) => s.key), [first, first, first, first],
+      'network, 5xx and "still running": the same key, so a take that was booked is not booked again');
+    // The 400 was a clear refusal: nothing was booked, a new tap is a new take.
+    await submit();
+    assert.notEqual(sent[4].key, first);
+    assert.equal(sent[4].amount, 0.5);
+
+    // Another amount after an open outcome is another take, with its own key.
+    P.openTakeModal(itemOf(1));
+    const second = takePanel({ '#pantry-take-amount': '0.5' });
+    opened[1].onSave(second.panel);
+    answers.push(fail(0), () => ({ data: { ...itemOf(1), quantity: 1 }, taken: 1 }));
+    await second.on['#pantry-take-form submit']({ preventDefault() {} });
+    await settled();
+    const open = sent[5].key;
+    assert.notEqual(open, first, 'a new dialog has a key of its own');
+    second.fields['#pantry-take-amount'].value = '1';
+    await second.on['#pantry-take-form submit']({ preventDefault() {} });
+    await settled();
+    assert.notEqual(sent[6].key, open);
+  } finally {
+    delete G.__openModal;
+    delete G.__closeModal;
+    G.window.yuvomi = {};
+    __test.expandedProducts.clear();
+    resetPantry();
+  }
+});
+
+test('#1891: taking exactly what is there says "used up"; a batch deleted meanwhile closes the dialog and reloads the list', async () => {
+  takeStage();
+  /** @type {any[]} */
+  const toasts = [];
+  /** @type {string[]} */
+  const calls = [];
+  let gone = false;
+  G.__apiStub = {
+    post: async () => {
+      if (gone) throw Object.assign(new Error('gone'), { status: 404, data: { error: 'Item not found.' } });
+      return { data: { ...itemOf(1), quantity: 0 }, taken: 2 };
+    },
+    get: async (/** @type {string} */ path) => { calls.push(`GET ${path}`); return { data: [], products: [], locations: [], categories: [] }; },
+  };
+  /** @type {any[]} */
+  const closed = [];
+  G.__closeModal = (/** @type {any} */ opts) => { closed.push(opts); return true; };
+  G.window.yuvomi = { showToast: (/** @type {string} */ msg, /** @type {string} */ type) => { toasts.push([msg, type]); return true; } };
+  try {
+    /** @type {any[]} */
+    const opened = [];
+    G.__openModal = (/** @type {any} */ opts) => { opened.push(opts); };
+    P.openTakeModal(itemOf(1));
+    const { panel } = takePanel({ '#pantry-take-amount': '2' });
+    opened[0].onSave(panel);
+    await P.submitTake(panel, itemOf(1));
+    assert.match(toasts.at(-1)[0], /^pantry\.takenAll\{/, '2 of 2 l: used up, not "2 l taken"');
+
+    gone = true;
+    closed.length = 0;
+    P.openTakeModal(itemOf(1));
+    const second = takePanel({ '#pantry-take-amount': '1' });
+    opened[1].onSave(second.panel);
+    await P.submitTake(second.panel, itemOf(1));
+    await settled();
+    assert.equal(toasts.at(-1)[1], 'danger');
+    assert.equal(closed.length, 1, 'the dialog of a batch that is gone closes');
+    assert.equal(closed[0].force, true);
+    assert.deepEqual(calls, ['GET /pantry'], 'and the list is loaded again');
+  } finally {
+    delete G.__openModal;
+    delete G.__closeModal;
+    G.window.yuvomi = {};
+    __test.expandedProducts.clear();
+    resetPantry();
+  }
+});

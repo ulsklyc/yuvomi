@@ -1,7 +1,7 @@
 import { op, idParam, withCaseReasons, withValidationRefusal } from '../helpers.js';
 import { MAX_SHORT, MAX_TEXT, MAX_TITLE } from '../../api/formats.ts';
 import { OPTIONAL_DATE_PATTERN } from '../../utils/datetime-pattern.js';
-import { PANTRY_UNITS } from '../../../public/utils/pantry-units.js';
+import { PANTRY_UNITS, MAX_PANTRY_QUANTITY } from '../../../public/utils/pantry-units.js';
 import { MAX_ORDER_ROWS, MAX_SHOPPING_ITEMS } from '../array-limits.js';
 
 /**
@@ -82,13 +82,32 @@ function itemProperties({ keepUnit, partial }) {
   };
 }
 
+/**
+ * The body of a take and of its undo (#1891): one amount in the unit of the
+ * item, at least 0.01 (the smallest step a quantity keeps) and at most
+ * MAX_PANTRY_QUANTITY.
+ * @param {string} description
+ */
+const TAKE_BODY = (description) => ({
+  type: 'object',
+  required: ['amount'],
+  properties: {
+    amount: { type: 'number', minimum: 0.01, maximum: MAX_PANTRY_QUANTITY, description },
+  },
+});
+
 const LOCATION_FIELDS = {
   name: { type: 'string', maxLength: MAX_SHORT, description: `At most ${MAX_SHORT} characters as sent.` },
   icon: { type: ['string', 'null'], maxLength: MAX_SHORT, description: 'A Lucide icon name; `null` or `""` keeps the stored one (on create: `package`).' },
 };
 
 export function pantryPaths() {
-  return withCaseReasons('pantry', CASE_REASONS, {
+  return withCaseReasons('pantry', CASE_REASONS, { ...stockPaths(), ...takePaths() });
+}
+
+/** The pantry items, locations, products and the take-over from Shopping. */
+function stockPaths() {
+  return {
     '/api/v1/pantry': {
       get: op({
         summary: 'List pantry items with storage locations and categories',
@@ -285,7 +304,78 @@ export function pantryPaths() {
         responses: answers(204, 'Pantry item deleted', { 404: apiError('No such pantry item') }),
       }),
     },
-  });
+  };
+}
+
+/**
+ * Taking an amount from a pantry item and its undo (#1891).
+ */
+function takePaths() {
+  return {
+    '/api/v1/pantry/{itemId}/take': {
+      post: op({
+        summary: 'Take an amount from a pantry item',
+        description: 'Body: `{ amount }`, how much was taken, in the unit of the item (#1891). An `Idempotency-Key` header makes a repeated request answer with the first take instead of taking again (the app sends one per dialog). '
+          + 'The server subtracts it from the quantity stored at that moment, so two takes from the same item both count, whatever quantity each sender last saw. '
+          + 'More than the item holds sets it to 0 instead of being refused; `taken` in the answer says how much was really taken (then less than `amount`). '
+          + 'The amount is rounded to two decimals like every quantity; 0, a negative amount and one that is not a number answer 400 with `fields` (`reason` `validation`). '
+          + 'An item taken to 0 loses its best-before reminder, as with a partial update to 0. '
+          + '`PATCH /api/v1/pantry/{itemId}` with `quantity` still sets the quantity as a whole. `POST /api/v1/pantry/{itemId}/take/undo` puts a take back.',
+        tag: 'Pantry',
+        params: [idParam('itemId', 'Item ID, plain decimal digits.')],
+        stateChanging: true,
+        requestBody: body(TAKE_BODY('How much was taken, in the unit of the item. Rounded to two decimals.')),
+        responses: answers(200, 'Amount taken', {
+          200: {
+            description: 'Amount taken: the item afterwards and the amount really taken',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['data', 'taken'],
+                  properties: {
+                    data: { type: 'object', description: 'The pantry item after the take, as in `GET /api/v1/pantry`.' },
+                    taken: { type: 'number', description: 'How much was taken: `amount`, or what the item held when that was less.' },
+                  },
+                },
+              },
+            },
+          },
+          404: apiError('No such pantry item'),
+        }),
+      }),
+    },
+    '/api/v1/pantry/{itemId}/take/undo': {
+      post: op({
+        summary: 'Undo a take from a pantry item',
+        description: 'Body: `{ amount }`. Adds the given amount to the item, whatever it is: meant for the `taken` of one `POST /api/v1/pantry/{itemId}/take` answer, '
+          + 'but it checks no take, so it needs the same pantry write access as `PATCH` with `quantity` and nothing more. '
+          + 'The amount is added to the quantity stored at that moment (at most 1,000,000), not written back as the old quantity, so a change someone made in between stays. '
+          + 'An item that comes back from 0 gets its best-before reminder again. The answer is `{ data }`, the item afterwards.',
+        tag: 'Pantry',
+        params: [idParam('itemId', 'Item ID, plain decimal digits.')],
+        stateChanging: true,
+        requestBody: body(TAKE_BODY('The amount to put back: the `taken` of the take.')),
+        responses: answers(200, 'Take undone', {
+          200: {
+            description: 'Take undone: the item afterwards',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['data'],
+                  properties: {
+                    data: { type: 'object', description: 'The pantry item after the amount was put back, as in `GET /api/v1/pantry`.' },
+                  },
+                },
+              },
+            },
+          },
+          404: apiError('No such pantry item'),
+        }),
+      }),
+    },
+  };
 }
 
 // #1909: was der Lagerort-Verwalter erreicht.

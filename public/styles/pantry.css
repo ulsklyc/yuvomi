@@ -513,6 +513,13 @@
   margin-inline-end: auto;
 }
 
+/* "Take an amount" (#1891) under Quantity and Unit, as wide as its word: a
+ * child of the dialog body, which is a flex column and would stretch it over
+ * the whole width like a field. */
+.pantry-form__take {
+  align-self: flex-start;
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* .list-row bringt seine eigene reduced-motion-Rücknahme mit. */
   .pantry-stepper__btn {
