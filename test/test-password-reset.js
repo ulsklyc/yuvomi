@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { createPasswordResetService } from '../server/services/password-reset.js';
+import passkeysMigration from '../server/migrations/0285.ts';
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 
@@ -25,6 +26,7 @@ function makeDb() {
     );
     CREATE UNIQUE INDEX idx_password_resets_hash ON password_resets(token_hash);
   `);
+  db.exec(passkeysMigration.up);
   db.prepare("INSERT INTO users (id, username) VALUES (1,'alice')").run();
   return db;
 }
@@ -448,6 +450,23 @@ test('reset-password updates the hash and consumes the token', async () => {
   assert.equal(db.prepare('SELECT COUNT(*) c FROM password_resets').get().c, 0);
 });
 
+test('a failure saving the reset password rolls back token redemption and passkey revocation', async () => {
+  const db = makeDb();
+  const options = { db, now: Date.now };
+  const reset = createPasswordResetService(options);
+  const token = reset.createToken(1).token;
+  db.prepare(`INSERT INTO user_passkeys (user_id, credential_id, public_key, name)
+    VALUES (1, 'fixture-credential', X'00', 'Fixture key')`).run();
+  db.exec(`CREATE TRIGGER reject_reset_password BEFORE UPDATE OF password_hash ON users
+    BEGIN SELECT RAISE(ABORT, 'Password update failed'); END;`);
+  const { app } = await makeAuthApp(db);
+  const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'new-password' });
+  assert.equal(status, 500);
+  assert.equal(passwordHashOf(db), 'x');
+  assert.ok(db.prepare('SELECT 1 FROM user_passkeys WHERE user_id = 1').get());
+  assert.equal(reset.verifyToken(token), 1);
+});
+
 test('reset-password beendet jede Sitzung des Kontos, auch eine abgelaufene Zeile, und nur dessen', async () => {
   const db = makeDb();
   seedContactsAndEmail(db);
@@ -464,7 +483,7 @@ test('reset-password beendet jede Sitzung des Kontos, auch eine abgelaufene Zeil
   const token = sent[0].html.match(/token=([a-f0-9]+)/)[1];
   const { status } = await callJson(app, 'POST', '/auth/reset-password', { token, password: 'brandnewpw' });
   assert.equal(status, 200);
-  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map((r) => r.sid);
+  const left = db.prepare('SELECT sid FROM sessions ORDER BY sid').all().map(row => row.sid);
   assert.deepEqual(left, ['bob-1', 'broken']);
 });
 

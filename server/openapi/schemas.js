@@ -2426,6 +2426,57 @@ export const schemas = {
           },
           required: ['data'],
         },
+        PasskeyOptionsRequest: {
+          type: 'object',
+          additionalProperties: false,
+        },
+        PasskeyCredential: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', minLength: 1, maxLength: 2048 },
+            response: { type: 'object' },
+          },
+          required: ['id', 'response'],
+        },
+        PasskeyLoginRequest: {
+          type: 'object',
+          properties: { credential: { $ref: '#/components/schemas/PasskeyCredential' } },
+          required: ['credential'],
+          additionalProperties: false,
+        },
+        PasskeyRegistrationRequest: {
+          type: 'object',
+          properties: {
+            credential: { $ref: '#/components/schemas/PasskeyCredential' },
+            name: { type: 'string', minLength: 1, maxLength: 80 },
+          },
+          required: ['credential', 'name'],
+          additionalProperties: false,
+        },
+        PasskeyReauthenticationRequest: {
+          oneOf: [
+            {
+              type: 'object',
+              properties: {
+                method: { type: 'string', enum: ['password'] },
+                password: { type: 'string', minLength: 1, maxLength: PASSWORD_MAX },
+                code: { type: 'string', maxLength: CODE_MAX },
+              },
+              required: ['method', 'password'],
+              additionalProperties: false,
+            },
+            {
+              type: 'object',
+              properties: {
+                method: { type: 'string', enum: ['passkey'] },
+                credential: { $ref: '#/components/schemas/PasskeyCredential' },
+                code: { type: 'string', maxLength: CODE_MAX },
+              },
+              required: ['method', 'credential'],
+              additionalProperties: false,
+            },
+          ],
+        },
         LoginRequest: {
           type: 'object',
           properties: {

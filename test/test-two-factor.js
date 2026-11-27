@@ -341,7 +341,9 @@ test('JEDER Weg in eine Sitzung prueft den zweiten Faktor - auch SSO', () => {
   const source = readFileSync(new URL('../server/auth.js', import.meta.url), 'utf8');
   const lines = source.split('\n');
 
+  /** @type {string[]} */
   const callers = [];
+  /** @type {string[]} */
   const unguarded = [];
   lines.forEach((line, index) => {
     // Der Aufruf, nicht die Definition - die traegt dieselbe Zeichenfolge.
@@ -373,7 +375,8 @@ test('JEDER Weg in eine Sitzung prueft den zweiten Faktor - auch SSO', () => {
   // Eine leere Liste ist fuer sich keine Zusicherung: sie waere auch leer,
   // wenn der Suchbegriff nicht mehr passte. Deshalb die Gegenprobe, dass
   // ueberhaupt die erwarteten Wege gefunden wurden.
-  assert.equal(callers.length, 3, `erwartet werden drei Anmeldewege, gefunden: ${callers.join(' | ')}`);
+  assert.equal(callers.length, 4, `erwartet werden drei Anmeldewege, gefunden: ${callers.join(' | ')}`);
+  assert.ok(callers.some((c) => c.includes("'/passkeys/login/verify'")), 'passkey sign-in route was not found');
   assert.ok(callers.some((c) => c.includes("'/login'")), 'der Passwort-Login wurde nicht gefunden');
   assert.ok(callers.some((c) => c.includes("'/oidc/callback'")), 'der OIDC-Callback wurde nicht gefunden');
   assert.ok(callers.some((c) => c.includes("'/2fa/verify'")), 'die Verify-Route wurde nicht gefunden');

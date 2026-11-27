@@ -427,13 +427,19 @@ function contended(file, busyFor) {
   const waiting = cipher(file);
   waiting.pragma('busy_timeout = 0');
   let attempts = 0;
+  let baselineCommitted = false;
   /** @type {ServerDatabase} */
   const database = {
     prepare: (sql) => waiting.prepare(sql),
-    // migrate() faehrt seine Transaktionen mit withTx(): jedes aeusserste BEGIN ist
-    // ein Versuch.
+    // Count the baseline attempts until it commits. Later migrations run in
+    // their own transactions and still contribute to the schema comparison.
     exec: (sql) => {
-      if (sql !== 'BEGIN') return waiting.exec(sql);
+      if (sql === 'COMMIT') {
+        const result = waiting.exec(sql);
+        baselineCommitted = true;
+        return result;
+      }
+      if (sql !== 'BEGIN' || baselineCommitted) return waiting.exec(sql);
       attempts += 1;
       if (attempts > busyFor) return waiting.exec(sql);
       // Die andere Verbindung schreibt (und haelt damit die Sperre), dann der
