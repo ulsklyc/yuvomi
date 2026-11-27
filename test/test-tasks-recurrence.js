@@ -1186,3 +1186,75 @@ test('Abbildbare fremde Serie: wer im selben PUT eine Uhrzeit setzt und abhakt, 
   assert.deepEqual({ ...row }, { status: 'open', due_time: null });
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE recurrence_origin_id = ?').get(id).n, 0);
 });
+
+// --------------------------------------------------------
+// Erinnerungen reisen mit der Folgeinstanz
+// --------------------------------------------------------
+/** @param {number|bigint} taskId */
+function taskReminders(taskId) {
+  return db.prepare(
+    `SELECT remind_at, created_by, dismissed FROM reminders
+      WHERE entity_type = 'task' AND entity_id = ? ORDER BY id`,
+  ).all(taskId).map((/** @type {any} */ r) => ({ ...r }));
+}
+
+/**
+ * @param {string} zone
+ * @param {() => Promise<void>} fn
+ */
+async function withHouseholdZone(zone, fn) {
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(zone);
+  try { return await fn(); } finally {
+    db.prepare(`DELETE FROM sync_config WHERE key = 'household_timezone'`).run();
+  }
+}
+
+test('PATCH done: die Folgeinstanz erbt die Erinnerung mit demselben Abstand zur Faelligkeit', async () => {
+  // Der Fall aus dem Bericht: Samstag 10:00, 15 Minuten vorher, America/Puerto_Rico (UTC-4).
+  await withHouseholdZone('America/Puerto_Rico', async () => {
+    const id = insertTask({
+      title: 'NAS1-Backups pruefen', status: 'open', due_date: '2030-11-30', due_time: '10:00',
+      priority: 'high', created_by: uid, is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY;BYDAY=SA',
+    });
+    db.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by, dismissed)
+      VALUES ('task', ?, '2030-11-30T13:45:00', ?, 1)`).run(id, uid);
+
+    const res = await call('PATCH', `/${id}/status`, { status: 'done' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const next = db.prepare('SELECT * FROM tasks WHERE recurrence_origin_id = ?').get(id);
+    assert.equal(next.due_date, '2030-12-07');
+    assert.deepEqual(taskReminders(next.id), [{ remind_at: '2030-12-07T13:45:00', created_by: uid, dismissed: 0 }]);
+    // Die erledigte Instanz behaelt ihre eigene.
+    assert.equal(taskReminders(id).length, 1);
+  });
+});
+
+test('PUT done: die Erinnerung haelt ihre Wanduhr auch ueber die Zeitumstellung', async () => {
+  await withHouseholdZone('Europe/Berlin', async () => {
+    const id = insertTask({
+      title: 'Filter tauschen', status: 'open', due_date: '2030-03-30', due_time: '10:00',
+      created_by: uid, is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY',
+    });
+    // 09:45 CET = 08:45Z; eine Woche spaeter gilt CEST, 09:45 = 07:45Z.
+    db.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+      VALUES ('task', ?, '2030-03-30T08:45:00', ?)`).run(id, uid);
+
+    const res = await call('PUT', `/${id}`, { status: 'done' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const next = db.prepare('SELECT * FROM tasks WHERE recurrence_origin_id = ?').get(id);
+    assert.equal(next.due_date, '2030-04-06');
+    assert.deepEqual(taskReminders(next.id).map((/** @type {any} */ r) => r.remind_at), ['2030-04-06T07:45:00']);
+  });
+});
+
+test('PATCH done: ohne Erinnerung bekommt die Folgeinstanz auch keine', async () => {
+  const id = insertTask({
+    title: 'Ohne Erinnerung', status: 'open', due_date: '2030-11-30', due_time: '10:00',
+    created_by: uid, is_recurring: 1, recurrence_rule: 'FREQ=WEEKLY',
+  });
+  await call('PATCH', `/${id}/status`, { status: 'done' });
+  const next = db.prepare('SELECT * FROM tasks WHERE recurrence_origin_id = ?').get(id);
+  assert.ok(next, 'Folgeinstanz angelegt');
+  assert.deepEqual(taskReminders(next.id), []);
+});
