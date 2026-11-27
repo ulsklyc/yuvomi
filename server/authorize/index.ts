@@ -87,6 +87,8 @@ export {
   ATTACHMENT_NARROW_ONLY,
   attachmentAccessMode,
   canManageDocument,
+  paperlessFolderAudienceWidens,
+  paperlessFolderMembers,
   documentClonePredicate,
   documentWidenPredicate,
   eventAudienceChanged,

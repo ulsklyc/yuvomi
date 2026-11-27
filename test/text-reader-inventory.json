@@ -188,6 +188,8 @@
   "test-page-fab-docked-browser.js": {"class":"V","sBlocks":0,"targets":["public/","public/index.html"],"fate":"stays:executed"},
   "test-page-mount.js": {"class":"M","sBlocks":2,"targets":["public/pages/","public/router.js"],"fate":"falls-with:public/router.js"},
   "test-pantry-ux.js": {"class":"M","sBlocks":9,"targets":["public/pages/pantry.js","public/styles/layout.css","public/styles/pantry.css"],"fate":"falls-with:public/pages/pantry.js"},
+  "test-paperless-folders-browser.js": {"class":"V","sBlocks":0,"targets":["public/components/modal.js"],"fate":"stays:coupling"},
+  "test-paperless-tags-browser.js": {"class":"V","sBlocks":0,"targets":["public/components/modal.js"],"fate":"stays:coupling"},
   "test-password-reset.js": {"class":"M","sBlocks":1,"targets":["server/auth.js"],"fate":"falls-with:server/auth.js"},
   "test-people-pickers.js": {"class":"M","sBlocks":2,"targets":["public/","public/pages/calendar.js","public/pages/meals.js","public/pages/notes.js","public/pages/rewards.js","public/pages/schedule.js","public/pages/tasks.js"],"fate":"falls-with:public/pages/tasks.js"},
   "test-permission-sheet-ui.js": {"class":"M","sBlocks":3,"targets":["public/settings/pages/admin-permissions.js","public/styles/settings.css"],"fate":"falls-with:public/settings/pages/admin-permissions.js"},

@@ -61,6 +61,9 @@ const ADMIN = Number(db.prepare(`
  * @type {Array<{ file: string, mount: string, exports?: string[] }>}
  */
 const MOUNTS = [
+  { file: 'paperless-folders.js', mount: '/api/v1/documents/dms/paperless' },
+  { file: 'paperless-live-settings.js', mount: '/api/v1/documents/dms/paperless' },
+  { file: 'paperless-tags.js', mount: '/api/v1/documents/dms/paperless' },
   { file: 'notes.js', mount: '/api/v1/notes' },
   { file: 'birthdays.js', mount: '/api/v1/birthdays' },
   { file: 'quick-links.js', mount: '/api/v1/quick-links' },

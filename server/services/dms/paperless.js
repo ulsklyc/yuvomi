@@ -9,9 +9,33 @@
  * Dependencies: global fetch (Node >=22), ./guard.js
  */
 import { assertDmsTargetAllowed, DmsTargetError } from './guard.js';
+import { paperlessStatus } from './paperless-errors.js';
+import { savedViewParams, positiveId, PaperlessViewError, tagFilter } from './paperless-views.js';
 import { remoteFailure } from '../../utils/http.js';
 
 const REQUEST_TIMEOUT_MS = 8000;
+// Cache only definitions, never document membership. Account credentials form
+// part of the key so replacing a token cannot reuse its predecessor's view.
+const VIEW_CACHE_MS = 5000;
+const viewCache = new Map();
+
+// Tags may be flat or contain nested child objects. Keep the public contract
+// flat, deduplicated and limited to IDs/names, never provider metadata.
+/** @param {unknown[]} rows @returns {import("../../../types/paperless.d.ts").Tag[]} */
+function namedTags(rows) {
+  const result = new Map(), pending = [...rows];
+  let cursor = 0;
+  while (cursor < pending.length) {
+    if (cursor >= 10000) throw new PaperlessViewError('Invalid tag catalogue.');
+    const tag = /** @type {{id?: unknown, name?: unknown, children?: unknown}} */ (pending[cursor++]);
+    if (!tag || typeof tag !== 'object') continue;
+    const id = positiveId(tag.id);
+    if (id && typeof tag.name === 'string' && tag.name.trim()) result.set(id, { id, name: tag.name });
+    if (Array.isArray(tag.children)) pending.push(...tag.children);
+  }
+  return [...result.values()];
+}
+
 // Paperless-ngx handelt seine REST-API über einen versionierten Accept-Header aus.
 // Fehlt die Version, antworten manche Instanzen/Reverse-Proxies mit 406 Not
 // Acceptable (Issue #438). Wir fordern daher explizit eine breit unterstützte
@@ -71,11 +95,11 @@ export class PaperlessAdapter {
     return res;
   }
 
+  /** @param {string} path @param {RequestInit} [opts] */
   async #request(path, opts = {}) {
     const res = await this.#fetch(path, opts);
     if (!res.ok) {
-      const err = new Error(`DMS request failed (${res.status})`);
-      err.status = res.status;
+      const err = Object.assign(new Error(`DMS request failed (${res.status})`), { status: res.status });
       throw err;
     }
     return res;
@@ -83,6 +107,109 @@ export class PaperlessAdapter {
 
   docUrl(id) {
     return `${this.base}/documents/${id}`;
+  }
+
+  async listSavedViews({ page = 1, pageSize = 50 } = {}) {
+    return this.#viewPage(`/api/saved_views/?page=${positiveId(page) || 1}&page_size=${Math.min(100, positiveId(pageSize) || 50)}`);
+  }
+
+  /** @param {unknown} id */
+  async getSavedView(id) {
+    if (!positiveId(id)) throw new PaperlessViewError('Invalid saved-view ID.');
+    const view = await (await this.#request(`/api/saved_views/${id}/`)).json();
+    savedViewParams(view); // Never accept an unsupported filter as an unfiltered view.
+    return view;
+  }
+
+  /** @param {string} path */
+  async #viewPage(path) {
+    const body = /** @type {{results: unknown[], count: number, next?: unknown}} */ (await (await this.#request(path)).json());
+    if (!Array.isArray(body.results) || !Number.isSafeInteger(body.count) || body.count < 0) {
+      throw new PaperlessViewError('Invalid Paperless pagination.');
+    }
+    // Return a flag, never follow Paperless's absolute next URL with our token.
+    return { results: /** @type {Array<Record<string, any>>} */ (body.results), count: body.count, has_more: Boolean(body.next) };
+  }
+
+  /** @param {unknown} viewId @param {{page?: number, pageSize?: number, documentId?: unknown, displayFields?: string[]}} [options] */
+  async listViewDocuments(viewId, { page = 1, pageSize = 50, documentId = null, displayFields = [] } = {}) {
+    const cacheKey = JSON.stringify([this.base, this.token, positiveId(viewId)]);
+    let cached = viewCache.get(cacheKey);
+    if (!cached || cached.expires <= Date.now()) {
+      viewCache.delete(cacheKey);
+      const view = await this.getSavedView(viewId);
+      cached = { view, expires: Date.now() + VIEW_CACHE_MS };
+      if (viewCache.size >= 128) viewCache.delete(viewCache.keys().next().value);
+      viewCache.set(cacheKey, cached);
+    }
+    const view = cached.view;
+    return this.#listDocuments(savedViewParams(view), { page, pageSize, documentId, displayFields });
+  }
+
+  /** @param {unknown} filter @param {{page?: number, pageSize?: number, documentId?: unknown, displayFields?: string[]}} [options] */
+  async listTagDocuments(filter, options = {}) {
+    const valid = tagFilter(filter);
+    const params = new URLSearchParams({ ordering: '-created',
+      [valid.match === 'all' ? 'tags__id__all' : 'tags__id__in']: valid.tag_ids.join(',') });
+    return this.#listDocuments(params, options);
+  }
+
+  /** @param {URLSearchParams} params @param {{page?: number, pageSize?: number, documentId?: unknown, displayFields?: string[]}} options */
+  async #listDocuments(params, { page = 1, pageSize = 50, documentId = null, displayFields = [] }) {
+    params.set('page', String(positiveId(page) || 1));
+    params.set('page_size', String(Math.min(100, positiveId(pageSize) || 50)));
+    if (documentId !== null) {
+      if (!positiveId(documentId)) throw new PaperlessViewError('Invalid document ID.');
+      params.set('id', String(documentId));
+    }
+    const result = await this.#viewPage(`/api/documents/?${params}`);
+    const names = new Map();
+    // Resolve only references on this page with the current reader's token.
+    // A missing catalogue permission must not prevent reading the documents.
+    await Promise.all(['correspondent', 'document_type', 'tags'].filter((field) => displayFields.includes(field)).map(async (field) => {
+      const ids = [...new Set(result.results.flatMap((row) => field === 'tags' && Array.isArray(row.tags) ? row.tags : [row[field]])
+        .map(positiveId).filter((id) => id !== null))];
+      if (!ids.length) return;
+      try {
+        const found = field === 'tags' ? await this.getTags(ids) : await this.#referenceNames(field, ids);
+        names.set(field, new Map(found.map((row) => [row.id, row.name])));
+      } catch (err) {
+        if (![400, 403, 404].includes(paperlessStatus(err) || 0)) throw err;
+      }
+    }));
+    return {
+      ...result,
+      results: result.results.map((r) => ({
+        id: String(r.id), title: r.title || r.original_file_name || `#${r.id}`,
+        created: r.created || null,
+        filename: r.archived_file_name || r.original_file_name || `${r.id}.pdf`,
+        url: this.docUrl(r.id),
+        ...(displayFields.length ? { display: Object.fromEntries(displayFields.map((field) => {
+          const value = r[field];
+          if (field === 'filename') return [field, r.original_file_name || r.archived_file_name || null];
+          if (field === 'tags') return [field, Array.isArray(value) ? value.map(positiveId).filter(Boolean)
+            .map((id) => names.get(field)?.get(id) || `#${id}`).join(', ') : null];
+          if (['correspondent', 'document_type'].includes(field)) return [field, positiveId(value) ? names.get(field)?.get(Number(value)) || `#${value}` : null];
+          return [field, ['created', 'added', 'modified', 'archive_serial_number'].includes(field)
+            && ['string', 'number'].includes(typeof value) ? value : null];
+        })) } : {}),
+      })),
+    };
+  }
+
+  /** @param {string} field @param {number[]} ids */
+  async #referenceNames(field, ids) {
+    const resource = field === 'correspondent' ? 'correspondents' : 'document_types';
+    const wanted = new Set(ids), found = new Map();
+    for (let page = 1; page <= 10; page++) {
+      const result = await this.#viewPage(`/api/${resource}/?id__in=${ids.join(',')}&page_size=100&page=${page}`);
+      for (const row of result.results) {
+        const id = positiveId(row.id);
+        if (id && wanted.has(id) && typeof row.name === 'string') found.set(id, { id, name: row.name });
+      }
+      if (!result.has_more || found.size === wanted.size) break;
+    }
+    return [...found.values()];
   }
 
   // Eine Ergebnisseite holen. `extra` setzt entweder den Volltext- oder den
@@ -135,6 +262,7 @@ export class PaperlessAdapter {
     return this.#searchPage(q ? { query: q } : {}, limit);
   }
 
+  /** @param {string | number} id */
   async getDocument(id) {
     const res = await this.#request(`/api/documents/${encodeURIComponent(id)}/`);
     const r = await res.json();
@@ -156,6 +284,72 @@ export class PaperlessAdapter {
       buffer: Buffer.from(arrayBuf),
       mime: res.headers.get('content-type') || 'application/octet-stream',
     };
+  }
+
+  async listTags({ page = 1 } = {}) {
+    return this.#tagPage(`/api/tags/?page=${positiveId(page) || 1}&page_size=100&ordering=name`);
+  }
+
+  /** @param {string} path */
+  async #tagPage(path) {
+    const body = /** @type {{results: unknown[], count: number, next?: unknown}} */ (await (await this.#request(path)).json());
+    if (Array.isArray(body)) return { results: namedTags(body), count: body.length, has_more: false };
+    if (!body || !Array.isArray(body.results) || !Number.isSafeInteger(body.count) || body.count < 0) {
+      throw new PaperlessViewError('Invalid tag pagination.');
+    }
+    return { results: namedTags(body.results), count: body.count, has_more: Boolean(body.next) };
+  }
+
+  /** @param {number[]} ids */
+  async getTags(ids) {
+    if (!Array.isArray(ids) || ids.length > 1000 || ids.some((id) => !positiveId(id))) {
+      throw new PaperlessViewError('Invalid tag IDs.');
+    }
+    const wanted = [...new Set(ids.map(Number))];
+    if (!wanted.length) return [];
+    const allowed = new Set(wanted);
+    const found = new Map();
+    // Some servers cap page_size or return an incomplete filtered list. Keep
+    // batching as the normal path, but do not mistake page one for all names.
+    for (let page = 1; page <= 10; page++) {
+      let result;
+      try {
+        result = await this.#tagPage(`/api/tags/?id__in=${wanted.join(',')}&page_size=100&page=${page}`);
+      } catch (err) {
+        if (![400, 403, 404].includes(paperlessStatus(err) || 0)) throw err;
+        break;
+      }
+      for (const tag of result.results) if (allowed.has(tag.id)) found.set(tag.id, tag);
+      if (found.size === wanted.length || !result.has_more) break;
+    }
+    // Resolve only assigned IDs, with the same credentials and target guard.
+    // Object-protected/deleted tags retain their ID in the route's fallback.
+    const missing = wanted.filter((id) => !found.has(id));
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(4, missing.length) }, async () => {
+      while (cursor < missing.length) {
+        const id = missing[cursor++];
+        try {
+          const tag = /** @type {{id?: unknown}} */ (await (await this.#request(`/api/tags/${id}/`)).json());
+          if (positiveId(tag?.id) !== id) throw new PaperlessViewError('Invalid tag identity.');
+          const named = namedTags([tag]).find((entry) => entry.id === id);
+          if (named) found.set(id, named);
+        } catch (err) { if (![403, 404].includes(paperlessStatus(err) || 0)) throw err; }
+      }
+    }));
+    return wanted.flatMap((id) => found.has(id) ? [found.get(id)] : []);
+  }
+
+  /** @param {number} id @param {number[]} tags */
+  async setDocumentTags(id, tags) {
+    if (!positiveId(id) || !Array.isArray(tags) || tags.some((tag) => !Number.isSafeInteger(tag) || tag < 1)) {
+      throw new PaperlessViewError('Invalid document tags.');
+    }
+    const result = /** @type {{tags: number[]}} */ (await (await this.#request(`/api/documents/${encodeURIComponent(id)}/`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags }),
+    })).json());
+    return { tags: result.tags };
   }
 
   // Vorschaubild der ersten Seite (Issue #533). Paperless-ngx rendert für jedes

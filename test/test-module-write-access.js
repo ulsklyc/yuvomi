@@ -236,8 +236,8 @@ test('Drift-Guard: die benannten Ausnahmen sind eine exakte Kopie von READ_LEVEL
   }));
   assert.deepEqual(plain(access.READ_LEVEL_WRITES), plain(serverScopes.READ_LEVEL_WRITES),
     'public/utils/module-access.js muss server/scopes.js folgen - dort geaendert, hier nachziehen');
-  assert.deepEqual(serverScopes.READ_LEVEL_WRITES.map((e) => e.id), ['schedule-preferences', 'recipe-to-shopping'],
-    'eine neue Ausnahme ist eine Entscheidung - diese Liste haelt fest, dass es genau diese zwei gibt');
+  assert.deepEqual(serverScopes.READ_LEVEL_WRITES.map((e) => e.id), ['paperless-personal-token', 'schedule-preferences', 'recipe-to-shopping'],
+    'eine neue Ausnahme ist eine Entscheidung - diese Liste haelt fest, welche Ausnahmen bewusst erlaubt sind');
 });
 
 test('Drift-Guard: die Tabelle ist eine exakte Kopie von SCOPE_MODULES', () => {
@@ -681,4 +681,15 @@ test('Kategorie-Verwalter: jeder basePath gehoert dem Modul der Seite, die ihn o
     }
   }
   assert.ok(gefunden.length >= 9, `nur ${gefunden.length} Verwalter gefunden: ${gefunden.join(', ')}`);
+});
+
+
+test('personal Paperless credentials require Documents read access; central policy still requires write', () => {
+  const personal = '/documents/dms/paperless/live-settings/1/token';
+  for (const verb of ['PUT', 'DELETE']) {
+    assert.deepEqual(serverScopes.sessionModuleAccessRequirement(personal, verb), { moduleKey: 'documents', access: 'read' });
+  }
+  for (const path of [personal + 'X', personal + '/other', '/documents/dms/paperless/live-settings/1']) {
+    assert.equal(serverScopes.sessionModuleAccessRequirement(path, 'PUT').access, 'write');
+  }
 });

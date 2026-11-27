@@ -80,6 +80,8 @@ import {
   scheduleFolderDeleteWithUndo,
 } from '/utils/document-folder-delete.js';
 import { reloadAfterSave } from '/utils/reload-after-save.js';
+import { mountPaperlessFolders } from '/components/paperless-folders.js';
+import { openPaperlessTags } from '/components/paperless-tags.js';
 
 // Das Eingabefeld der Personenauswahl im Dialog (#1705).
 const SUBJECT_INPUT = 'document_subject';
@@ -251,7 +253,11 @@ function readStoredSortDirection(sort) {
   return direction === 'asc' || direction === 'desc' ? direction : defaultSortDirection(sort);
 }
 
+/** @type {Awaited<ReturnType<typeof mountPaperlessFolders>> | null} */
+let _paperlessFolders = null;
+
 let state = {
+  isAdmin: false,
   allDocuments: [],
   documents: [],
   // Treffer der leeren Suche in der ANDEREN Ansicht: { status, query, count }
@@ -319,6 +325,7 @@ function persistExpandedFolders() {
     // weiter, er erinnert sich nur bis zum naechsten Laden.
   }
 }
+/** The legacy page controller receives its DOM container from the router. @type {any} */
 let _container = null;
 // Der Container, dessen erster Aufbau fertig ist (applyFolderDeleteResult, #2005).
 let _built = null;
@@ -374,6 +381,7 @@ function mayManage(doc) {
 
 export async function render(container, context = {}) {
   _container = container;
+  _paperlessFolders = null;
   state.currentUserId = context.user?.id ?? null;
   _pageController?.abort();
   _pageController = createPageController(context.signal);
@@ -399,9 +407,9 @@ export async function render(container, context = {}) {
       <a class="sr-only documents-skip" href="#documents-list" data-documents-skip>${t('documents.skipToDocuments')}</a>
       <div class="page-toolbar page-toolbar--wrap page-toolbar--title-tools page-toolbar--fold-search documents-toolbar">
         <h1 class="page-toolbar__title">${t('documents.title')}</h1>
-        ${renderPageSearch({ id: 'documents-search', label: t('documents.searchPlaceholder'), placeholder: t('documents.searchPlaceholder'), value: state.query, clearLabel: t('common.searchClear'), className: 'documents-toolbar__search page-toolbar__center' })}
+        ${renderPageSearch({ id: 'documents-search', label: t('documents.searchPlaceholder'), placeholder: t('documents.searchPlaceholder'), value: state.query, clearLabel: t('common.searchClear'), className: 'documents-local-only documents-toolbar__search page-toolbar__center' })}
         <div class="page-toolbar__actions">
-          <button class="btn btn--secondary documents-dms-link-btn" id="documents-dms-link-btn" type="button"
+          <button class="documents-local-only btn btn--secondary documents-dms-link-btn" id="documents-dms-link-btn" type="button"
                   title="${t('documents.linkFromDms')}" aria-label="${t('documents.linkFromDms')}" hidden>
             <i data-lucide="link" class="icon-md" aria-hidden="true"></i>
             <span class="documents-dms-link-btn__label">${t('documents.linkFromDms')}</span>
@@ -409,7 +417,7 @@ export async function render(container, context = {}) {
           ${/* DIE ANSICHTSWAHL IST DAS KANON-SEGMENT (D1, Critique 2026-10-16):
                 `.segmented` in der Icon-Variante statt einer runden Eigen-Pille
                 - dieselbe Form wie Aufgaben und Kalender. */ ''}
-          <div class="segmented segmented--icons documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
+          <div class="documents-local-only segmented segmented--icons documents-view-toggle" role="group" aria-label="${t('documents.viewToggle')}">
             <button type="button" class="segmented__item documents-view-toggle__btn${state.view === 'grid' ? ' is-active' : ''}" data-view="grid" aria-label="${t('documents.gridView')}" title="${t('documents.gridView')}" aria-pressed="${state.view === 'grid'}">
               <i data-lucide="layout-grid" class="icon-md" aria-hidden="true"></i>
             </button>
@@ -428,7 +436,7 @@ export async function render(container, context = {}) {
            lagen sie bei x=1020 und x=1203 auf einer 375px-Zeile. Was hier
            seitlich scrollt, ist allein die Chip-Spur. */ ''}
       <div class="documents-filters">
-        <div class="segmented documents-status" id="documents-status" role="radiogroup" aria-label="${t('documents.statusLabel')}">
+        <div class="documents-local-only segmented documents-status" id="documents-status" role="radiogroup" aria-label="${t('documents.statusLabel')}">
           ${[['active', 'documents.statusActive'], ['archived', 'documents.statusArchived']].map(([id, key]) => {
             const on = state.status === id;
             return `<button type="button" class="segmented__item${on ? ' is-active' : ''}"
@@ -456,9 +464,9 @@ export async function render(container, context = {}) {
             <span class="documents-folder-chip__facet" id="documents-folder-chip-facet"></span>
             <i data-lucide="chevron-down" aria-hidden="true" class="icon-sm documents-folder-browser__chevron"></i>
           </button>
-          <div class="documents-filter-chips documents-filter-chips--person" id="documents-person-filter"></div>
-          <div class="documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
-          <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
+          <div class="documents-local-only documents-filter-chips documents-filter-chips--person" id="documents-person-filter"></div>
+          <div class="documents-local-only documents-filter-chips documents-filter-chips--deadlines" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterGroupLabel')}"></div>
+          <div class="documents-local-only documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryFilterLabel')}"></div>
         </div>
       </div>
       <div class="documents-browser-layout">
@@ -479,11 +487,12 @@ export async function render(container, context = {}) {
                 damit der Knopf nie namenlos ist - `renderFolderBrowser` schreibt
                 sie danach bei jedem Rendern fort. */ ''}
             ${readOnly() ? '' : `
-            <button class="documents-folder-browser__add" id="documents-folder-add" type="button" aria-label="${t('documents.addFolderButton')}" title="${t('documents.addFolderButton')}">
+            <button class="documents-local-only documents-folder-browser__add" id="documents-folder-add" type="button" aria-label="${t('documents.addFolderButton')}" title="${t('documents.addFolderButton')}">
               <i data-lucide="folder-plus" aria-hidden="true"></i>
             </button>`}
           </div>
           <ul class="documents-folder-browser__list row-carrier" id="documents-folder-browser"></ul>
+          <section id="paperless-folder-nav" hidden></section>
           ${/* WO UND WAS IN EINER AUSWAHL (R21 S9b, Critique a4/D7). Am Telefon
                standen drei Filterachsen in einer Zeile - Status, Ordner und
                die Kategorie-Chips -, und von den sechs Kategorien war bei 390px
@@ -493,8 +502,8 @@ export async function render(container, context = {}) {
                Dateien-App; die Chips weichen dort. Beide Ordnungen bleiben
                (D7), nur die Zeile ordnet sich. Ab 768px steht alles wie
                vorher (documents.css). */ ''}
-          <h2 class="documents-folder-browser__title documents-category-browser__title" id="documents-category-browser-title">${t('documents.categoryLabel')}</h2>
-          <ul class="documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"></ul>
+          <h2 class="documents-local-only documents-folder-browser__title documents-category-browser__title" id="documents-category-browser-title">${t('documents.categoryLabel')}</h2>
+          <ul class="documents-local-only documents-folder-browser__list documents-category-browser row-carrier" id="documents-category-browser" aria-labelledby="documents-category-browser-title"></ul>
         </aside>
         <div class="documents-browser-main">
           ${/* Der Pfad, in dem man steht (#785). Er steht ueber der Liste und
@@ -504,8 +513,9 @@ export async function render(container, context = {}) {
                ist die Leiste ohnehin zugeklappt. Leer, solange kein Ordner
                gewaehlt ist: ein Pfad auf "alle Dokumente" waere eine Zeile
                ohne Aussage. */''}
-          <nav class="documents-breadcrumb" id="documents-breadcrumb" aria-label="${t('documents.folderPathLabel')}" hidden></nav>
+          <nav class="documents-local-only documents-breadcrumb" id="documents-breadcrumb" aria-label="${t('documents.folderPathLabel')}" hidden></nav>
           <div id="documents-list" class="${listClasses()}" aria-busy="true">${renderSkeletonList({ rows: 6, lines: 2 })}</div>
+          <section id="paperless-folder-content" class="paperless-folder" hidden></section>
         </div>
       </div>
       ${/* "+" WIE JEDER ANLEGEN-KNOPF (R22, D11): der Pfeil nach oben war der
@@ -534,6 +544,35 @@ export async function render(container, context = {}) {
   renderCategoryBrowser();
   renderDocuments();
   openLinkedDocument();
+  const paperlessFolders = await mountPaperlessFolders({
+    sidebar: container.querySelector('#paperless-folder-nav'),
+    content: container.querySelector('#paperless-folder-content'),
+    accounts: state.dmsAccounts.filter((/** @type {{provider: string}} */ a) => a.provider === 'paperless'),
+    canManage: state.isAdmin && !readOnly(),
+    members: state.members,
+    userId: state.currentUserId,
+    signal: _pageController.signal,
+    onActiveChange(active, folder) {
+      if (!stillShown(container)) return;
+      container.querySelector('.documents-page')?.classList.toggle('documents--paperless-view', active);
+      const fab = findPageFab('fab-new-document');
+      if (fab) fab.hidden = active || readOnly();
+      if (active) {
+        exitSelectMode();
+        closeContextMenu();
+        container.querySelectorAll('#documents-folder-browser [aria-current]').forEach((el) => el.setAttribute('aria-current', 'false'));
+        container.querySelectorAll('#documents-folder-browser .documents-folder-item--active').forEach((el) => el.classList.remove('documents-folder-item--active'));
+        const label = container.querySelector('.documents-folder-browser__toggle-label');
+        if (label) label.textContent = folder?.name || '';
+        container.querySelector('.documents-folder-browser')?.classList.remove('documents-folder-browser--open');
+        container.querySelector('#documents-folder-toggle')?.setAttribute('aria-expanded', 'false');
+      } else {
+        renderFolderBrowser();
+        renderCategoryBrowser();
+      }
+    },
+  });
+  if (stillShown(container)) _paperlessFolders = paperlessFolders;
 }
 
 /**
@@ -665,6 +704,13 @@ async function loadMetaOptions() {
  */
 function skipToDocuments(event) {
   event.preventDefault();
+  const remote = _container?.querySelector('#paperless-folder-content');
+  if (remote && !remote.hidden) {
+    const target = remote.querySelector('.paperless-folder__title') || remote;
+    target.setAttribute('tabindex', '-1');
+    target.focus();
+    return;
+  }
   const list = _container?.querySelector('#documents-list');
   if (!list) return;
   repairRovingStops(list);
@@ -767,7 +813,7 @@ function documentsToolsMenuHtml() {
     ['desc', t('documents.sortDescending'), 'arrow-down-wide-narrow'],
   ];
   return `
-    <button type="button" class="btn btn--secondary btn--icon page-tools-btn documents-tools-btn popover-menu__trigger"
+    <button type="button" class="documents-local-only btn btn--secondary btn--icon page-tools-btn documents-tools-btn popover-menu__trigger"
             popovertarget="documents-tools-menu" aria-haspopup="menu" aria-expanded="false"
             aria-label="${esc(label)}" title="${esc(label)}">
       ${/* EIN ZEICHEN FUER DAS MENUE DES KOPFS (R24, G4-Quer-P2-1): die
@@ -1104,6 +1150,7 @@ function bindPageEvents() {
  * @param {string} id  Ordner-id als Zeichenkette, `''` = alle, `'__none'` = ohne Ordner
  */
 function selectFolder(id) {
+  _paperlessFolders?.close();
   state.folderId = id;
   /* Wer einen Ordner mit Kindern waehlt, klappt ihn auf: die Ansicht zeigt ab
    * jetzt auch dessen Unterordner, und ein zugeklappter Zweig verschwiege,
@@ -1147,6 +1194,7 @@ function clearSearch() {
 }
 
 function resetFilters() {
+  _paperlessFolders?.close();
   state.category = '';
   state.folderId = '';
   state.expiringSoon = false;
@@ -1173,6 +1221,7 @@ function filteredDocuments() {
 function listClasses() {
   return [
     'documents-list',
+    'documents-local-only',
     `documents-list--${state.view}`,
     state.view === 'list' ? 'row-carrier' : '',
     state.selectMode ? 'documents-list--selecting' : '',
@@ -1855,7 +1904,7 @@ async function moveFolder(folder) {
 
   const chosen = await selectModal(t('documents.moveFolderTo', { name: folder.name }), options);
   if (chosen === null) return;
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     await api.put(`/documents/folders/${folder.id}`, { parent_id: chosen === '' ? null : Number(chosen) });
     window.yuvomi?.showToast(t('documents.folderMovedToast'), 'success');
@@ -1917,7 +1966,7 @@ async function renameFolder(folder) {
   if (readOnly()) return;
   const newName = await promptModal(t('documents.renameFolder'), folder.name);
   if (!newName || newName === folder.name) return;
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     await api.put(`/documents/folders/${folder.id}`, { name: newName });
     window.yuvomi?.showToast(t('documents.folderRenamedToast'), 'success');
@@ -2236,6 +2285,7 @@ function wireLocalThumbs(root) {
  * Dokumentenseite scrollt nicht im Fenster, sondern in der Shell (am Desktop
  * `.app-content`) - mit dem Fenster als Wurzel schnitte der Scroller den
  * Vorlauf ab, und eine Karte laedt erst, wenn sie schon im Bild steht. */
+/** @param {Element} el */
 function scrollRootOf(el) {
   for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
     if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
@@ -2749,7 +2799,7 @@ async function archiveSelected() {
   // sonst archivieren. Kein gemischter Zustand möglich, da beides nie zugleich sichtbar ist.
   const archived = state.status === 'archived';
   exitSelectMode();
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     await Promise.all(docs.map((doc) => api.patch(`/documents/${doc.id}/archive`, { archived: !archived })));
     window.yuvomi?.showToast(
@@ -2775,7 +2825,7 @@ async function moveSelected() {
   ]);
   if (target === null) return;
   exitSelectMode();
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     await Promise.all(docs.map((doc) => api.put(`/documents/${doc.id}`, {
       name: doc.name,
@@ -2902,7 +2952,7 @@ export const __test = {
   linkDmsDocument, folderUploadFailureText,
 };
 
-function openDocumentModal(doc = null) {
+function openDocumentModal(doc = /** @type {Record<string, any> | null} */ (null)) {
   // DER EINE RIEGEL fuer Hochladen und Bearbeiten: FAB, Leerzustand,
   // Tastenkuerzel „n" (klickt den FAB), Menue und Stift im Betrachter enden
   // hier. Anlegen braucht das Modulrecht, Bearbeiten dazu die Besitzregel.
@@ -4145,6 +4195,7 @@ function renderDmsResults(container, items, accountId) {
 
 // Titel und Screenreader-Label einer Vorschaukachel gemeinsam setzen - beide
 // beschreiben dieselbe Aktion und dürfen nie auseinanderlaufen.
+/** @param {HTMLElement} el @param {string} label */
 function setMediaAffordance(el, label) {
   el.title = label;
   el.setAttribute('aria-label', label);
@@ -4154,7 +4205,7 @@ function setMediaAffordance(el, label) {
 // damit der auslösende Button im Fehlerfall wieder bedienbar wird.
 async function linkDmsDocument(item, accountId) {
   const modalContext = captureModalContext();
-  const owner = _container;
+  const owner = /** @type {HTMLElement | null} */ (_container);
   try {
     // Feste, vorhersagbare Kategorie: früher erbte das verknüpfte Dokument
     // stillschweigend das gerade aktive Filter-Chip, was nirgends stand.
@@ -4353,13 +4404,38 @@ function viewerStepKeys() {
   return rtl ? { prev: 'ArrowRight', next: 'ArrowLeft' } : { prev: 'ArrowLeft', next: 'ArrowRight' };
 }
 
+/** @param {HTMLElement} panel */
+function bindViewerMenu(panel) {
+  installPopoverMenus(panel);
+  /** @type {Record<string, string>} */
+  const VIEWER_MENU_TARGETS = {
+    'viewer-tags': '[data-action="paperless-tags"]',
+    'viewer-dms': '.doc-viewer__dms-link',
+    'viewer-open-tab': 'a.document-viewer__action[target="_blank"]',
+    'viewer-edit': '[data-action="edit-document"]',
+    'viewer-share': '[data-action="share"]',
+    'viewer-download': '[data-viewer-download]',
+  };
+  const menu = /** @type {HTMLElement | null} */ (panel.querySelector('#document-viewer-more-menu'));
+  if (!menu) return;
+  menu.addEventListener('click', (event) => {
+    const item = event.target instanceof Element ? event.target.closest('.popover-menu__item[data-action]') : null;
+    const selector = item instanceof HTMLElement ? VIEWER_MENU_TARGETS[item.dataset.action ?? ''] : null;
+    const target = selector ? panel.querySelector(selector) : null;
+    if (!(target instanceof HTMLElement) || target.matches(':disabled')) return;
+    menu.hidePopover?.();
+    target.click();
+  });
+}
+
 /**
- * @param {object} doc
+ * @param {Record<string, any>} doc
  * @param {object} [carry]
  * @param {Element|null} [carry.opener] - beim Blaettern der Ausloeser in der
  *   Liste, den der vorige Betrachter weiterreicht
  */
 function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
+  const paperless = documentStorageBackend(doc) === 'dms' && doc.dms_provider === 'paperless';
   const categoryLabel = categoryLabels()[doc.category] || doc.category;
   const previewUrl = `/api/v1/documents/${doc.id}/preview`;
   const downloadUrl = `/api/v1/documents/${doc.id}/download`;
@@ -4457,6 +4533,7 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
             ${nextDoc ? rowActionHtml({ icon: 'chevron-right', action: 'viewer-next', label: t('documents.viewerNextNamed', { name: nextDoc.name }), attrs: { 'aria-keyshortcuts': stepKeys.next, title: t('documents.viewerNextNamed', { name: nextDoc.name }) } }) : '<span class="row-action document-viewer__pager-edge" aria-hidden="true"><i data-lucide="chevron-right" class="icon-md"></i></span>'}
           </span>` : ''}
           <span class="document-viewer__actions">
+            ${paperless ? `<button type="button" class="btn btn--secondary btn--sm document-viewer__action" data-action="paperless-tags"><i data-lucide="tags" class="icon-md" aria-hidden="true"></i><span>${esc(t('documents.paperless.tags.action'))}</span></button>` : ''}
             ${externalUrl ? `
             <a class="btn btn--ghost btn--sm doc-viewer__dms-link" href="${esc(externalUrl)}" target="_blank" rel="noopener noreferrer">
               <i data-lucide="external-link" class="icon-md" aria-hidden="true"></i>
@@ -4498,6 +4575,7 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
             label: t('common.moreActionsNamed', { name: doc.name }),
             triggerClass: 'btn btn--secondary btn--icon document-viewer__more-btn',
             items: [
+              ...(paperless ? [{ action: 'viewer-tags', icon: 'tags', label: t('documents.paperless.tags.action') }] : []),
               ...(externalUrl ? [{ action: 'viewer-dms', icon: 'external-link', label: t('documents.dmsOpenExternal') }] : []),
               ...(previewKind(doc.mime_type) === 'pdf' ? [{ action: 'viewer-open-tab', icon: 'external-link', label: t('documents.viewerOpenInTab') }] : []),
               ...(mayManage(doc) ? [{ action: 'viewer-edit', icon: 'pencil', label: t('common.edit') }] : []),
@@ -4544,24 +4622,16 @@ function openDocumentViewer(doc, { opener: listOpener = null } = {}) {
         openDocumentModal(doc);
       });
       wireViewerStage(panel, doc);
+      panel.querySelector('[data-action="paperless-tags"]')?.addEventListener('click', () => {
+        const tagOpener = /** @type {HTMLElement | null} */ (opener);
+        if (tagOpener?.isConnected && tagOpener !== document.body) tagOpener.focus();
+        openPaperlessTags({ path: `/documents/dms/paperless/documents/${doc.id}/tags`, title: doc.name,
+          onSaved: () => openDocumentViewer(doc, { opener }) });
+      });
       // Das Mehr-Menue (schmal) loest die Knoepfe der Leiste aus - ein Weg je
       // Handlung. Synchron im Tipp: Teilen und Herunterladen brauchen die
       // Nutzeraktivierung des Klicks.
-      installPopoverMenus(panel);
-      const VIEWER_MENU_TARGETS = {
-        'viewer-dms': '.doc-viewer__dms-link',
-        'viewer-open-tab': 'a.document-viewer__action[target="_blank"]',
-        'viewer-edit': '[data-action="edit-document"]',
-        'viewer-share': '[data-action="share"]',
-        'viewer-download': '[data-viewer-download]',
-      };
-      panel.querySelector('#document-viewer-more-menu')?.addEventListener('click', (event) => {
-        const item = event.target.closest?.('.popover-menu__item[data-action]');
-        const target = item && panel.querySelector(VIEWER_MENU_TARGETS[item.dataset.action] ?? '');
-        if (!target || target.disabled) return;
-        panel.querySelector('#document-viewer-more-menu')?.hidePopover?.();
-        target.click();
-      });
+      bindViewerMenu(panel);
       // Vor/Zurueck: die Knoepfe und die Pfeiltasten, die auf sie zeigen
       // (RTL gespiegelt). Nicht aus einem Feld oder der PDF-Seitenleiste heraus
       // - dort gehoeren die Pfeile dem Element.

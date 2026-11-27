@@ -458,7 +458,8 @@ test('die Schreibsperre ist beim naechsten Versuch frei: die Baseline wird einge
   const replayed = CIPHER.replayFromZero();
   try {
     assert.deepEqual(migrate(database, MIGRATIONS, () => shipped), { baseline: shipped.version });
-    assert.equal(attempts(), 2, 'ein Versuch an der Sperre, einer danach');
+    const pendingCount = MIGRATIONS.filter((migration) => migration.version > shipped.version).length;
+    assert.equal(attempts(), 2 + pendingCount, 'ein Versuch an der Sperre, einer danach und einer je ausstehender Migration');
     assert.deepEqual(log.error, []);
     assert.equal(log.warn.length, 1);
     assert.match(log.warn[0], /Schreibsperre \(SQLITE_BUSY\w*\), Versuch 2 von/);

@@ -167,6 +167,21 @@ export const ROWS = [
     ['PATCH', '/outlook/accounts/:id/calendars', `/outlook/accounts/${NO_ID}/calendars`, {}],
     ['POST', '/outlook/sync', '/outlook/sync', {}],
   ]),
+  // Paperless delegates live source access explicitly through administrator gates.
+  ...middlewareRows('server/routes/paperless-folders.js', '/api/v1/documents/dms/paperless', ADMIN_REQUIRED, [
+    ['GET', '/saved-views'],
+    ['GET', '/filter-tags'],
+    ['POST', '/folders', '/folders', {}],
+    ['PUT', '/folders/:id', `/folders/${NO_ID}`, {}],
+    ['DELETE', '/folders/:id', `/folders/${NO_ID}`],
+  ]),
+  ...middlewareRows('server/routes/paperless-live-settings.js', '/api/v1/documents/dms/paperless', ADMIN_REQUIRED, [
+    ['PUT', '/live-settings/:id', `/live-settings/${NO_ID}`, {}],
+    ['GET', '/live-settings/:id/tags', `/live-settings/${NO_ID}/tags`],
+  ]),
+  ...middlewareRows('server/routes/paperless-tags.js', '/api/v1/documents/dms/paperless', ADMIN_REQUIRED, [
+    ['GET', '/tags'],
+  ]),
   // --- routers behind router.use(requireAdmin) ------------------------------
   ...middlewareRows('server/routes/cardav.js', '/api/v1/contacts/cardav', ADMIN_REQUIRED, [
     ['USE', '', '/accounts'],
@@ -359,6 +374,7 @@ export const MIXED = [
  * @type {Array<Pick<GateRow, 'form' | 'method' | 'path' | 'body'>>}
  */
 export const ADMIN_PASSES = [
+  { form: 'requireAdmin (Paperless)', method: 'GET', path: '/api/v1/documents/dms/paperless/saved-views' },
   { form: 'requireAdmin (shared)', method: 'GET', path: '/api/v1/backup/status' },
   { form: 'requireAdmin (shared, auth router)', method: 'GET', path: '/api/v1/auth/api-tokens' },
   { form: 'requireAdmin (former local copy)', method: 'GET', path: '/api/v1/screensaver/config' },
@@ -377,6 +393,7 @@ export const ADMIN_PASSES = [
  * reason and an inline gate with its own text.
  */
 export const DEVICE_CASES = [
+  { form: 'requireAdmin (Paperless)', method: 'GET', path: '/api/v1/documents/dms/paperless/saved-views', expect: DEVICE_CREDENTIAL },
   { form: 'requireAdmin (shared)', method: 'GET', path: '/api/v1/backup/status', expect: DEVICE_CREDENTIAL },
   { form: 'requireAdmin (former local copy)', method: 'GET', path: '/api/v1/screensaver/config', expect: DEVICE_CREDENTIAL },
   { form: 'requireAdmin (route middleware)', method: 'GET', path: '/api/v1/recipe-providers/accounts', expect: DEVICE_CREDENTIAL },

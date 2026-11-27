@@ -636,6 +636,16 @@ export const SETTINGS_SECTIONS = freezeEntries([
     loader: () => import('/settings/pages/documents-dms.js'),
   },
   {
+    id: 'documents-live-folders',
+    sheetId: 'module-documents',
+    scope: 'household',
+    labelKey: 'settings.liveFolders.title',
+    descriptionKey: 'settings.liveFolders.description',
+    options: ['settings.liveFolders.tags', 'settings.liveFolders.tokenMode', 'settings.liveFolders.displayFields'],
+    adminOnly: false,
+    loader: () => import('/settings/pages/documents-live-folders.js'),
+  },
+  {
     id: 'options-housekeeping',
     sheetId: 'module-housekeeping',
     scope: 'household',
@@ -887,7 +897,7 @@ function sectionVisible(section, user) {
 }
 
 /** Die Abschnitte eines Blatts in Anzeigereihenfolge: erst "Fuer mich", dann der Haushalt. */
-export function settingsSheetSections(sheet, user = null, { all = false } = {}) {
+export function settingsSheetSections(sheet, user = /** @type {{role?: string} | null} */ (null), { all = false } = {}) {
   const sections = allSettingsSections().filter((section) => section.sheetId === sheet?.id
     && (all || sectionVisible(section, user)));
   return SETTINGS_SCOPES.flatMap((scope) => sections.filter((section) => section.scope === scope));

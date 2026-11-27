@@ -189,7 +189,7 @@ function seite(vorab = '') {
     if (!traeger.has(id)) traeger.set(id, new MiniElement('div'));
     return traeger.get(id);
   };
-  const BEKANNT = ['documents-list', 'documents-folder-browser', 'documents-tools-menu'];
+  const BEKANNT = ['documents-list', 'documents-folder-browser', 'documents-tools-menu', 'paperless-folder-nav', 'paperless-folder-content'];
   return {
     isConnected: true,
     dataset: {},

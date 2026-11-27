@@ -58,12 +58,21 @@ export function documentVisibleSql(alias: string = 'd', param: string = 'userId'
  * builds.
  */
 export function documentVisibleWhere(alias: string, viewer: string): string {
+  return delegatedDocumentWhere(alias, viewer, 'family_document_access', 'document_id');
+}
+
+/** Saved views delegate the same audience as a linked document. */
+export function paperlessFolderVisibleWhere(alias: string, viewer: string): string {
+  return delegatedDocumentWhere(alias, viewer, 'paperless_view_folder_access', 'folder_id');
+}
+
+function delegatedDocumentWhere(alias: string, viewer: string, table: string, key: string): string {
   return `(
     ${alias}.created_by = ${viewer}
     OR ${alias}.visibility = 'family'
     OR EXISTS (
-      SELECT 1 FROM family_document_access a
-      WHERE a.document_id = ${alias}.id AND a.user_id = ${viewer}
+      SELECT 1 FROM ${table} a
+      WHERE a.${key} = ${alias}.id AND a.user_id = ${viewer}
     )
   )`;
 }
@@ -99,11 +108,11 @@ export function filterVisibleIds(
     .filter((id) => Number.isInteger(id) && id > 0))];
   if (!wanted.length) return [];
 
-  const idList = sqlInList(wanted);
+  const idList = sqlInList(wanted, 'ids');
   const rows = new Set((database.prepare(`
     SELECT d.id FROM ${table} d
     WHERE d.id IN (${idList.sql}) AND ${visible}
-  `).all(idList.param, { userId }) as { id: number }[]).map((row) => row.id));
+  `).all({ ids: idList.param, userId }) as { id: number }[]).map((row) => row.id));
 
   return wanted.filter((id) => rows.has(id));
 }
@@ -294,4 +303,22 @@ export function documentClonePredicate(
 
 function documentSeenBy(database: Database, documentId: number, userId: number): boolean {
   return filterVisibleDocumentIds(database, [documentId], userId).length > 0;
+}
+
+/** A folder audience, already validated by the route. */
+type FolderAudience = { visibility: string; allowed_member_ids: number[]; created_by?: number | null };
+
+/** Null means a restricted audience is missing its required selection. */
+export function paperlessFolderMembers(visibility: string, memberIds: readonly number[]): number[] | null {
+  if (visibility !== 'restricted') return [];
+  if (!memberIds.length) return null;
+  return [...new Set(memberIds)].sort((a, b) => a - b);
+}
+
+/** Consent is required only when an update makes the delegation wider. */
+export function paperlessFolderAudienceWidens(after: FolderAudience, before: FolderAudience): boolean {
+  return before.visibility !== 'family' && (
+    after.visibility === 'family' || (after.visibility === 'restricted'
+      && after.allowed_member_ids.some((id) => id !== before.created_by && !before.allowed_member_ids.includes(id)))
+  );
 }

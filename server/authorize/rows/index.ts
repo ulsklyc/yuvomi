@@ -17,7 +17,7 @@
 import type { Database } from '../catalog.ts';
 import { assignableRowVisible, visibilityWhere } from './assignees.ts';
 import { budgetVisibilityWhere } from './budget.ts';
-import { documentVisibleWhere, filterVisibleIds } from './documents.ts';
+import { documentVisibleWhere, paperlessFolderVisibleWhere, filterVisibleIds } from './documents.ts';
 import { icsSubscriptionVisibleWhere } from './ics-subscriptions.ts';
 import { categoryVisibleWhere, noteVisibleWhere } from './notes.ts';
 import { quickLinkRowVisible, quickLinkVisibleWhere } from './quick-links.ts';
@@ -30,6 +30,7 @@ type RowType =
   | 'notes'
   | 'note_categories'
   | 'documents'
+  | 'paperless_folders'
   | 'budget'
   | 'reminders'
   | 'ics_subscriptions'
@@ -66,6 +67,7 @@ const ROW_RULES: Readonly<Record<RowType, RowRule>> = Object.freeze({
   notes: (alias, viewer = '?') => noteVisibleWhere(alias, viewer),
   note_categories: (alias, viewer = '?') => categoryVisibleWhere(alias, viewer),
   documents: (alias, viewer = '@userId') => documentVisibleWhere(alias, viewer),
+  paperless_folders: (alias, viewer = '@userId') => paperlessFolderVisibleWhere(alias, viewer),
   budget: (alias, viewer, { mode }) => budgetVisibilityWhere(
     alias,
     required(viewer, 'a viewer', 'budget'),
@@ -87,6 +89,7 @@ const ROW_TABLES: Readonly<Partial<Record<RowType, string>>> = Object.freeze({
   notes: 'notes',
   note_categories: 'note_categories',
   documents: 'family_documents',
+  paperless_folders: 'paperless_view_folders',
   quick_links: 'quick_links',
 });
 
