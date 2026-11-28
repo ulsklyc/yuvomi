@@ -584,8 +584,8 @@ const rezept = (over = {}) => ({
   id: 21, title: 'Pfannkuchen', source: 'native', notes: 'Teig ruhen lassen', recipe_url: 'https://example.org/pfannkuchen',
   meal_types: ['breakfast', 'lunch', 'dinner', 'snack'], has_own_image: false,
   ingredients: [
-    { name: 'Mehl', quantity: '250 g', category: 'Backwaren', pantry_item_id: 3, pantry_item_name: 'Weizenmehl 405' },
-    { name: 'Milch', quantity: '500 ml', category: 'Milchprodukte', pantry_item_id: null, pantry_item_name: null },
+    { name: 'Mehl', quantity: '250 g', category: 'Backwaren', pantry_product_id: 3, pantry_product_name: 'Weizenmehl 405', pantry_item_id: 30, pantry_item_name: 'Weizenmehl 405' },
+    { name: 'Milch', quantity: '500 ml', category: 'Milchprodukte', pantry_product_id: null, pantry_product_name: null, pantry_item_id: null, pantry_item_name: null },
   ],
   ...over,
 });
@@ -770,8 +770,8 @@ test('Rezepte bei `read`: eine Aktion, die morgen dazukommt, ist zu, bis sie auf
 });
 
 test('Rezepte: die offenen Dialoge speichern nichts mehr, wenn das Recht inzwischen fehlt', async () => {
-  const VORRAT = { 'GET /pantry': { data: [{ id: 3, name: 'Weizenmehl 405' }] },
-    'PUT /recipes/21/ingredient-match': { data: { pantry_item_id: 3, pantry_item_name: 'Weizenmehl 405' } } };
+  const VORRAT = { 'GET /pantry': { data: [{ id: 30, product_id: 3, name: 'Weizenmehl 405' }], products: [{ id: 3, name: 'Weizenmehl 405', unit: 'kg', total_quantity: 1 }] },
+    'PUT /recipes/21/ingredient-match': { data: { ingredient_key: 'mehl', pantry_product_id: 3, pantry_product_name: 'Weizenmehl 405', pantry_item_id: 30, pantry_item_name: 'Weizenmehl 405' } } };
   const dialoge = {
     'Zuordnen': {
       oeffnen: () => recipes.openPantryMatchModal(rezept(), 'Mehl'),
@@ -843,6 +843,121 @@ test('Rezepte bei `read`: kein Schreibweg schickt eine Anfrage, auch nicht direk
     assert.equal(await fahren(LESEN, weg), 0, `${name}: bei \`read\` kein Aufruf, kein Dialog, kein Rueckgaengig-Fenster`);
     assert.ok(await fahren(SCHREIBEN, weg) > 0, `Gegenfall ${name}: mit Schreibrecht passiert etwas`);
   }
+});
+
+/* DIE AUSWAHL LISTET PRODUKTE (#1448, Teil 4). Eine Zuordnung nennt das
+ * Produkt des Haushalts, nicht eine Packung: die Auswahl zeigt je Produkt eine
+ * Option mit Summe und Ort, wie die Produktzeile im Vorrat, auch ein Produkt
+ * ohne Charge. Und eine gespeicherte Zuordnung steht danach an jeder Zutat
+ * derselben Schreibweise, in jedem geladenen Rezept. */
+const VORRAT_PRODUKTE = {
+  data: [
+    { id: 40, product_id: 4, name: 'Milch', quantity: 1, unit: 'l', location_id: 1, location_name: 'Kühlschrank' },
+    { id: 41, product_id: 4, name: 'milch', quantity: 1, unit: 'l', location_id: 2, location_name: 'Garage' },
+    { id: 50, product_id: 5, name: 'Mehl', quantity: 2, unit: 'kg', location_id: 1, location_name: 'Kühlschrank' },
+    { id: 51, product_id: 5, name: 'Mehl', quantity: 1, unit: 'kg', location_id: 1, location_name: 'Kühlschrank' },
+    { id: 60, product_id: 7, name: 'Hefe', quantity: 1, unit: 'pcs', location_id: null, location_name: null },
+  ],
+  products: [
+    { id: 7, name: 'Hefe', unit: 'pcs', total_quantity: 1, batch_count: 1 },
+    { id: 5, name: 'Mehl', unit: 'kg', total_quantity: 3, batch_count: 2 },
+    { id: 4, name: 'Milch', unit: 'l', total_quantity: 2, batch_count: 2 },
+    { id: 6, name: 'Zahnpasta', unit: 'pcs', total_quantity: 0, batch_count: 0 },
+  ],
+};
+const optionenAus = (/** @type {unknown} */ html) => [...String(html).matchAll(/<option value="([^"]*)"( selected)?>([^<]*)<\/option>/g)]
+  .map((m) => ({ value: m[1], selected: Boolean(m[2]), text: m[3].replaceAll('&quot;', '"') }));
+
+test('Rezepte: die Auswahl listet Produkte mit Summe und Ort, nicht Chargen (#1448 Teil 4)', async () => {
+  const wahl = recipes.pantryChoices(VORRAT_PRODUKTE);
+  assert.deepEqual(wahl.map((p) => [p.id, p.total, p.places.length]), [[7, 1, 1], [5, 3, 1], [4, 2, 2], [6, 0, 0]],
+    'je Produkt die Summe seiner Chargen und die Zahl seiner Orte; ein Produkt ohne Charge steht mit 0 da');
+
+  const optionen = optionenAus(recipes.pantrySelectOptionsHtml(wahl, 4));
+  assert.deepEqual(optionen.map((o) => o.value), ['', '7', '5', '4', '6'], 'eine Option je Produkt, keine je Charge');
+  assert.deepEqual(optionen.filter((o) => o.selected).map((o) => o.value), ['4'], 'das zugeordnete Produkt ist gewaehlt');
+  // Der Lader dieser Suite setzt t() auf Schluessel samt Parametern: daran ist die Form zu lesen.
+  const text = Object.fromEntries(optionen.map((o) => [o.value, o.text]));
+  assert.equal(text[''], 'recipes.ingredientMatchNone');
+  assert.equal(text['7'], 'Hefe · 1 pantry.units.pcs{"count":1} · pantry.unlocated', 'ein Ort: Menge und Ort, wie die Zeile im Vorrat');
+  assert.equal(text['5'], 'Mehl · 3 pantry.units.kg{"count":3} · pantry.locFridge', 'zwei Chargen an einem Ort: die Summe, und der Ort uebersetzt');
+  assert.ok(text['4'].startsWith('Milch · pantry.productTotal{"quantity":"2 pantry.units.l')
+    && text['4'].endsWith(' · pantry.productPlaces{"count":2}'), `mehrere Orte: "2 l insgesamt · 2 Orte", war: ${text['4']}`);
+  assert.equal(text['6'], 'Zahnpasta · 0 pantry.units.pcs{"count":0}', 'ohne Charge: 0, ohne Ort');
+  for (const charge of ['40', '41', '50', '51', '60']) {
+    assert.ok(!optionen.some((o) => o.value === charge), `die Charge ${charge} steht nicht zur Wahl`);
+  }
+
+  // Der Dialog selbst: Produkte, der Satz zum Haushalt, und gespeichert wird das Produkt.
+  const r = rezept();
+  const andere = rezept({ id: 23, title: 'Waffeln', ingredients: [
+    { name: ' MEHL ', quantity: '200 g', pantry_product_id: null, pantry_product_name: null },
+    { name: 'Zucker', quantity: '50 g', pantry_product_id: null, pantry_product_name: null },
+  ] });
+  await withAccess(SCHREIBEN, () => mitRezepten([r, andere], async () => {
+    /** @type {any} */
+    let dialog;
+    /** @type {Array<[string, unknown]>} */
+    const gesendet = [];
+    const g = /** @type {any} */ (globalThis);
+    const zuvor = g.__apiStub;
+    g.__apiStub = {
+      get: async () => VORRAT_PRODUKTE,
+      put: async (/** @type {string} */ path, /** @type {unknown} */ body) => {
+        gesendet.push([path, body]);
+        return { data: { name: 'Mehl', ingredient_key: 'mehl', pantry_product_id: 5, pantry_product_name: 'Mehl', pantry_item_id: 50, pantry_item_name: 'Mehl' } };
+      },
+    };
+    try {
+      [dialog] = await modalMitschnitt(() => recipes.openPantryMatchModal(r, 'Mehl'));
+      assert.ok(dialog, 'der Dialog geht auf');
+      assert.match(dialog.content, /<p class="form-hint">recipes\.ingredientMatchHint<\/p>/,
+        'ein Hinweis, dessen Satz sagt, dass die Wahl fuer jedes Rezept gilt (test:recipe-pantry-match liest ihn)');
+      assert.deepEqual(optionenAus(dialog.content).map((o) => o.value), ['', '7', '5', '4', '6']);
+      assert.deepEqual(optionenAus(dialog.content).filter((o) => o.selected).map((o) => o.value), [],
+        'Produkt 3 steht nicht im Vorrat: nichts ist vorgewaehlt');
+      const panel = dialogPanel({ '#pantry-match-select': '5' });
+      dialog.onSave(panel);
+      await panel.druecken('#pantry-match-save');
+    } finally {
+      g.__apiStub = zuvor;
+    }
+    assert.deepEqual(gesendet, [['/recipes/21/ingredient-match', { name: 'Mehl', pantryProductId: 5 }]],
+      'das Produkt, nicht die abgekuendigte Charge');
+    assert.equal(r.ingredients[0].pantry_product_id, 5);
+    assert.equal(andere.ingredients[0].pantry_product_id, 5, 'dieselbe Schreibweise im anderen Rezept zieht mit');
+    assert.equal(andere.ingredients[0].pantry_product_name, 'Mehl');
+    assert.equal(andere.ingredients[1].pantry_product_id, null, 'eine andere Schreibweise nicht');
+  }));
+});
+
+test('Rezepte: der Sammeldialog fragt je Schreibweise einmal, der Knopf zaehlt genauso (#1448 Teil 4)', async () => {
+  // Zwei gleich geschriebene Zutaten waeren zwei Auswahlfelder fuer dieselbe
+  // Frage des Haushalts, und das zuletzt gespeicherte gewaenne still.
+  const r = rezept({ id: 24, title: 'Zopf', ingredients: [
+    { name: 'Mehl', quantity: '300 g', pantry_product_id: null, pantry_product_name: null },
+    { name: ' MEHL ', quantity: '50 g', pantry_product_id: null, pantry_product_name: null },
+    { name: 'Hefe', quantity: '1', pantry_product_id: null, pantry_product_name: null },
+  ] });
+  await withAccess(SCHREIBEN, () => mitRezepten([r], async () => {
+    const g = /** @type {any} */ (globalThis);
+    const zuvor = g.__apiStub;
+    g.__apiStub = { get: async () => VORRAT_PRODUKTE };
+    /** @type {any} */
+    let dialog;
+    try {
+      [dialog] = await modalMitschnitt(() => recipes.openPantryBulkMatchModal(r));
+    } finally {
+      g.__apiStub = zuvor;
+    }
+    const felder = [...dialog.content.matchAll(/data-ingredient-index="(\d+)"/g)].map((m) => m[1]);
+    assert.deepEqual(felder, ['0', '1'], 'Mehl und Hefe, nicht zweimal Mehl');
+    assert.match(dialog.content, /300 g · Mehl/, 'die erste Zutat der Schreibweise steht fuer sie');
+    assert.doesNotMatch(dialog.content, /50 g ·/);
+    const knopf = recipes.pantryMatchBulkEl(r);
+    assert.ok(knopf, 'mit Schreibrecht steht der Sammelknopf da');
+    assert.match(knopf.outerHTML, /recipes\.ingredientMatchOpen\{"count":2\}/, 'der Knopf nennt zwei offene, nicht drei');
+  }));
 });
 
 test('Rezepte: die Vorrats-Zuordnung braucht Kueche UND Vorrat, wie der Server', async () => {

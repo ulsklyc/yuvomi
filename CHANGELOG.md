@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Recipes: a confirmed pantry link holds for the whole household** (part 4 of #1448). Linking
+  "chopped tomatoes" to your tomatoes once now links it in every recipe that names the ingredient
+  the same way, and removing the link removes it everywhere; the dialog says so. The link names
+  the product, not one pack, so using up the last tin no longer takes it away, and a product whose
+  last batch is gone stays linked. The picker lists your products with their total and place, as
+  the pantry shows them, instead of every single batch. Saving a recipe or a sync with a recipe
+  provider no longer removes a link: an ingredient renamed to a wording you have linked elsewhere
+  shows that link. Renaming the only item of a product (or changing its unit) takes its links
+  along, like its minimum. Existing links move to the product of their item once on update; where
+  the same wording pointed at different products in different recipes, the link confirmed last is
+  kept, and the update log says how many wordings that affected. Deleting a product without items
+  deletes its links, and the message with the undo button says how many. The old table of
+  per-recipe links stays unread for one release, so the previous version still finds them, and goes
+  in a later release. For API clients, every recipe ingredient additionally returns
+  `pantry_product_id` and `pantry_product_name`, `PUT /api/v1/recipes/{id}/ingredient-match` takes
+  `pantryProductId`, and `products` in `GET /api/v1/pantry` returns `match_count`.
+
+### Deprecated
+- **The batch fields of a recipe's pantry link (`/api/v1/recipes`) are deprecated and will be
+  removed in the first minor release on or after 2027-03-01** (part 4 of #1448), at least 90 days
+  after this release, as MODULES.md promises for `/api/v1`. A link names a household product now.
+  Until the fields go, `pantry_item_id` and `pantry_item_name` on every ingredient name one item
+  of the linked product (the one with the lowest id), and are `null` when the product has no item
+  left, and `pantryItemId` on `PUT /api/v1/recipes/{id}/ingredient-match` links the product the
+  item belongs to, so a client that worked yesterday keeps working. Sending both `pantryItemId`
+  and `pantryProductId` is refused with 400. Read `pantry_product_id` and send
+  `pantryProductId` instead.
+
 ## [2.96.0] - 2026-11-26
 
 ### Foundation

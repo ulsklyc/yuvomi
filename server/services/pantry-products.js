@@ -1,9 +1,10 @@
 /**
- * Module: Household products above the stock batches (#1448, parts 1 and 3)
+ * Module: Household products above the stock batches (#1448, parts 1, 3 and 4)
  * Purpose: Which product a pantry batch belongs to, for every path that writes a
  *          batch, and the live grouping that puts batches without a product into
  *          products at the start of the server (migration 253 has a frozen copy),
- *          and the minimum a batch write hands to its product (step 3).
+ *          the minimum a batch write hands to its product (step 3), and the
+ *          recipe matches a move hands along with the batch (step 4).
  * Dependencies: public/utils/ingredient-match-key.js (isomorphic)
  *
  * IDENTITY IS THE HOUSEHOLD'S OWN WORDING (docs/DECISIONS.md, 7). A batch joins
@@ -19,7 +20,9 @@
  * rows from before that validation can be like this.
  *
  * A PRODUCT OUTLIVES ITS LAST BATCH. Moving or deleting a batch never deletes a
- * product; deleting a product is its own action (a later step of #1448).
+ * product; deleting a product is its own action (a later step of #1448). The
+ * household's recipe matches (`pantry_product_matches`, step 4) name products,
+ * so using up a batch leaves them standing.
  *
  * Every function takes the database handle and runs inside the caller's
  * transaction: the batch and its product are written together or not at all.
@@ -59,6 +62,8 @@ export function productKey(name) {
  *   it; this way a rename leaves the count where it was. The empty product
  *   stays and can be deleted. A product that keeps other batches keeps its
  *   minimum: it still speaks for them.
+ * - The same move takes the product's RECIPE MATCHES along (#1448, part 4), so
+ *   renaming the only batch leaves the recipes where they pointed before.
  * - The product's NAME is set when it is created and does not follow a batch:
  *   renaming one batch moves it to another product (#1448, point 5), a case or
  *   whitespace change keeps it where it is, and renaming the product with all
@@ -114,23 +119,33 @@ export function assignPantryProduct(database, itemId, { userId = null, syncCateg
   }
   if (moved) {
     database.prepare('UPDATE pantry_items SET product_id = ? WHERE id = ?').run(product.id, item.id);
-    if (from) handOverMinimum(database, from, product.id);
+    if (from) handOverFromEmptiedProduct(database, from, product.id);
   }
   return product.id;
 }
 
 /**
- * The minimum of a product a move has just left: when no batch is left in it,
- * the minimum goes to the product the batch moved to, unless that one has a
- * minimum of its own, and the product left behind keeps none (#2118). Runs in
- * the caller's transaction, right after the move.
+ * What a product a move has just left hands to the product the batch moved to,
+ * when no batch is left in it. Runs in the caller's transaction, right after
+ * the move; a product that keeps other batches keeps everything, since it
+ * still speaks for them.
+ *
+ * - THE MINIMUM goes along, unless the target has a minimum of its own, and the
+ *   product left behind keeps none (#2118).
+ * - THE RECIPE MATCHES go along (#1448, part 4): a wording that named the
+ *   product now names the one its last batch moved to. Before part 4 a match
+ *   named the batch and followed it through a rename; without this, renaming
+ *   the only "Milch" to "Vollmilch" would leave the recipe pointing at an empty
+ *   product. It is the one UPDATE a merge of two products needs as well.
+ *
  * @param {import('better-sqlite3-multiple-ciphers').Database} database
  * @param {{ id: number, min_quantity: number|null }} from the product as it was before the move
  * @param {number} toId the product the batch moved to
  */
-function handOverMinimum(database, from, toId) {
-  if (from.min_quantity == null) return;
+function handOverFromEmptiedProduct(database, from, toId) {
   if (database.prepare('SELECT 1 FROM pantry_items WHERE product_id = ? LIMIT 1').get(from.id)) return;
+  database.prepare('UPDATE pantry_product_matches SET product_id = ? WHERE product_id = ?').run(toId, from.id);
+  if (from.min_quantity == null) return;
   database.prepare('UPDATE pantry_products SET min_quantity = ? WHERE id = ? AND min_quantity IS NULL')
     .run(from.min_quantity, toId);
   database.prepare('UPDATE pantry_products SET min_quantity = NULL WHERE id = ?').run(from.id);

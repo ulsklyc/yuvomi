@@ -455,10 +455,13 @@ Not in one function, because it is a rule about which columns get written at all
 consequences: `recipe_ingredients` keeps a quantity as free text and `pantry_items` keeps a number
 plus a unit, and the comment above `pantry_items.quantity` (`server/migrations/0108.ts`) says why - a stepper and
 a minimum need a number. Bridging the two is a household statement, not a computation over a
-catalogue. Since migration 222 (#1335) that statement has a table of its own,
-`recipe_ingredient_pantry_matches`, and it is written on confirmation only:
-`PUT /recipes/:id/ingredient-match` in `server/routes/recipes.js` is the one route that creates a
-match.
+catalogue. Since migration 222 (#1335) that statement has a table of its own, and it is written on
+confirmation only: `PUT /recipes/:id/ingredient-match` in `server/routes/recipes.js` is the one
+route that creates a match. Since migration 285 (#1448, step 4) the table is
+`pantry_product_matches`, and the statement is the household's: "this wording means this product",
+confirmed once for every recipe that uses the wording. That is still the household's own word
+about its own wording and its own products, not an identity Yuvomi infers; the same wording in
+another recipe is the same statement, not a guess.
 
 ### What counts as undoing it
 
